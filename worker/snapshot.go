@@ -21,18 +21,18 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/ristretto/z"
 	"github.com/dustin/go-humanize"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"go.etcd.io/etcd/raft"
 
-	"github.com/dgraph-io/badger/v3"
-	"github.com/dgraph-io/dgraph/conn"
-	"github.com/dgraph-io/dgraph/posting"
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/schema"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/outserv/conn"
+	"github.com/outcaste-io/outserv/posting"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/schema"
+	"github.com/outcaste-io/outserv/x"
 )
 
 const (

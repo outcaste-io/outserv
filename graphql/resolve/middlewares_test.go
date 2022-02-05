@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dgraph-io/dgraph/graphql/schema"
+	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/stretchr/testify/require"
 )
 

@@ -3,7 +3,7 @@
 package x
 
 import (
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/ristretto/z"
 	"github.com/golang/glog"
 )
 

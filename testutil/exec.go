@@ -25,7 +25,7 @@ import (
 	"os/exec"
 	"strconv"
 
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/x"
 )
 
 // These are exported so they can also be set directly from outside this package.

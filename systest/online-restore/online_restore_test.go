@@ -36,9 +36,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
-	"github.com/dgraph-io/dgraph/chunker"
-	"github.com/dgraph-io/dgraph/testutil"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/chunker"
+	"github.com/outcaste-io/outserv/testutil"
+	"github.com/outcaste-io/outserv/x"
 )
 
 type restoreReq struct {

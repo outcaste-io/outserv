@@ -17,9 +17,9 @@
 package algo
 
 import (
-	"github.com/dgraph-io/dgraph/codec"
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/sroar"
+	"github.com/outcaste-io/outserv/codec"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/sroar"
 )
 
 const jump = 32 // Jump size in InsersectWithJump.

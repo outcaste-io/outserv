@@ -37,10 +37,10 @@ import (
 
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/dgraph-io/dgraph/graphql/schema"
+	"github.com/outcaste-io/outserv/graphql/schema"
 
-	"github.com/dgraph-io/dgraph/testutil"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/testutil"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 )

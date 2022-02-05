@@ -25,10 +25,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dgraph-io/dgraph/types"
-	"github.com/dgraph-io/dgraph/worker"
-	"github.com/dgraph-io/dgraph/x"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/outserv/types"
+	"github.com/outcaste-io/outserv/worker"
+	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/ristretto/z"
 	"github.com/stretchr/testify/require"
 )
 

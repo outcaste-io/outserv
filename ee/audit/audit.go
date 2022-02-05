@@ -1,5 +1,3 @@
-// +build oss
-
 /*
  * Copyright 2021 Dgraph Labs, Inc. and Contributors
  *
@@ -18,7 +16,7 @@
 
 package audit
 
-import "github.com/dgraph-io/dgraph/x"
+import "github.com/outcaste-io/outserv/x"
 
 type AuditConf struct {
 	Dir string

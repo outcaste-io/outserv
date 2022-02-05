@@ -26,15 +26,15 @@ import (
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 
-	badgerpb "github.com/dgraph-io/badger/v3/pb"
-	"github.com/dgraph-io/dgraph/edgraph"
-	"github.com/dgraph-io/dgraph/graphql/resolve"
-	"github.com/dgraph-io/dgraph/graphql/schema"
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/query"
-	"github.com/dgraph-io/dgraph/worker"
-	"github.com/dgraph-io/dgraph/x"
-	"github.com/dgraph-io/ristretto/z"
+	badgerpb "github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/outserv/edgraph"
+	"github.com/outcaste-io/outserv/graphql/resolve"
+	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/query"
+	"github.com/outcaste-io/outserv/worker"
+	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/ristretto/z"
 )
 
 const (

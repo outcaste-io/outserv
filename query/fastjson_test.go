@@ -5,12 +5,12 @@ import (
 	"math"
 	"testing"
 
-	"github.com/dgraph-io/dgraph/codec"
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/task"
-	"github.com/dgraph-io/dgraph/testutil"
-	"github.com/dgraph-io/dgraph/types"
-	"github.com/dgraph-io/sroar"
+	"github.com/outcaste-io/outserv/codec"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/task"
+	"github.com/outcaste-io/outserv/testutil"
+	"github.com/outcaste-io/outserv/types"
+	"github.com/outcaste-io/sroar"
 	"github.com/stretchr/testify/require"
 )
 

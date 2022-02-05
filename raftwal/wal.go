@@ -20,9 +20,9 @@ import (
 	"bytes"
 	"sort"
 
-	"github.com/dgraph-io/badger/v3/y"
-	"github.com/dgraph-io/dgraph/x"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/ristretto/z"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"go.etcd.io/etcd/raft"

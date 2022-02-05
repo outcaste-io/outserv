@@ -36,12 +36,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dgraph-io/dgraph/testutil"
-	"github.com/dgraph-io/dgraph/x"
-	"github.com/dgraph-io/ristretto/z"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/outcaste-io/outserv/testutil"
+	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/ristretto/z"
 	"github.com/spf13/pflag"
 	"golang.org/x/tools/go/packages"
 )
@@ -244,7 +244,7 @@ func runTestsFor(ctx context.Context, pkg, prefix string) error {
 }
 
 func hasTestFiles(pkg string) bool {
-	dir := strings.Replace(pkg, "github.com/dgraph-io/dgraph/", "", 1)
+	dir := strings.Replace(pkg, "github.com/outcaste-io/outserv/", "", 1)
 	dir = filepath.Join(*baseDir, dir)
 
 	hasTests := false
@@ -280,7 +280,7 @@ func runTests(taskCh chan task, closer *z.Closer) error {
 		closer.Done()
 	}()
 
-	defaultCompose := filepath.Join(*baseDir, "dgraph/docker-compose.yml")
+	defaultCompose := filepath.Join(*baseDir, "outserv/docker-compose.yml")
 	prefix := getClusterPrefix()
 
 	var started, stopped bool
@@ -443,7 +443,7 @@ func (o *outputCatcher) Print() {
 		if dur.dur < time.Second {
 			continue
 		}
-		pkg := strings.Replace(dur.pkg, "github.com/dgraph-io/dgraph/", "", 1)
+		pkg := strings.Replace(dur.pkg, "github.com/outcaste-io/outserv/", "", 1)
 		fmt.Printf("[%6s]%s[%d] %s took: %s\n", dur.ts.Sub(baseTs).Round(time.Second),
 			strings.Repeat("   ", int(dur.threadId)), dur.threadId, pkg,
 			dur.dur.Round(time.Second))
@@ -460,7 +460,7 @@ type task struct {
 }
 
 func composeFileFor(pkg string) string {
-	dir := strings.Replace(pkg, "github.com/dgraph-io/dgraph/", "", 1)
+	dir := strings.Replace(pkg, "github.com/outcaste-io/outserv/", "", 1)
 	return filepath.Join(*baseDir, dir, "docker-compose.yml")
 }
 
@@ -603,7 +603,7 @@ var loadPackages = []string{
 	"/systest/bulk_live/live",
 	"/systest/bgindex",
 	"/contrib/scripts",
-	"/dgraph/cmd/bulk/systest",
+	"/outserv/cmd/bulk/systest",
 }
 
 func isValidPackageForSuite(pkg string) bool {
@@ -732,7 +732,7 @@ func run() error {
 	}()
 	signal.Notify(sdCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
-	// pkgs, err := packages.Load(nil, "github.com/dgraph-io/dgraph/...")
+	// pkgs, err := packages.Load(nil, "github.com/outcaste-io/outserv/...")
 	go func() {
 		defer close(testCh)
 		valid := getPackages()

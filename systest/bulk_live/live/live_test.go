@@ -19,7 +19,7 @@ package live
 import (
 	"testing"
 
-	"github.com/dgraph-io/dgraph/systest/bulk_live/common"
+	"github.com/outcaste-io/outserv/systest/bulk_live/common"
 )
 
 func TestLiveCases(t *testing.T) {

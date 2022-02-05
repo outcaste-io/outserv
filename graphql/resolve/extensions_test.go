@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/dgraph/graphql/test"
+	"github.com/outcaste-io/outserv/graphql/test"
 	"github.com/stretchr/testify/require"
 )
 

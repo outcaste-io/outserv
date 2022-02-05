@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/golang/glog"

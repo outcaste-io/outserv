@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"unicode/utf8"
 
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
 

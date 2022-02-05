@@ -24,9 +24,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dgraph-io/badger/v3/skl"
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/badger/v3/skl"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/golang/glog"
 	ostats "go.opencensus.io/stats"
 	otrace "go.opencensus.io/trace"

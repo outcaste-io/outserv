@@ -18,7 +18,7 @@ package gql
 
 import (
 	"github.com/dgraph-io/dgo/v210/protos/api"
-	"github.com/dgraph-io/dgraph/lex"
+	"github.com/outcaste-io/outserv/lex"
 )
 
 // ParseMutation parses a block into a mutation. Returns an object with a mutation or

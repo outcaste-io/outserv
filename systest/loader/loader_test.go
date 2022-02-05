@@ -29,8 +29,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dgraph-io/dgo/v210/protos/api"
-	"github.com/dgraph-io/dgraph/testutil"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/testutil"
+	"github.com/outcaste-io/outserv/x"
 )
 
 // TestLoaderXidmap checks that live loader re-uses xidmap on loading data from two different files

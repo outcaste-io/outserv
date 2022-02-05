@@ -25,8 +25,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/dgraph/chunker"
-	"github.com/dgraph-io/dgraph/testutil"
+	"github.com/outcaste-io/outserv/chunker"
+	"github.com/outcaste-io/outserv/testutil"
 )
 
 // JSON output can be hundreds of lines and diffs can scroll off the terminal before you

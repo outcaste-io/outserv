@@ -21,7 +21,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/dgraph-io/gqlparser/v2/gqlerror"
 	"github.com/stretchr/testify/require"
 

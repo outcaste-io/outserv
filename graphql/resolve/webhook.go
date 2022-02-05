@@ -24,10 +24,10 @@ import (
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 
-	"github.com/dgraph-io/dgraph/graphql/authorization"
-	"github.com/dgraph-io/dgraph/graphql/schema"
-	"github.com/dgraph-io/dgraph/worker"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/graphql/authorization"
+	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/worker"
+	"github.com/outcaste-io/outserv/x"
 )
 
 type webhookPayload struct {

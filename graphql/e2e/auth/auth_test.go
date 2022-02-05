@@ -25,14 +25,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dgraph-io/dgraph/graphql/authorization"
+	"github.com/outcaste-io/outserv/graphql/authorization"
 
 	"github.com/dgrijalva/jwt-go/v4"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/dgraph-io/dgraph/graphql/e2e/common"
-	"github.com/dgraph-io/dgraph/testutil"
+	"github.com/outcaste-io/outserv/graphql/e2e/common"
+	"github.com/outcaste-io/outserv/testutil"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 )

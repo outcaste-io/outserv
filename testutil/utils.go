@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/stretchr/testify/require"
 )

@@ -108,11 +108,11 @@ set -e
 set -o xtrace
 
 ratel_release="github.com/dgraph-io/ratel/server.ratelVersion"
-release="github.com/dgraph-io/dgraph/x.dgraphVersion"
-codenameKey="github.com/dgraph-io/dgraph/x.dgraphCodename"
-branch="github.com/dgraph-io/dgraph/x.gitBranch"
-commitSHA1="github.com/dgraph-io/dgraph/x.lastCommitSHA"
-commitTime="github.com/dgraph-io/dgraph/x.lastCommitTime"
+release="github.com/outcaste-io/outserv/x.dgraphVersion"
+codenameKey="github.com/outcaste-io/outserv/x.dgraphCodename"
+branch="github.com/outcaste-io/outserv/x.gitBranch"
+commitSHA1="github.com/outcaste-io/outserv/x.lastCommitSHA"
+commitTime="github.com/outcaste-io/outserv/x.lastCommitTime"
 jemallocXgoFlags=
 
 # Get xgo and docker image

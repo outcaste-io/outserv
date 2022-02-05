@@ -1,5 +1,3 @@
-// +build oss
-
 /*
  * Copyright 2021 Dgraph Labs, Inc. and Contributors
  *
@@ -21,8 +19,8 @@ package worker
 import (
 	"context"
 
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/x"
 )
 
 func (w *grpcWorker) DeleteNamespace(ctx context.Context,

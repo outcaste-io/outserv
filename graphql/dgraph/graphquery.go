@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dgraph-io/dgraph/gql"
-	"github.com/dgraph-io/dgraph/graphql/schema"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/gql"
+	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/x"
 )
 
 // AsString writes query as an indented dql query string.  AsString doesn't

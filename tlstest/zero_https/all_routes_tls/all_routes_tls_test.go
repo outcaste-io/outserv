@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/dgraph/testutil"
+	"github.com/outcaste-io/outserv/testutil"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )

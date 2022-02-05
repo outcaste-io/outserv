@@ -23,9 +23,9 @@ import (
 	"testing"
 
 	dgoapi "github.com/dgraph-io/dgo/v210/protos/api"
-	"github.com/dgraph-io/dgraph/graphql/schema"
-	"github.com/dgraph-io/dgraph/graphql/test"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/graphql/test"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"

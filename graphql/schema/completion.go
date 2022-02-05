@@ -25,8 +25,8 @@ import (
 
 	"github.com/golang/glog"
 
-	dgTypes "github.com/dgraph-io/dgraph/types"
-	"github.com/dgraph-io/dgraph/x"
+	dgTypes "github.com/outcaste-io/outserv/types"
+	"github.com/outcaste-io/outserv/x"
 )
 
 const (

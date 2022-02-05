@@ -19,7 +19,7 @@ package worker
 import (
 	"errors"
 
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/x"
 )
 
 func evalCompare(cmp string, lv, rv int64) bool {

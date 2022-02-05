@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/ristretto/z"
 	"github.com/golang/glog"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/tag"

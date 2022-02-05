@@ -22,13 +22,13 @@ import (
 	"math"
 	"sync"
 
-	"github.com/dgraph-io/dgraph/algo"
-	"github.com/dgraph-io/dgraph/codec"
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/types"
-	"github.com/dgraph-io/dgraph/types/facets"
-	"github.com/dgraph-io/dgraph/x"
-	"github.com/dgraph-io/sroar"
+	"github.com/outcaste-io/outserv/algo"
+	"github.com/outcaste-io/outserv/codec"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/types"
+	"github.com/outcaste-io/outserv/types/facets"
+	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/sroar"
 	"github.com/pkg/errors"
 )
 

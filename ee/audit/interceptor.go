@@ -1,5 +1,3 @@
-// +build oss
-
 /*
  * Copyright 2021 Dgraph Labs, Inc. and Contributors
  *
@@ -24,7 +22,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/dgraph-io/dgraph/graphql/schema"
+	"github.com/outcaste-io/outserv/graphql/schema"
 )
 
 func AuditRequestGRPC(ctx context.Context, req interface{},

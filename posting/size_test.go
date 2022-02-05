@@ -32,9 +32,9 @@ import (
 
 	_ "net/http/pprof"
 
-	"github.com/dgraph-io/badger/v3"
+	"github.com/outcaste-io/badger/v3"
 	"github.com/dgraph-io/dgo/v210/protos/api"
-	"github.com/dgraph-io/dgraph/protos/pb"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
 

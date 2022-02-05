@@ -23,9 +23,9 @@ import (
 	"log"
 	"sort"
 
-	"github.com/dgraph-io/badger/v3"
-	bpb "github.com/dgraph-io/badger/v3/pb"
-	"github.com/dgraph-io/dgraph/protos/pb"
+	"github.com/outcaste-io/badger/v3"
+	bpb "github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/outserv/protos/pb"
 )
 
 func init() {

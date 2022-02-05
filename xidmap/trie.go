@@ -20,7 +20,7 @@ import (
 	"math"
 	"unsafe"
 
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/ristretto/z"
 )
 
 // Trie is an implementation of Ternary Search Tries to store XID to UID map. It uses Arena to

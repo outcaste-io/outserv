@@ -5,11 +5,11 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/dgraph-io/dgraph/edgraph"
-	"github.com/dgraph-io/dgraph/graphql/resolve"
-	"github.com/dgraph-io/dgraph/graphql/schema"
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/edgraph"
+	"github.com/outcaste-io/outserv/graphql/resolve"
+	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/pkg/errors"
 )

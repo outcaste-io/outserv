@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/dgraph-io/dgraph/graphql/e2e/common"
+	"github.com/outcaste-io/outserv/graphql/e2e/common"
 	"github.com/stretchr/testify/require"
 )
 

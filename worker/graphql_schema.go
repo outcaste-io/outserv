@@ -27,11 +27,11 @@ import (
 
 	"github.com/golang/glog"
 
-	"github.com/dgraph-io/dgraph/codec"
-	"github.com/dgraph-io/dgraph/conn"
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/schema"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/codec"
+	"github.com/outcaste-io/outserv/conn"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/schema"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
 

@@ -20,7 +20,7 @@ import (
 	"encoding/binary"
 	"math"
 
-	"github.com/dgraph-io/dgraph/protos/pb"
+	"github.com/outcaste-io/outserv/protos/pb"
 )
 
 var (

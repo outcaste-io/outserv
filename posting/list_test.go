@@ -26,17 +26,17 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/dgraph-io/badger/v3"
-	bpb "github.com/dgraph-io/badger/v3/pb"
+	"github.com/outcaste-io/badger/v3"
+	bpb "github.com/outcaste-io/badger/v3/pb"
 	"github.com/dgraph-io/dgo/v210/protos/api"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/ristretto/z"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dgraph-io/dgraph/codec"
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/schema"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/codec"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/schema"
+	"github.com/outcaste-io/outserv/x"
 )
 
 func setMaxListSize(newMaxListSize int) {

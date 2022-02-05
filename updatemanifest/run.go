@@ -21,10 +21,10 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/dgraph-io/dgraph/ee"
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/worker"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/ee"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/worker"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )

@@ -21,11 +21,11 @@ import (
 
 	cindex "github.com/google/codesearch/index"
 
-	"github.com/dgraph-io/dgraph/posting"
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/tok"
-	"github.com/dgraph-io/dgraph/x"
-	"github.com/dgraph-io/sroar"
+	"github.com/outcaste-io/outserv/posting"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/tok"
+	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/sroar"
 )
 
 var errRegexTooWide = errors.New(

@@ -20,8 +20,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/dgraph/graphql/e2e/common"
-	"github.com/dgraph-io/dgraph/testutil"
+	"github.com/outcaste-io/outserv/graphql/e2e/common"
+	"github.com/outcaste-io/outserv/testutil"
 	"github.com/dgrijalva/jwt-go/v4"
 	"github.com/stretchr/testify/require"
 )

@@ -19,7 +19,7 @@ package chunker
 import (
 	"strconv"
 
-	"github.com/dgraph-io/dgraph/lex"
+	"github.com/outcaste-io/outserv/lex"
 )
 
 // The constants represent different types of lexed Items possible for an rdf N-Quad.

@@ -43,7 +43,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dgraph-io/dgraph/contrib/jepsen/browser"
+	"github.com/outcaste-io/outserv/contrib/jepsen/browser"
 	"github.com/spf13/pflag"
 )
 

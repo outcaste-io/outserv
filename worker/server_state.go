@@ -22,11 +22,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/dgraph-io/badger/v3"
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/raftwal"
-	"github.com/dgraph-io/dgraph/x"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/raftwal"
+	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/ristretto/z"
 	"github.com/golang/glog"
 )
 

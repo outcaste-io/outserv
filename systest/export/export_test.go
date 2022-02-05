@@ -33,7 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
-	"github.com/dgraph-io/dgraph/testutil"
+	"github.com/outcaste-io/outserv/testutil"
 )
 
 var (

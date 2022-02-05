@@ -22,7 +22,7 @@ import (
 
 	"github.com/dgraph-io/dgo/v210"
 	"github.com/dgraph-io/dgo/v210/protos/api"
-	"github.com/dgraph-io/dgraph/testutil"
+	"github.com/outcaste-io/outserv/testutil"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 )

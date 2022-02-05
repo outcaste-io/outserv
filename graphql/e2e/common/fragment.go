@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dgraph-io/dgraph/testutil"
+	"github.com/outcaste-io/outserv/testutil"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"

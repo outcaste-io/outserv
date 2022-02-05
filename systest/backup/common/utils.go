@@ -20,11 +20,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v3/options"
+	"github.com/outcaste-io/badger/v3/options"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dgraph-io/dgraph/testutil"
-	"github.com/dgraph-io/dgraph/worker"
+	"github.com/outcaste-io/outserv/testutil"
+	"github.com/outcaste-io/outserv/worker"
 )
 
 var (

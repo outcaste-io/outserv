@@ -25,15 +25,15 @@ import (
 	"path/filepath"
 	"time"
 
-	bpb "github.com/dgraph-io/badger/v3/pb"
+	bpb "github.com/outcaste-io/badger/v3/pb"
 	"github.com/golang/glog"
 
-	"github.com/dgraph-io/dgraph/ee"
-	"github.com/dgraph-io/dgraph/posting"
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/worker"
-	"github.com/dgraph-io/dgraph/x"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/outserv/ee"
+	"github.com/outcaste-io/outserv/posting"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/worker"
+	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/ristretto/z"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )

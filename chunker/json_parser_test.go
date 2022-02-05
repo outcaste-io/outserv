@@ -25,12 +25,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/dgraph/testutil"
-	"github.com/dgraph-io/dgraph/tok"
+	"github.com/outcaste-io/outserv/testutil"
+	"github.com/outcaste-io/outserv/tok"
 	"github.com/golang/glog"
 
 	"github.com/dgraph-io/dgo/v210/protos/api"
-	"github.com/dgraph-io/dgraph/types"
+	"github.com/outcaste-io/outserv/types"
 	"github.com/stretchr/testify/require"
 )
 

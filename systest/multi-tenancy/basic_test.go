@@ -28,11 +28,11 @@ import (
 
 	"github.com/dgraph-io/dgo/v210"
 	"github.com/dgraph-io/dgo/v210/protos/api"
-	"github.com/dgraph-io/dgraph/ee/acl"
-	"github.com/dgraph-io/dgraph/graphql/e2e/common"
-	"github.com/dgraph-io/dgraph/graphql/schema"
-	"github.com/dgraph-io/dgraph/testutil"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/ee/acl"
+	"github.com/outcaste-io/outserv/graphql/e2e/common"
+	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/testutil"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/stretchr/testify/require"
 )
 

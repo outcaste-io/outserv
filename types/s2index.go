@@ -22,7 +22,7 @@ import (
 	"github.com/golang/geo/s2"
 	geom "github.com/twpayne/go-geom"
 
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
 

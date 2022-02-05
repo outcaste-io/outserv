@@ -26,21 +26,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgraph-io/sroar"
+	"github.com/outcaste-io/sroar"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/dgraph-io/dgraph/algo"
-	"github.com/dgraph-io/dgraph/codec"
-	"github.com/dgraph-io/dgraph/gql"
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/schema"
-	"github.com/dgraph-io/dgraph/types"
-	"github.com/dgraph-io/dgraph/types/facets"
-	"github.com/dgraph-io/dgraph/worker"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/algo"
+	"github.com/outcaste-io/outserv/codec"
+	"github.com/outcaste-io/outserv/gql"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/schema"
+	"github.com/outcaste-io/outserv/types"
+	"github.com/outcaste-io/outserv/types/facets"
+	"github.com/outcaste-io/outserv/worker"
+	"github.com/outcaste-io/outserv/x"
 )
 
 /*

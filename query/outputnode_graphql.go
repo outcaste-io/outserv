@@ -25,8 +25,8 @@ import (
 	"strings"
 	"sync"
 
-	gqlSchema "github.com/dgraph-io/dgraph/graphql/schema"
-	"github.com/dgraph-io/dgraph/x"
+	gqlSchema "github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/x"
 )
 
 // graphQLEncoder is used to encode JSON response for GraphQL queries.

@@ -20,10 +20,10 @@ import (
 	"encoding/binary"
 	"sort"
 
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/x"
-	"github.com/dgraph-io/ristretto/z"
-	"github.com/dgraph-io/sroar"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/ristretto/z"
+	"github.com/outcaste-io/sroar"
 )
 
 type seekPos int

@@ -42,13 +42,13 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/peer"
 
-	"github.com/dgraph-io/badger/v3"
-	bo "github.com/dgraph-io/badger/v3/options"
-	"github.com/dgraph-io/badger/v3/pb"
-	badgerpb "github.com/dgraph-io/badger/v3/pb"
+	"github.com/outcaste-io/badger/v3"
+	bo "github.com/outcaste-io/badger/v3/options"
+	"github.com/outcaste-io/badger/v3/pb"
+	badgerpb "github.com/outcaste-io/badger/v3/pb"
 	"github.com/dgraph-io/dgo/v210"
 	"github.com/dgraph-io/dgo/v210/protos/api"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/ristretto/z"
 	"github.com/dustin/go-humanize"
 
 	"github.com/golang/glog"

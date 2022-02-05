@@ -19,10 +19,10 @@
 package x
 
 import (
-	bpb "github.com/dgraph-io/badger/v3/pb"
+	bpb "github.com/outcaste-io/badger/v3/pb"
 
-	"github.com/dgraph-io/badger/v3"
-	"github.com/dgraph-io/dgraph/protos/pb"
+	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/outserv/protos/pb"
 )
 
 var Debug bool

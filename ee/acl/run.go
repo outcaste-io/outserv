@@ -1,5 +1,3 @@
-// +build oss
-
 /*
  * Copyright 2018 Dgraph Labs, Inc. and Contributors
  *
@@ -20,7 +18,7 @@ package acl
 
 import (
 	"github.com/dgraph-io/dgo/v210/protos/api"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/spf13/cobra"
 )
 

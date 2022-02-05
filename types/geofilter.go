@@ -24,8 +24,8 @@ import (
 	"github.com/golang/geo/s2"
 	geom "github.com/twpayne/go-geom"
 
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	"github.com/twpayne/go-geom/xy"
 )

@@ -23,7 +23,7 @@ import (
 	"math/rand"
 	"net/http"
 
-	"github.com/dgraph-io/dgraph/graphql/schema"
+	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/gorilla/websocket"
 )
 

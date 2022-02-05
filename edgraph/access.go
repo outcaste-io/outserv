@@ -1,5 +1,3 @@
-// +build oss
-
 /*
  * Copyright 2018 Dgraph Labs, Inc. and Contributors
  *
@@ -22,10 +20,10 @@ import (
 	"context"
 
 	"github.com/dgraph-io/dgo/v210/protos/api"
-	"github.com/dgraph-io/dgraph/gql"
-	"github.com/dgraph-io/dgraph/query"
-	"github.com/dgraph-io/dgraph/x"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/outserv/gql"
+	"github.com/outcaste-io/outserv/query"
+	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/ristretto/z"
 	"github.com/golang/glog"
 )
 

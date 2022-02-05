@@ -30,8 +30,8 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
-	"github.com/dgraph-io/dgraph/codec"
-	gqlSchema "github.com/dgraph-io/dgraph/graphql/schema"
+	"github.com/outcaste-io/outserv/codec"
+	gqlSchema "github.com/outcaste-io/outserv/graphql/schema"
 
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
@@ -39,13 +39,13 @@ import (
 	"github.com/twpayne/go-geom/encoding/geojson"
 
 	"github.com/dgraph-io/dgo/v210/protos/api"
-	"github.com/dgraph-io/dgraph/algo"
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/task"
-	"github.com/dgraph-io/dgraph/types"
-	"github.com/dgraph-io/dgraph/types/facets"
-	"github.com/dgraph-io/dgraph/x"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/outserv/algo"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/task"
+	"github.com/outcaste-io/outserv/types"
+	"github.com/outcaste-io/outserv/types/facets"
+	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/ristretto/z"
 )
 
 // ToJson converts the list of subgraph into a JSON response by calling toFastJSON.

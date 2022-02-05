@@ -22,11 +22,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/x"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dgraph-io/dgraph/graphql/e2e/common"
+	"github.com/outcaste-io/outserv/graphql/e2e/common"
 )
 
 const (

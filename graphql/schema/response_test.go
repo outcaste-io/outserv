@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/dgraph-io/gqlparser/v2/gqlerror"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"

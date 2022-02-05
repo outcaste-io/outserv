@@ -17,7 +17,7 @@
 package schema
 
 import (
-	"github.com/dgraph-io/dgraph/lex"
+	"github.com/outcaste-io/outserv/lex"
 )
 
 // Constants representing type of different graphql lexed items.

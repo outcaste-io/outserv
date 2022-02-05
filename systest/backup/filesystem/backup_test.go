@@ -30,16 +30,16 @@ import (
 
 	"google.golang.org/grpc/credentials"
 
-	"github.com/dgraph-io/badger/v3/options"
+	"github.com/outcaste-io/badger/v3/options"
 	"github.com/dgraph-io/dgo/v210"
 	"github.com/dgraph-io/dgo/v210/protos/api"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
-	"github.com/dgraph-io/dgraph/systest/backup/common"
-	"github.com/dgraph-io/dgraph/testutil"
-	"github.com/dgraph-io/dgraph/worker"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/systest/backup/common"
+	"github.com/outcaste-io/outserv/testutil"
+	"github.com/outcaste-io/outserv/worker"
+	"github.com/outcaste-io/outserv/x"
 )
 
 var (

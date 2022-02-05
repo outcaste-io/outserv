@@ -28,12 +28,12 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/trace"
 
-	"github.com/dgraph-io/badger/v3"
-	badgerpb "github.com/dgraph-io/badger/v3/pb"
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/tok"
-	"github.com/dgraph-io/dgraph/types"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/badger/v3"
+	badgerpb "github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/tok"
+	"github.com/outcaste-io/outserv/types"
+	"github.com/outcaste-io/outserv/x"
 )
 
 var (

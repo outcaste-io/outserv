@@ -1,5 +1,3 @@
-// +build oss
-
 /*
  * Copyright 2021 Dgraph Labs, Inc. and Contributors
  *
@@ -21,7 +19,7 @@ package worker
 import (
 	"math"
 
-	"github.com/dgraph-io/dgraph/protos/pb"
+	"github.com/outcaste-io/outserv/protos/pb"
 )
 
 type CDC struct {

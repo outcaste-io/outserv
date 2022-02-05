@@ -25,7 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dgraph-io/dgraph/protos/pb"
+	"github.com/outcaste-io/outserv/protos/pb"
 )
 
 const (

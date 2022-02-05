@@ -22,9 +22,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/x"
 
-	"github.com/dgraph-io/dgraph/graphql/e2e/common"
+	"github.com/outcaste-io/outserv/graphql/e2e/common"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )

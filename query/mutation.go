@@ -24,12 +24,12 @@ import (
 	otrace "go.opencensus.io/trace"
 
 	"github.com/dgraph-io/dgo/v210/protos/api"
-	"github.com/dgraph-io/dgraph/gql"
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/types/facets"
-	"github.com/dgraph-io/dgraph/worker"
-	"github.com/dgraph-io/dgraph/x"
-	"github.com/dgraph-io/sroar"
+	"github.com/outcaste-io/outserv/gql"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/types/facets"
+	"github.com/outcaste-io/outserv/worker"
+	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/sroar"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 )

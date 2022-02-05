@@ -22,11 +22,11 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dgraph-io/badger/v3"
-	"github.com/dgraph-io/dgraph/schema"
-	"github.com/dgraph-io/dgraph/tok"
-	"github.com/dgraph-io/dgraph/types"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/outserv/schema"
+	"github.com/outcaste-io/outserv/tok"
+	"github.com/outcaste-io/outserv/types"
+	"github.com/outcaste-io/outserv/x"
 )
 
 func verifyStringIndex(ctx context.Context, attr string, funcType FuncType) (string, bool) {

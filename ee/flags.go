@@ -21,8 +21,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgraph-io/dgraph/x"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/ristretto/z"
 	"github.com/spf13/pflag"
 )
 

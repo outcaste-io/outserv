@@ -1,10 +1,6 @@
-module github.com/dgraph-io/dgraph
+module github.com/outcaste-io/outserv
 
 go 1.16
-
-// replace github.com/dgraph-io/badger/v3 => /home/mrjn/go/src/github.com/dgraph-io/badger
-// replace github.com/dgraph-io/ristretto => /home/mrjn/go/src/github.com/dgraph-io/ristretto
-// replace github.com/dgraph-io/sroar => /home/ash/go/src/github.com/dgraph-io/sroar
 
 require (
 	cloud.google.com/go/storage v1.15.0
@@ -19,14 +15,11 @@ require (
 	github.com/Shopify/sarama v1.27.2
 	github.com/blevesearch/bleve v1.0.13
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd
-	github.com/dgraph-io/badger/v3 v3.0.0-20211202135705-3f320f5df1bf
 	github.com/dgraph-io/dgo/v210 v210.0.0-20210421093152-78a2fece3ebd
 	github.com/dgraph-io/gqlgen v0.13.2
 	github.com/dgraph-io/gqlparser/v2 v2.2.2
 	github.com/dgraph-io/graphql-transport-ws v0.0.0-20210511143556-2cef522f1f15
-	github.com/dgraph-io/ristretto v0.1.1-0.20210824115121-89e99415887a
 	github.com/dgraph-io/simdjson-go v0.3.0
-	github.com/dgraph-io/sroar v0.0.0-20211124172931-39228b21f455
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dgrijalva/jwt-go/v4 v4.0.0-preview1
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13
@@ -46,9 +39,11 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/gorilla/websocket v1.4.2
 	github.com/graph-gophers/graphql-go v0.0.0-20200309224638-dae41bde9ef9
-	github.com/hashicorp/vault/api v1.0.4
 	github.com/minio/minio-go/v6 v6.0.55
 	github.com/mitchellh/panicwrap v1.0.0
+	github.com/outcaste-io/badger/v3 v3.0.0-20220125191754-e885a3ee3261
+	github.com/outcaste-io/ristretto v0.2.0
+	github.com/outcaste-io/sroar v0.0.0-20220125195115-6426030f80a8
 	github.com/paulmach/go.geojson v0.0.0-20170327170536-40612a87147b
 	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
 	github.com/pkg/errors v0.9.1

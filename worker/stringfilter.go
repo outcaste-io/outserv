@@ -19,9 +19,9 @@ package worker
 import (
 	"strings"
 
-	"github.com/dgraph-io/dgraph/tok"
-	"github.com/dgraph-io/dgraph/types"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/tok"
+	"github.com/outcaste-io/outserv/types"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/golang/glog"
 )
 

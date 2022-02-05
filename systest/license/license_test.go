@@ -23,7 +23,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/dgraph-io/dgraph/testutil"
+	"github.com/outcaste-io/outserv/testutil"
 	"github.com/stretchr/testify/require"
 )
 

@@ -31,8 +31,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dgraph-io/dgraph/testutil"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/testutil"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 

@@ -20,7 +20,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/dgraph-io/dgraph/types"
+	"github.com/outcaste-io/outserv/types"
 	"github.com/stretchr/testify/require"
 )
 

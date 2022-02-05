@@ -21,8 +21,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/dgraph-io/badger/v3"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/ristretto/z"
 	"github.com/spf13/viper"
 )
 

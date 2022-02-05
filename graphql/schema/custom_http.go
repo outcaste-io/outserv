@@ -26,10 +26,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dgraph-io/dgraph/graphql/authorization"
-	"github.com/dgraph-io/dgraph/worker"
+	"github.com/outcaste-io/outserv/graphql/authorization"
+	"github.com/outcaste-io/outserv/worker"
 
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/x"
 )
 
 var (

@@ -19,10 +19,10 @@ package admin
 import (
 	"context"
 
-	"github.com/dgraph-io/dgraph/gql"
-	"github.com/dgraph-io/dgraph/graphql/resolve"
-	"github.com/dgraph-io/dgraph/graphql/schema"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/gql"
+	"github.com/outcaste-io/outserv/graphql/resolve"
+	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/x"
 )
 
 type currentUserResolver struct {

@@ -24,14 +24,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v3"
-	"github.com/dgraph-io/badger/v3/y"
+	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/badger/v3/y"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/schema"
-	"github.com/dgraph-io/dgraph/types"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/schema"
+	"github.com/outcaste-io/outserv/types"
+	"github.com/outcaste-io/outserv/x"
 )
 
 func uids(l *List, readTs uint64) []uint64 {

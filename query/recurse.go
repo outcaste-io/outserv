@@ -21,10 +21,10 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/dgraph-io/dgraph/algo"
-	"github.com/dgraph-io/dgraph/codec"
-	"github.com/dgraph-io/dgraph/x"
-	"github.com/dgraph-io/sroar"
+	"github.com/outcaste-io/outserv/algo"
+	"github.com/outcaste-io/outserv/codec"
+	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/sroar"
 	"github.com/pkg/errors"
 )
 

@@ -17,7 +17,7 @@
 package query
 
 import (
-	"github.com/dgraph-io/dgraph/types"
+	"github.com/outcaste-io/outserv/types"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 )

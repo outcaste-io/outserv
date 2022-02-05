@@ -1,5 +1,3 @@
-// +build oss
-
 /*
  * Copyright 2020-2021 Dgraph Labs, Inc. and Contributors
  *
@@ -19,7 +17,7 @@
 package vault
 
 import (
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/golang/glog"
 	"github.com/spf13/viper"
 )

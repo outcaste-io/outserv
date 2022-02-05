@@ -19,8 +19,8 @@ package algo
 import (
 	"testing"
 
-	"github.com/dgraph-io/dgraph/codec"
-	"github.com/dgraph-io/dgraph/protos/pb"
+	"github.com/outcaste-io/outserv/codec"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/stretchr/testify/require"
 )
 

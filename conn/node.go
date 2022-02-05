@@ -34,12 +34,12 @@ import (
 	"go.etcd.io/etcd/raft/raftpb"
 	otrace "go.opencensus.io/trace"
 
-	"github.com/dgraph-io/badger/v3/y"
+	"github.com/outcaste-io/badger/v3/y"
 	"github.com/dgraph-io/dgo/v210/protos/api"
-	"github.com/dgraph-io/dgraph/protos/pb"
-	"github.com/dgraph-io/dgraph/raftwal"
-	"github.com/dgraph-io/dgraph/x"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/raftwal"
+	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/ristretto/z"
 )
 
 var (

@@ -20,8 +20,8 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/dgo/v210/protos/api"
-	"github.com/dgraph-io/dgraph/chunker"
-	"github.com/dgraph-io/dgraph/x"
+	"github.com/outcaste-io/outserv/chunker"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/stretchr/testify/require"
 )
 

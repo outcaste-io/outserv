@@ -22,7 +22,7 @@ BUILD_VERSION  ?= $(shell git describe --always --tags)
 
 MODIFIED = $(shell git diff-index --quiet HEAD || echo "-mod")
 
-SUBDIRS = dgraph
+SUBDIRS = outserv
 
 ###############
 
@@ -31,9 +31,6 @@ all: $(SUBDIRS)
 
 $(SUBDIRS):
 	$(MAKE) -w -C $@ all
-
-oss:
-	$(MAKE) BUILD_TAGS=oss
 
 version:
 	@echo Dgraph ${BUILD_VERSION}
@@ -48,9 +45,6 @@ install:
 		echo Installing $$i ...; \
 		$(MAKE) -C $$i install; \
 	done)
-
-install_oss oss_install:
-	$(MAKE) BUILD_TAGS=oss install
 
 uninstall:
 	@(set -e;for i in $(SUBDIRS); do \

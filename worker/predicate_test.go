@@ -27,14 +27,14 @@ package worker
 // "sync/atomic"
 // "testing"
 
-// "github.com/dgraph-io/badger/v3"
+// "github.com/outcaste-io/badger/v3"
 // "github.com/golang/glog"
 // "github.com/stretchr/testify/require"
 // "google.golang.org/grpc"
 
-// "github.com/dgraph-io/dgraph/posting"
-// "github.com/dgraph-io/dgraph/protos/pb"
-// "github.com/dgraph-io/dgraph/x"
+// "github.com/outcaste-io/outserv/posting"
+// "github.com/outcaste-io/outserv/protos/pb"
+// "github.com/outcaste-io/outserv/x"
 // )
 
 // func checkShard(ps *badger.DB) (int, []byte) {

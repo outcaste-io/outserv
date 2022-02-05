@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/dgraph/graphql/authorization"
-	"github.com/dgraph-io/dgraph/graphql/e2e/common"
-	"github.com/dgraph-io/dgraph/testutil"
+	"github.com/outcaste-io/outserv/graphql/authorization"
+	"github.com/outcaste-io/outserv/graphql/e2e/common"
+	"github.com/outcaste-io/outserv/testutil"
 	"github.com/stretchr/testify/require"
 )
 
