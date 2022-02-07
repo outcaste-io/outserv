@@ -38,7 +38,7 @@ import (
 	geom "github.com/twpayne/go-geom"
 	"github.com/twpayne/go-geom/encoding/geojson"
 
-	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/algo"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/task"

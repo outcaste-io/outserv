@@ -30,13 +30,13 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/dgryski/go-farm"
+	"github.com/golang/glog"
 	"github.com/outcaste-io/badger/v3"
-	"github.com/dgraph-io/dgo/v210"
+	"github.com/outcaste-io/dgo/v210"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
-	"github.com/dgryski/go-farm"
-	"github.com/golang/glog"
 )
 
 var maxLeaseRegex = regexp.MustCompile(`currMax:([0-9]+)`)

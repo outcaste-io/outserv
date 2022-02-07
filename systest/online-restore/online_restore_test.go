@@ -30,9 +30,9 @@ import (
 
 	"google.golang.org/grpc/credentials"
 
-	"github.com/dgraph-io/dgo/v210"
-	"github.com/dgraph-io/dgo/v210/protos/api"
 	"github.com/graph-gophers/graphql-go/errors"
+	"github.com/outcaste-io/dgo/v210"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 

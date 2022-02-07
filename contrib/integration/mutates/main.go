@@ -23,8 +23,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/dgraph-io/dgo/v210"
-	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/outcaste-io/dgo/v210"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/x"
 	"google.golang.org/grpc"
 )

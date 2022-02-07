@@ -28,7 +28,8 @@ import (
 
 	"google.golang.org/grpc/metadata"
 
-	dgoapi "github.com/dgraph-io/dgo/v210/protos/api"
+	_ "github.com/dgraph-io/gqlparser/v2/validator/rules" // make gql validator init() all rules
+	dgoapi "github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/authorization"
 	"github.com/outcaste-io/outserv/graphql/dgraph"
@@ -36,7 +37,6 @@ import (
 	"github.com/outcaste-io/outserv/graphql/test"
 	"github.com/outcaste-io/outserv/testutil"
 	"github.com/outcaste-io/outserv/x"
-	_ "github.com/dgraph-io/gqlparser/v2/validator/rules" // make gql validator init() all rules
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )

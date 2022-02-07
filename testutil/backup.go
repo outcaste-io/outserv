@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/outcaste-io/badger/v3"
-	"github.com/dgraph-io/dgo/v210"
+	"github.com/outcaste-io/dgo/v210"
 	"github.com/outcaste-io/outserv/ee"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"

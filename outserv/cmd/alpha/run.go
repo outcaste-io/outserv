@@ -43,7 +43,8 @@ import (
 	"github.com/outcaste-io/outserv/ee"
 	"github.com/outcaste-io/outserv/ee/audit"
 
-	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/golang/glog"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/ee/enc"
 	"github.com/outcaste-io/outserv/graphql/admin"
@@ -53,7 +54,6 @@ import (
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"go.opencensus.io/plugin/ocgrpc"

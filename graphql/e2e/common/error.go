@@ -29,14 +29,14 @@ import (
 
 	admin2 "github.com/outcaste-io/outserv/graphql/admin"
 
-	"github.com/dgraph-io/dgo/v210"
-	"github.com/dgraph-io/dgo/v210/protos/api"
-	dgoapi "github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/google/go-cmp/cmp"
+	"github.com/outcaste-io/dgo/v210"
+	"github.com/outcaste-io/dgo/v210/protos/api"
+	dgoapi "github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/graphql/test"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"

@@ -31,19 +31,19 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dgryski/go-farm"
+	"github.com/dustin/go-humanize"
+	"github.com/dustin/go-humanize/english"
 	"github.com/outcaste-io/badger/v3"
 	"github.com/outcaste-io/badger/v3/y"
-	"github.com/dgraph-io/dgo/v210"
-	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/outcaste-io/dgo/v210"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/tok"
 	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/outserv/xidmap"
-	"github.com/dgryski/go-farm"
-	"github.com/dustin/go-humanize"
-	"github.com/dustin/go-humanize/english"
 )
 
 // batchMutationOptions sets the clients batch mode to Pending number of buffers each of Size.

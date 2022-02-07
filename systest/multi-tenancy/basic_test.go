@@ -26,8 +26,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/dgo/v210"
-	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/outcaste-io/dgo/v210"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/ee/acl"
 	"github.com/outcaste-io/outserv/graphql/e2e/common"
 	"github.com/outcaste-io/outserv/graphql/schema"

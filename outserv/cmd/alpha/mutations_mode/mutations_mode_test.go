@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dgraph-io/dgo/v210"
-	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/outcaste-io/dgo/v210"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/testutil"
 	"github.com/stretchr/testify/require"
 

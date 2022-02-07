@@ -23,14 +23,14 @@ import (
 
 	otrace "go.opencensus.io/trace"
 
-	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/golang/glog"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/types/facets"
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/sroar"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 )
 

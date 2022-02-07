@@ -39,7 +39,7 @@ import (
 	bpb "github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/ristretto/z"
 
-	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 
 	"github.com/outcaste-io/outserv/ee/enc"
 	"github.com/outcaste-io/outserv/posting"

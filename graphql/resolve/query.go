@@ -25,7 +25,7 @@ import (
 	"github.com/golang/glog"
 	otrace "go.opencensus.io/trace"
 
-	dgoapi "github.com/dgraph-io/dgo/v210/protos/api"
+	dgoapi "github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"

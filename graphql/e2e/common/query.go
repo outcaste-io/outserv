@@ -29,8 +29,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/dgo/v210"
-	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/outcaste-io/dgo/v210"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 	"google.golang.org/grpc"
 
 	"github.com/spf13/cast"
@@ -39,9 +39,9 @@ import (
 
 	"github.com/outcaste-io/outserv/graphql/schema"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/outcaste-io/outserv/testutil"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 )
 

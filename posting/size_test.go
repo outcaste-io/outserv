@@ -32,10 +32,10 @@ import (
 
 	_ "net/http/pprof"
 
-	"github.com/outcaste-io/badger/v3"
-	"github.com/dgraph-io/dgo/v210/protos/api"
-	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/dustin/go-humanize"
+	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/dgo/v210/protos/api"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/pkg/errors"
 
 	"github.com/stretchr/testify/require"

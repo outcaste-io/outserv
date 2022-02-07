@@ -20,11 +20,11 @@ import (
 	"context"
 	"encoding/json"
 
-	dgoapi "github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/golang/glog"
+	dgoapi "github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
-	"github.com/golang/glog"
 )
 
 type loginInput struct {

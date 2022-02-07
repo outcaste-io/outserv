@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	dgoapi "github.com/dgraph-io/dgo/v210/protos/api"
+	dgoapi "github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/api"
 	"github.com/outcaste-io/outserv/graphql/dgraph"

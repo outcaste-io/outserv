@@ -15,7 +15,6 @@ require (
 	github.com/Shopify/sarama v1.27.2
 	github.com/blevesearch/bleve v1.0.13
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd
-	github.com/dgraph-io/dgo/v210 v210.0.0-20210421093152-78a2fece3ebd
 	github.com/dgraph-io/gqlgen v0.13.2
 	github.com/dgraph-io/gqlparser/v2 v2.2.2
 	github.com/dgraph-io/graphql-transport-ws v0.0.0-20210511143556-2cef522f1f15
@@ -42,8 +41,9 @@ require (
 	github.com/minio/minio-go/v6 v6.0.55
 	github.com/mitchellh/panicwrap v1.0.0
 	github.com/outcaste-io/badger/v3 v3.0.0-20220125191754-e885a3ee3261
+	github.com/outcaste-io/dgo/v210 v210.0.0-20220207213049-2f4dade232d5
 	github.com/outcaste-io/ristretto v0.2.0
-	github.com/outcaste-io/sroar v0.0.0-20220125195115-6426030f80a8
+	github.com/outcaste-io/sroar v0.0.0-20220207092908-fa5c189ea338
 	github.com/paulmach/go.geojson v0.0.0-20170327170536-40612a87147b
 	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
 	github.com/pkg/errors v0.9.1

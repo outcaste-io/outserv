@@ -31,12 +31,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/testutil"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 
-	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/stretchr/testify/require"
 )
 

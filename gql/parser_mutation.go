@@ -17,7 +17,7 @@
 package gql
 
 import (
-	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/lex"
 )
 

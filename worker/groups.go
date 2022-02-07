@@ -25,8 +25,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/golang/glog"
+	"github.com/golang/protobuf/proto"
 	badgerpb "github.com/outcaste-io/badger/v3/pb"
-	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/ee/enc"
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -34,8 +36,6 @@ import (
 	"github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
-	"github.com/golang/glog"
-	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 )
 

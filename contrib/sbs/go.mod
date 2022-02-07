@@ -3,7 +3,7 @@ module sbs
 go 1.16
 
 require (
-	github.com/dgraph-io/dgo/v210 v210.0.0-20210421093152-78a2fece3ebd
+	github.com/outcaste-io/dgo/v210 v210.0.0-20210421093152-78a2fece3ebd
 	github.com/golang/protobuf v1.5.2
 	github.com/gopherjs/gopherjs v0.0.0-20190910122728-9d188e94fb99 // indirect
 	github.com/pkg/errors v0.9.1

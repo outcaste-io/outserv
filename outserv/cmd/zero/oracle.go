@@ -25,11 +25,11 @@ import (
 
 	"github.com/outcaste-io/ristretto/z"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/badger/v3/y"
-	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
 )

@@ -35,7 +35,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 
 	"github.com/outcaste-io/outserv/chunker"
 	"github.com/outcaste-io/outserv/gql"

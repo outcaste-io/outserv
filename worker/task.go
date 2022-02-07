@@ -24,8 +24,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
+	"github.com/golang/protobuf/proto"
 	"github.com/outcaste-io/badger/v3"
-	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/algo"
 	"github.com/outcaste-io/outserv/codec"
 	"github.com/outcaste-io/outserv/conn"
@@ -38,8 +40,6 @@ import (
 	"github.com/outcaste-io/outserv/types/facets"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/sroar"
-	"github.com/golang/glog"
-	"github.com/golang/protobuf/proto"
 	otrace "go.opencensus.io/trace"
 	"golang.org/x/sync/errgroup"
 

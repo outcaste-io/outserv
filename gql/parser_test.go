@@ -22,7 +22,7 @@ import (
 	"runtime/debug"
 	"testing"
 
-	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/chunker"
 	"github.com/outcaste-io/outserv/lex"
 	"github.com/pkg/errors"

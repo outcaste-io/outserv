@@ -7,16 +7,17 @@ import (
 	context "context"
 	encoding_binary "encoding/binary"
 	fmt "fmt"
-	pb "github.com/outcaste-io/badger/v3/pb"
-	api "github.com/dgraph-io/dgo/v210/protos/api"
-	_ "github.com/gogo/protobuf/gogoproto"
-	proto "github.com/gogo/protobuf/proto"
-	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 	io "io"
 	math "math"
 	math_bits "math/bits"
+
+	_ "github.com/gogo/protobuf/gogoproto"
+	proto "github.com/gogo/protobuf/proto"
+	pb "github.com/outcaste-io/badger/v3/pb"
+	api "github.com/outcaste-io/dgo/v210/protos/api"
+	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.

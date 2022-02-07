@@ -23,11 +23,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/golang/glog"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"go.opencensus.io/plugin/ocgrpc"
 

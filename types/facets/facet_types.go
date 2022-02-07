@@ -19,7 +19,7 @@ package facets
 import (
 	"errors"
 
-	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/x"
 )
 
