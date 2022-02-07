@@ -51,3 +51,9 @@ following questions:
 2. What did you do?
 3. What did you expect?
 4. What did you see instead?
+
+## License
+
+This project, as a whole, is licensed under the terms of the Smart License.
+Certain portions of this project are licensed by contributors or others
+under the terms of open source licenses such as the Apache 2.0 license.
