@@ -243,28 +243,6 @@ Over years of writing big scalable systems, we are convinced that striving for s
 - Avoid unnecessary vertical spaces. Use your judgment or follow the code review comments.
 - Wrap your code and comments to 100 characters, unless doing so makes the code less legible.
 
-### License Header
-
-Every new source file must begin with a license header.
-
-Most of Dgraph, Badger, and the Dgraph clients (dgo, dgraph-js, pydgraph and dgraph4j) are licensed under the Apache 2.0 license:
-
-    /*
-     * Copyright 2016-2018 Dgraph Labs, Inc. and Contributors
-     *
-     * Licensed under the Apache License, Version 2.0 (the "License");
-     * you may not use this file except in compliance with the License.
-     * You may obtain a copy of the License at
-     *
-     *    http://www.apache.org/licenses/LICENSE-2.0
-     *
-     * Unless required by applicable law or agreed to in writing, software
-     * distributed under the License is distributed on an "AS IS" BASIS,
-     * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-     * See the License for the specific language governing permissions and
-     * limitations under the License.
-     */
-
 ### Signed Commits
 
 Signed commits help in verifying the authenticity of the contributor. We use signed commits in Dgraph, and we prefer it, though it's not compulsory to have signed commits. This is a recommended step for people who intend to contribute to Dgraph on a regular basis.
