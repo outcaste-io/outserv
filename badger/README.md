@@ -1,13 +1,11 @@
-# BadgerDB [![Go Reference](https://pkg.go.dev/badge/github.com/dgraph-io/badger/v3.svg)](https://pkg.go.dev/github.com/dgraph-io/badger/v3) [![Go Report Card](https://goreportcard.com/badge/github.com/dgraph-io/badger)](https://goreportcard.com/report/github.com/dgraph-io/badger) [![Sourcegraph](https://sourcegraph.com/github.com/dgraph-io/badger/-/badge.svg)](https://sourcegraph.com/github.com/dgraph-io/badger?badge) [![Build Status](https://teamcity.dgraph.io/guestAuth/app/rest/builds/buildType:(id:Badger_UnitTests)/statusIcon.svg)](https://teamcity.dgraph.io/viewLog.html?buildTypeId=Badger_UnitTests&buildId=lastFinished&guest=1) ![Appveyor](https://ci.appveyor.com/api/projects/status/github/dgraph-io/badger?branch=master&svg=true) [![Coverage Status](https://coveralls.io/repos/github/dgraph-io/badger/badge.svg?branch=master)](https://coveralls.io/github/dgraph-io/badger?branch=master)
+# BadgerDB [![Go Reference](https://pkg.go.dev/badge/github.com/outcaste-io/badger/v3.svg)](https://pkg.go.dev/github.com/outcaste-io/badger/v3)
 
-![Badger mascot](images/diggy-shadow.png)
+**This is a fork of dgraph-io/badger, maintained by the Outcaste team.**
 
 BadgerDB is an embeddable, persistent and fast key-value (KV) database written
 in pure Go. It is the underlying database for [Dgraph](https://dgraph.io), a
 fast, distributed graph database. It's meant to be a performant alternative to
 non-Go-based key-value stores like RocksDB.
-
-**Use [Discuss Issues](https://discuss.dgraph.io/c/issues/badger/37) for reporting issues about this repository.**
 
 ## Project Status [March 24, 2020]
 
@@ -54,13 +52,13 @@ For more details on our version naming schema please read [Choosing a version](#
 To start using Badger, install Go 1.12 or above. Badger v2 needs go modules. Run the following command to retrieve the library.
 
 ```sh
-$ go get github.com/dgraph-io/badger/v3
+$ go get github.com/outcaste-io/badger/v3
 ```
 This will retrieve the library.
 
 #### Installing Badger Command Line Tool
 
-Download and extract the latest Badger DB release from https://github.com/dgraph-io/badger/releases and then run the following commands.
+Download and extract the latest Badger DB release from https://github.com/outcaste-io/badger/releases and then run the following commands.
 
 ```sh
 $ cd badger-<version>/badger
@@ -184,7 +182,7 @@ Below is a list of known projects that use Badger:
 * [BadgerHold](https://github.com/timshannon/badgerhold) - An embeddable NoSQL store for querying Go types built on Badger
 * [Goblero](https://github.com/didil/goblero) - Pure Go embedded persistent job queue backed by BadgerDB
 * [Surfline](https://www.surfline.com) - Serving global wave and weather forecast data with Badger.
-* [Cete](https://github.com/mosuka/cete) - Simple and highly available distributed key-value store built on Badger. Makes it easy bringing up a cluster of Badger with Raft consensus algorithm by hashicorp/raft. 
+* [Cete](https://github.com/mosuka/cete) - Simple and highly available distributed key-value store built on Badger. Makes it easy bringing up a cluster of Badger with Raft consensus algorithm by hashicorp/raft.
 * [Volument](https://volument.com/) - A new take on website analytics backed by Badger.
 * [KVdb](https://kvdb.io/) - Hosted key-value store and serverless platform built on top of Badger.
 * [Terminotes](https://gitlab.com/asad-awadia/terminotes) - Self hosted notes storage and search server - storage powered by BadgerDB
@@ -205,8 +203,3 @@ If you are using Badger in a project please send a pull request to add it to the
 ## Contributing
 
 If you're interested in contributing to Badger see [CONTRIBUTING.md](./CONTRIBUTING.md).
-
-## Contact
-- Please use [discuss.dgraph.io](https://discuss.dgraph.io) for questions, feature requests and discussions.
-- Please use [discuss.dgraph.io](https://discuss.dgraph.io) for filing bugs or feature requests.
-- Follow us on Twitter [@dgraphlabs](https://twitter.com/dgraphlabs).
