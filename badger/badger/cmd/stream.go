@@ -22,9 +22,9 @@ import (
 	"math"
 	"os"
 
-	"github.com/dgraph-io/badger/v3"
-	"github.com/dgraph-io/badger/v3/options"
-	"github.com/dgraph-io/badger/v3/y"
+	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/badger/v3/options"
+	"github.com/outcaste-io/badger/v3/y"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )

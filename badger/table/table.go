@@ -35,12 +35,12 @@ import (
 	"github.com/golang/snappy"
 	"github.com/pkg/errors"
 
-	"github.com/dgraph-io/badger/v3/fb"
-	"github.com/dgraph-io/badger/v3/options"
-	"github.com/dgraph-io/badger/v3/pb"
-	"github.com/dgraph-io/badger/v3/y"
-	"github.com/dgraph-io/ristretto"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/badger/v3/fb"
+	"github.com/outcaste-io/badger/v3/options"
+	"github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/ristretto"
+	"github.com/outcaste-io/ristretto/z"
 )
 
 const fileSuffix = ".sst"

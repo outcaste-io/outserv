@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/dgraph-io/badger/v3/options"
+	"github.com/outcaste-io/badger/v3/options"
 )
 
 func TestOptions(t *testing.T) {

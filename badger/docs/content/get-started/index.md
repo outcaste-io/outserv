@@ -60,7 +60,7 @@ package main
 import (
 	"log"
 
-	badger "github.com/dgraph-io/badger/v3"
+	badger "github.com/outcaste-io/badger/v3"
 )
 
 func main() {

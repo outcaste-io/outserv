@@ -28,10 +28,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"github.com/dgraph-io/badger/v3"
-	"github.com/dgraph-io/badger/v3/pb"
-	"github.com/dgraph-io/badger/v3/y"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/ristretto/z"
 )
 
 var readBenchCmd = &cobra.Command{

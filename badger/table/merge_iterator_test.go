@@ -20,7 +20,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/dgraph-io/badger/v3/y"
+	"github.com/outcaste-io/badger/v3/y"
 	"github.com/stretchr/testify/require"
 )
 

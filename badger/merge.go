@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dgraph-io/badger/v3/y"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/ristretto/z"
 	"github.com/pkg/errors"
 )
 

@@ -22,8 +22,8 @@ import (
 	_ "net/http/pprof"
 	"runtime"
 
-	"github.com/dgraph-io/badger/v3/badger/cmd"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/outcaste-io/badger/v3/badger/cmd"
+	"github.com/outcaste-io/ristretto/z"
 	"github.com/dustin/go-humanize"
 	"go.opencensus.io/zpages"
 )

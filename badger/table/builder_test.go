@@ -25,11 +25,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dgraph-io/badger/v3/fb"
-	"github.com/dgraph-io/badger/v3/options"
-	"github.com/dgraph-io/badger/v3/pb"
-	"github.com/dgraph-io/badger/v3/y"
-	"github.com/dgraph-io/ristretto"
+	"github.com/outcaste-io/badger/v3/fb"
+	"github.com/outcaste-io/badger/v3/options"
+	"github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/ristretto"
 )
 
 func TestTableIndex(t *testing.T) {

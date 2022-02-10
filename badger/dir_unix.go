@@ -24,7 +24,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dgraph-io/badger/v3/y"
+	"github.com/outcaste-io/badger/v3/y"
 	"golang.org/x/sys/unix"
 )
 
