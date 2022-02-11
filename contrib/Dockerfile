@@ -10,7 +10,7 @@ WORKDIR /go/outserv
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 COPY . .
-RUN go build -v -o /outserv ./outserv
+RUN go build -o /outserv ./outserv
 
 FROM ubuntu:20.04 as final
 LABEL maintainer="Dgraph Labs <contact@dgraph.io>"
