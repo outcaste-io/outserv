@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+//go:generate compose -q -l -a 1 -z 1 --port_offset=0 --expose_ports=false --mem= --names=false
 package main
 
 import (

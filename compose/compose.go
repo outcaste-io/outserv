@@ -83,6 +83,7 @@ type composeConfig struct {
 }
 
 type options struct {
+	Quiet          bool
 	NumZeros       int
 	NumAlphas      int
 	NumReplicas    int
@@ -104,6 +105,7 @@ type options struct {
 	Image          string
 	Tag            string
 	WhiteList      bool
+	Token          string
 	MemLimit       string
 	ExposePorts    bool
 	Encryption     bool
@@ -351,9 +353,17 @@ func getAlpha(idx int, raft string, customFlags string) service {
 	if opts.Vmodule != "" {
 		svc.Command += fmt.Sprintf(" --vmodule=%s", opts.Vmodule)
 	}
-	if opts.WhiteList {
-		svc.Command += ` --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.0.0.0/8;"`
+	if opts.WhiteList || opts.Token != "" {
+		svc.Command += ` --security "`
+		if opts.WhiteList {
+			svc.Command += `whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.0.0.0/8;`
+		}
+		if opts.Token != "" {
+			svc.Command += fmt.Sprintf("token=%s;", opts.Token)
+		}
+		svc.Command += `"`
 	}
+
 	if opts.Acl {
 		svc.Command += ` --acl "secret-file=/secret/hmac;"`
 		svc.Volumes = append(svc.Volumes, volume{
@@ -668,6 +678,8 @@ func main() {
 		},
 	}
 
+	cmd.PersistentFlags().BoolVarP(&opts.Quiet, "quiet", "q", false,
+		"Quiet output")
 	cmd.PersistentFlags().IntVarP(&opts.NumZeros, "num_zeros", "z", 3,
 		"number of zeros in Outserv cluster")
 	cmd.PersistentFlags().IntVarP(&opts.NumAlphas, "num_alphas", "a", 3,
@@ -711,6 +723,8 @@ func main() {
 		"Docker tag for the --image image. Requires -l=false to use binary from docker container.")
 	cmd.PersistentFlags().BoolVarP(&opts.WhiteList, "whitelist", "w", true,
 		"include a whitelist if true")
+	cmd.PersistentFlags().StringVar(&opts.Token, "token", "",
+		"Admin security token")
 	cmd.PersistentFlags().StringVarP(&opts.MemLimit, "mem", "", "32G",
 		"Limit memory provided to the docker containers, for example 8G.")
 	cmd.PersistentFlags().BoolVar(&opts.ExposePorts, "expose_ports", true,
@@ -929,8 +943,10 @@ func main() {
 	if opts.OutFile == "-" {
 		x.Check2(fmt.Printf("%s", doc))
 	} else {
-		fmt.Printf("Options: %+v\n", opts)
-		fmt.Printf("Writing file: %s\n", opts.OutFile)
+		if !opts.Quiet {
+			fmt.Printf("Options: %+v\n", opts)
+			fmt.Printf("Writing file: %s\n", opts.OutFile)
+		}
 		err = ioutil.WriteFile(opts.OutFile, []byte(doc), 0644)
 		if err != nil {
 			fatal(errors.Errorf("unable to write file: %v", err))

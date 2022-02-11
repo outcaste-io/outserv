@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+//go:generate compose -q -a 1 -z 1 --token itIsSecret --acl_secret ../../../../ee/acl/hmac-secret --local=false --mem=
 package admin_auth
 
 import (
