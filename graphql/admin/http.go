@@ -20,7 +20,6 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"github.com/outcaste-io/outserv/ee/audit"
 	"io"
 	"io/ioutil"
 	"mime"
@@ -29,14 +28,16 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/outcaste-io/outserv/ee/audit"
+
+	"github.com/dgraph-io/graphql-transport-ws/graphqlws"
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/api"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/graphql/subscription"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/dgraph-io/graphql-transport-ws/graphqlws"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
 )
@@ -240,7 +241,6 @@ func (gh *graphqlHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer span.End()
 
 	ns, _ := strconv.ParseUint(r.Header.Get("resolver"), 10, 64)
-	glog.Infof("namespace: %d. Got GraphQL request over HTTP.", ns)
 	if err := gh.isValid(ns); err != nil {
 		glog.Errorf("namespace: %d. graphqlHandler not initialised: %s", ns, err)
 		WriteErrorResponse(w, r, errors.New(resolve.ErrInternal))

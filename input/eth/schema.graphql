@@ -1,10 +1,13 @@
 type Txn {
-  Hash: String! @search(by: [exact])
-  Value: Int
+  Oid: ID!
+  Hash: String! @id
+  Value: Int64
+  Block: Int64 @search
   To: Account
   From: Account
 }
 
 type Account {
-  Hash: String!
+  Oid: ID!
+  Hash: String! @id
 }

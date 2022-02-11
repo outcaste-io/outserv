@@ -2,7 +2,10 @@ module eth
 
 go 1.17
 
-require github.com/ethereum/go-ethereum v1.10.15
+require (
+	github.com/ethereum/go-ethereum v1.10.15
+	github.com/pkg/errors v0.9.1
+)
 
 require (
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
