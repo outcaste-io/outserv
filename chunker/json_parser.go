@@ -370,10 +370,6 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 			Namespace: namespace,
 		}
 
-		if _, ok := v.([]interface{}); !ok {
-			return mr, fmt.Errorf("Facets are not supported")
-		}
-
 		// Here we split predicate and lang directive (ex: "name@en"), if needed. With JSON
 		// mutations that's the only way to send language for a value.
 		nq.Predicate, nq.Lang = x.PredicateLang(nq.Predicate)

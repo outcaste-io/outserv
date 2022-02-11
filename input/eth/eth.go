@@ -78,26 +78,27 @@ func main() {
 		// }
 		fmt.Printf("txn count: %d for block: %d\n", len(block.Transactions()), blockNumber)
 
-		// for i, tx := range block.Transactions() {
-		// 	if i > 10 {
-		// 		break
-		// 	}
-		// 	fmt.Println(tx.Hash().Hex())        // 0x5d49fcaa394c97ec8a9c3e7bd9e8388d420fb050a52083ca52ff24b3b65bc9c2
-		// 	fmt.Println(tx.Value().String())    // 10000000000000000
-		// 	fmt.Println(tx.Gas())               // 105000
-		// 	fmt.Println(tx.GasPrice().Uint64()) // 102000000000
-		// 	fmt.Println(tx.Nonce())             // 110644
-		// 	fmt.Println(tx.Data())              // []
-		// 	fmt.Println(tx.To().Hex())          // 0x55fE59D8Ad77035154dDd0AD0388D09Dd4047A8e
+		for i, tx := range block.Transactions() {
+			if i > 10 {
+				break
+			}
+			fmt.Println("hex", tx.Hash().Hex()) // 0x5d49fcaa394c97ec8a9c3e7bd9e8388d420fb050a52083ca52ff24b3b65bc9c2
+			tx.Hash()
+			fmt.Println(tx.Value().String())    // 10000000000000000
+			fmt.Println(tx.Gas())               // 105000
+			fmt.Println(tx.GasPrice().Uint64()) // 102000000000
+			fmt.Println(tx.Nonce())             // 110644
+			fmt.Println(tx.Data())              // []
+			fmt.Println(tx.To().Hex())          // 0x55fE59D8Ad77035154dDd0AD0388D09Dd4047A8e
 
-		// 	// receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
-		// 	// if err != nil {
-		// 	// 	fmt.Printf("txn: %x couldn't query receipt. Error: %v\n", tx.Hash(), err)
-		// 	// 	continue
-		// 	// }
+			// receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
+			// if err != nil {
+			// 	fmt.Printf("txn: %x couldn't query receipt. Error: %v\n", tx.Hash(), err)
+			// 	continue
+			// }
 
-		// 	// fmt.Println("receipt:", receipt.Status) // 1
-		// 	// fmt.Println("logs:", receipt.Logs)      // ...
-		// }
+			// fmt.Println("receipt:", receipt.Status) // 1
+			// fmt.Println("logs:", receipt.Logs)      // ...
+		}
 	}
 }

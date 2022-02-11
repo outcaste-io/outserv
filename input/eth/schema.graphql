@@ -1,0 +1,10 @@
+type Txn {
+  Hash: String! @search(by: [exact])
+  Value: Int
+  To: Account
+  From: Account
+}
+
+type Account {
+  Hash: String!
+}
