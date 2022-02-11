@@ -54,7 +54,7 @@ var (
 	testId     int32
 
 	baseDir = pflag.StringP("base", "", "../",
-		"Base dir for Dgraph")
+		"Base dir for Outserv")
 	runPkg = pflag.StringP("pkg", "p", "",
 		"Only run tests for this package")
 	runTest = pflag.StringP("test", "t", "",
@@ -693,7 +693,7 @@ func run() error {
 		oc.Took(0, "COMPILE", time.Since(start))
 	}
 
-	tmpDir, err := ioutil.TempDir("", "dgraph-test")
+	tmpDir, err := ioutil.TempDir("", "outserv-test")
 	x.Check(err)
 	defer os.RemoveAll(tmpDir)
 
