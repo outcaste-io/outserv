@@ -216,7 +216,6 @@ func createUidEdge(nq *api.NQuad, sid, oid uint64) *pb.DirectedEdge {
 		Attr:      nq.Predicate,
 		Namespace: nq.Namespace,
 		Lang:      nq.Lang,
-		Facets:    nq.Facets,
 		ValueId:   oid,
 		ValueType: pb.Posting_UID,
 	}
@@ -228,7 +227,6 @@ func createValueEdge(nq *api.NQuad, sid uint64) (*pb.DirectedEdge, error) {
 		Attr:      nq.Predicate,
 		Namespace: nq.Namespace,
 		Lang:      nq.Lang,
-		Facets:    nq.Facets,
 	}
 	val, err := getTypeVal(nq.ObjectValue)
 	if err != nil {

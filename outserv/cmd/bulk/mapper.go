@@ -39,7 +39,6 @@ import (
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/tok"
 	"github.com/outcaste-io/outserv/types"
-	"github.com/outcaste-io/outserv/types/facets"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
 )
@@ -249,13 +248,6 @@ func (m *mapper) run(inputFormat chunker.InputFormat) {
 
 	for nqs := range nquads.Ch() {
 		for _, nq := range nqs {
-			if err := facets.SortAndValidate(nq.Facets); err != nil {
-				atomic.AddInt64(&m.prog.errCount, 1)
-				if !m.opt.IgnoreErrors {
-					x.Check(err)
-				}
-			}
-
 			m.processNQuad(gql.NQuad{NQuad: nq})
 			atomic.AddInt64(&m.prog.nquadCount, 1)
 		}
@@ -288,7 +280,7 @@ func (m *mapper) addMapEntry(key []byte, p *pb.Posting, shard int) {
 	atomic.AddInt64(&m.prog.mapEdgeCount, 1)
 
 	uid := p.Uid
-	if p.PostingType != pb.Posting_REF || len(p.Facets) > 0 {
+	if p.PostingType != pb.Posting_REF {
 		// Keep p
 	} else {
 		// We only needed the UID.
@@ -406,7 +398,6 @@ func (m *mapper) createPostings(nq gql.NQuad,
 			p.Uid = math.MaxUint64
 		}
 	}
-	p.Facets = nq.Facets
 
 	// Early exit for no reverse edge.
 	if sch.GetDirective() != pb.SchemaUpdate_REVERSE {

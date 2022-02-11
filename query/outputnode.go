@@ -43,7 +43,6 @@ import (
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/task"
 	"github.com/outcaste-io/outserv/types"
-	"github.com/outcaste-io/outserv/types/facets"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
 )
@@ -706,36 +705,6 @@ func (enc *encoder) writeKey(fj fastJsonNode) error {
 	return nil
 }
 
-func (enc *encoder) attachFacets(fj fastJsonNode, fieldName string, isList bool,
-	fList []*api.Facet, facetIdx int) error {
-
-	idxFieldID := enc.idForAttr(strconv.Itoa(facetIdx))
-	for _, f := range fList {
-		fName := facetName(fieldName, f)
-		fVal, err := facets.ValFor(f)
-		if err != nil {
-			return err
-		}
-
-		if !isList {
-			if err := enc.AddValue(fj, enc.idForAttr(fName), fVal); err != nil {
-				return err
-			}
-		} else {
-			facetNode := enc.newNode(enc.idForAttr(fName))
-			err := enc.AddValue(facetNode, idxFieldID, fVal)
-			if err != nil {
-				return err
-			}
-			// Mark this node as facetsParent.
-			enc.setFacetsParent(facetNode)
-			enc.AddMapChild(fj, facetNode)
-		}
-	}
-
-	return nil
-}
-
 func (enc *encoder) encode(fj fastJsonNode) error {
 	child := enc.children(fj)
 	// This is a scalar value.
@@ -1342,10 +1311,6 @@ func (sg *SubGraph) preTraverse(enc *encoder, uid uint64, dst fastJsonNode) erro
 			// Can happen in recurse query.
 			continue
 		}
-		if len(pc.facetsMatrix) > 0 && len(pc.facetsMatrix) != len(pc.uidMatrix) {
-			return errors.Errorf("Length of facetsMatrix and uidMatrix mismatch: %d vs %d",
-				len(pc.facetsMatrix), len(pc.uidMatrix))
-		}
 
 		// TODO: If we move GroupbyRes to a map, then this won't be needed.
 		idx := algo.IndexOf(pc.SrcUIDs, uid)
@@ -1377,11 +1342,6 @@ func (sg *SubGraph) preTraverse(enc *encoder, uid uint64, dst fastJsonNode) erro
 			}
 
 		case idx < len(pc.uidMatrix) && len(uids) > 0:
-			var fcsList []*pb.Facets
-			if pc.Params.Facet != nil {
-				fcsList = pc.facetsMatrix[idx].FacetsList
-			}
-
 			if sg.Params.IgnoreReflex {
 				pc.Params.ParentIds = sg.Params.ParentIds
 			}
@@ -1393,7 +1353,7 @@ func (sg *SubGraph) preTraverse(enc *encoder, uid uint64, dst fastJsonNode) erro
 
 			// We create as many predicate entity children as the length of uids for
 			// this predicate.
-			for childIdx, childUID := range uids {
+			for _, childUID := range uids {
 				if fieldName == "" || (invalidUids != nil && invalidUids[childUID]) {
 					continue
 				}
@@ -1413,14 +1373,6 @@ func (sg *SubGraph) preTraverse(enc *encoder, uid uint64, dst fastJsonNode) erro
 				if !enc.IsEmpty(uc) {
 					if sg.Params.GetUid {
 						if err := enc.SetUID(uc, childUID, enc.uidAttr); err != nil {
-							return err
-						}
-					}
-
-					// Add facets nodes.
-					if pc.Params.Facet != nil && len(fcsList) > childIdx {
-						fs := fcsList[childIdx].Facets
-						if err := enc.attachFacets(uc, fieldName, false, fs, childIdx); err != nil {
 							return err
 						}
 					}
@@ -1502,15 +1454,6 @@ func (sg *SubGraph) preTraverse(enc *encoder, uid uint64, dst fastJsonNode) erro
 					return err
 				}
 				continue
-			}
-
-			if len(pc.facetsMatrix) > idx && len(pc.facetsMatrix[idx].FacetsList) > 0 {
-				// In case of Value we have only one Facets.
-				for i, fcts := range pc.facetsMatrix[idx].FacetsList {
-					if err := enc.attachFacets(dst, fieldName, pc.List, fcts.Facets, i); err != nil {
-						return err
-					}
-				}
 			}
 
 			if len(pc.valueMatrix) <= idx {

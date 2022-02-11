@@ -26,7 +26,6 @@ import (
 	"github.com/outcaste-io/outserv/lex"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/types"
-	"github.com/outcaste-io/outserv/types/facets"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
@@ -293,15 +292,6 @@ func parseFacetsRDF(it *lex.ItemIterator, rnq *api.NQuad) error {
 			return errors.Errorf("Unexpected end of facets.")
 		}
 		item = it.Item()
-		facetVal := ""
-		if item.Typ == itemText {
-			facetVal = item.Val
-		}
-		facet, err := facets.FacetFor(facetKey, facetVal)
-		if err != nil {
-			return err
-		}
-		rnq.Facets = append(rnq.Facets, facet)
 
 		// empty value case..
 		if item.Typ == itemRightRound {

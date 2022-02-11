@@ -66,11 +66,6 @@ message Query {
   // Whether this is a reverse edge.
   bool reverse = 7;
 
-  // Which facets to fetch.
-  FacetParams facet_param = 8;
-  // Filtering on facets: has Op (and/or/not) tree.
-  FilterTree facets_filter = 9;
-
   // Expand all language variants.
   bool expand_all = 10;
 
@@ -97,7 +92,6 @@ message Result {
   repeated ValueList value_matrix = 2;
   repeated uint32 counts = 3;
   bool intersect_dest = 4;
-  repeated FacetsList facet_matrix = 5;
   repeated LangList lang_matrix = 6;
   bool list = 7;
 }
@@ -244,7 +238,6 @@ message DirectedEdge {
     DEL = 1;
   }
   Op op = 8;
-  repeated api.Facet facets = 9;
   repeated string allowedPreds = 10;
   uint64 namespace = 11;
 }
@@ -392,7 +385,6 @@ message Posting {
   }
   PostingType posting_type = 4;
   bytes lang_tag = 5;  // Only set for VALUE_LANG
-  repeated api.Facet facets = 9;
 
   // TODO: op is only used temporarily. See if we can remove it from here.
   uint32 op = 12;
@@ -408,24 +400,6 @@ message PostingList {
   repeated uint64 splits = 4;
 
   bytes bitmap = 5;  // Roaring Bitmap encoded uint64s.
-}
-
-message FacetParam {
-  string key = 1;
-  string alias = 2;
-}
-
-message FacetParams {
-  bool all_keys = 1;  // Keys should be in sorted order.
-  repeated FacetParam param = 2;
-}
-
-message Facets {
-  repeated api.Facet facets = 1;
-}
-
-message FacetsList {
-  repeated Facets facets_list = 1;
 }
 
 message Function {

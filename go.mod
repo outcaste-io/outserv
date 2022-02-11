@@ -40,7 +40,7 @@ require (
 	github.com/graph-gophers/graphql-go v0.0.0-20200309224638-dae41bde9ef9
 	github.com/minio/minio-go/v6 v6.0.55
 	github.com/mitchellh/panicwrap v1.0.0
-	github.com/outcaste-io/badger/v3 v3.0.0-20220125191754-e885a3ee3261
+	github.com/outcaste-io/badger/v3 v3.0.0-20220210203236-1b1148a36313
 	github.com/outcaste-io/dgo/v210 v210.0.0-20220207213049-2f4dade232d5
 	github.com/outcaste-io/ristretto v0.2.0
 	github.com/outcaste-io/sroar v0.0.0-20220207092908-fa5c189ea338

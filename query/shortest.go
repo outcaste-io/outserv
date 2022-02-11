@@ -25,17 +25,14 @@ import (
 	"github.com/outcaste-io/outserv/algo"
 	"github.com/outcaste-io/outserv/codec"
 	"github.com/outcaste-io/outserv/protos/pb"
-	"github.com/outcaste-io/outserv/types"
-	"github.com/outcaste-io/outserv/types/facets"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/sroar"
 	"github.com/pkg/errors"
 )
 
 type pathInfo struct {
-	uid   uint64
-	attr  string
-	facet *pb.Facets
+	uid  uint64
+	attr string
 }
 
 type route struct {
@@ -101,9 +98,8 @@ func (h *priorityQueue) Pop() interface{} {
 }
 
 type mapItem struct {
-	attr  string
-	cost  float64
-	facet *pb.Facets
+	attr string
+	cost float64
 }
 
 // We manintain a map from UID to nodeInfo for Djikstras.
@@ -112,42 +108,6 @@ type nodeInfo struct {
 	parent uint64
 	// Pointer to the item in heap. Used to update priority
 	node *queueItem
-}
-
-func (sg *SubGraph) getCost(matrix, list int) (cost float64,
-	fcs *pb.Facets, rerr error) {
-
-	cost = 1.0
-	if len(sg.facetsMatrix) <= matrix {
-		return cost, fcs, rerr
-	}
-	fcsList := sg.facetsMatrix[matrix].FacetsList
-	if len(fcsList) <= list {
-		rerr = errFacet
-		return cost, fcs, rerr
-	}
-	fcs = fcsList[list]
-	if len(fcs.Facets) == 0 {
-		rerr = errFacet
-		return cost, fcs, rerr
-	}
-	if len(fcs.Facets) > 1 {
-		rerr = errors.Errorf("Expected 1 but got %d facets", len(fcs.Facets))
-		return cost, fcs, rerr
-	}
-	tv, err := facets.ValFor(fcs.Facets[0])
-	if err != nil {
-		return 0.0, nil, err
-	}
-	switch {
-	case tv.Tid == types.IntID:
-		cost = float64(tv.Value.(int64))
-	case tv.Tid == types.FloatID:
-		cost = float64(tv.Value.(float64))
-	default:
-		rerr = errFacet
-	}
-	return cost, fcs, rerr
 }
 
 func (sg *SubGraph) expandOut(ctx context.Context,
@@ -212,27 +172,16 @@ func (sg *SubGraph) expandOut(ctx context.Context,
 						continue
 					}
 
-					for lIdx, toUID := range codec.GetUids(subgraph.uidMatrix[mIdx]) {
+					for _, toUID := range codec.GetUids(subgraph.uidMatrix[mIdx]) {
 						if adjacencyMap[fromUID] == nil {
 							adjacencyMap[fromUID] = make(map[uint64]mapItem)
-						}
-						// The default cost we'd use is 1.
-						cost, facet, err := subgraph.getCost(mIdx, lIdx)
-						switch {
-						case err == errFacet:
-							// Ignore the edge and continue.
-							continue
-						case err != nil:
-							rch <- err
-							return
 						}
 
 						// TODO - This simplify overrides the adjacency matrix. What happens if the
 						// cost along the second attribute is more than that along the first.
 						adjacencyMap[fromUID][toUID] = mapItem{
-							cost:  cost,
-							facet: facet,
-							attr:  subgraph.Attr,
+							cost: 1.0,
+							attr: subgraph.Attr,
 						}
 						numEdges++
 					}
@@ -407,9 +356,8 @@ func runKShortestPaths(ctx context.Context, sg *SubGraph) ([]*SubGraph, error) {
 			}
 			n := copy(*curPath, *item.path.route)
 			(*curPath)[n] = pathInfo{
-				uid:   toUid,
-				attr:  info.attr,
-				facet: info.facet,
+				uid:  toUid,
+				attr: info.attr,
 			}
 			node := &queueItem{
 				uid:  toUid,
@@ -587,9 +535,8 @@ func shortestPath(ctx context.Context, sg *SubGraph) ([]*SubGraph, error) {
 				parent: item.uid,
 				node:   node,
 				mapItem: mapItem{
-					cost:  nodeCost,
-					attr:  neighbour.attr,
-					facet: neighbour.facet,
+					cost: nodeCost,
+					attr: neighbour.attr,
 				},
 			}
 		}
@@ -653,12 +600,7 @@ func createPathSubgraph(ctx context.Context, dist map[uint64]nodeInfo, totalWeig
 		node.Params = params{
 			Shortest: true,
 		}
-		if nodeInfo.facet != nil {
-			// For consistent later processing.
-			node.Params.Facet = &pb.FacetParams{}
-		}
 		node.Attr = nodeInfo.attr
-		node.facetsMatrix = []*pb.FacetsList{{FacetsList: []*pb.Facets{nodeInfo.facet}}}
 		node.SrcUIDs = &pb.List{SortedUids: []uint64{curUid}}
 		node.DestMap = sroar.NewBitmap()
 		node.DestMap.Set(childUid)
@@ -705,12 +647,7 @@ func createkroutesubgraph(ctx context.Context, kroutes []route) []*SubGraph {
 			node.Params = params{
 				Shortest: true,
 			}
-			if (*it.route)[i+1].facet != nil {
-				// For consistent later processing.
-				node.Params.Facet = &pb.FacetParams{}
-			}
 			node.Attr = (*it.route)[i+1].attr
-			node.facetsMatrix = []*pb.FacetsList{{FacetsList: []*pb.Facets{(*it.route)[i+1].facet}}}
 			node.SrcUIDs = &pb.List{SortedUids: []uint64{curUid}}
 			node.DestMap = codec.FromList(node.SrcUIDs)
 			node.uidMatrix = []*pb.List{{SortedUids: []uint64{childUid}}}

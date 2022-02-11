@@ -224,9 +224,9 @@ func initService(basename string, idx, grpcPort int) service {
 		// no data volume
 	}
 
-	svc.Command = "dgraph"
+	svc.Command = "outserv"
 	if opts.LocalBin {
-		svc.Command = "/gobin/dgraph"
+		svc.Command = "/gobin/outserv"
 	}
 	if opts.UserOwnership {
 		user, err := user.Current()

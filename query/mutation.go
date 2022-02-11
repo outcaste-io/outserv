@@ -27,7 +27,6 @@ import (
 	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/protos/pb"
-	"github.com/outcaste-io/outserv/types/facets"
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/sroar"
@@ -253,9 +252,6 @@ func ToDirectedEdges(gmuList []*gql.Mutation, newUids map[string]uint64) (
 			}
 		}
 		for _, nq := range gmu.Set {
-			if err := facets.SortAndValidate(nq.Facets); err != nil {
-				return edges, err
-			}
 			if err := parse(nq, pb.DirectedEdge_SET); err != nil {
 				return edges, err
 			}
