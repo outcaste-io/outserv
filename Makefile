@@ -57,11 +57,7 @@ test:
 	./test.sh
 
 image:
-	@GOOS=linux $(MAKE) dgraph
-	@mkdir -p linux
-	@mv ./dgraph/dgraph ./linux/dgraph
-	@docker build -f contrib/Dockerfile -t dgraph/dgraph:$(subst /,-,${BUILD_BRANCH}) .
-	@rm -r linux
+	docker build -f contrib/Dockerfile --target final -t outcaste/outserv:$(subst /,-,${BUILD_BRANCH}) .
 
 help:
 	@echo

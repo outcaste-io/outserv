@@ -4,7 +4,15 @@
 # This gets built as part of release.sh. Must be run from /tmp/build, with the linux binaries
 # already built and placed there.
 
-FROM ubuntu:20.04
+# docker build --target builder -t outcaste/outserv:latest .
+FROM golang:1.17.7-bullseye AS builder
+WORKDIR /go/outserv
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
+COPY . .
+RUN go build -v -o /outserv ./outserv
+
+FROM ubuntu:20.04 as final
 LABEL maintainer="Dgraph Labs <contact@dgraph.io>"
 
 RUN apt-get update && \
@@ -20,13 +28,12 @@ RUN apt-get update && \
   apt-get install -y nodejs && \
   rm -rf /var/lib/apt/lists/*
 
-ADD linux /usr/local/bin
+COPY --from=builder /outserv /usr/local/bin/outserv
 
 EXPOSE 8080
 EXPOSE 9080
 
-RUN mkdir /dgraph
-WORKDIR /dgraph
+RUN mkdir /outserv
+WORKDIR /outserv
 
-ENV GODEBUG=madvdontneed=1
-CMD ["dgraph"] # Shows the dgraph version and commands available.
+CMD ["outserv"] # Shows the dgraph version and commands available.
