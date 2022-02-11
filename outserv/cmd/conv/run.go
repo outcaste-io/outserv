@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Conv is the sub-command invoked when running "dgraph conv".
+// Conv is the sub-command invoked when running "outserv conv".
 var Conv x.SubCommand
 
 var opt struct {
@@ -36,7 +36,7 @@ var opt struct {
 func init() {
 	Conv.Cmd = &cobra.Command{
 		Use:   "conv",
-		Short: "Dgraph Geo file converter",
+		Short: "Outserv Geo file converter",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			defer x.StartProfile(Conv.Conf).Stop()
