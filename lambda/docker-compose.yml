@@ -1,6 +1,6 @@
 version: '3.4'
 services:
-  dgraph-lambda:
+  outserv-lambda:
     build:
       context: .
       target: build
@@ -9,9 +9,13 @@ services:
     ports:
       - "8686:8686"
     depends_on:
-      - dgraph
+      - outserv
     environment:
-      DGRAPH_URL: http://dgraph:8080
+      DGRAPH_URL: http://outserv:8080
       INTEGRATION_TEST: "true"
-  dgraph:
-    image: "dgraph/standalone:master"
+  outserv:
+    image: outcaste/outserv:latest
+    command: outserv alpha --my=outserv:7080 --zero=zero:5080 --logtostderr -v=2
+  zero:
+    image: outcaste/outserv:latest
+    command: outserv zero --my=zero:5080 --raft 'idx=1' --logtostderr -v=2

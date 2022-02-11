@@ -224,9 +224,9 @@ func initService(basename string, idx, grpcPort int) service {
 		// no data volume
 	}
 
-	svc.Command = "dgraph"
+	svc.Command = "outserv"
 	if opts.LocalBin {
-		svc.Command = "/gobin/dgraph"
+		svc.Command = "/gobin/outserv"
 	}
 	if opts.UserOwnership {
 		user, err := user.Current()
@@ -499,7 +499,7 @@ func addMetrics(cfg *composeConfig) {
 			},
 			{
 				Type:     "bind",
-				Source:   "$GOPATH/src/github.com/dgraph-io/dgraph/compose/prometheus.yml",
+				Source:   "$GOPATH/src/github.com/outcaste-io/outserv/compose/prometheus.yml",
 				Target:   "/etc/prometheus/prometheus.yml",
 				ReadOnly: true,
 			},
@@ -660,8 +660,8 @@ func copyDir(src string, dst string) error {
 func main() {
 	var cmd = &cobra.Command{
 		Use:     "compose",
-		Short:   "docker-compose config file generator for dgraph",
-		Long:    "Dynamically generate a docker-compose.yml file for running a dgraph cluster.",
+		Short:   "docker-compose config file generator for outserv",
+		Long:    "Dynamically generate a docker-compose.yml file for running a outserv cluster.",
 		Example: "$ compose -z=3 -a=3",
 		Run: func(cmd *cobra.Command, args []string) {
 			// dummy to get "Usage:" template in Usage() output.
@@ -669,13 +669,13 @@ func main() {
 	}
 
 	cmd.PersistentFlags().IntVarP(&opts.NumZeros, "num_zeros", "z", 3,
-		"number of zeros in Dgraph cluster")
+		"number of zeros in Outserv cluster")
 	cmd.PersistentFlags().IntVarP(&opts.NumAlphas, "num_alphas", "a", 3,
-		"number of alphas in Dgraph cluster")
+		"number of alphas in Outserv cluster")
 	cmd.PersistentFlags().IntVarP(&opts.NumReplicas, "num_replicas", "r", 3,
-		"number of alpha replicas in Dgraph cluster")
+		"number of alpha replicas in Outserv cluster")
 	cmd.PersistentFlags().IntVarP(&opts.NumLearners, "num_learners", "n", 0,
-		"number of learner replicas in Dgraph cluster")
+		"number of learner replicas in Outserv cluster")
 	cmd.PersistentFlags().BoolVar(&opts.DataVol, "data_vol", false,
 		"mount a docker volume as /data in containers")
 	cmd.PersistentFlags().StringVarP(&opts.DataDir, "data_dir", "d", "",
@@ -705,8 +705,7 @@ func main() {
 		"./docker-compose.yml", "name of output file")
 	cmd.PersistentFlags().BoolVarP(&opts.LocalBin, "local", "l", true,
 		"use locally-compiled binary if true, otherwise use binary from docker container")
-	// TODO(Naman): Change this to dgraph/dgraph once the lambda changes are released.
-	cmd.PersistentFlags().StringVar(&opts.Image, "image", "public.ecr.aws/n1e3y0t3/dgraph-lambda",
+	cmd.PersistentFlags().StringVar(&opts.Image, "image", "outcaste/outserv",
 		"Docker image for alphas and zeros.")
 	cmd.PersistentFlags().StringVarP(&opts.Tag, "tag", "t", "latest",
 		"Docker tag for the --image image. Requires -l=false to use binary from docker container.")
