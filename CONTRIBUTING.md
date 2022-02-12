@@ -243,6 +243,17 @@ Over years of writing big scalable systems, we are convinced that striving for s
 - Avoid unnecessary vertical spaces. Use your judgment or follow the code review comments.
 - Wrap your code and comments to 100 characters, unless doing so makes the code less legible.
 
+### License Header
+
+Every new source file must begin with a license header.
+
+Copyright yyyy-yyyy Outcaste, Inc. are available under the Smart License.
+
+If you're modifying existing Apache licensed files files, please modify the header to this:
+
+Portions Copyright yyyy-yyyy Dgraph Labs, Inc. are available under the Apache 2.0 license.
+Portions Copyright yyyy-yyyy Outcaste, Inc. are available under the Smart License.
+
 ### Signed Commits
 
 Signed commits help in verifying the authenticity of the contributor. We use signed commits in Dgraph, and we prefer it, though it's not compulsory to have signed commits. This is a recommended step for people who intend to contribute to Dgraph on a regular basis.
