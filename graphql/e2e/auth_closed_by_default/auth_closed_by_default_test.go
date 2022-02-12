@@ -14,15 +14,16 @@
  * limitations under the License.
  */
 
+//go:generate compose -q -a 1 -z 1 --mem= --extra_alpha_flags='--graphql="debug=true;"' --names=false
 package auth_closed_by_default
 
 import (
 	"os"
 	"testing"
 
+	"github.com/dgrijalva/jwt-go/v4"
 	"github.com/outcaste-io/outserv/graphql/e2e/common"
 	"github.com/outcaste-io/outserv/testutil"
-	"github.com/dgrijalva/jwt-go/v4"
 	"github.com/stretchr/testify/require"
 )
 
