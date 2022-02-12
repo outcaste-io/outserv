@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+//go:generate compose -q -a 1 -z 1 --mem= --extra_alpha_flags='--graphql="debug=true;"' --names=false
 package auth
 
 import (
@@ -31,9 +32,9 @@ import (
 
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/outcaste-io/outserv/graphql/e2e/common"
 	"github.com/outcaste-io/outserv/testutil"
-	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 )
 
