@@ -2,7 +2,7 @@ type Txn {
   Oid: ID!
   Hash: String! @id
   Value: Int64
-  Block: Int64 @search
+  Block: Int64
   To: Account
   From: Account
 }

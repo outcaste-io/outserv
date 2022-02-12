@@ -21,7 +21,8 @@ import (
 
 var path = flag.String("geth", "", "Geth IPC path")
 var graphql = flag.String("gql", "", "GraphQL endpoint")
-var batchSize = flag.Int("batch", 100, "Num txns in one batch")
+var dryRun = flag.Bool("dry", false, "If true, don't send txns to GraphQL endpoint")
+var numGo = flag.Int("gor", 3, "Number of goroutines to use")
 
 type Txn struct {
 	Hash  string
@@ -52,12 +53,18 @@ type DataResp struct {
 	Resp Resp `json:"addTxn"`
 }
 
+type ErrorResp struct {
+	Message string `json:"message"`
+}
+
 type WResp struct {
-	DataResp `json:"data"`
+	Data   DataResp  `json:"data"`
+	Errors ErrorResp `json:"errors"`
 }
 
 var start = time.Now()
 var sent int64
+var numTxns int64
 
 var mq = `
 mutation($Post: [AddTxnInput!]!) {
@@ -67,57 +74,118 @@ mutation($Post: [AddTxnInput!]!) {
 }
 `
 
-func sendToGraphQL(b *Batch) error {
+func createBatchFrom(blockId int64) Batch {
+	blockNumber := big.NewInt(blockId)
+	block, err := client.BlockByNumber(context.Background(), blockNumber)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// fmt.Println(block.Number().Uint64())     // 5671744
+	// fmt.Println(block.Difficulty().Uint64()) // 3217000136609065
+	// fmt.Println(block.Hash().Hex())          // 0x9e8751ebb5069389b855bba72d94902cc385042661498a415979b7b6ee9ba4b9
+	// fmt.Println(len(block.Transactions()))   // 144
+
+	// count, err := client.TransactionCount(context.Background(), block.Hash())
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// fmt.Printf("txn count: %d for block: %d\n", len(block.Transactions()), blockNumber)
+
+	var batch Batch
+	for _, tx := range block.Transactions() {
+		var to, from Account
+		if msg, err := tx.AsMessage(types.NewEIP155Signer(chainID), nil); err == nil {
+			from.Hash = msg.From().Hex()
+		}
+
+		if tx.To() != nil {
+			to.Hash = tx.To().Hex()
+		}
+		txn := Txn{
+			Hash:  tx.Hash().Hex(),
+			Value: tx.Value().Int64(),
+			Block: blockNumber.Int64(),
+			To:    to,
+			From:  from,
+		}
+		if txn.Value == 0 || len(txn.To.Hash) == 0 || len(txn.From.Hash) == 0 {
+			continue
+		}
+		batch.Txns = append(batch.Txns, txn)
+	}
+	return batch
+}
+
+func processBlock(blockId int64) error {
+	batch := createBatchFrom(blockId)
+	if len(batch.Txns) == 0 {
+		return nil
+	}
+
 	q := GQL{
 		Query:     mq,
-		Variables: *b,
+		Variables: batch,
 	}
 	data, err := json.Marshal(q)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// fmt.Printf("%s\n", data)
-
 	// TODO: Check that the schema is correctly set.
-	resp, err := http.Post("http://localhost:8080/graphql", "application/json", bytes.NewBuffer(data))
-	if err != nil {
-		return errors.Wrapf(err, "while posting request")
-	}
-	out, err := ioutil.ReadAll(resp.Body)
-	resp.Body.Close()
-
 	var wr WResp
-	if err := json.Unmarshal(out, &wr); err != nil {
-		return errors.Wrapf(err, "response: %s\n", out)
+	if !*dryRun {
+		resp, err := http.Post("http://localhost:8080/graphql", "application/json", bytes.NewBuffer(data))
+		if err != nil {
+			return errors.Wrapf(err, "while posting request")
+		}
+		out, err := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		fmt.Printf("out: %s\n", out)
+
+		if err := json.Unmarshal(out, &wr); err != nil {
+			return errors.Wrapf(err, "response: %s\n", out)
+		}
+		if len(wr.Errors.Message) > 0 {
+			return fmt.Errorf("Got error from GraphQL: %s\n", wr.Errors.Message)
+		}
 	}
 	s := atomic.AddInt64(&sent, 1)
+	num := atomic.AddInt64(&numTxns, int64(len(batch.Txns)))
 	dur := time.Since(start)
 	fmt.Printf("[ %04d at block: %06d ] [ %s @ %6.1f /s ] Batch added numUids: %03d\n", s,
-		b.Txns[len(b.Txns)-1].Block, dur.Round(time.Second),
-		float64(s)*float64(*batchSize)/dur.Seconds(),
-		wr.Resp.NumUids)
+		blockId, dur.Round(time.Second), float64(num)/dur.Seconds(), wr.Data.Resp.NumUids)
 	return nil
 }
 
-func processQueue(ch chan *Batch, wg *sync.WaitGroup) {
+var curBlock int64 = 46000
+
+func processQueue(wg *sync.WaitGroup) {
 	defer wg.Done()
-	for b := range ch {
-		if err := sendToGraphQL(b); err != nil {
-			log.Fatalf("Unable to send request: %v\n", err)
+	for {
+		blockId := atomic.AddInt64(&curBlock, 1)
+		if blockId > 1e6 {
+			return
+		}
+		if err := processBlock(blockId); err != nil {
+			log.Fatalf("Unable to process Block: %v\n", err)
 		}
 	}
 }
 
+var client *ethclient.Client
+var chainID *big.Int
+
 func main() {
 	flag.Parse()
 
-	client, err := ethclient.Dial(*path)
+	var err error
+	client, err = ethclient.Dial(*path)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	chainID, err := client.NetworkID(context.Background())
+	chainID, err = client.NetworkID(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -154,100 +222,12 @@ func main() {
 		log.Fatal(err)
 	}
 	fmt.Printf("Latest: %08d\n", header.Number)
+	fmt.Printf("Using %d goroutines.\n", *numGo)
 
 	var wg sync.WaitGroup
-	ch := make(chan *Batch, 10)
-	for i := 0; i < 1; i++ {
+	for i := 0; i < *numGo; i++ {
 		wg.Add(1)
-		go processQueue(ch, &wg)
+		go processQueue(&wg)
 	}
-
-	var count int
-
-	batch := &Batch{}
-	defer func() {
-		if len(batch.Txns) > 0 {
-			ch <- batch
-		}
-		close(ch)
-		wg.Wait()
-	}()
-	// Blocks before 46K don't seem to have any transactions.
-	for i := int64(46000); i < header.Number.Int64(); i++ {
-		// if i%1000 == 0 {
-		// 	fmt.Printf("Block : %08d\n", i)
-		// }
-		if i > 1e6 {
-			fmt.Println("Exiting...")
-			return
-		}
-		blockNumber := big.NewInt(i)
-		block, err := client.BlockByNumber(context.Background(), blockNumber)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if len(block.Transactions()) == 0 {
-			continue
-		}
-
-		// fmt.Println(block.Number().Uint64())     // 5671744
-		// fmt.Println(block.Difficulty().Uint64()) // 3217000136609065
-		// fmt.Println(block.Hash().Hex())          // 0x9e8751ebb5069389b855bba72d94902cc385042661498a415979b7b6ee9ba4b9
-		// fmt.Println(len(block.Transactions()))   // 144
-
-		// count, err := client.TransactionCount(context.Background(), block.Hash())
-		// if err != nil {
-		// 	log.Fatal(err)
-		// }
-		// fmt.Printf("txn count: %d for block: %d\n", len(block.Transactions()), blockNumber)
-
-		for _, tx := range block.Transactions() {
-			var to, from Account
-			if msg, err := tx.AsMessage(types.NewEIP155Signer(chainID), nil); err == nil {
-				from.Hash = msg.From().Hex()
-			}
-
-			if tx.To() != nil {
-				to.Hash = tx.To().Hex()
-			}
-			txn := Txn{
-				Hash:  tx.Hash().Hex(),
-				Value: tx.Value().Int64(),
-				Block: blockNumber.Int64(),
-				To:    to,
-				From:  from,
-			}
-			if txn.Value == 0 || len(txn.To.Hash) == 0 || len(txn.From.Hash) == 0 {
-				continue
-			}
-			batch.Txns = append(batch.Txns, txn)
-
-			if len(batch.Txns) >= *batchSize {
-				ch <- batch
-				batch = &Batch{}
-				count++
-				if count > 1e6 {
-					return
-				}
-			}
-
-			// fmt.Println("hex", tx.Hash().Hex()) // 0x5d49fcaa394c97ec8a9c3e7bd9e8388d420fb050a52083ca52ff24b3b65bc9c2
-			// tx.Hash()
-			// fmt.Println(tx.Value().String())    // 10000000000000000
-			// fmt.Println(tx.Gas())               // 105000
-			// fmt.Println(tx.GasPrice().Uint64()) // 102000000000
-			// fmt.Println(tx.Nonce())             // 110644
-			// fmt.Println(tx.Data())              // []
-			// fmt.Println(tx.To().Hex())          // 0x55fE59D8Ad77035154dDd0AD0388D09Dd4047A8e
-
-			// receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
-			// if err != nil {
-			// 	fmt.Printf("txn: %x couldn't query receipt. Error: %v\n", tx.Hash(), err)
-			// 	continue
-			// }
-
-			// fmt.Println("receipt:", receipt.Status) // 1
-			// fmt.Println("logs:", receipt.Logs)      // ...
-		}
-	}
+	wg.Wait()
 }
