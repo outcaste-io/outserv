@@ -1,5 +1,4 @@
-// Portions Copyright 2015-2018 Dgraph Labs, Inc. are available under the Apache 2.0
-// license.
+// Portions Copyright 2015-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
 // Portions Copyright 2022 Outcaste, Inc. are available under the Smart license.
 
 package posting

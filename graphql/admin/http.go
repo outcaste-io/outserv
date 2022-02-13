@@ -15,11 +15,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/outcaste-io/outserv/ee/audit"
-
 	"github.com/dgraph-io/graphql-transport-ws/graphqlws"
 	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/edgraph"
+	"github.com/outcaste-io/outserv/ee/audit"
 	"github.com/outcaste-io/outserv/graphql/api"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
