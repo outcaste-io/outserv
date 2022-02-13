@@ -1,18 +1,5 @@
-/*
- * Copyright 2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
 
 package chunker
 
@@ -30,7 +17,6 @@ import (
 	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/types"
-	"github.com/outcaste-io/outserv/types/facets"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	geom "github.com/twpayne/go-geom"
@@ -45,146 +31,6 @@ func stripSpaces(str string) string {
 
 		return r
 	}, str)
-}
-
-// handleBasicFacetsType parses a facetVal to string/float64/bool/datetime type.
-func handleBasicFacetsType(key string, facetVal interface{}) (*api.Facet, error) {
-	var jsonValue interface{}
-	var valueType api.Facet_ValType
-	switch v := facetVal.(type) {
-	case string:
-		if t, err := types.ParseTime(v); err == nil {
-			valueType = api.Facet_DATETIME
-			jsonValue = t
-		} else {
-			facet, err := facets.FacetFor(key, strconv.Quote(v))
-			if err != nil {
-				return nil, err
-			}
-
-			// FacetFor function already converts the value to binary so there is no need
-			// for the conversion again after the switch block.
-			return facet, nil
-		}
-	case json.Number:
-		number := facetVal.(json.Number)
-		if strings.Contains(number.String(), ".") {
-			jsonFloat, err := number.Float64()
-			if err != nil {
-				return nil, err
-			}
-			jsonValue = jsonFloat
-			valueType = api.Facet_FLOAT
-		} else {
-			jsonInt, err := number.Int64()
-			if err != nil {
-				return nil, err
-			}
-			jsonValue = jsonInt
-			valueType = api.Facet_INT
-		}
-	// these int64/float64 cases are needed for the FastParseJSON simdjson
-	// parser, which doesn't use json.Number
-	case int64:
-		jsonValue = v
-		valueType = api.Facet_INT
-	case float64:
-		jsonValue = v
-		valueType = api.Facet_FLOAT
-	case bool:
-		jsonValue = v
-		valueType = api.Facet_BOOL
-	default:
-		return nil, errors.Errorf("facet value can only be string/number/bool.")
-	}
-
-	// Convert facet val interface{} to binary.
-	binaryValueFacet, err := facets.ToBinary(key, jsonValue, valueType)
-	if err != nil {
-		return nil, err
-	}
-
-	return binaryValueFacet, nil
-}
-
-// parseMapFacets parses facets which are of map type. Facets for scalar list predicates are
-// specified in map format. For example below predicate nickname and kind facet associated with it.
-// Here nickname "bob" doesn't have any facet associated with it.
-// {
-//		"nickname": ["alice", "bob", "josh"],
-//		"nickname|kind": {
-//			"0": "friends",
-//			"2": "official"
-// 		}
-// }
-// Parsed response would a slice of maps[int]*api.Facet, one map for each facet.
-// Map key would be the index of scalar value for respective facets.
-func parseMapFacets(m map[string]interface{}, prefix string) ([]map[int]*api.Facet, error) {
-	// This happens at root.
-	if prefix == "" {
-		return nil, nil
-	}
-
-	var mapSlice []map[int]*api.Facet
-	for fname, facetVal := range m {
-		if facetVal == nil {
-			continue
-		}
-		if !strings.HasPrefix(fname, prefix) {
-			continue
-		}
-
-		fm, ok := facetVal.(map[string]interface{})
-		if !ok {
-			return nil, errors.Errorf("facets format should be of type map for "+
-				"scalarlist predicates, found: %v for facet: %v", facetVal, fname)
-		}
-
-		idxMap := make(map[int]*api.Facet, len(fm))
-		for sidx, val := range fm {
-			key := fname[len(prefix):]
-			facet, err := handleBasicFacetsType(key, val)
-			if err != nil {
-				return nil, errors.Wrapf(err, "facet: %s, index: %s", fname, sidx)
-			}
-			idx, err := strconv.Atoi(sidx)
-			if err != nil {
-				return nil, errors.Wrapf(err, "facet: %s, index: %s", fname, sidx)
-			}
-			idxMap[idx] = facet
-		}
-		mapSlice = append(mapSlice, idxMap)
-	}
-
-	return mapSlice, nil
-}
-
-// parseScalarFacets parses facets which should be of type string/json.Number/bool.
-// It returns []*api.Facet, one *api.Facet for each facet.
-func parseScalarFacets(m map[string]interface{}, prefix string) ([]*api.Facet, error) {
-	// This happens at root.
-	if prefix == "" {
-		return nil, nil
-	}
-
-	var facetsForPred []*api.Facet
-	for fname, facetVal := range m {
-		if facetVal == nil {
-			continue
-		}
-		if !strings.HasPrefix(fname, prefix) {
-			continue
-		}
-
-		key := fname[len(prefix):]
-		facet, err := handleBasicFacetsType(key, facetVal)
-		if err != nil {
-			return nil, errors.Wrapf(err, "facet: %s", fname)
-		}
-		facetsForPred = append(facetsForPred, facet)
-	}
-
-	return facetsForPred, nil
 }
 
 // This is the response for a map[string]interface{} i.e. a struct.
@@ -511,15 +357,6 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 			Namespace: namespace,
 		}
 
-		prefix := pred + x.FacetDelimeter
-		if _, ok := v.([]interface{}); !ok {
-			fts, err := parseScalarFacets(mr.rawFacets, prefix)
-			if err != nil {
-				return mr, err
-			}
-			nq.Facets = fts
-		}
-
 		// Here we split predicate and lang directive (ex: "name@en"), if needed. With JSON
 		// mutations that's the only way to send language for a value.
 		nq.Predicate, nq.Lang = x.PredicateLang(nq.Predicate)
@@ -566,18 +403,12 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 		case []interface{}:
 			buf.PushPredHint(pred, pb.Metadata_LIST)
 
-			// NOTE: facetsMapSlice should be empty unless this is a scalar list
-			var facetsMapSlice []map[int]*api.Facet
 			for idx, item := range v {
 				if idx == 0 {
 					// determine if this is a scalar list
 					switch item.(type) {
 					case string, float64, json.Number, int64:
-						var err error
-						facetsMapSlice, err = parseMapFacets(mr.rawFacets, prefix)
-						if err != nil {
-							return mr, err
-						}
+						// Used to parse facet here.
 					default:
 						// not a scalar list, continue
 					}
@@ -615,13 +446,6 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 					//			1: *api.Facet
 					// 		}
 					// ]
-					var fts []*api.Facet
-					for _, fm := range facetsMapSlice {
-						if ft, ok := fm[idx]; ok {
-							fts = append(fts, ft)
-						}
-					}
-					nq.Facets = fts
 					buf.Push(&nq)
 				case map[string]interface{}:
 					// map[string]interface{} can mean geojson or a connecting entity.
@@ -639,7 +463,6 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 						return mr, err
 					}
 					nq.ObjectId = cr.uid
-					nq.Facets = cr.fcts
 					buf.Push(&nq)
 				default:
 					return mr,
@@ -651,10 +474,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 		}
 	}
 
-	fts, err := parseScalarFacets(mr.rawFacets, parentPred+x.FacetDelimeter)
-	mr.fcts = fts
-
-	return mr, err
+	return mr, nil
 }
 
 const (

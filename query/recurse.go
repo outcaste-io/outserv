@@ -1,18 +1,5 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
 
 package query
 
@@ -69,16 +56,6 @@ func (start *SubGraph) expandRecurse(ctx context.Context, maxDepth uint64) error
 			return nil
 		}
 		depth++
-
-		// When the maximum depth has been reached, avoid retrieving any facets as
-		// the nodes at the other end of the edge will not be a part of this query.
-		// Otherwise, the facets will be included in the query without any other
-		// information about the node, which is quite counter-intuitive.
-		if depth == maxDepth {
-			for _, sg := range exec {
-				sg.Params.Facet = nil
-			}
-		}
 
 		rrch := make(chan error, len(exec))
 		for _, sg := range exec {
@@ -160,7 +137,7 @@ func (start *SubGraph) expandRecurse(ctx context.Context, maxDepth uint64) error
 					}
 				}
 			}
-			if len(sg.Params.Order) > 0 || len(sg.Params.FacetsOrder) > 0 {
+			if len(sg.Params.Order) > 0 {
 				// Can't use merge sort if the UIDs are not sorted.
 				sg.updateDestUids()
 			} else {

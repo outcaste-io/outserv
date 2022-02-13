@@ -18,7 +18,7 @@
 BADGER_PB_VERSION = 3
 
 DGO_PATH    := github.com/outcaste-io/dgo/v210
-BADGER_PATH := github.com/dgraph-io/badger/v${BADGER_PB_VERSION}
+BADGER_PATH := github.com/outcaste-io/badger/v${BADGER_PB_VERSION}
 GOGO_PATH   := github.com/gogo/protobuf
 
 TMPDIR     := $(shell mktemp -d)

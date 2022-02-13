@@ -4,8 +4,8 @@
 # This gets built as part of release.sh. Must be run from /tmp/build, with the linux binaries
 # already built and placed there.
 
-FROM ubuntu:20.04
-LABEL maintainer="Dgraph Labs <contact@dgraph.io>"
+FROM ubuntu:21.10
+# LABEL maintainer="Dgraph Labs <contact@dgraph.io>"
 
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
@@ -29,4 +29,4 @@ RUN mkdir /dgraph
 WORKDIR /dgraph
 
 ENV GODEBUG=madvdontneed=1
-CMD ["dgraph"] # Shows the dgraph version and commands available.
+CMD ["outserv"] # Shows the dgraph version and commands available.

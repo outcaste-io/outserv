@@ -1,18 +1,5 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
 
 package edgraph
 
@@ -56,7 +43,6 @@ import (
 	"github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/telemetry"
 	"github.com/outcaste-io/outserv/types"
-	"github.com/outcaste-io/outserv/types/facets"
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
 )
@@ -1888,38 +1874,10 @@ func parseMutationObject(mu *api.Mutation, qc *queryContext) (*gql.Mutation, err
 
 	res.Set = append(res.Set, mu.Set...)
 	res.Del = append(res.Del, mu.Del...)
-	// parse facets and convert to the binary format so that
-	// a field of type datetime like "2017-01-01" can be correctly encoded in the
-	// marshaled binary format as done in the time.Marshal method
-	if err := validateAndConvertFacets(res.Set); err != nil {
-		return nil, err
-	}
-
 	if err := validateNQuads(res.Set, res.Del, qc); err != nil {
 		return nil, err
 	}
 	return res, nil
-}
-
-func validateAndConvertFacets(nquads []*api.NQuad) error {
-	for _, m := range nquads {
-		encodedFacets := make([]*api.Facet, 0, len(m.Facets))
-		for _, f := range m.Facets {
-			// try to interpret the value as binary first
-			if _, err := facets.ValFor(f); err == nil {
-				encodedFacets = append(encodedFacets, f)
-			} else {
-				encodedFacet, err := facets.FacetFor(f.Key, string(f.Value))
-				if err != nil {
-					return err
-				}
-				encodedFacets = append(encodedFacets, encodedFacet)
-			}
-		}
-
-		m.Facets = encodedFacets
-	}
-	return nil
 }
 
 // validateForGraphql validate nquads for graphql
@@ -1932,7 +1890,6 @@ func validateForGraphql(nq *api.NQuad, isGraphql bool) error {
 }
 
 func validateNQuads(set, del []*api.NQuad, qc *queryContext) error {
-
 	for _, nq := range set {
 		if err := validatePredName(nq.Predicate); err != nil {
 			return err

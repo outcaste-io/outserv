@@ -1,32 +1,18 @@
-/*
- * Copyright 2015-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2015-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
 
 package gql
 
 import (
 	"bytes"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/lex"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 )
 
@@ -70,7 +56,6 @@ type GraphQuery struct {
 	ShortestPathArgs ShortestPathArgs
 	Cascade          []string
 	IgnoreReflex     bool
-	Facets           *pb.FacetParams
 	FacetsFilter     *FilterTree
 	GroupbyAttrs     []GroupByAttr
 	FacetVar         map[string]string
@@ -1946,188 +1931,6 @@ L:
 	return function, nil
 }
 
-type facetRes struct {
-	f           *pb.FacetParams
-	ft          *FilterTree
-	vmap        map[string]string
-	facetsOrder []*FacetOrder
-}
-
-func parseFacets(it *lex.ItemIterator) (res facetRes, err error) {
-	res, ok, err := tryParseFacetList(it)
-	if err != nil || ok {
-		return res, err
-	}
-
-	filterTree, err := parseFilter(it)
-	res.ft = filterTree
-	return res, err
-}
-
-type facetItem struct {
-	name      string
-	alias     string
-	varName   string
-	ordered   bool
-	orderdesc bool
-}
-
-// If err != nil, an error happened, abandon parsing.  If err == nil && parseOk == false, the
-// attempt to parse failed, no data was consumed, and there might be a valid alternate parse with a
-// different function.
-func tryParseFacetItem(it *lex.ItemIterator) (res facetItem, parseOk bool, err error) {
-	// We parse this:
-	// [{orderdesc|orderasc|alias}:] [varname as] name
-
-	savePos := it.Save()
-	defer func() {
-		if err == nil && !parseOk {
-			it.Restore(savePos)
-		}
-	}()
-
-	item, ok := tryParseItemType(it, itemName)
-	if !ok {
-		return res, false, nil
-	}
-
-	isOrderasc := item.Val == "orderasc"
-	if _, ok := tryParseItemType(it, itemColon); ok {
-		if isOrderasc || item.Val == "orderdesc" {
-			res.ordered = true
-			res.orderdesc = !isOrderasc
-		} else {
-			res.alias = item.Val
-		}
-
-		// Step past colon.
-		item, ok = tryParseItemType(it, itemName)
-		if !ok {
-			return res, false, item.Errorf("Expected name after colon")
-		}
-	}
-
-	// We've possibly set ordered, orderdesc, alias and now we have consumed another item,
-	// which is a name.
-	name1 := item.Val
-
-	// Now try to consume "as".
-	if !trySkipItemVal(it, "as") {
-		name1 = collectName(it, name1)
-		res.name = name1
-		return res, true, nil
-	}
-	item, ok = tryParseItemType(it, itemName)
-	if !ok {
-		return res, false, item.Errorf("Expected name in facet list")
-	}
-
-	res.name = collectName(it, item.Val)
-	res.varName = name1
-	return res, true, nil
-}
-
-// If err != nil, an error happened, abandon parsing.  If err == nil && parseOk == false, the
-// attempt to parse failed, but there might be a valid alternate parse with a different function,
-// such as parseFilter.
-func tryParseFacetList(it *lex.ItemIterator) (res facetRes, parseOk bool, err error) {
-	savePos := it.Save()
-	defer func() {
-		if err == nil && !parseOk {
-			it.Restore(savePos)
-		}
-	}()
-
-	// Skip past '('
-	if _, ok := tryParseItemType(it, itemLeftRound); !ok {
-		it.Restore(savePos)
-		var facets pb.FacetParams
-		facets.AllKeys = true
-		res.f = &facets
-		res.vmap = make(map[string]string)
-		return res, true, nil
-	}
-
-	facetVar := make(map[string]string)
-	var facets pb.FacetParams
-	var facetsOrder []*FacetOrder
-
-	if _, ok := tryParseItemType(it, itemRightRound); ok {
-		// @facets() just parses to an empty set of facets.
-		res.f, res.vmap, res.facetsOrder = &facets, facetVar, facetsOrder
-		return res, true, nil
-	}
-
-	facetsOrderKeys := make(map[string]struct{})
-	for {
-		// We've just consumed a leftRound or a comma.
-
-		// Parse a facet item.
-		// copy the iterator first to facetItemIt so that it corresponds to the parsed facetItem
-		// facetItemIt is used later for reporting errors with line and column numbers
-		facetItemIt := it
-		facetItem, ok, err := tryParseFacetItem(it)
-		if !ok || err != nil {
-			return res, ok, err
-		}
-
-		// Combine the facetitem with our result.
-		{
-			if facetItem.varName != "" {
-				if _, has := facetVar[facetItem.name]; has {
-					return res, false, facetItemIt.Errorf("Duplicate variable mappings for facet %v",
-						facetItem.name)
-				}
-				facetVar[facetItem.name] = facetItem.varName
-			}
-			facets.Param = append(facets.Param, &pb.FacetParam{
-				Key:   facetItem.name,
-				Alias: facetItem.alias,
-			})
-			if facetItem.ordered {
-				if _, ok := facetsOrderKeys[facetItem.name]; ok {
-					return res, false,
-						it.Errorf("Sorting by facet: [%s] can only be done once", facetItem.name)
-				}
-				facetsOrderKeys[facetItem.name] = struct{}{}
-				facetsOrder = append(facetsOrder,
-					&FacetOrder{Key: facetItem.name, Desc: facetItem.orderdesc})
-			}
-		}
-
-		// Now what?  Either close-paren or a comma.
-		if _, ok := tryParseItemType(it, itemRightRound); ok {
-			sort.Slice(facets.Param, func(i, j int) bool {
-				return facets.Param[i].Key < facets.Param[j].Key
-			})
-			// deduplicate facets
-			out := facets.Param[:0]
-			flen := len(facets.Param)
-			for i := 1; i < flen; i++ {
-				if facets.Param[i-1].Key == facets.Param[i].Key {
-					continue
-				}
-				out = append(out, facets.Param[i-1])
-			}
-			out = append(out, facets.Param[flen-1])
-			facets.Param = out
-			res.f, res.vmap, res.facetsOrder = &facets, facetVar, facetsOrder
-			return res, true, nil
-		}
-		if item, ok := tryParseItemType(it, itemComma); !ok {
-			if len(facets.Param) < 2 {
-				// We have only consumed ``'@facets' '(' <facetItem>`, which means parseFilter might
-				// succeed. Return no-parse, no-error.
-				return res, false, nil
-			}
-			// We've consumed `'@facets' '(' <facetItem> ',' <facetItem>`, so this is definitely
-			// not a filter.  Return an error.
-			return res, false, item.Errorf(
-				"Expected ',' or ')' in facet list: %s", item.Val)
-		}
-	}
-}
-
 // parseCascade parses the cascade directive.
 // Two formats:
 // 	1. @cascade
@@ -2505,30 +2308,7 @@ func parseDirective(it *lex.ItemIterator, curp *GraphQuery) error {
 
 	switch {
 	case item.Val == "facets": // because @facets can come w/t '()'
-		res, err := parseFacets(it)
-		if err != nil {
-			return err
-		}
-		switch {
-		case res.f != nil:
-			curp.FacetVar = res.vmap
-			curp.FacetsOrder = res.facetsOrder
-			if curp.Facets != nil {
-				return item.Errorf("Only one facets allowed")
-			}
-			curp.Facets = res.f
-		case res.ft != nil:
-			if curp.FacetsFilter != nil {
-				return item.Errorf("Only one facets filter allowed")
-			}
-			if res.ft.hasVars() {
-				return item.Errorf(
-					"variables are not allowed in facets filter.")
-			}
-			curp.FacetsFilter = res.ft
-		default:
-			return item.Errorf("Facets parsing failed.")
-		}
+		return item.Errorf("facets are not supported")
 	case item.Val == "cascade":
 		if err := parseCascade(it, curp); err != nil {
 			return err

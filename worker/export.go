@@ -1,18 +1,5 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
 
 package worker
 
@@ -39,13 +26,10 @@ import (
 	bpb "github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/ristretto/z"
 
-	"github.com/outcaste-io/dgo/v210/protos/api"
-
 	"github.com/outcaste-io/outserv/ee/enc"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/types"
-	"github.com/outcaste-io/outserv/types/facets"
 	"github.com/outcaste-io/outserv/x"
 )
 
@@ -108,21 +92,6 @@ func valToStr(v types.Val) (string, error) {
 	return strings.TrimRight(v2.Value.(string), "\x00"), nil
 }
 
-// facetToString convert a facet value to a string.
-func facetToString(fct *api.Facet) (string, error) {
-	v1, err := facets.ValFor(fct)
-	if err != nil {
-		return "", errors.Wrapf(err, "getting value from facet %#v", fct)
-	}
-
-	v2 := &types.Val{Tid: types.StringID}
-	if err = types.Marshal(v1, v2); err != nil {
-		return "", errors.Wrapf(err, "marshaling facet value %v to string", v1)
-	}
-
-	return v2.Value.(string), nil
-}
-
 // escapedString converts a string into an escaped string for exports.
 func escapedString(str string) string {
 	// We use the Marshal function in the JSON package for all export formats
@@ -142,31 +111,6 @@ func (e *exporter) toJSON() (*bpb.KVList, error) {
 	// We could output more compact JSON at the cost of code complexity.
 	// Leaving it simple for now.
 
-	writeFacets := func(pfacets []*api.Facet) error {
-		for _, fct := range pfacets {
-			fmt.Fprintf(bp, `,"%s|%s":`, e.attr, fct.Key)
-
-			str, err := facetToString(fct)
-			if err != nil {
-				glog.Errorf("Ignoring error: %+v", err)
-				return nil
-			}
-
-			tid, err := facets.TypeIDFor(fct)
-			if err != nil {
-				glog.Errorf("Error getting type id from facet %#v: %v", fct, err)
-				continue
-			}
-
-			if !tid.IsNumber() {
-				str = escapedString(str)
-			}
-
-			fmt.Fprint(bp, str)
-		}
-		return nil
-	}
-
 	continuing := false
 	mapStart := fmt.Sprintf("  {\"uid\":"+uidFmtStrJson+`,"namespace":"%#x"`, e.uid, e.namespace)
 	err := e.pl.IterateAll(e.readTs, 0, func(p *pb.Posting) error {
@@ -180,9 +124,6 @@ func (e *exporter) toJSON() (*bpb.KVList, error) {
 		if p.PostingType == pb.Posting_REF {
 			fmt.Fprintf(bp, `,"%s":[`, e.attr)
 			fmt.Fprintf(bp, "{\"uid\":"+uidFmtStrJson, p.Uid)
-			if err := writeFacets(p.Facets); err != nil {
-				return errors.Wrap(err, "While writing facets for posting_REF")
-			}
 			fmt.Fprint(bp, "}]")
 		} else {
 			if p.PostingType == pb.Posting_VALUE_LANG {
@@ -206,9 +147,6 @@ func (e *exporter) toJSON() (*bpb.KVList, error) {
 			}
 
 			fmt.Fprint(bp, str)
-			if err := writeFacets(p.Facets); err != nil {
-				return errors.Wrap(err, "While writing facets for value postings")
-			}
 		}
 
 		fmt.Fprint(bp, "}")
@@ -251,34 +189,6 @@ func (e *exporter) toRDF() (*bpb.KVList, error) {
 		// Use label for storing namespace.
 		fmt.Fprintf(bp, " <%#x>", e.namespace)
 
-		// Facets.
-		if len(p.Facets) != 0 {
-			fmt.Fprint(bp, " (")
-			for i, fct := range p.Facets {
-				if i != 0 {
-					fmt.Fprint(bp, ",")
-				}
-				fmt.Fprint(bp, fct.Key+"=")
-
-				str, err := facetToString(fct)
-				if err != nil {
-					glog.Errorf("Ignoring error: %+v", err)
-					return nil
-				}
-
-				tid, err := facets.TypeIDFor(fct)
-				if err != nil {
-					glog.Errorf("Error getting type id from facet %#v: %v", fct, err)
-					continue
-				}
-
-				if tid == types.StringID {
-					str = escapedString(str)
-				}
-				fmt.Fprint(bp, str)
-			}
-			fmt.Fprint(bp, ")")
-		}
 		// End dot.
 		fmt.Fprint(bp, " .\n")
 		return nil

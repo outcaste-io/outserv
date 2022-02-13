@@ -1,18 +1,5 @@
-/*
- * Copyright 2016-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2016-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart license.
 
 package posting
 
@@ -181,7 +168,6 @@ func (txn *Txn) addReverseMutation(ctx context.Context, t *pb.DirectedEdge) erro
 		ValueId: t.Entity,
 		Attr:    t.Attr,
 		Op:      t.Op,
-		Facets:  t.Facets,
 	}
 	return plist.addMutation(ctx, txn, edge)
 }
@@ -245,7 +231,6 @@ func (txn *Txn) addReverseAndCountMutation(ctx context.Context, t *pb.DirectedEd
 		ValueId: t.Entity,
 		Attr:    t.Attr,
 		Op:      t.Op,
-		Facets:  t.Facets,
 	}
 
 	cp, err := txn.addReverseMutationHelper(ctx, plist, hasCountIndex, edge)
@@ -1125,7 +1110,6 @@ func rebuildReverseEdges(ctx context.Context, rb *IndexRebuild) error {
 			// Add reverse entries based on p.
 			edge.ValueId = puid
 			edge.Op = pb.DirectedEdge_SET
-			edge.Facets = pp.Facets
 
 			for {
 				// we only need to build reverse index here.
@@ -1206,7 +1190,6 @@ func rebuildListType(ctx context.Context, rb *IndexRebuild) error {
 			Value:     mpost.Value,
 			ValueType: mpost.ValType,
 			Op:        pb.DirectedEdge_SET,
-			Facets:    mpost.Facets,
 		}
 		return pl.addMutation(ctx, txn, newEdge)
 	}

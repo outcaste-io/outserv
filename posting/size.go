@@ -1,18 +1,5 @@
-/*
- * Copyright 2019 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2019 Dgraph Labs, Inc. are available under the Apache 2.0 license.
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart license.
 
 package posting
 
@@ -128,11 +115,6 @@ func calculatePostingSize(posting *pb.Posting) uint64 {
 
 	// Adding the size of each entry in LangTag array.
 	size += uint64(cap(posting.LangTag))
-
-	for _, f := range posting.Facets {
-		// Add the size of each facet.
-		size += calculateFacet(f)
-	}
 
 	return size
 }
