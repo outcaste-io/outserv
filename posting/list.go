@@ -27,6 +27,7 @@ import (
 	"github.com/dgryski/go-farm"
 	"github.com/pkg/errors"
 
+	"github.com/golang/protobuf/proto"
 	bpb "github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/outserv/codec"
@@ -37,7 +38,6 @@ import (
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
 	"github.com/outcaste-io/sroar"
-	"github.com/golang/protobuf/proto"
 )
 
 var (
@@ -234,8 +234,6 @@ func NewPosting(t *pb.DirectedEdge) *pb.Posting {
 
 	var postingType pb.Posting_PostingType
 	switch {
-	case len(t.Lang) > 0:
-		postingType = pb.Posting_VALUE_LANG
 	case t.ValueId == 0:
 		postingType = pb.Posting_VALUE
 	default:
@@ -247,7 +245,6 @@ func NewPosting(t *pb.DirectedEdge) *pb.Posting {
 		Value:       t.Value,
 		ValType:     t.ValueType,
 		PostingType: postingType,
-		LangTag:     []byte(t.Lang),
 		Op:          op,
 		Facets:      t.Facets,
 	}
@@ -255,7 +252,7 @@ func NewPosting(t *pb.DirectedEdge) *pb.Posting {
 }
 
 func hasDeleteAll(mpost *pb.Posting) bool {
-	return mpost.Op == Del && bytes.Equal(mpost.Value, []byte(x.Star)) && len(mpost.LangTag) == 0
+	return mpost.Op == Del && bytes.Equal(mpost.Value, []byte(x.Star))
 }
 
 // Ensure that you either abort the uncommitted postings or commit them before calling me.
@@ -357,8 +354,6 @@ func fingerprintEdge(t *pb.DirectedEdge) uint64 {
 
 	// Value with a lang type.
 	switch {
-	case len(t.Lang) > 0:
-		id = farm.Fingerprint64([]byte(t.Lang))
 	case schema.State().IsList(t.Attr):
 		// TODO - When values are deleted for list type, then we should only delete the UID from
 		// index if no other values produces that index token.
@@ -1389,12 +1384,10 @@ func (l *List) AllUntaggedValues(readTs uint64) ([]types.Val, error) {
 
 	var vals []types.Val
 	err := l.iterate(readTs, 0, func(p *pb.Posting) error {
-		if len(p.LangTag) == 0 {
-			vals = append(vals, types.Val{
-				Tid:   types.TypeID(p.ValType),
-				Value: p.Value,
-			})
-		}
+		vals = append(vals, types.Val{
+			Tid:   types.TypeID(p.ValType),
+			Value: p.Value,
+		})
 		return nil
 	})
 	return vals, errors.Wrapf(err, "cannot retrieve untagged values from list with key %s",
@@ -1407,9 +1400,6 @@ func (l *List) allUntaggedFacets(readTs uint64) ([]*pb.Facets, error) {
 	l.AssertRLock()
 	var facets []*pb.Facets
 	err := l.iterate(readTs, 0, func(p *pb.Posting) error {
-		if len(p.LangTag) == 0 {
-			facets = append(facets, &pb.Facets{Facets: p.Facets})
-		}
 		return nil
 	})
 
@@ -1434,20 +1424,6 @@ func (l *List) AllValues(readTs uint64) ([]types.Val, error) {
 		hex.EncodeToString(l.key))
 }
 
-// GetLangTags finds the language tags of each posting in the list.
-func (l *List) GetLangTags(readTs uint64) ([]string, error) {
-	l.RLock()
-	defer l.RUnlock()
-
-	var tags []string
-	err := l.iterate(readTs, 0, func(p *pb.Posting) error {
-		tags = append(tags, string(p.LangTag))
-		return nil
-	})
-	return tags, errors.Wrapf(err, "cannot retrieve language tags from list with key %s",
-		hex.EncodeToString(l.key))
-}
-
 // Value returns the default value from the posting list. The default value is
 // defined as the value without a language tag.
 func (l *List) Value(readTs uint64) (rval types.Val, rerr error) {
@@ -1469,16 +1445,16 @@ func (l *List) Value(readTs uint64) (rval types.Val, rerr error) {
 // available, value with smallest UID is returned.
 // If list consists of one or more languages, first available value is returned.
 // If no language from the list matches the values, processing is the same as for empty list.
-func (l *List) ValueFor(readTs uint64, langs []string) (rval types.Val, rerr error) {
+func (l *List) ValueFor(readTs uint64) (rval types.Val, rerr error) {
 	l.RLock() // All public methods should acquire locks, while private ones should assert them.
 	defer l.RUnlock()
-	p, err := l.postingFor(readTs, langs)
+	p, err := l.postingFor(readTs)
 	switch {
 	case err == ErrNoValue:
 		return rval, err
 	case err != nil:
-		return rval, errors.Wrapf(err, "cannot retrieve value with langs %v from list with key %s",
-			langs, hex.EncodeToString(l.key))
+		return rval, errors.Wrapf(err, "cannot retrieve value from list with key %s",
+			hex.EncodeToString(l.key))
 	}
 	return valueToTypesVal(p), nil
 }
@@ -1487,12 +1463,12 @@ func (l *List) ValueFor(readTs uint64, langs []string) (rval types.Val, rerr err
 func (l *List) PostingFor(readTs uint64, langs []string) (p *pb.Posting, rerr error) {
 	l.RLock()
 	defer l.RUnlock()
-	return l.postingFor(readTs, langs)
+	return l.postingFor(readTs)
 }
 
-func (l *List) postingFor(readTs uint64, langs []string) (p *pb.Posting, rerr error) {
+func (l *List) postingFor(readTs uint64) (p *pb.Posting, rerr error) {
 	l.AssertRLock() // Avoid recursive locking by asserting a lock here.
-	return l.postingForLangs(readTs, langs)
+	return l.postingForLangs(readTs)
 }
 
 // ValueForTag returns the value in the posting list with the given language tag.
@@ -1514,55 +1490,17 @@ func valueToTypesVal(p *pb.Posting) (rval types.Val) {
 	return
 }
 
-func (l *List) postingForLangs(readTs uint64, langs []string) (*pb.Posting, error) {
+func (l *List) postingForLangs(readTs uint64) (*pb.Posting, error) {
 	l.AssertRLock()
 
-	any := false
-	// look for language in preferred order
-	for _, lang := range langs {
-		if lang == "." {
-			any = true
-			break
-		}
-		pos, err := l.postingForTag(readTs, lang)
-		if err == nil {
-			return pos, nil
-		}
-	}
-
 	// look for value without language
-	if any || len(langs) == 0 {
-		found, pos, err := l.findPosting(readTs, math.MaxUint64)
-		switch {
-		case err != nil:
-			return nil, errors.Wrapf(err,
-				"cannot find value without language tag from list with key %s",
-				hex.EncodeToString(l.key))
-		case found:
-			return pos, nil
-		}
-	}
-
-	var found bool
-	var pos *pb.Posting
-	// last resort - return value with smallest lang UID.
-	if any {
-		err := l.iterate(readTs, 0, func(p *pb.Posting) error {
-			if p.PostingType == pb.Posting_VALUE_LANG {
-				pos = p
-				found = true
-				return ErrStopIteration
-			}
-			return nil
-		})
-		if err != nil {
-			return nil, errors.Wrapf(err,
-				"cannot retrieve value with the smallest lang UID from list with key %s",
-				hex.EncodeToString(l.key))
-		}
-	}
-
-	if found {
+	found, pos, err := l.findPosting(readTs, math.MaxUint64)
+	switch {
+	case err != nil:
+		return nil, errors.Wrapf(err,
+			"cannot find value without language tag from list with key %s",
+			hex.EncodeToString(l.key))
+	case found:
 		return pos, nil
 	}
 
@@ -1625,7 +1563,7 @@ func (l *List) Facets(readTs uint64, param *pb.FacetParams, langs []string,
 		}
 		return fcs, nil
 	}
-	p, err := l.postingFor(readTs, langs)
+	p, err := l.postingFor(readTs)
 	switch {
 	case err == ErrNoValue:
 		return nil, err

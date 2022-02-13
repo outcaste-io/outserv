@@ -185,11 +185,7 @@ func (e *exporter) toJSON() (*bpb.KVList, error) {
 			}
 			fmt.Fprint(bp, "}]")
 		} else {
-			if p.PostingType == pb.Posting_VALUE_LANG {
-				fmt.Fprintf(bp, `,"%s@%s":`, e.attr, string(p.LangTag))
-			} else {
-				fmt.Fprintf(bp, `,"%s":`, e.attr)
-			}
+			fmt.Fprintf(bp, `,"%s":`, e.attr)
 
 			val := types.Val{Tid: types.TypeID(p.ValType), Value: p.Value}
 			str, err := valToStr(val)
@@ -240,9 +236,7 @@ func (e *exporter) toRDF() (*bpb.KVList, error) {
 			fmt.Fprintf(bp, "%s", escapedString(str))
 
 			tid := types.TypeID(p.ValType)
-			if p.PostingType == pb.Posting_VALUE_LANG {
-				fmt.Fprint(bp, "@"+string(p.LangTag))
-			} else if tid != types.DefaultID {
+			if tid != types.DefaultID {
 				rdfType, ok := rdfTypeMap[tid]
 				x.AssertTruef(ok, "Didn't find RDF type for dgraph type: %+v", tid.Name())
 				fmt.Fprint(bp, "^^<"+rdfType+">")
@@ -316,9 +310,6 @@ func toSchema(attr string, update *pb.SchemaUpdate) *bpb.KV {
 	}
 	if update.GetCount() {
 		x.Check2(buf.WriteString(" @count"))
-	}
-	if update.GetLang() {
-		x.Check2(buf.WriteString(" @lang"))
 	}
 	if update.GetUpsert() {
 		x.Check2(buf.WriteString(" @upsert"))

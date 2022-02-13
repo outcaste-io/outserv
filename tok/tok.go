@@ -19,7 +19,6 @@ package tok
 import (
 	"encoding/binary"
 	"plugin"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -289,17 +288,8 @@ func (t TermTokenizer) Tokens(v interface{}) ([]string, error) {
 	if !ok || str == "" {
 		return []string{str}, nil
 	}
-	lang := LangBase(t.lang)
-	switch lang {
-	case "zh", "ja", "th", "lo", "my", "bo", "km", "kxm":
-		// Chinese, Japanese, Thai, Lao, Burmese, Tibetan and Khmer (km, kxm) do not use spaces as delimiters. We simply split by space.
-		tokens := strings.Split(str, " ")
-		return x.RemoveDuplicates(tokens), nil
-	default:
-		tokens := termAnalyzer.Analyze([]byte(str))
-		return uniqueTerms(tokens), nil
-	}
-
+	tokens := termAnalyzer.Analyze([]byte(str))
+	return uniqueTerms(tokens), nil
 }
 func (t TermTokenizer) Identifier() byte { return IdentTerm }
 func (t TermTokenizer) IsSortable() bool { return false }
@@ -364,13 +354,12 @@ func (t FullTextTokenizer) Tokens(v interface{}) ([]string, error) {
 	if !ok || str == "" {
 		return []string{}, nil
 	}
-	lang := LangBase(t.lang)
 	// pass 1 - lowercase and normalize input
 	tokens := fulltextAnalyzer.Analyze([]byte(str))
 	// pass 2 - filter stop words
-	tokens = filterStopwords(lang, tokens)
+	tokens = filterStopwords(tokens)
 	// pass 3 - filter stems
-	tokens = filterStemmers(lang, tokens)
+	tokens = filterStemmers(tokens)
 	// finally, return the terms.
 	return uniqueTerms(tokens), nil
 }

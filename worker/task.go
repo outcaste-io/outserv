@@ -417,21 +417,9 @@ func (qs *queryState) handleValuePostings(ctx context.Context, args funcArgs) er
 				out.FacetMatrix = append(out.FacetMatrix, &pb.FacetsList{})
 				out.ValueMatrix = append(out.ValueMatrix,
 					&pb.ValueList{Values: []*pb.TaskValue{}})
-				if q.ExpandAll {
-					// To keep the cardinality same as that of ValueMatrix.
-					out.LangMatrix = append(out.LangMatrix, &pb.LangList{})
-				}
 				continue
 			case err != nil:
 				return err
-			}
-
-			if q.ExpandAll {
-				langTags, err := pl.GetLangTags(args.q.ReadTs)
-				if err != nil {
-					return err
-				}
-				out.LangMatrix = append(out.LangMatrix, &pb.LangList{Lang: langTags})
 			}
 
 			res := sroar.NewBitmap()

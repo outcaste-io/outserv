@@ -53,7 +53,6 @@ message SrcFunction {
 
 message Query {
   string attr = 1;
-  repeated string langs = 2;  // language list for attribute
   fixed64 after_uid = 3;      // Only return UIDs greater than this.
   bool do_count = 4;          // Are we just getting lengths?
 
@@ -88,24 +87,18 @@ message ValueList {
   repeated TaskValue values = 1;
 }
 
-message LangList {
-  repeated string lang = 1;
-}
-
 message Result {
   repeated List uid_matrix = 1;
   repeated ValueList value_matrix = 2;
   repeated uint32 counts = 3;
   bool intersect_dest = 4;
   repeated FacetsList facet_matrix = 5;
-  repeated LangList lang_matrix = 6;
   bool list = 7;
 }
 
 message Order {
   string attr = 1;
   bool desc = 2;
-  repeated string langs = 3;
 }
 
 message SortMessage {
@@ -238,7 +231,6 @@ message DirectedEdge {
   bytes value = 3;                 // Edge points to a value.
   Posting.ValType value_type = 4;  // The type of the value
   fixed64 value_id = 5;            // Object or destination node / UID.
-  string lang = 7;
   enum Op {
     SET = 0;
     DEL = 1;
@@ -388,10 +380,8 @@ message Posting {
   enum PostingType {
     REF = 0;         // UID
     VALUE = 1;       // simple, plain value
-    VALUE_LANG = 2;  // value with specified language
   }
   PostingType posting_type = 4;
-  bytes lang_tag = 5;  // Only set for VALUE_LANG
   repeated api.Facet facets = 9;
 
   // TODO: op is only used temporarily. See if we can remove it from here.
@@ -460,7 +450,6 @@ message SchemaNode {
   bool count = 6;
   bool list = 7;
   bool upsert = 8;
-  bool lang = 9;
   bool no_conflict = 10;
 }
 
@@ -482,7 +471,6 @@ message SchemaUpdate {
   bool count = 5;
   bool list = 6;
   bool upsert = 8;
-  bool lang = 9;
 
   // Fields required for type system.
   bool non_nullable = 10;

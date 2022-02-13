@@ -56,7 +56,6 @@ type indexMutationInfo struct {
 // index rune, for specific tokenizers.
 func indexTokens(ctx context.Context, info *indexMutationInfo) ([]string, error) {
 	attr := info.edge.Attr
-	lang := info.edge.GetLang()
 
 	schemaType, err := schema.State().TypeOf(attr)
 	if err != nil || !schemaType.IsScalar() {
@@ -73,7 +72,7 @@ func indexTokens(ctx context.Context, info *indexMutationInfo) ([]string, error)
 
 	var tokens []string
 	for _, it := range info.tokenizers {
-		toks, err := tok.BuildTokens(sv.Value, tok.GetTokenizerForLang(it, lang))
+		toks, err := tok.BuildTokens(sv.Value, it)
 		if err != nil {
 			return tokens, err
 		}
@@ -505,18 +504,13 @@ func (l *List) AddMutationWithIndex(ctx context.Context, edge *pb.DirectedEdge, 
 }
 
 // prefixesToDeleteTokensFor returns the prefixes to be deleted for index for the given attribute and token.
-func prefixesToDeleteTokensFor(attr, tokenizerName string, hasLang bool) ([][]byte, error) {
+func prefixesToDeleteTokensFor(attr, tokenizerName string) ([][]byte, error) {
 	prefixes := [][]byte{}
 	pk := x.ParsedKey{Attr: attr}
 	prefix := pk.IndexPrefix()
 	tokenizer, ok := tok.GetTokenizer(tokenizerName)
 	if !ok {
 		return nil, errors.Errorf("Could not find valid tokenizer for %s", tokenizerName)
-	}
-	if hasLang {
-		// We just need the tokenizer identifier for ExactTokenizer having language.
-		// It will be same for all the language.
-		tokenizer = tok.GetTokenizerForLang(tokenizer, "en")
 	}
 	prefix = append(prefix, tokenizer.Identifier())
 	prefixes = append(prefixes, prefix)
@@ -876,38 +870,22 @@ func prefixesForTokIndexes(ctx context.Context, rb *IndexRebuild) ([][]byte, err
 	glog.Infof("Computing prefix index for attr %s and tokenizers %s", rb.Attr,
 		rebuildInfo.tokenizersToDelete)
 	for _, tokenizer := range rebuildInfo.tokenizersToDelete {
-		prefixesNonLang, err := prefixesToDeleteTokensFor(rb.Attr, tokenizer, false)
+		prefixesNonLang, err := prefixesToDeleteTokensFor(rb.Attr, tokenizer)
 		if err != nil {
 			return nil, err
 		}
 		prefixes = append(prefixes, prefixesNonLang...)
-		if tokenizer != "exact" {
-			continue
-		}
-		prefixesWithLang, err := prefixesToDeleteTokensFor(rb.Attr, tokenizer, true)
-		if err != nil {
-			return nil, err
-		}
-		prefixes = append(prefixes, prefixesWithLang...)
 	}
 
 	glog.Infof("Deleting index for attr %s and tokenizers %s", rb.Attr,
 		rebuildInfo.tokenizersToRebuild)
 	// Before rebuilding, the existing index needs to be deleted.
 	for _, tokenizer := range rebuildInfo.tokenizersToRebuild {
-		prefixesNonLang, err := prefixesToDeleteTokensFor(rb.Attr, tokenizer, false)
+		prefixesNonLang, err := prefixesToDeleteTokensFor(rb.Attr, tokenizer)
 		if err != nil {
 			return nil, err
 		}
 		prefixes = append(prefixes, prefixesNonLang...)
-		if tokenizer != "exact" {
-			continue
-		}
-		prefixesWithLang, err := prefixesToDeleteTokensFor(rb.Attr, tokenizer, true)
-		if err != nil {
-			return nil, err
-		}
-		prefixes = append(prefixes, prefixesWithLang...)
 	}
 
 	return prefixes, nil
@@ -943,7 +921,6 @@ func rebuildTokIndex(ctx context.Context, rb *IndexRebuild) error {
 				Value: p.Value,
 				Tid:   types.TypeID(p.ValType),
 			}
-			edge.Lang = string(p.LangTag)
 
 			for {
 				err := txn.addIndexMutations(ctx, &indexMutationInfo{

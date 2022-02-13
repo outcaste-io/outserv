@@ -230,19 +230,7 @@ func sortWithIndex(ctx context.Context, ts *pb.SortMessage) *sortresult {
 	}
 
 	var prefix []byte
-	if len(order.Langs) > 0 {
-		// Only one languge is allowed.
-		lang := order.Langs[0]
-		tokenizer = tok.GetTokenizerForLang(tokenizer, lang)
-		langTokenizer, ok := tokenizer.(tok.ExactTokenizer)
-		if !ok {
-			return resultWithError(errors.Errorf(
-				"Failed to get tokenizer for Attribute %s for language %s.", order.Attr, lang))
-		}
-		prefix = langTokenizer.Prefix()
-	} else {
-		prefix = []byte{tokenizer.Identifier()}
-	}
+	prefix = []byte{tokenizer.Identifier()}
 
 	// Iterate over every bucket / token.
 	iterOpt := badger.DefaultIteratorOptions
@@ -394,7 +382,6 @@ func multiSort(ctx context.Context, r *sortresult, ts *pb.SortMessage) error {
 		in := &pb.Query{
 			Attr:    ts.Order[i].Attr,
 			UidList: codec.ToSortedList(dest),
-			Langs:   ts.Order[i].Langs,
 			ReadTs:  ts.ReadTs,
 		}
 		go fetchValues(ctx, in, i, och)
