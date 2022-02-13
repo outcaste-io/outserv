@@ -10,6 +10,7 @@ import (
 	"log"
 	"math/big"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -58,8 +59,8 @@ type ErrorResp struct {
 }
 
 type WResp struct {
-	Data   DataResp  `json:"data"`
-	Errors ErrorResp `json:"errors"`
+	Data   DataResp    `json:"data"`
+	Errors []ErrorResp `json:"errors"`
 }
 
 var start = time.Now()
@@ -135,19 +136,28 @@ func processBlock(blockId int64) error {
 	// TODO: Check that the schema is correctly set.
 	var wr WResp
 	if !*dryRun {
+	LOOP:
 		resp, err := http.Post("http://localhost:8080/graphql", "application/json", bytes.NewBuffer(data))
 		if err != nil {
 			return errors.Wrapf(err, "while posting request")
 		}
 		out, err := ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
-		fmt.Printf("out: %s\n", out)
+		// fmt.Printf("out: %s\n", out)
 
 		if err := json.Unmarshal(out, &wr); err != nil {
 			return errors.Wrapf(err, "response: %s\n", out)
 		}
-		if len(wr.Errors.Message) > 0 {
-			return fmt.Errorf("Got error from GraphQL: %s\n", wr.Errors.Message)
+		// TODO: Remove this once we remove txns from Outserv.
+		for _, werr := range wr.Errors {
+			if strings.Contains(werr.Message, "has been aborted") {
+				// We need to retry.
+				fmt.Printf("Retrying update. Error: %v\n", werr.Message)
+				goto LOOP
+			}
+			if len(werr.Message) > 0 {
+				return fmt.Errorf("Got error from GraphQL: %s\n", werr.Message)
+			}
 		}
 	}
 	s := atomic.AddInt64(&sent, 1)
