@@ -31,7 +31,7 @@ The [Changelog] is kept fairly up-to-date.
 
 For more details on our version naming schema please read [Choosing a version](#choosing-a-version).
 
-[Changelog]:https://github.com/dgraph-io/badger/blob/master/CHANGELOG.md
+[Changelog]:https://github.com/outcaste-io/badger/blob/main/CHANGELOG.md
 
 ## Table of Contents
  * [Getting Started](#getting-started)
@@ -51,7 +51,8 @@ For more details on our version naming schema please read [Choosing a version](#
 ## Getting Started
 
 ### Installing
-To start using Badger, install Go 1.12 or above. Badger v2 needs go modules. Run the following command to retrieve the library.
+
+Badger v2 and later require Go Modules. To start using Badger, install Go 1.12 or above and run the following command to retrieve the library.
 
 ```sh
 $ go get github.com/outcaste-io/badger/v3
@@ -89,6 +90,16 @@ Following these rules:
 
 For a longer explanation on the reasons behind using a new versioning naming schema, you can read
 [VERSIONING.md](VERSIONING.md).
+
+### Migrating from dgraph-io/badger to outcaste-io/badger
+
+If you're currently using dgraph-io/badger, you can migrate to outcaste-io/badger by using pattern
+replacement with `gofmt` to update all the import paths in your project's Go files:
+
+```bash
+go get github.com/outcaste-io/badger/v3
+find . -name '*.go' | xargs gofmt -w -r '"github.com/dgraph-io/badger/v3" -> "github.com/outcaste-io/badger/v3"'
+```
 
 ## Badger Documentation
 

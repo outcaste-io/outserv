@@ -8,21 +8,31 @@ aliases = ["/get-started"]
 To start using Badger, install Go 1.12 or above. Badger v2 needs go modules. Run the following command to retrieve the library.
 
 ```sh
-$ go get github.com/dgraph-io/badger/v3
+$ go get github.com/outcaste-io/badger/v3
 ```
 This will retrieve the library.
 
-{{% notice "note" %}} Badger does not directly use CGO but it relies on https://github.com/DataDog/zstd for compression and it requires gcc/cgo. If you wish to use badger without gcc/cgo, you can run `CGO_ENABLED=0 go get github.com/dgraph-io/badger/...` which will download badger without the support for ZSTD compression algorithm.{{% /notice %}}
+{{% notice "note" %}} Badger does not directly use CGO but it relies on https://github.com/DataDog/zstd for compression and it requires gcc/cgo. If you wish to use badger without gcc/cgo, you can run `CGO_ENABLED=0 go get github.com/outcaste-io/badger/...` which will download badger without the support for ZSTD compression algorithm.{{% /notice %}}
 
 ### Installing Badger Command Line Tool
 
-Download and extract the latest Badger DB release from https://github.com/dgraph-io/badger/releases and then run the following commands.
+Download and extract the latest Badger DB release from https://github.com/outcaste-io/badger/releases and then run the following commands.
 
 ```sh
 $ cd badger-<version>/badger
 $ go install
 ```
 This will install the badger command line utility into your $GOBIN path.
+
+### Migrating from dgraph-io/badger to outcaste-io/badger
+
+If you're currently using dgraph-io/badger, you can migrate to outcaste-io/badger by using pattern
+replacement with `gofmt` to update all the import paths in your project's Go files:
+
+```bash
+go get github.com/outcaste-io/badger/v3
+find . -name '*.go' | xargs gofmt -w -r '"github.com/dgraph-io/badger/v3" -> "github.com/outcaste-io/badger/v3"'
+```
 
 ### Choosing a version
 
@@ -44,7 +54,7 @@ Following these rules:
  v1.6.0 will need to be converted into the new format before they can be used by v2.0.0.
 
 For a longer explanation on the reasons behind using a new versioning naming schema, you can read
-[VERSIONING.md](https://github.com/dgraph-io/badger/blob/master/VERSIONING.md)
+[VERSIONING.md](https://github.com/outcaste-io/badger/blob/master/VERSIONING.md)
 
 ## Opening a database
 The top-level object in Badger is a `DB`. It represents multiple files on disk
