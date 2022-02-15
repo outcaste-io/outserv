@@ -30,9 +30,6 @@ import (
 
 	"github.com/outcaste-io/badger/v3"
 	bpb "github.com/outcaste-io/badger/v3/pb"
-	"github.com/outcaste-io/badger/v3/skl"
-	"github.com/outcaste-io/badger/v3/table"
-	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -363,8 +360,8 @@ func (n *node) mutationWorker(workerId int) {
 		span := otrace.FromContext(ctx)
 		span.Annotatef(nil, "Executing mutation from worker id: %d", workerId)
 
-		txn := posting.Oracle().GetTxn(p.Mutations.StartTs)
-		x.AssertTruef(txn != nil, "Unable to find txn with start ts: %d", p.Mutations.StartTs)
+		txn := posting.GetTxn(p.CommitTs)
+		x.AssertTruef(txn != nil, "Unable to find txn with commit ts: %d", p.CommitTs)
 		txn.ErrCh <- n.concMutations(ctx, p.Mutations, txn)
 		close(txn.ErrCh)
 	}
@@ -465,16 +462,16 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 // We don't support schema mutations across nodes in a transaction.
 // Wait for all transactions to either abort or complete and all write transactions
 // involving the predicate are aborted until schema mutations are done.
-func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr error) {
+func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr error) {
 	span := otrace.FromContext(ctx)
 
-	if proposal.Mutations.DropOp == pb.Mutations_DATA {
-		ns, err := strconv.ParseUint(proposal.Mutations.DropValue, 0, 64)
+	if prop.Mutations.DropOp == pb.Mutations_DATA {
+		ns, err := strconv.ParseUint(prop.Mutations.DropValue, 0, 64)
 		if err != nil {
 			return err
 		}
 		// Ensures nothing get written to disk due to commit proposals.
-		n.keysWritten.rejectBeforeIndex = proposal.Index
+		n.keysWritten.rejectBeforeIndex = prop.Index
 
 		// Stop rollups, otherwise we might end up overwriting some new data.
 		n.stopTask(opRollup)
@@ -491,9 +488,9 @@ func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr 
 		return nil
 	}
 
-	if proposal.Mutations.DropOp == pb.Mutations_ALL {
+	if prop.Mutations.DropOp == pb.Mutations_ALL {
 		// Ensures nothing get written to disk due to commit proposals.
-		n.keysWritten.rejectBeforeIndex = proposal.Index
+		n.keysWritten.rejectBeforeIndex = prop.Index
 
 		// Stop rollups, otherwise we might end up overwriting some new data.
 		n.stopTask(opRollup)
@@ -530,43 +527,38 @@ func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr 
 		return nil
 	}
 
-	if proposal.Mutations.DropOp == pb.Mutations_TYPE {
-		n.keysWritten.rejectBeforeIndex = proposal.Index
-		return schema.State().DeleteType(proposal.Mutations.DropValue, proposal.CommitTs)
+	if prop.Mutations.DropOp == pb.Mutations_TYPE {
+		n.keysWritten.rejectBeforeIndex = prop.Index
+		return schema.State().DeleteType(prop.Mutations.DropValue, prop.CommitTs)
 	}
 
-	if proposal.Mutations.StartTs == 0 {
+	if prop.Mutations.StartTs == 0 {
 		return errors.New("StartTs must be provided")
 	}
 
-	if len(proposal.Mutations.Schema) > 0 || len(proposal.Mutations.Types) > 0 {
-		n.keysWritten.rejectBeforeIndex = proposal.Index
-
-		// MaxAssigned would ensure that everything that's committed up until this point
-		// would be picked up in building indexes. Any uncommitted txns would be cancelled
-		// by detectPendingTxns below.
-		startTs := posting.Oracle().MaxAssigned()
+	if len(prop.Mutations.Schema) > 0 || len(prop.Mutations.Types) > 0 {
+		n.keysWritten.rejectBeforeIndex = prop.Index
 
 		span.Annotatef(nil, "Applying schema and types")
-		for _, supdate := range proposal.Mutations.Schema {
+		for _, supdate := range prop.Mutations.Schema {
 			// We should not need to check for predicate move here.
 			if err := detectPendingTxns(supdate.Predicate); err != nil {
 				return err
 			}
 		}
 
-		if err := runSchemaMutation(ctx, proposal.Mutations.Schema, startTs); err != nil {
+		if err := runSchemaMutation(ctx, prop.Mutations.Schema, prop.CommitTs); err != nil {
 			return err
 		}
 
 		// Clear the entire cache if there is a schema update because the index rebuild
 		// will invalidate the state.
-		if len(proposal.Mutations.Schema) > 0 {
+		if len(prop.Mutations.Schema) > 0 {
 			posting.ResetCache()
 		}
 
-		for _, tupdate := range proposal.Mutations.Types {
-			if err := runTypeMutation(ctx, tupdate, startTs); err != nil {
+		for _, tupdate := range prop.Mutations.Types {
+			if err := runTypeMutation(ctx, tupdate, prop.CommitTs); err != nil {
 				return err
 			}
 		}
@@ -582,7 +574,7 @@ func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr 
 
 	// Stores a map of predicate and type of first mutation for each predicate.
 	schemaMap := make(map[string]types.TypeID)
-	for _, edge := range proposal.Mutations.Edges {
+	for _, edge := range prop.Mutations.Edges {
 		if edge.Entity == 0 && bytes.Equal(edge.Value, []byte(x.Star)) {
 			// We should only drop the predicate if there is no pending
 			// transaction.
@@ -591,8 +583,8 @@ func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr 
 				return err
 			}
 			span.Annotatef(nil, "Deleting predicate: %s", edge.Attr)
-			n.keysWritten.rejectBeforeIndex = proposal.Index
-			return posting.DeletePredicate(ctx, edge.Attr, proposal.CommitTs)
+			n.keysWritten.rejectBeforeIndex = prop.Index
+			return posting.DeletePredicate(ctx, edge.Attr, prop.CommitTs)
 		}
 		// Don't derive schema when doing deletion.
 		if edge.Op == pb.DirectedEdge_DEL {
@@ -603,7 +595,7 @@ func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr 
 		}
 	}
 
-	total := len(proposal.Mutations.Edges)
+	total := len(prop.Mutations.Edges)
 
 	// TODO: Active mutations values can go up or down but with
 	// OpenCensus stats bucket boundaries start from 0, hence
@@ -619,18 +611,18 @@ func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr 
 	for attr, storageType := range schemaMap {
 		if _, err := schema.State().TypeOf(attr); err != nil {
 			hint := pb.Metadata_DEFAULT
-			if mutHint, ok := proposal.GetMutations().GetMetadata().GetPredHints()[attr]; ok {
+			if mutHint, ok := prop.GetMutations().GetMetadata().GetPredHints()[attr]; ok {
 				hint = mutHint
 			}
-			if err := createSchema(attr, storageType, hint, proposal.CommitTs); err != nil {
+			if err := createSchema(attr, storageType, hint, prop.CommitTs); err != nil {
 				return err
 			}
 		}
 	}
 
-	m := proposal.Mutations
-	txn := posting.NewTxn(m.StartTs)
-	x.AssertTruef(txn != nil, "Unable to find txn with start ts: %d", m.StartTs)
+	m := prop.Mutations
+	txn := posting.GetTxn(prop.CommitTs)
+	x.AssertTruef(txn != nil, "Unable to find txn with commit ts: %d", prop.CommitTs)
 
 	// If we didn't have it in Oracle, then mutation workers won't be processing it either. So,
 	// don't block on txn.ErrCh.
@@ -641,7 +633,7 @@ func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr 
 		return nil
 	}
 	// If mutation is invalid or we got an error, reset the txn, so we can run again.
-	txn = posting.Oracle().ResetTxn(m.StartTs)
+	txn = posting.Oracle().ResetTxn(prop.CommitTs)
 
 	// If we have an error, re-run this.
 	span.Annotatef(nil, "Re-running mutation from applyCh.")
@@ -668,6 +660,8 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 			span.Annotatef(nil, "While applying mutations: %v", err)
 			return err
 		}
+		txn := posting.GetTxn(proposal.CommitTs)
+		n.commit(txn)
 
 		span.Annotate(nil, "Done")
 		return nil
@@ -847,8 +841,7 @@ func (n *node) processApplyCh() {
 			// if this applyCommited fails, how do we ensure
 			start := time.Now()
 
-			// This is where the logic gets called.
-			perr = n.applyCommitted(&prop)
+			perr = n.applyCommitted(&prop) // LOGIC is run here.
 
 			if prop.Key != 0 {
 				p := &P{err: perr, seen: time.Now()}
@@ -880,6 +873,7 @@ func (n *node) processApplyCh() {
 
 		n.Proposals.Done(prop.Key, perr)
 		n.Applied.Done(prop.Index)
+		posting.DoneTimestamp(prop.CommitTs)
 		ostats.Record(context.Background(), x.RaftAppliedIndex.M(int64(n.Applied.DoneUntil())))
 	}
 
@@ -954,115 +948,62 @@ func (n *node) processApplyCh() {
 	}
 }
 
-func (n *node) commitOrAbort(_ uint64, delta *pb.OracleDelta) error {
-	_, span := otrace.StartSpan(context.Background(), "node.commitOrAbort")
-	defer span.End()
-
-	span.Annotate(nil, "Start")
+func (n *node) commit(txn *posting.Txn) error {
+	x.AssertTrue(txn != nil)
 	start := time.Now()
-	var numKeys int
 
-	itrStart := time.Now()
-	var itrs []y.Iterator
-	var txns []*posting.Txn
-	var sz int64
-	for _, status := range delta.Txns {
-		txn := posting.Oracle().GetTxn(status.StartTs)
-		if txn == nil || status.CommitTs == 0 {
-			continue
-		}
-		c := txn.Cache()
-		c.RLock()
-		for k := range c.Deltas() {
-			n.keysWritten.keyCommitTs[z.MemHashString(k)] = status.CommitTs
-		}
-		num := len(c.Deltas())
-		c.RUnlock()
-
-		n.keysWritten.totalKeys += num
-		numKeys += num
-		if num == 0 {
-			continue
-		}
-		txns = append(txns, txn)
-
-		sz += txn.Skiplist().MemSize()
-		// Iterate to set the commit timestamp for all keys.
-		// Skiplist can block if the conversion to Skiplist isn't done yet.
-		itr := txn.Skiplist().NewIterator()
-		for itr.SeekToFirst(); itr.Valid(); itr.Next() {
-			key := itr.Key()
-			// We don't expect the ordering of the keys to change due to setting their commit
-			// timestamps. Each key in the skiplist should be unique already.
-			y.SetKeyTs(key, status.CommitTs)
-		}
-		itr.Close()
-
-		itrs = append(itrs, txn.Skiplist().NewUniIterator(false))
+	c := txn.Cache()
+	c.RLock()
+	for k := range c.Deltas() {
+		n.keysWritten.keyCommitTs[z.MemHashString(k)] = txn.CommitTs
 	}
-	span.Annotatef(nil, "Num keys: %d Itr: %s\n", numKeys, time.Since(itrStart))
+	numKeys := len(c.Deltas())
+	c.RUnlock()
+
+	n.keysWritten.totalKeys += numKeys
+
+	// span.Annotatef(nil, "Num keys: %d\n", numKeys)
 	ostats.Record(n.ctx, x.NumEdges.M(int64(numKeys)))
 
 	// This would be used for callback via Badger when skiplist is pushed to
 	// disk.
-	deleteTxns := func() {
-		posting.Oracle().DeleteTxnsAndRollupKeys(delta)
+	deleteTxn := func() {
+		posting.DeleteTxnAndRollupKeys(txn)
 	}
 
-	if len(itrs) == 0 {
-		deleteTxns()
-
-	} else {
-		sn := time.Now()
-		mi := table.NewMergeIterator(itrs, false)
-		mi.Rewind()
-
-		var keys int
-		b := skl.NewBuilder(int64(float64(sz) * 1.1))
-		for mi.Valid() {
-			b.Add(mi.Key(), mi.Value())
-			keys++
-			mi.Next()
+	err := x.RetryUntilSuccess(3600, time.Second, func() error {
+		if numKeys == 0 {
+			deleteTxn()
+			return nil
 		}
-		span.Annotatef(nil, "Iterating and skiplist over %d keys took: %s", keys, time.Since(sn))
-		err := x.RetryUntilSuccess(3600, time.Second, func() error {
-			if numKeys == 0 {
-				return nil
-			}
-			// We do the pending txn deletion in the callback, so that our snapshot and checkpoint
-			// tracking would only consider the txns which have been successfully pushed to disk.
-			return pstore.HandoverSkiplist(b.Skiplist(), deleteTxns)
-		})
-		if err != nil {
-			glog.Errorf("while handing over skiplist: %v\n", err)
-		}
-		span.Annotatef(nil, "Handover skiplist done for %d txns, %d keys", len(delta.Txns), numKeys)
+		// We do the pending txn deletion in the callback, so that our snapshot and checkpoint
+		// tracking would only consider the txns which have been successfully pushed to disk.
+		return pstore.HandoverSkiplist(txn.Skiplist(), deleteTxn)
+	})
+	if err != nil {
+		glog.Errorf("while handing over skiplist: %v\n", err)
 	}
-
-	ms := x.SinceMs(start)
-	tags := []tag.Mutator{tag.Upsert(x.KeyMethod, "apply.toDisk")}
-	x.Check(ostats.RecordWithTags(context.Background(), tags, x.LatencyMs.M(ms)))
+	txn.UpdateCachedKeys()
 
 	// Before, we used to call pstore.Sync() here. We don't need to do that
 	// anymore because we're not using Badger's WAL.
 
+	ms := x.SinceMs(start)
+	tags := []tag.Mutator{tag.Upsert(x.KeyMethod, "commit")}
+	x.Check(ostats.RecordWithTags(context.Background(), tags, x.LatencyMs.M(ms)))
+	return nil
+}
+
+// commitOrAbort is now only dealing with group checksum.
+func (n *node) commitOrAbort(_ uint64, delta *pb.OracleDelta) error {
 	g := groups()
 	if delta.GroupChecksums != nil && delta.GroupChecksums[g.groupId()] > 0 {
 		atomic.StoreUint64(&g.deltaChecksum, delta.GroupChecksums[g.groupId()])
 	}
 
-	// Clear all the cached lists that were touched by this transaction.
-	for _, status := range delta.Txns {
-		txn := posting.Oracle().GetTxn(status.StartTs)
-		if status.CommitTs > 0 {
-			txn.UpdateCachedKeys(status.CommitTs)
-		}
-	}
-	span.Annotate(nil, "cache keys removed")
-
+	// TODO: Remove this.
 	// Now advance Oracle(), so we can service waiting reads.
 	posting.Oracle().ProcessDelta(delta)
-	span.Annotate(nil, "process delta done")
 	return nil
 }
 

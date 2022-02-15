@@ -25,28 +25,29 @@ func newKeysWritten() *keysWritten {
 }
 
 // We use keysWritten structure to allow mutations to be run concurrently. Consider this:
-// 1. We receive a txn with mutation at start ts = Ts.
-// 2. The server is at MaxAssignedTs Tm < Ts.
-// 3. Before, we would block proposing until Tm >= Ts.
-// 4. Now, we propose the mutation immediately.
-// 5. Once the mutation goes through raft, it is executed concurrently, and the "seen" MaxAssignedTs
-//    is registered as Tm-seen.
-// 6. The same mutation is also pushed to applyCh.
-// 7. When applyCh sees the mutation, it checks if any reads the txn incurred, have been written to
-//    with a commit ts in the range (Tm-seen, Ts]. If so, the mutation is re-run. In 21M live load,
-//    this happens about 3.6% of the time.
-// 8. If no commits have happened for the read key set, we are done. This happens 96.4% of the time.
-// 9. If multiple mutations happen for the same txn, the sequential mutations are always run
-//    serially by applyCh. This is to avoid edge cases.
+// 1. We receive a mutation proposal (CommittedEntries in Raft).
+// 2. We set a StartTs and CommitTs for the proposal. Both of them are based on
+// Raft Index. StartTs is calculated based on what applyCh has processed so far.
+// CommitTs is what the timestamp would be based on Raft index.
+// 3. It is executed concurrently.
+// 4. It is also pushed to applyCh.
+// 5. When applych receives the mutation, it checks if any reads the txn
+// incurred, have been written to in the range (Tstart, inf).
+// 6. If the mutation was applied serially, it would have read everything below
+// Tcommit. So, it's Tstart would be Tcommit - 1.
+// 7. If something got written after Tstart, then we need to redo the update
+// serially. So, concurrent processing done would be invalid.
+// 8. If nothing was written, then the processing done is valid.
 func (kw *keysWritten) StillValid(txn *posting.Txn) bool {
 	if atomic.LoadUint64(&txn.AppliedIndexSeen) < kw.rejectBeforeIndex {
 		kw.invalidTxns++
 		return false
 	}
-	if atomic.LoadUint64(&txn.MaxAssignedSeen) >= txn.StartTs {
-		kw.validTxns++
-		return true
-	}
+	// TODO: Need to understand this better.
+	// if atomic.LoadUint64(&txn.MaxAssignedSeen) >= txn.StartTs {
+	// 	kw.validTxns++
+	// 	return true
+	// }
 
 	c := txn.Cache()
 	c.Lock()
@@ -56,7 +57,7 @@ func (kw *keysWritten) StillValid(txn *posting.Txn) bool {
 		// commitTs is > StartTs, then it doesn't matter for reads. If the commit ts is <
 		// MaxAssignedSeen, that means our reads are valid.
 		commitTs := kw.keyCommitTs[hash]
-		if commitTs > atomic.LoadUint64(&txn.MaxAssignedSeen) && commitTs <= txn.StartTs {
+		if commitTs > txn.StartTs {
 			kw.invalidTxns++
 			return false
 		}

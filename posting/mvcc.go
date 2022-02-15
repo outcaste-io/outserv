@@ -294,7 +294,7 @@ func (txn *Txn) ToSkiplist() error {
 			glog.Errorf("Invalid Entry. len(key): %d len(val): %d\n", len(k), len(data))
 			continue
 		}
-		b.Add(y.KeyWithTs(k, math.MaxUint64),
+		b.Add(y.KeyWithTs(k, txn.CommitTs),
 			y.ValueStruct{
 				Value:    data,
 				UserMeta: BitDeltaPosting,
@@ -309,13 +309,12 @@ func ResetCache() {
 }
 
 // RemoveCachedKeys will delete the cached list by this txn.
-func (txn *Txn) UpdateCachedKeys(commitTs uint64) {
+func (txn *Txn) UpdateCachedKeys() {
 	if txn == nil || txn.cache == nil {
 		return
 	}
-	x.AssertTrue(commitTs > 0)
 	for key := range txn.cache.deltas {
-		lCache.SetIfPresent([]byte(key), commitTs, 0)
+		lCache.SetIfPresent([]byte(key), txn.CommitTs, 0)
 	}
 }
 

@@ -142,6 +142,9 @@ type oracle struct {
 func RegisterTimestamp(ts uint64) {
 	o.applied.Begin(ts)
 }
+func DoneTimestamp(ts uint64) {
+	o.applied.Done(ts)
+}
 func ReadTimestamp() uint64 {
 	return o.applied.DoneUntil()
 }
@@ -284,23 +287,21 @@ func (o *oracle) WaitForTs(ctx context.Context, startTs uint64) error {
 
 // DeleteTxnsAndRollupKeys is called via a callback when Skiplist is handled
 // over to Badger with latest commits in it.
-func (o *oracle) DeleteTxnsAndRollupKeys(delta *pb.OracleDelta) {
+func DeleteTxnAndRollupKeys(txn *Txn) {
 	o.Lock()
-	for _, status := range delta.Txns {
-		txn := o.pendingTxns[status.StartTs]
-		if txn != nil && status.CommitTs > 0 {
-			c := txn.Cache()
-			c.RLock()
-			for k := range c.Deltas() {
-				IncrRollup.addKeyToBatch([]byte(k), 0)
-			}
-			c.RUnlock()
+	if txn != nil && txn.CommitTs > 0 {
+		c := txn.Cache()
+		c.RLock()
+		for k := range c.Deltas() {
+			IncrRollup.addKeyToBatch([]byte(k), 0)
 		}
-		delete(o.pendingTxns, status.StartTs)
+		c.RUnlock()
+		delete(o.pendingTxns, txn.CommitTs)
 	}
 	o.Unlock()
 }
 
+// TODO: Fix this up.
 func (o *oracle) ProcessDelta(delta *pb.OracleDelta) {
 	if glog.V(3) {
 		glog.Infof("ProcessDelta: Max Assigned: %d", delta.MaxAssigned)
@@ -359,10 +360,10 @@ func (o *oracle) ResetTxnsForNs(ns uint64) {
 	}
 }
 
-func (o *oracle) GetTxn(startTs uint64) *Txn {
+func GetTxn(commitTs uint64) *Txn {
 	o.RLock()
 	defer o.RUnlock()
-	return o.pendingTxns[startTs]
+	return o.pendingTxns[commitTs]
 }
 
 func (txn *Txn) matchesDelta(ok func(key []byte) bool) bool {

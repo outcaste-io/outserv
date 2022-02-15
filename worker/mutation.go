@@ -561,8 +561,9 @@ func AssignUidsOverNetwork(ctx context.Context, num *pb.Num) (*pb.AssignedIds, e
 	return c.AssignIds(ctx, num)
 }
 
+// TODO: Do we need fillTxnContext?
 func fillTxnContext(tctx *api.TxnContext, startTs uint64) {
-	if txn := posting.Oracle().GetTxn(startTs); txn != nil {
+	if txn := posting.GetTxn(startTs); txn != nil {
 		txn.FillContext(tctx, groups().groupId())
 	}
 	// We do not need to fill linread mechanism anymore, because transaction
