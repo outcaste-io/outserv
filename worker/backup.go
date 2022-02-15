@@ -230,7 +230,7 @@ func ProcessBackupRequest(ctx context.Context, req *pb.BackupRequest) error {
 		}
 	}()
 
-	ts := posting.Timestamp()
+	ts := posting.ReadTimestamp()
 	req.ReadTs = ts
 	req.UnixTs = time.Now().UTC().Format("20060102.150405.000")
 

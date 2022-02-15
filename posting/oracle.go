@@ -22,12 +22,13 @@ import (
 	"math"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/golang/glog"
 	"github.com/outcaste-io/badger/v3/skl"
+	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/ristretto/z"
 	ostats "go.opencensus.io/stats"
 	otrace "go.opencensus.io/trace"
 )
@@ -53,20 +54,12 @@ type Txn struct {
 	MaxAssignedSeen  uint64 // atomic
 	AppliedIndexSeen uint64 // atomic
 
-	// Runs keeps track of how many times this txn has been through applyCh.
-	Runs int32 // atomic
-
-	shouldAbort uint32 // atomic
 	// Fields which can changed after init
 	sync.Mutex
 
 	// Keeps track of conflict keys that should be used to determine if this
 	// transaction conflicts with another.
 	conflicts map[uint64]struct{}
-
-	// Keeps track of last update wall clock. We use this fact later to
-	// determine unhealthy, stale txns.
-	lastUpdate time.Time
 
 	cache *LocalCache // This pointer does not get modified.
 	ErrCh chan error
@@ -78,10 +71,9 @@ type Txn struct {
 // NewTxn returns a new Txn instance.
 func NewTxn(startTs uint64) *Txn {
 	return &Txn{
-		StartTs:    startTs,
-		cache:      NewLocalCache(startTs),
-		lastUpdate: time.Now(),
-		ErrCh:      make(chan error, 1),
+		StartTs: startTs,
+		cache:   NewLocalCache(startTs),
+		ErrCh:   make(chan error, 1),
 	}
 }
 
@@ -128,6 +120,8 @@ func (txn *Txn) Store(pl *List) *List {
 type oracle struct {
 	x.SafeMutex
 
+	closer    *z.Closer
+	applied   y.WaterMark
 	timestamp uint64
 
 	// max start ts given out by Zero. Do not use mutex on this, only use atomics.
@@ -145,11 +139,18 @@ type oracle struct {
 	waiters map[uint64][]chan struct{}
 }
 
-func Timestamp() uint64 {
+func RegisterTimestamp(ts uint64) {
+	o.applied.Begin(ts)
+}
+func ReadTimestamp() uint64 {
+	return o.applied.DoneUntil()
+}
+func CurTimestamp() uint64 {
 	return atomic.LoadUint64(&o.timestamp)
 }
 func NewTimestamp() uint64 {
-	return atomic.AddUint64(&o.timestamp, 2)
+	ts := atomic.AddUint64(&o.timestamp, 2)
+	return ts
 }
 func SetTimestamp(newTs uint64) {
 	for {
@@ -164,22 +165,25 @@ func SetTimestamp(newTs uint64) {
 }
 
 func (o *oracle) init() {
+	o.closer = z.NewCloser(1)
+	o.applied.Init(o.closer)
 	o.waiters = make(map[uint64][]chan struct{})
 	o.pendingTxns = make(map[uint64]*Txn)
 }
 
 // RegisterCommitTs would return a txn and a bool.
 // If the bool is true, the txn was already present. If false, it is new.
-func RegisterTxn(startTs uint64) *Txn {
+func RegisterTxn(startTs, commitTs uint64) *Txn {
 	o.Lock()
 	defer o.Unlock()
 
-	commitTs := NewTimestamp()
 	_, ok := o.pendingTxns[commitTs]
 	x.AssertTrue(!ok)
 
 	txn := NewTxn(startTs)
 	txn.CommitTs = commitTs
+
+	RegisterTimestamp(commitTs)
 
 	o.pendingTxns[commitTs] = txn
 	return txn
@@ -234,21 +238,6 @@ func (o *oracle) NumPendingTxns() int {
 	o.RLock()
 	defer o.RUnlock()
 	return len(o.pendingTxns)
-}
-
-func (o *oracle) TxnOlderThan(dur time.Duration) (res []uint64) {
-	o.RLock()
-	defer o.RUnlock()
-
-	cutoff := time.Now().Add(-dur)
-	for startTs, txn := range o.pendingTxns {
-		txn.Lock()
-		if txn.lastUpdate.Before(cutoff) {
-			res = append(res, startTs)
-		}
-		txn.Unlock()
-	}
-	return res
 }
 
 func (o *oracle) addToWaiters(startTs uint64) (chan struct{}, bool) {

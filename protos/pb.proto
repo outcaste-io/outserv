@@ -333,15 +333,18 @@ message Proposal {
   string clean_predicate = 6;
   OracleDelta delta = 8;
   Snapshot snapshot = 9;  // Used to tell the group when to take snapshot.
-  uint64 index = 10;      // Used to store Raft index, in raft.Ready.
   // Block an operation until membership reaches this checksum.
   uint64 expected_checksum = 11;
   RestoreRequest restore = 12;
   CDCState cdc_state = 13;
   DeleteNsRequest delete_ns = 14;  // Used to delete namespace.
+
+  // These following are used during processing.
+  uint64 index = 10;      // Used to store Raft index, in raft.Ready.
   uint64 key = 15;
-  // We no longer need a start ts to be part of the proposal.
-  /* uint64 start_ts = 16; */
+  uint64 read_ts = 16;
+  uint64 commit_ts = 17;
+  int64 entry_size = 18;
 }
 
 message CDCState {

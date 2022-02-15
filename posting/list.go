@@ -416,10 +416,6 @@ func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.DirectedEdge) uint64 {
 func (l *List) addMutationInternal(ctx context.Context, txn *Txn, t *pb.DirectedEdge) error {
 	l.AssertLock()
 
-	if txn.ShouldAbort() {
-		return x.ErrConflict
-	}
-
 	mpost := NewPosting(t)
 	mpost.StartTs = txn.StartTs
 	if mpost.PostingType != pb.Posting_REF {

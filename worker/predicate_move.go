@@ -99,7 +99,9 @@ func batchAndProposeKeyValues(ctx context.Context, kvs chan *pb.KVS) error {
 				if kv.StreamId == CleanPredicate {
 					// Delete on all nodes. Remove the schema at timestamp kv.Version-1 and set it at
 					// kv.Version. kv.Version will be the TxnTs of the predicate move.
-					p := &pb.Proposal{CleanPredicate: pk.Attr, StartTs: kv.Version - 1}
+
+					// TODO: Check what this ReadTs would do later.
+					p := &pb.Proposal{CleanPredicate: pk.Attr, ReadTs: kv.Version - 1}
 					if err := n.proposeAndWait(ctx, p); err != nil {
 						glog.Errorf("Error while cleaning predicate %v %v\n", pk.Attr, err)
 						return err
@@ -232,7 +234,8 @@ func (w *grpcWorker) MovePredicate(ctx context.Context,
 		p := &pb.Proposal{
 			CleanPredicate:   in.Predicate,
 			ExpectedChecksum: in.ExpectedChecksum,
-			StartTs:          in.ReadTs,
+			ReadTs:           in.ReadTs,
+			// TODO: Should we set commitTs?
 		}
 		return &emptyPayload, groups().Node.proposeAndWait(ctx, p)
 	}

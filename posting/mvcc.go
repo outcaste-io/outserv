@@ -228,14 +228,6 @@ func (ir *incrRollupi) Process(closer *z.Closer) {
 	}
 }
 
-// ShouldAbort returns whether the transaction should be aborted.
-func (txn *Txn) ShouldAbort() bool {
-	if txn == nil {
-		return false
-	}
-	return atomic.LoadUint32(&txn.shouldAbort) > 0
-}
-
 func (txn *Txn) addConflictKey(conflictKey uint64) {
 	txn.Lock()
 	defer txn.Unlock()

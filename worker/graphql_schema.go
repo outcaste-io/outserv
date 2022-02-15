@@ -287,7 +287,7 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 		if _, err = MutateOverNetwork(ctx, &pb.Mutations{
 			// TODO: We no longer should provide a start ts. That would be
 			// applied during WAL.
-			StartTs: posting.Oracle().Timestamp(),
+			StartTs: posting.ReadTimestamp(),
 			Schema:  req.DgraphPreds,
 			Types:   req.DgraphTypes,
 		}); err != nil {

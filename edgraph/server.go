@@ -221,7 +221,8 @@ func UpdateGQLSchema(ctx context.Context, gqlSchema,
 	}
 
 	return worker.UpdateGQLSchemaOverNetwork(ctx, &pb.UpdateGraphQLSchemaRequest{
-		StartTs:       posting.Oracle().Timestamp(),
+		// TODO: Understand this better and see what timestamp should be set.
+		StartTs:       posting.ReadTimestamp(),
 		GraphqlSchema: gqlSchema,
 		DgraphPreds:   parsedDgraphSchema.Preds,
 		DgraphTypes:   parsedDgraphSchema.Types,
@@ -238,7 +239,8 @@ func UpdateLambdaScript(
 	}
 
 	return worker.UpdateGQLSchemaOverNetwork(ctx, &pb.UpdateGraphQLSchemaRequest{
-		StartTs:      posting.Oracle().Timestamp(),
+		// TODO: Understand this better and see what timestamp should be set.
+		StartTs:      posting.ReadTimestamp(),
 		LambdaScript: script,
 		Op:           pb.UpdateGraphQLSchemaRequest_SCRIPT,
 	})
@@ -416,7 +418,9 @@ func (s *Server) Alter(ctx context.Context, op *api.Operation) (*api.Payload, er
 
 	// StartTs is not needed if the predicate to be dropped lies on this server but is required
 	// if it lies on some other machine. Let's get it for safety.
-	m := &pb.Mutations{StartTs: posting.Oracle().Timestamp()}
+
+	// TODO: Understand this better and see what timestamp should be set.
+	m := &pb.Mutations{StartTs: posting.ReadTimestamp()}
 	if isDropAll(op) {
 		if x.Config.BlockClusterWideDrop {
 			glog.V(2).Info("Blocked drop-all because it is not permitted.")
@@ -1453,12 +1457,16 @@ func (s *Server) doQuery(ctx context.Context, req *Request) (resp *api.Response,
 	// We use defer here because for queries, startTs will be
 	// assigned in the processQuery function called below.
 	defer annotateStartTs(qc.span, qc.req.StartTs)
+
 	// For mutations, we update the startTs if necessary.
-	if isMutation && req.req.StartTs == 0 {
-		start := time.Now()
-		req.req.StartTs = posting.Oracle().Timestamp()
-		qc.latency.AssignTimestamp = time.Since(start)
-	}
+	// NOTE: We don't need to set start ts for mutations. They'd get their own
+	// post proposal.
+	//
+	// if isMutation && req.req.StartTs == 0 {
+	// 	start := time.Now()
+	// 	req.req.StartTs = posting.Timestamp()
+	// 	qc.latency.AssignTimestamp = time.Since(start)
+	// }
 	if x.WorkerConfig.AclEnabled {
 		ns, err := x.ExtractNamespace(ctx)
 		if err != nil {
@@ -1498,11 +1506,10 @@ func (s *Server) doQuery(ctx context.Context, req *Request) (resp *api.Response,
 	// TODO(martinmr): Include Transport as part of the latency. Need to do
 	// this separately since it involves modifying the API protos.
 	resp.Latency = &api.Latency{
-		AssignTimestampNs: uint64(l.AssignTimestamp.Nanoseconds()),
-		ParsingNs:         uint64(l.Parsing.Nanoseconds()),
-		ProcessingNs:      uint64(l.Processing.Nanoseconds()),
-		EncodingNs:        uint64(l.Json.Nanoseconds()),
-		TotalNs:           uint64((time.Since(l.Start)).Nanoseconds()),
+		ParsingNs:    uint64(l.Parsing.Nanoseconds()),
+		ProcessingNs: uint64(l.Processing.Nanoseconds()),
+		EncodingNs:   uint64(l.Json.Nanoseconds()),
+		TotalNs:      uint64((time.Since(l.Start)).Nanoseconds()),
 	}
 	md := metadata.Pairs(x.DgraphCostHeader, fmt.Sprint(resp.Metrics.NumUids["_total"]))
 	grpc.SendHeader(ctx, md)
@@ -1550,9 +1557,7 @@ func processQuery(ctx context.Context, qc *queryContext) (*api.Response, error) 
 	}
 
 	if qc.req.StartTs == 0 {
-		assignTimestampStart := time.Now()
-		qc.req.StartTs = posting.Oracle().Timestamp()
-		qc.latency.AssignTimestamp = time.Since(assignTimestampStart)
+		qc.req.StartTs = posting.ReadTimestamp()
 	}
 
 	qr.ReadTs = qc.req.StartTs

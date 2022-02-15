@@ -801,7 +801,7 @@ func ExportOverNetwork(ctx context.Context, input *pb.ExportRequest) (ExportedFi
 		return nil, err
 	}
 	// Get ReadTs from zero and wait for stream to catch up.
-	readTs := posting.Oracle().Timestamp()
+	readTs := posting.ReadTimestamp()
 	glog.Infof("Using readTs: %d\n", readTs)
 
 	// Let's first collect all groups.
