@@ -17,17 +17,14 @@
 package worker
 
 import (
-	"context"
 	"math"
 	"os"
-	"time"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/badger/v3"
-	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/raftwal"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
-	"github.com/golang/glog"
 )
 
 const (
@@ -56,13 +53,9 @@ const (
 
 // ServerState holds the state of the Dgraph server.
 type ServerState struct {
-	FinishCh chan struct{} // channel to wait for all pending reqs to finish.
-
 	Pstore   *badger.DB
 	WALstore *raftwal.DiskStorage
 	gcCloser *z.Closer // closer for valueLogGC
-
-	needTs chan tsReq
 }
 
 // State is the instance of ServerState used by the current server.
@@ -71,12 +64,7 @@ var State ServerState
 // InitServerState initializes this server's state.
 func InitServerState() {
 	Config.validate()
-
-	State.FinishCh = make(chan struct{})
-	State.needTs = make(chan tsReq, 100)
-
 	State.initStorage()
-	go State.fillTimestampRequests()
 
 	groupId, err := x.ReadGroupIdFile(Config.PostingDir)
 	if err != nil {
@@ -165,88 +153,4 @@ func (s *ServerState) Dispose() {
 	if err := s.WALstore.Close(); err != nil {
 		glog.Errorf("Error while closing WAL store: %v", err)
 	}
-}
-
-func (s *ServerState) GetTimestamp(readOnly bool) uint64 {
-	tr := tsReq{readOnly: readOnly, ch: make(chan uint64)}
-	s.needTs <- tr
-	return <-tr.ch
-}
-
-func (s *ServerState) fillTimestampRequests() {
-	const (
-		initDelay = 10 * time.Millisecond
-		maxDelay  = time.Second
-	)
-
-	defer func() {
-		glog.Infoln("Exiting fillTimestampRequests")
-	}()
-
-	var reqs []tsReq
-	for {
-		// Reset variables.
-		reqs = reqs[:0]
-		delay := initDelay
-
-		select {
-		case <-s.gcCloser.HasBeenClosed():
-			return
-		case req := <-s.needTs:
-		slurpLoop:
-			for {
-				reqs = append(reqs, req)
-				select {
-				case req = <-s.needTs:
-				default:
-					break slurpLoop
-				}
-			}
-		}
-
-		// Generate the request.
-		num := &pb.Num{}
-		for _, r := range reqs {
-			if r.readOnly {
-				num.ReadOnly = true
-			} else {
-				num.Val++
-			}
-		}
-
-		// Execute the request with infinite retries.
-	retry:
-		if s.gcCloser.Ctx().Err() != nil {
-			return
-		}
-		ctx, cancel := context.WithTimeout(s.gcCloser.Ctx(), 10*time.Second)
-		ts, err := Timestamps(ctx, num)
-		cancel()
-		if err != nil {
-			glog.Warningf("Error while retrieving timestamps: %v with delay: %v."+
-				" Will retry...\n", err, delay)
-			time.Sleep(delay)
-			delay *= 2
-			if delay > maxDelay {
-				delay = maxDelay
-			}
-			goto retry
-		}
-		var offset uint64
-		for _, req := range reqs {
-			if req.readOnly {
-				req.ch <- ts.ReadOnly
-			} else {
-				req.ch <- ts.StartId + offset
-				offset++
-			}
-		}
-		x.AssertTrue(ts.StartId == 0 || ts.StartId+offset-1 == ts.EndId)
-	}
-}
-
-type tsReq struct {
-	readOnly bool
-	// A one-shot chan which we can send a txn timestamp upon.
-	ch chan uint64
 }

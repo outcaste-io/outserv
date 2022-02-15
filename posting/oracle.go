@@ -24,10 +24,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/badger/v3/skl"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/golang/glog"
 	ostats "go.opencensus.io/stats"
 	otrace "go.opencensus.io/trace"
 )
@@ -49,6 +49,7 @@ func init() {
 // Txn represents a transaction.
 type Txn struct {
 	StartTs          uint64 // This does not get modified.
+	CommitTs         uint64
 	MaxAssignedSeen  uint64 // atomic
 	AppliedIndexSeen uint64 // atomic
 
@@ -127,6 +128,8 @@ func (txn *Txn) Store(pl *List) *List {
 type oracle struct {
 	x.SafeMutex
 
+	timestamp uint64
+
 	// max start ts given out by Zero. Do not use mutex on this, only use atomics.
 	maxAssigned uint64
 
@@ -142,26 +145,44 @@ type oracle struct {
 	waiters map[uint64][]chan struct{}
 }
 
+func Timestamp() uint64 {
+	return atomic.LoadUint64(&o.timestamp)
+}
+func NewTimestamp() uint64 {
+	return atomic.AddUint64(&o.timestamp, 2)
+}
+func SetTimestamp(newTs uint64) {
+	for {
+		curTs := atomic.LoadUint64(&o.timestamp)
+		if newTs <= curTs {
+			glog.Fatalf("Timestamp to set: %d <= cur ts: %d\n", newTs, curTs)
+		}
+		if atomic.CompareAndSwapUint64(&o.timestamp, curTs, newTs) {
+			return
+		}
+	}
+}
+
 func (o *oracle) init() {
 	o.waiters = make(map[uint64][]chan struct{})
 	o.pendingTxns = make(map[uint64]*Txn)
 }
 
-// RegisterStartTs would return a txn and a bool.
+// RegisterCommitTs would return a txn and a bool.
 // If the bool is true, the txn was already present. If false, it is new.
-func (o *oracle) RegisterStartTs(ts uint64) (*Txn, bool) {
+func RegisterTxn(startTs uint64) *Txn {
 	o.Lock()
 	defer o.Unlock()
-	txn, ok := o.pendingTxns[ts]
-	if ok {
-		txn.Lock()
-		txn.lastUpdate = time.Now()
-		txn.Unlock()
-	} else {
-		txn = NewTxn(ts)
-		o.pendingTxns[ts] = txn
-	}
-	return txn, ok
+
+	commitTs := NewTimestamp()
+	_, ok := o.pendingTxns[commitTs]
+	x.AssertTrue(!ok)
+
+	txn := NewTxn(startTs)
+	txn.CommitTs = commitTs
+
+	o.pendingTxns[commitTs] = txn
+	return txn
 }
 
 func (o *oracle) ResetTxn(ts uint64) *Txn {

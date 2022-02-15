@@ -561,18 +561,6 @@ func AssignUidsOverNetwork(ctx context.Context, num *pb.Num) (*pb.AssignedIds, e
 	return c.AssignIds(ctx, num)
 }
 
-// Timestamps sends a request to assign startTs for a new transaction to the current zero leader.
-func Timestamps(ctx context.Context, num *pb.Num) (*pb.AssignedIds, error) {
-	pl := groups().connToZeroLeader()
-	if pl == nil {
-		return nil, conn.ErrNoConnection
-	}
-
-	con := pl.Get()
-	c := pb.NewZeroClient(con)
-	return c.Timestamps(ctx, num)
-}
-
 func fillTxnContext(tctx *api.TxnContext, startTs uint64) {
 	if txn := posting.Oracle().GetTxn(startTs); txn != nil {
 		txn.FillContext(tctx, groups().groupId())

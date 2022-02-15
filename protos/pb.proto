@@ -340,7 +340,8 @@ message Proposal {
   CDCState cdc_state = 13;
   DeleteNsRequest delete_ns = 14;  // Used to delete namespace.
   uint64 key = 15;
-  uint64 start_ts = 16;
+  // We no longer need a start ts to be part of the proposal.
+  /* uint64 start_ts = 16; */
 }
 
 message CDCState {

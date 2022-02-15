@@ -30,13 +30,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+	"github.com/golang/protobuf/proto"
+	"github.com/golang/snappy"
 	"github.com/outcaste-io/badger/v3"
 	bpb "github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/ristretto/z"
-	"github.com/golang/glog"
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/snappy"
 	"github.com/pkg/errors"
 	ostats "go.opencensus.io/stats"
 
@@ -230,13 +230,8 @@ func ProcessBackupRequest(ctx context.Context, req *pb.BackupRequest) error {
 		}
 	}()
 
-	ts, err := Timestamps(ctx, &pb.Num{ReadOnly: true})
-	if err != nil {
-		glog.Errorf("Unable to retrieve readonly timestamp for backup: %s", err)
-		return err
-	}
-
-	req.ReadTs = ts.ReadOnly
+	ts := posting.Timestamp()
+	req.ReadTs = ts
 	req.UnixTs = time.Now().UTC().Format("20060102.150405.000")
 
 	// Read the manifests to get the right timestamp from which to start the backup.

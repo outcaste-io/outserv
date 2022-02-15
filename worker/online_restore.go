@@ -170,7 +170,7 @@ func ProcessRestoreRequest(ctx context.Context, req *pb.RestoreRequest, wg *sync
 			"Please retry later.")
 	}
 
-	req.RestoreTs = State.GetTimestamp(false)
+	req.RestoreTs = posting.Oracle().Timestamp()
 
 	// TODO: prevent partial restores when proposeRestoreOrSend only sends the restore
 	// request to a subset of groups.

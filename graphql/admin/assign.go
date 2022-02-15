@@ -55,7 +55,8 @@ func resolveAssign(ctx context.Context, m schema.Mutation) (*resolve.Resolved, b
 		if num.Val == 0 {
 			num.ReadOnly = true
 		}
-		resp, err = worker.Timestamps(ctx, num)
+		// TODO: Figure out what to do here.
+		// resp, err = worker.Timestamps(ctx, num)
 	case namespaceId:
 		resp, err = worker.AssignNsIdsOverNetwork(ctx, num)
 	}

@@ -90,8 +90,7 @@ type node struct {
 	canCampaign bool
 	elog        trace.EventLog
 
-	keysWritten      *keysWritten
-	pendingProposals []pb.Proposal
+	keysWritten *keysWritten
 }
 
 // keysWritten is always accessed serially via applyCh. So, we don't need to make it thread-safe.
@@ -703,22 +702,23 @@ func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr 
 	}
 
 	m := proposal.Mutations
-	txn := posting.Oracle().GetTxn(m.StartTs)
+	txn := posting.NewTxn(m.StartTs)
 	x.AssertTruef(txn != nil, "Unable to find txn with start ts: %d", m.StartTs)
 	runs := atomic.AddInt32(&txn.Runs, 1)
-	if runs <= 1 {
-		// If we didn't have it in Oracle, then mutation workers won't be processing it either. So,
-		// don't block on txn.ErrCh.
-		err, ok := <-txn.ErrCh
-		x.AssertTrue(ok)
-		if err == nil && n.keysWritten.StillValid(txn) {
-			span.Annotate(nil, "Mutation is still valid.")
-			return nil
-		}
-		// If mutation is invalid or we got an error, reset the txn, so we can run again.
-		txn = posting.Oracle().ResetTxn(m.StartTs)
-		atomic.AddInt32(&txn.Runs, 1) // We have already run this once via serial loop.
+
+	// TODO: We don't need runs. Because each txn is executed exactly once.
+	x.AssertTrue(runs <= 1)
+	// If we didn't have it in Oracle, then mutation workers won't be processing it either. So,
+	// don't block on txn.ErrCh.
+	err, ok := <-txn.ErrCh
+	x.AssertTrue(ok)
+	if err == nil && n.keysWritten.StillValid(txn) {
+		span.Annotate(nil, "Mutation is still valid.")
+		return nil
 	}
+	// If mutation is invalid or we got an error, reset the txn, so we can run again.
+	txn = posting.Oracle().ResetTxn(m.StartTs)
+	atomic.AddInt32(&txn.Runs, 1) // We have already run this once via serial loop.
 
 	// If we have an error, re-run this.
 	span.Annotatef(nil, "Re-running mutation from applyCh. Runs: %d", runs)
@@ -906,6 +906,10 @@ func (n *node) processApplyCh() {
 
 	// This function must be run serially.
 	handle := func(prop pb.Proposal) {
+		// Set the timestamp as of now. This timestamp is advanced by the
+		// applyCh loop serially.
+		prop.StartTs = posting.Oracle().Timestamp()
+
 		var perr error
 		prev, ok := previous[prop.Key]
 		if ok && prev.err == nil {
@@ -917,18 +921,12 @@ func (n *node) processApplyCh() {
 			// Don't break here. We still need to call the Done below.
 
 		} else {
-			if max := posting.Oracle().MaxAssigned(); prop.StartTs > max {
-				// Wait to run this proposal.
-				if x.Debug {
-					glog.Infof("start ts: %d max: %d. Pushing to pending.\n", prop.StartTs, max)
-				}
-				n.pendingProposals = append(n.pendingProposals, prop)
-				return
-			}
-
 			// if this applyCommited fails, how do we ensure
 			start := time.Now()
+
+			// This is where the logic gets called.
 			perr = n.applyCommitted(&prop)
+
 			if prop.Key != 0 {
 				p := &P{err: perr, seen: time.Now()}
 				previous[prop.Key] = p
@@ -960,19 +958,6 @@ func (n *node) processApplyCh() {
 		n.Proposals.Done(prop.Key, perr)
 		n.Applied.Done(prop.Index)
 		ostats.Record(context.Background(), x.RaftAppliedIndex.M(int64(n.Applied.DoneUntil())))
-	}
-
-	loopOverPending := func(maxAssigned uint64) {
-		idx := 0
-		for idx < len(n.pendingProposals) {
-			p := n.pendingProposals[idx]
-			if maxAssigned >= p.StartTs {
-				handle(p)
-				n.pendingProposals = append(n.pendingProposals[:idx], n.pendingProposals[idx+1:]...)
-			} else {
-				idx++
-			}
-		}
 	}
 
 	maxAge := 2 * time.Minute
@@ -1017,15 +1002,9 @@ func (n *node) processApplyCh() {
 			for _, e := range entries {
 				x.AssertTrue(len(e.Data) > 0)
 				p := getProposal(e)
-				handle(p)
 
-				if p.Delta != nil && len(n.pendingProposals) > 0 {
-					// MaxAssigned would only change during deltas.
-					if max := orc.MaxAssigned(); max > maxAssigned {
-						loopOverPending(max)
-						maxAssigned = max
-					}
-				}
+				handle(p) // Run the logic.
+
 				totalSize += int64(e.Size())
 			}
 			if sz := atomic.AddInt64(&n.pendingSize, -totalSize); sz < 0 {
@@ -1698,6 +1677,7 @@ func (n *node) Run() {
 					glog.Warningf("Inflight proposal size: %d. There would be some throttling.", sz)
 				}
 
+				startTs := posting.Oracle().Timestamp()
 				for _, e := range entries {
 					p := getProposal(e)
 					if len(p.Mutations.GetEdges()) == 0 {
@@ -1717,26 +1697,13 @@ func (n *node) Run() {
 					}
 					// We should register this txn before sending it over for concurrent
 					// application.
-					txn, has := posting.Oracle().RegisterStartTs(p.StartTs)
+					txn := posting.RegisterTxn(startTs)
 					if x.Debug {
-						glog.Infof("Registered start ts: %d txn: %p. has: %v. mutation: %+v\n",
-							p.StartTs, txn, has, p.Mutations)
+						glog.Infof("start ts: %d commit ts: %d txn: %p. mutation: %+v\n",
+							p.StartTs, txn, p.Mutations)
 					}
 
-					if has {
-						// We have already registered this txn before. That means, this txn would
-						// either have already been run via apply channel, or would be on its way.
-						// It could even be currently being executed via concurrent mutation
-						// workers.  Moreover, in concurrent execution, when MaxAssigned <
-						// txn.StartTs, we might have to waste the work done, and reset the txn.
-						// To avoid edge cases, it is just simpler to NOT run the txn mutation
-						// concurrently.
-						// There's an optimization here where if startTs < MaxAssigned, then we
-						// could run it concurrently. But, we won't use that to avoid complexity of
-						// figuring out whether we set it up for concurrent execution or serial.
-					} else {
-						n.concApplyCh <- &p
-					}
+					n.concApplyCh <- &p
 				}
 				n.applyCh <- entries
 			}

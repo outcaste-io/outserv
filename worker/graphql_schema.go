@@ -29,6 +29,7 @@ import (
 
 	"github.com/outcaste-io/outserv/codec"
 	"github.com/outcaste-io/outserv/conn"
+	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/x"
@@ -284,7 +285,9 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 	// types/queries/mutations.
 	if len(req.DgraphPreds) != 0 && len(req.DgraphTypes) != 0 {
 		if _, err = MutateOverNetwork(ctx, &pb.Mutations{
-			StartTs: State.GetTimestamp(false), // StartTs must be provided
+			// TODO: We no longer should provide a start ts. That would be
+			// applied during WAL.
+			StartTs: posting.Oracle().Timestamp(),
 			Schema:  req.DgraphPreds,
 			Types:   req.DgraphTypes,
 		}); err != nil {
