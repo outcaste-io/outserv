@@ -532,8 +532,8 @@ func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr erro
 		return schema.State().DeleteType(prop.Mutations.DropValue, prop.CommitTs)
 	}
 
-	if prop.Mutations.StartTs == 0 {
-		return errors.New("StartTs must be provided")
+	if prop.ReadTs == 0 || prop.CommitTs == 0 {
+		return errors.New("ReadTs and CommitTs must be provided")
 	}
 
 	if len(prop.Mutations.Schema) > 0 || len(prop.Mutations.Types) > 0 {
@@ -651,17 +651,19 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 	}
 
 	if proposal.Mutations != nil {
+		x.AssertTrue(proposal.ReadTs > 0)
 		// syncmarks for this shouldn't be marked done until it's committed.
 		span.Annotate(nil, "Applying mutations")
 		if x.Debug {
-			glog.Infof("applyCommitted: Mutation: %+v\n", proposal.Mutations)
+			glog.Infof("applyCommitted: Proposal: %+v\n", proposal)
 		}
 		if err := n.applyMutations(ctx, proposal); err != nil {
 			span.Annotatef(nil, "While applying mutations: %v", err)
 			return err
 		}
-		txn := posting.GetTxn(proposal.CommitTs)
-		n.commit(txn)
+		if txn := posting.GetTxn(proposal.CommitTs); txn != nil {
+			n.commit(txn)
+		}
 
 		span.Annotate(nil, "Done")
 		return nil
@@ -825,8 +827,6 @@ func (n *node) processApplyCh() {
 
 	// This function must be run serially.
 	handle := func(prop pb.Proposal) {
-		x.AssertTrue(prop.ReadTs > 0)
-
 		var perr error
 		prev, ok := previous[prop.Key]
 		if ok && prev.err == nil {
@@ -976,6 +976,7 @@ func (n *node) commit(txn *posting.Txn) error {
 			deleteTxn()
 			return nil
 		}
+		glog.Infof("---> HandoverSkiplist: %d\n", txn.CommitTs)
 		// We do the pending txn deletion in the callback, so that our snapshot and checkpoint
 		// tracking would only consider the txns which have been successfully pushed to disk.
 		return pstore.HandoverSkiplist(txn.Skiplist(), deleteTxn)
@@ -1535,6 +1536,7 @@ func (n *node) Run() {
 					p := getProposal(e)
 					p.ReadTs = readTs
 					p.CommitTs = posting.NewTimestamp()
+					glog.Infof("proposal: %+v\n", p)
 
 					props = append(props, p)
 

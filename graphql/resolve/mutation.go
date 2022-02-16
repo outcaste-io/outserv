@@ -24,11 +24,11 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/golang/glog"
 	dgoapi "github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
@@ -129,7 +129,6 @@ type DgraphExecutor interface {
 	// occurs, that indicates that the execution failed in some way significant enough
 	// way as to not continue processing this query/mutation or others in the same request.
 	Execute(ctx context.Context, req *dgoapi.Request, field schema.Field) (*dgoapi.Response, error)
-	CommitOrAbort(ctx context.Context, tc *dgoapi.TxnContext) (*dgoapi.TxnContext, error)
 }
 
 // An UpsertMutation is the query and mutations needed for a Dgraph upsert.
@@ -219,17 +218,6 @@ func (mr *dgraphResolver) rewriteAndExecute(
 	mutation schema.Mutation) (*Resolved, bool) {
 	var mutResp, qryResp *dgoapi.Response
 	req := &dgoapi.Request{}
-	commit := false
-
-	defer func() {
-		if !commit && mutResp != nil && mutResp.Txn != nil {
-			mutResp.Txn.Aborted = true
-			_, err := mr.executor.CommitOrAbort(ctx, mutResp.Txn)
-			if err != nil {
-				glog.Errorf("Error occurred while aborting transaction: %s", err)
-			}
-		}
-	}()
 
 	dgraphPreMutationQueryDuration := &schema.LabeledOffsetDuration{Label: "preMutationQuery"}
 	dgraphMutationDuration := &schema.LabeledOffsetDuration{Label: "mutation"}
@@ -493,19 +481,14 @@ func (mr *dgraphResolver) rewriteAndExecute(
 		return emptyResult(queryErrs), resolverFailed
 	}
 
-	txnCtx, err := mr.executor.CommitOrAbort(ctx, mutResp.Txn)
-	if err != nil {
-		return emptyResult(
-				schema.GQLWrapf(err, "mutation failed, couldn't commit transaction")),
-			resolverFailed
-	}
-	commit = true
-
 	// once committed, send async updates to configured webhooks, if any.
 	if mutation.HasLambdaOnMutate() {
 		rootUIDs := mr.mutationRewriter.MutatedRootUIDs(mutation, mutResp.GetUids(), result)
 		// NOTE: This is an async operation. We can't extract logs from webhooks.
-		go sendWebhookEvent(ctx, mutation, txnCtx.CommitTs, rootUIDs)
+		//
+		// TODO: Check if we can just send a readtimestamp, or do we need to
+		// send the exact commit timestamp.
+		go sendWebhookEvent(ctx, mutation, posting.ReadTimestamp(), rootUIDs)
 	}
 
 	// For delete mutation, we would have already populated qryResp if query field was requested.

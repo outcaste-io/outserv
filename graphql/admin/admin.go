@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	errMsgServerNotReady = "Unavailable: Server not ready."
+	errMsgServerNotReady = "Unavailable: Server not ready per GraphQL."
 
 	errNoGraphQLSchema = "Not resolving %s. There's no GraphQL schema in Dgraph. " +
 		"Use the /admin API to add a GraphQL schema"
@@ -830,8 +830,10 @@ type GraphQLHealthStore struct {
 }
 
 func (g *GraphQLHealthStore) GetHealth() GraphQLHealth {
+	glog.Infof("GetHealth")
 	v := g.v.Load()
 	if v == nil {
+		glog.Infof("GetHealth is returning false")
 		return GraphQLHealth{Healthy: false, StatusMsg: "init"}
 	}
 	return v.(GraphQLHealth)
@@ -1132,6 +1134,7 @@ func (as *adminServer) initServer() {
 	for {
 		<-time.After(waitFor)
 
+		glog.Infof("getCurrentGraphQLSchema")
 		sch, err := getCurrentGraphQLSchema(x.GalaxyNamespace)
 		if err != nil {
 			glog.Errorf("namespace: %d. Error reading GraphQL schema: %s.", x.GalaxyNamespace, err)

@@ -22,6 +22,7 @@ import (
 	"math"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/outcaste-io/badger/v3/skl"
@@ -172,6 +173,9 @@ func (o *oracle) init() {
 	o.applied.Init(o.closer)
 	o.waiters = make(map[uint64][]chan struct{})
 	o.pendingTxns = make(map[uint64]*Txn)
+
+	o.timestamp = uint64(time.Now().UTC().Unix()) << 32
+	glog.Infof("Initialized timestamp to: %d %016x\n", o.timestamp, o.timestamp)
 }
 
 // RegisterCommitTs would return a txn and a bool.
@@ -273,6 +277,9 @@ func (o *oracle) SetMaxAssigned(m uint64) {
 }
 
 func (o *oracle) WaitForTs(ctx context.Context, startTs uint64) error {
+	glog.Infof("----> WaitForTs: %d. Returning...\n", startTs)
+	return nil
+
 	ch, ok := o.addToWaiters(startTs)
 	if !ok {
 		return nil

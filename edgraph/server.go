@@ -1366,9 +1366,14 @@ func (s *Server) doQuery(ctx context.Context, req *Request) (resp *api.Response,
 		return nil, serverOverloadErr
 	}
 
-	if bool(glog.V(3)) || worker.LogRequestEnabled() {
+	if bool(glog.V(2)) || worker.LogRequestEnabled() {
 		glog.Infof("Got a query: %+v", req.req)
 	}
+
+	glog.Infof("doQuery begin")
+	defer func() {
+		glog.Infof("doQuery done")
+	}()
 
 	isGraphQL, _ := ctx.Value(IsGraphql).(bool)
 	if isGraphQL {
@@ -1480,6 +1485,8 @@ func (s *Server) doQuery(ctx context.Context, req *Request) (resp *api.Response,
 		}()
 	}
 
+	glog.Infof("----> going to call processQuery")
+
 	var gqlErrs error
 	if resp, rerr = processQuery(ctx, qc); rerr != nil {
 		// if rerr is just some error from GraphQL encoding, then we need to continue the normal
@@ -1536,6 +1543,8 @@ func processQuery(ctx context.Context, qc *queryContext) (*api.Response, error) 
 	// Here we try our best effort to not contact Zero for a timestamp. If we succeed,
 	// then we use the max known transaction ts value (from ProcessDelta) for a read-only query.
 	// If we haven't processed any updates yet then fall back to getting TS from Zero.
+	//
+	// TODO: We don't need these divisions in the request.
 	switch {
 	case qc.req.BestEffort:
 		qc.span.Annotate([]otrace.Attribute{otrace.BoolAttribute("be", true)}, "")
@@ -1558,11 +1567,13 @@ func processQuery(ctx context.Context, qc *queryContext) (*api.Response, error) 
 
 	if qc.req.StartTs == 0 {
 		qc.req.StartTs = posting.ReadTimestamp()
+		glog.V(2).Infof("---> Using start ts: %d\n", qc.req.StartTs)
 	}
 
 	qr.ReadTs = qc.req.StartTs
 	resp.Txn = &api.TxnContext{StartTs: qc.req.StartTs}
 
+	glog.Infof("---> Going to call Process\n")
 	// Core processing happens here.
 	er, err := qr.Process(ctx)
 
@@ -1745,6 +1756,7 @@ func (s *Server) CommitOrAbort(ctx context.Context, tc *api.TxnContext) (*api.Tx
 	ctx, span := otrace.StartSpan(ctx, "Server.CommitOrAbort")
 	defer span.End()
 
+	panic("CommitOrAbort should not be called")
 	if err := x.HealthCheck(); err != nil {
 		return &api.TxnContext{}, err
 	}

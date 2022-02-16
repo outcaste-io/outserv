@@ -62,9 +62,3 @@ func (dg *DgraphEx) Execute(ctx context.Context, req *dgoapi.Request,
 
 	return resp, err
 }
-
-// CommitOrAbort is the underlying dgraph implementation for committing a Dgraph transaction
-func (dg *DgraphEx) CommitOrAbort(ctx context.Context,
-	tc *dgoapi.TxnContext) (*dgoapi.TxnContext, error) {
-	return (&edgraph.Server{}).CommitOrAbort(ctx, tc)
-}

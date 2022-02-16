@@ -294,6 +294,8 @@ func (txn *Txn) ToSkiplist() error {
 			glog.Errorf("Invalid Entry. len(key): %d len(val): %d\n", len(k), len(data))
 			continue
 		}
+
+		glog.Infof("Key: %s CommitTs: %d\n", key, txn.CommitTs)
 		b.Add(y.KeyWithTs(k, txn.CommitTs),
 			y.ValueStruct{
 				Value:    data,
@@ -384,6 +386,12 @@ func ReadPostingList(key []byte, it *badger.Iterator) (*List, error) {
 			break
 		}
 
+		// TODO: Remove this.
+		val, err := item.ValueCopy(nil)
+		x.Check(err)
+		glog.Infof("---> ReadPostingList Key: %s val: %s Version: %d\n",
+			item.Key(), val, item.Version())
+
 		switch item.UserMeta() {
 		case BitForbidPosting:
 			l.minTs = item.Version()
@@ -417,6 +425,7 @@ func ReadPostingList(key []byte, it *badger.Iterator) (*List, error) {
 				if l.mutationMap == nil {
 					l.mutationMap = make(map[uint64]*pb.PostingList)
 				}
+				glog.Infof("Key: %s PL: %+v\n", item.Key(), pl)
 				l.mutationMap[pl.CommitTs] = pl
 				return nil
 			})
