@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -2267,6 +2268,7 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 		}
 		go ProcessGraph(ctx, child, sg, childChan)
 	}
+	debug.PrintStack()
 
 	var childErr error
 	// Now get all the results back.
@@ -2709,6 +2711,7 @@ func (req *Request) ProcessQuery(ctx context.Context) (err error) {
 				go ProcessGraph(ctx, sg, nil, errChan)
 			}
 		}
+		debug.PrintStack()
 
 		var ferr error
 		// Wait for the execution that was started in this iteration.

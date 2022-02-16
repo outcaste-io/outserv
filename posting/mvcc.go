@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"math"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"sync"
@@ -374,6 +375,8 @@ func ReadPostingList(key []byte, it *badger.Iterator) (*List, error) {
 		}
 	}()
 
+	debug.PrintStack()
+
 	// Iterates from highest Ts to lowest Ts
 	for it.Valid() {
 		item := it.Item()
@@ -536,7 +539,8 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 	// the latest version of the PL. We also check that we're reading a version
 	// from Badger, which is higher than the write registered by the cache.
 	if readTs >= latestTs && latestTs >= seenTs {
-		lCache.SetIfPresent(key, newList(), 0)
+		ok := lCache.SetIfPresent(key, newList(), 0)
+		glog.Infof("----> Cache.SetIfPresent key: %s plist: %+v readTs: %d. OK: %v\n", key, out.plist, readTs, ok)
 	}
 	return newList(), nil
 }

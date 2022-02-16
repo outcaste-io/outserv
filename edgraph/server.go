@@ -1372,7 +1372,7 @@ func (s *Server) doQuery(ctx context.Context, req *Request) (resp *api.Response,
 
 	glog.Infof("doQuery begin")
 	defer func() {
-		glog.Infof("doQuery done")
+		glog.Infof("doQuery done. Resp: %s\n", resp.Json)
 	}()
 
 	isGraphQL, _ := ctx.Value(IsGraphql).(bool)
@@ -1540,30 +1540,8 @@ func processQuery(ctx context.Context, qc *queryContext) (*api.Response, error) 
 		GqlQuery: &qc.gqlRes,
 	}
 
-	// Here we try our best effort to not contact Zero for a timestamp. If we succeed,
-	// then we use the max known transaction ts value (from ProcessDelta) for a read-only query.
-	// If we haven't processed any updates yet then fall back to getting TS from Zero.
-	//
-	// TODO: We don't need these divisions in the request.
-	switch {
-	case qc.req.BestEffort:
-		qc.span.Annotate([]otrace.Attribute{otrace.BoolAttribute("be", true)}, "")
-	case qc.req.ReadOnly:
-		qc.span.Annotate([]otrace.Attribute{otrace.BoolAttribute("ro", true)}, "")
-	default:
-		qc.span.Annotate([]otrace.Attribute{otrace.BoolAttribute("no", true)}, "")
-	}
-
-	if qc.req.BestEffort {
-		// Sanity: check that request is read-only too.
-		if !qc.req.ReadOnly {
-			return resp, errors.Errorf("A best effort query must be read-only.")
-		}
-		if qc.req.StartTs == 0 {
-			qc.req.StartTs = posting.Oracle().MaxAssigned()
-		}
-		qr.Cache = worker.NoCache
-	}
+	// TODO: HACK for now. This fixes the null value problem for GraphQL queries.
+	qr.Cache = worker.NoCache
 
 	if qc.req.StartTs == 0 {
 		qc.req.StartTs = posting.ReadTimestamp()
