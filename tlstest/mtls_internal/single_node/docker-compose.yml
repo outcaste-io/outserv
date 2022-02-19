@@ -1,42 +1,36 @@
+# Auto-generated with: [compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --num_zeros 1 --image=outcaste/outserv --tag=test -O ../tlstest/mtls_internal/single_node/docker-compose.yml --num_alphas 1 --num_zeros 1 --custom_alpha_options=1:--tls="ca-cert=/dgraph-tls/alpha1/ca.crt;server-cert=/dgraph-tls/alpha1/node.crt;server-key=/dgraph-tls/alpha1/node.key;internal-port=true;client-cert=/dgraph-tls/alpha1/client.alpha1.crt;client-key=/dgraph-tls/alpha2/client.alpha1.key;" --custom_alpha_options=2:--tls="ca-cert=/dgraph-tls/alpha2/ca.crt;server-cert=/dgraph-tls/alpha2/node.crt;server-key=/dgraph-tls/alpha2/node.key;internal-port=true;client-cert=/dgraph-tls/alpha2/client.alpha2.crt;client-key=/dgraph-tls/alpha2/client.alpha2.key;" --custom_alpha_options=3:--tls="ca-cert=/dgraph-tls/alpha3/ca.crt;server-cert=/dgraph-tls/alpha3/node.crt;server-key=/dgraph-tls/alpha3/node.key;internal-port=true;client-cert=/dgraph-tls/alpha3/client.alpha3.crt;client-key=/dgraph-tls/alpha3/client.alpha3.key;" --custom_zero_options=1:--tls="ca-cert=/dgraph-tls/zero1/ca.crt;server-cert=/dgraph-tls/zero1/node.crt;server-key=/dgraph-tls/zero1/node.key;internal-port=true;client-cert=/dgraph-tls/zero1/client.zero1.crt;client-key=/dgraph-tls/zero2/client.zero1.key;" --custom_zero_options=2:--tls="ca-cert=/dgraph-tls/zero2/ca.crt;server-cert=/dgraph-tls/zero2/node.crt;server-key=/dgraph-tls/zero2/node.key;internal-port=true;client-cert=/dgraph-tls/zero2/client.zero2.crt;client-key=/dgraph-tls/zero2/client.zero2.key;" --custom_zero_options=3:--tls="ca-cert=/dgraph-tls/zero3/ca.crt;server-cert=/dgraph-tls/zero3/node.crt;server-key=/dgraph-tls/zero3/node.key;internal-port=true;client-cert=/dgraph-tls/zero3/client.zero3.crt;client-key=/dgraph-tls/zero3/client.zero3.key;" --alpha_volume ../tls:/dgraph-tls:ro --zero_volume ../tls:/dgraph-tls:ro]
+#
 version: "3.5"
 services:
   alpha1:
-    image: dgraph/dgraph:latest
+    image: outcaste/outserv:test
     working_dir: /data/alpha1
     labels:
       cluster: test
     ports:
-      - 8080
-      - 9080
+    - "8080"
+    - "9080"
     volumes:
-      - type: bind
-        source: $GOPATH/bin
-        target: /gobin
-        read_only: true
-      - type: bind
-        source: ../tls/alpha1
-        target: /dgraph-tls
-        read_only: true
-    command: /gobin/dgraph alpha --my=alpha1:7080 --zero=zero1:5080 --logtostderr -v=2
-      --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16;"
-      --tls "ca-cert=/dgraph-tls/ca.crt; server-cert=/dgraph-tls/node.crt; server-key=/dgraph-tls/node.key; internal-port=true; client-cert=/dgraph-tls/client.alpha1.crt; client-key=/dgraph-tls/client.alpha1.key;"
+    - type: bind
+      source: ../tls
+      target: /dgraph-tls
+      read_only: true
+    command: outserv alpha --my=alpha1:7080 --zero=zero1:5080 --logtostderr -v=2 --expose_trace=true
+      --raft "idx=1; group=1" --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.0.0.0/8;"
+      --tls="ca-cert=/dgraph-tls/alpha1/ca.crt;server-cert=/dgraph-tls/alpha1/node.crt;server-key=/dgraph-tls/alpha1/node.key;internal-port=true;client-cert=/dgraph-tls/alpha1/client.alpha1.crt;client-key=/dgraph-tls/alpha2/client.alpha1.key;"
   zero1:
-    image: dgraph/dgraph:latest
+    image: outcaste/outserv:test
     working_dir: /data/zero1
     labels:
       cluster: test
     ports:
-      - 5080
-      - 6080
+    - "5080"
+    - "6080"
     volumes:
-      - type: bind
-        source: $GOPATH/bin
-        target: /gobin
-        read_only: true
-      - type: bind
-        source: ../tls/zero1
-        target: /dgraph-tls
-        read_only: true
-    command: /gobin/dgraph zero --raft "idx=1;" --my=zero1:5080 --logtostderr -v=2 --bindall
-      --tls "ca-cert=/dgraph-tls/ca.crt; server-cert=/dgraph-tls/node.crt; server-key=/dgraph-tls/node.key; internal-port=true; client-cert=/dgraph-tls/client.zero1.crt; client-key=/dgraph-tls/client.zero1.key;"
+    - type: bind
+      source: ../tls
+      target: /dgraph-tls
+      read_only: true
+    command: outserv zero --raft='idx=1' --my=zero1:5080 --logtostderr -v=2 --bindall
+      --tls="ca-cert=/dgraph-tls/zero1/ca.crt;server-cert=/dgraph-tls/zero1/node.crt;server-key=/dgraph-tls/zero1/node.key;internal-port=true;client-cert=/dgraph-tls/zero1/client.zero1.crt;client-key=/dgraph-tls/zero2/client.zero1.key;"
 volumes: {}

@@ -123,8 +123,9 @@ type options struct {
 	Cdc            bool
 	CdcConsumer    bool
 
-	// Alpha Configurations
+	// Custom Configurations
 	CustomAlphaOptions []string
+	CustomZeroOptions  []string
 
 	// Container Alias
 	ContainerPrefix string
@@ -246,7 +247,7 @@ func initService(basename string, idx, grpcPort int) service {
 	return svc
 }
 
-func getZero(idx int, raft string) service {
+func getZero(idx int, raft string, customFlags string) service {
 	basename := "zero"
 	basePort := zeroBasePort + opts.PortOffset
 	grpcPort := basePort + getOffset(idx)
@@ -291,6 +292,10 @@ func getZero(idx int, raft string) service {
 		}
 	}
 	svc.EnvFile = opts.ZeroEnvFile
+
+	if customFlags != "" {
+		svc.Command += " " + customFlags
+	}
 
 	return svc
 }
@@ -762,6 +767,9 @@ func main() {
 	cmd.PersistentFlags().StringArrayVar(&opts.CustomAlphaOptions, "custom_alpha_options", nil,
 		"Custom alpha flags for specific alphas,"+
 			" following {\"1:custom_flags\", \"2:custom_flags\"}, eg: {\"2: -p <bulk_path>\"")
+	cmd.PersistentFlags().StringArrayVar(&opts.CustomZeroOptions, "custom_zero_options", nil,
+		"Custom zero flags for specific zeros,"+
+			" following {\"1:custom_flags\", \"2:custom_flags\"}, eg: {\"2: -p <bulk_path>\"")
 	cmd.PersistentFlags().StringVar(&opts.Hostname, "hostname", "",
 		"hostname for the alpha and zero servers")
 	cmd.PersistentFlags().BoolVar(&opts.Cdc, "cdc", false,
@@ -805,8 +813,23 @@ func main() {
 
 	services := make(map[string]service)
 
+	// Zero Customization
+	customZeros := make(map[int]string)
+	for _, flag := range opts.CustomZeroOptions {
+		splits := strings.SplitN(flag, ":", 2)
+		if len(splits) != 2 {
+			fatal(errors.Errorf("custom_zero_options, requires string in index:options format."))
+		}
+		idx, err := strconv.Atoi(splits[0])
+		if err != nil {
+			fatal(errors.Errorf(" custom_zero_options, error while parsing index value %v", err))
+		}
+		customZeros[idx] = splits[1]
+	}
 	for i := 1; i <= opts.NumZeros; i++ {
-		svc := getZero(i, fmt.Sprintf("idx=%d", i))
+		svc := getZero(i, fmt.Sprintf("idx=%d", i), customZeros[i])
+		// Don't make Zeros depend on each other.
+		svc.DependsOn = nil
 		services[svc.name] = svc
 	}
 
@@ -819,7 +842,7 @@ func main() {
 		}
 		idx, err := strconv.Atoi(splits[0])
 		if err != nil {
-			fatal(errors.Errorf(" custom_alpha_options, captured erros while parsing index value %v", err))
+			fatal(errors.Errorf(" custom_alpha_options, error while parsing index value %v", err))
 		}
 		customAlphas[idx] = splits[1]
 	}
@@ -838,7 +861,7 @@ func main() {
 	for i := 1; i <= opts.NumLearners; i++ {
 		lidx++
 		rs := fmt.Sprintf("idx=%d; learner=true", lidx)
-		svc := getZero(lidx, rs)
+		svc := getZero(lidx, rs, customZeros[i])
 		services[svc.name] = svc
 	}
 	lidx = opts.NumAlphas

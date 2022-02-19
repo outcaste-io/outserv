@@ -63,8 +63,6 @@ services:
   zero2:
     image: outcaste/outserv:test
     working_dir: /data/zero2
-    depends_on:
-    - zero1
     labels:
       cluster: test
     ports:
@@ -75,8 +73,6 @@ services:
   zero3:
     image: outcaste/outserv:test
     working_dir: /data/zero3
-    depends_on:
-    - zero2
     labels:
       cluster: test
     ports:
