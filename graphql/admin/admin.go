@@ -308,7 +308,6 @@ const (
 	}
 
 	enum TaskKind {
-		Backup
 		Export
 		Unknown
 	}
@@ -412,223 +411,6 @@ const (
 		response: AssignedIds
 	}
 
-	input BackupInput {
-
-		"""
-		Destination for the backup: e.g. Minio or S3 bucket.
-		"""
-		destination: String!
-
-		"""
-		Access key credential for the destination.
-		"""
-		accessKey: String
-
-		"""
-		Secret key credential for the destination.
-		"""
-		secretKey: String
-
-		"""
-		AWS session token, if required.
-		"""
-		sessionToken: String
-
-		"""
-		Set to true to allow backing up to S3 or Minio bucket that requires no credentials.
-		"""
-		anonymous: Boolean
-
-		"""
-		Force a full backup instead of an incremental backup.
-		"""
-		forceFull: Boolean
-	}
-
-	type BackupPayload {
-		response: Response
-		taskId: String
-	}
-
-	input RestoreInput {
-
-		"""
-		Destination for the backup: e.g. Minio or S3 bucket.
-		"""
-		location: String!
-
-		"""
-		Backup ID of the backup series to restore. This ID is included in the manifest.json file.
-		If missing, it defaults to the latest series.
-		"""
-		backupId: String
-
-		"""
-		Number of the backup within the backup series to be restored. Backups with a greater value
-		will be ignored. If the value is zero or missing, the entire series will be restored.
-		"""
-		backupNum: Int
-
-		"""
-		All the backups with num >= incrementalFrom will be restored.
-		"""
-		incrementalFrom: Int
-
-		"""
-		If isPartial is set to true then the cluster will be kept in draining mode after
-		restore. This makes sure that the db is not corrupted by any mutations or tablet moves in
-		between two restores.
-		"""
-		isPartial: Boolean
-
-		"""
-		Path to the key file needed to decrypt the backup. This file should be accessible
-		by all alphas in the group. The backup will be written using the encryption key
-		with which the cluster was started, which might be different than this key.
-		"""
-		encryptionKeyFile: String
-
-		"""
-		Vault server address where the key is stored. This server must be accessible
-		by all alphas in the group. Default "http://localhost:8200".
-		"""
-		vaultAddr: String
-
-		"""
-		Path to the Vault RoleID file.
-		"""
-		vaultRoleIDFile: String
-
-		"""
-		Path to the Vault SecretID file.
-		"""
-		vaultSecretIDFile: String
-
-		"""
-		Vault kv store path where the key lives. Default "secret/data/dgraph".
-		"""
-		vaultPath: String
-
-		"""
-		Vault kv store field whose value is the key. Default "enc_key".
-		"""
-		vaultField: String
-
-		"""
-		Vault kv store field's format. Must be "base64" or "raw". Default "base64".
-		"""
-		vaultFormat: String
-
-		"""
-		Access key credential for the destination.
-		"""
-		accessKey: String
-
-		"""
-		Secret key credential for the destination.
-		"""
-		secretKey: String
-
-		"""
-		AWS session token, if required.
-		"""
-		sessionToken: String
-
-		"""
-		Set to true to allow backing up to S3 or Minio bucket that requires no credentials.
-		"""
-		anonymous: Boolean
-	}
-
-	type RestorePayload {
-		"""
-		A short string indicating whether the restore operation was successfully scheduled.
-		"""
-		code: String
-
-		"""
-		Includes the error message if the operation failed.
-		"""
-		message: String
-	}
-
-	input ListBackupsInput {
-		"""
-		Destination for the backup: e.g. Minio or S3 bucket.
-		"""
-		location: String!
-
-		"""
-		Access key credential for the destination.
-		"""
-		accessKey: String
-
-		"""
-		Secret key credential for the destination.
-		"""
-		secretKey: String
-
-		"""
-		AWS session token, if required.
-		"""
-		sessionToken: String
-
-		"""
-		Whether the destination doesn't require credentials (e.g. S3 public bucket).
-		"""
-		anonymous: Boolean
-
-	}
-
-	type BackupGroup {
-		"""
-		The ID of the cluster group.
-		"""
-		groupId: UInt64
-
-		"""
-		List of predicates assigned to the group.
-		"""
-		predicates: [String]
-	}
-
-	type Manifest {
-		"""
-		Unique ID for the backup series.
-		"""
-		backupId: String
-
-		"""
-		Number of this backup within the backup series. The full backup always has a value of one.
-		"""
-		backupNum: UInt64
-
-		"""
-		Whether this backup was encrypted.
-		"""
-		encrypted: Boolean
-
-		"""
-		List of groups and the predicates they store in this backup.
-		"""
-		groups: [BackupGroup]
-
-		"""
-		Path to the manifest file.
-		"""
-		path: String
-
-		"""
-		The timestamp at which this backup was taken. The next incremental backup will
-		start from this timestamp.
-		"""
-		since: UInt64
-
-		"""
-		The type of backup, either full or incremental.
-		"""
-		type: String
-	}
 
 	` + adminTypes + `
 
@@ -639,10 +421,6 @@ const (
 		state: MembershipState
 		config: Config
 		task(input: TaskInput!): TaskPayload
-		"""
-		Get the information about the backups at a given location.
-		"""
-		listBackups(input: ListBackupsInput!) : [Manifest]
 		` + adminQueries + `
 	}
 
@@ -696,15 +474,6 @@ const (
 		"""
 		assign(input: AssignInput!): AssignPayload
 
-		"""
-		Start a binary backup.
-		"""
-		backup(input: BackupInput!) : BackupPayload
-
-		"""
-		Start restoring a binary backup.
-		"""
-		restore(input: RestoreInput!) : RestorePayload
 
 		` + adminMutations + `
 	}
@@ -764,7 +533,6 @@ var (
 		"health":          minimalAdminQryMWs, // dgraph checks Guardian auth for health
 		"state":           minimalAdminQryMWs, // dgraph checks Guardian auth for state
 		"config":          gogQryMWs,
-		"listBackups":     gogQryMWs,
 		"getGQLSchema":    stdAdminQryMWs,
 		"getLambdaScript": stdAdminQryMWs,
 		// for queries and mutations related to User/Group, dgraph handles Guardian auth,
@@ -776,12 +544,10 @@ var (
 		"getGroup":       minimalAdminQryMWs,
 	}
 	adminMutationMWConfig = map[string]resolve.MutationMiddlewares{
-		"backup":             gogMutMWs,
 		"config":             gogMutMWs,
 		"draining":           gogMutMWs,
 		"export":             stdAdminMutMWs, // dgraph handles the export by GoG internally
 		"login":              minimalAdminMutMWs,
-		"restore":            gogMutMWs,
 		"shutdown":           gogMutMWs,
 		"removeNode":         gogMutMWs,
 		"moveTablet":         gogMutMWs,
@@ -1026,14 +792,12 @@ func newAdminResolver(
 func newAdminResolverFactory() resolve.ResolverFactory {
 	adminMutationResolvers := map[string]resolve.MutationResolverFunc{
 		"addNamespace":       resolveAddNamespace,
-		"backup":             resolveBackup,
 		"config":             resolveUpdateConfig,
 		"deleteNamespace":    resolveDeleteNamespace,
 		"draining":           resolveDraining,
 		"export":             resolveExport,
 		"login":              resolveLogin,
 		"resetPassword":      resolveResetPassword,
-		"restore":            resolveRestore,
 		"shutdown":           resolveShutdown,
 		"updateLambdaScript": resolveUpdateLambda,
 
@@ -1054,9 +818,6 @@ func newAdminResolverFactory() resolve.ResolverFactory {
 		}).
 		WithQueryResolver("config", func(q schema.Query) resolve.QueryResolver {
 			return resolve.QueryResolverFunc(resolveGetConfig)
-		}).
-		WithQueryResolver("listBackups", func(q schema.Query) resolve.QueryResolver {
-			return resolve.QueryResolverFunc(resolveListBackups)
 		}).
 		WithQueryResolver("task", func(q schema.Query) resolve.QueryResolver {
 			return resolve.QueryResolverFunc(resolveTask)
@@ -1379,7 +1140,7 @@ func response(code, msg string) map[string]interface{} {
 		"response": map[string]interface{}{"code": code, "message": msg}}
 }
 
-// DestinationFields is used by both export and backup to specify destination
+// DestinationFields is used by export to specify destination
 type DestinationFields struct {
 	Destination  string
 	AccessKey    string

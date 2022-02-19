@@ -25,7 +25,6 @@ import (
 	"math"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -160,10 +159,6 @@ func (id op) String() string {
 		return "opSnapshot"
 	case opIndexing:
 		return "opIndexing"
-	case opRestore:
-		return "opRestore"
-	case opBackup:
-		return "opBackup"
 	case opPredMove:
 		return "opPredMove"
 	default:
@@ -175,8 +170,6 @@ const (
 	opRollup op = iota + 1
 	opSnapshot
 	opIndexing
-	opRestore
-	opBackup
 	opPredMove
 )
 
@@ -190,7 +183,6 @@ func (n *node) startTask(id op) (*z.Closer, error) {
 // startTaskAtTs is used to check whether an op is already running. If a rollup is running,
 // it is canceled and startTask will wait until it completes before returning.
 // If the same task is already running, this method returns an errror.
-// Restore operations have preference and cancel all other operations, not just rollups.
 // You should only call Done() on the returned closer. Calling other functions (such as
 // SignalAndWait) for closer could result in panics. For more details, see GitHub issue #5034.
 func (n *node) startTaskAtTs(id op, ts uint64) (*z.Closer, error) {
@@ -219,39 +211,9 @@ func (n *node) startTaskAtTs(id op, ts uint64) (*z.Closer, error) {
 			return nil, errors.Errorf("another operation is already running")
 		}
 		go posting.IncrRollup.Process(closer)
-	case opRestore:
-		// Restores cancel all other operations, except for other restores since
-		// only one restore operation should be active any given moment.
-		for otherId, otherOp := range n.ops {
-			if otherId == opRestore {
-				return nil, errors.Errorf("another restore operation is already running")
-			}
-			// Remove from map and signal the closer to cancel the operation.
-			delete(n.ops, otherId)
-			otherOp.SignalAndWait()
-		}
-	case opBackup:
-		// Backup cancels all other operations, except for other backups since
-		// only one backup operation should be active any given moment. Also, indexing at higher
-		// timestamp can also run concurrently with backup.
-		for otherId, otherOp := range n.ops {
-			if otherId == opBackup {
-				return nil, errors.Errorf("another backup operation is already running")
-			}
-			// Remove from map and signal the closer to cancel the operation.
-			delete(n.ops, otherId)
-			otherOp.SignalAndWait()
-		}
 	case opIndexing:
 		for otherId, otherOp := range n.ops {
 			switch otherId {
-			case opBackup:
-				if otherOp.ts < ts {
-					// If backup is running at higher timestamp, then indexing can't be executed.
-					continue
-				} else {
-					return nil, errors.Errorf("operation %s is already running", otherId)
-				}
 			case opRollup:
 				// Remove from map and signal the closer to cancel the operation.
 				delete(n.ops, otherId)
@@ -818,34 +780,6 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 		// We can now discard all invalid versions of keys below this ts.
 		pstore.SetDiscardTs(snap.ReadTs)
 		return nil
-	case proposal.Restore != nil:
-		// Enable draining mode for the duration of the restore processing.
-		x.UpdateDrainingMode(true)
-		if !proposal.Restore.IsPartial {
-			defer x.UpdateDrainingMode(false)
-		}
-
-		var err error
-		var closer *z.Closer
-		closer, err = n.startTask(opRestore)
-		if err != nil {
-			return errors.Wrapf(err, "cannot start restore task")
-		}
-		defer closer.Done()
-
-		glog.Infof("Got restore proposal at Index: %d, ReadTs: %d",
-			proposal.Index, proposal.Restore.RestoreTs)
-		if err := handleRestoreProposal(ctx, proposal.Restore, proposal.Index); err != nil {
-			return err
-		}
-
-		// Call commitOrAbort to update the group checksums.
-		ts := proposal.Restore.RestoreTs
-		return n.commitOrAbort(key, &pb.OracleDelta{
-			Txns: []*pb.TxnStatus{
-				{StartTs: ts, CommitTs: ts},
-			},
-		})
 
 	case proposal.DeleteNs != nil:
 		x.AssertTrue(proposal.DeleteNs.Namespace != x.GalaxyNamespace)
@@ -934,8 +868,7 @@ func (n *node) processApplyCh() {
 				previous[prop.Key] = p
 			}
 			if perr != nil {
-				glog.Errorf("Applying proposal. Error: %v. Proposal: %q.", perr,
-					getSanitizedString(&prop))
+				glog.Errorf("Applying proposal. Error: %v. Proposal: %q.", perr, prop.String())
 			}
 			n.elog.Printf("Applied proposal with key: %d, index: %d. Err: %v",
 				prop.Key, prop.Index, perr)
@@ -2045,21 +1978,6 @@ func (n *node) calculateSnapshot(startIdx, lastIdx, minPendingStart uint64) (*pb
 					maxCommitTs = x.Max(maxCommitTs, txn.CommitTs)
 				}
 			}
-
-			// If we encounter a restore proposal, we can immediately truncate the WAL and create
-			// a snapshot. This is to avoid the restore happening again if the server restarts.
-			if proposal.Restore != nil {
-				restoreTs := proposal.Restore.GetRestoreTs()
-				s := &pb.Snapshot{
-					Context:     n.RaftContext,
-					Index:       entry.Index,
-					ReadTs:      restoreTs,
-					MaxAssigned: restoreTs,
-				}
-				span.Annotatef(nil, "Found restore proposal with restoreTs: %d", restoreTs)
-				glog.Infof("calculated snapshot from restore proposal: %+v", s)
-				return s, nil
-			}
 		}
 	}
 
@@ -2243,19 +2161,4 @@ func (n *node) monitorRaftMetrics() {
 		ostats.Record(n.ctx, x.RaftPendingSize.M(curPendingSize))
 		ostats.Record(n.ctx, x.RaftApplyCh.M(int64(len(n.applyCh))))
 	}
-}
-
-func getSanitizedString(proposal *pb.Proposal) string {
-	ps := proposal.String()
-	if proposal.GetRestore() != nil {
-		if len(proposal.GetRestore().GetAccessKey()) != 0 {
-			ps = strings.Replace(ps, proposal.GetRestore().GetAccessKey(),
-				sensitiveString, 1)
-		}
-		if len(proposal.GetRestore().GetSecretKey()) != 0 {
-			ps = strings.Replace(ps, proposal.GetRestore().GetSecretKey(),
-				sensitiveString, 1)
-		}
-	}
-	return ps
 }

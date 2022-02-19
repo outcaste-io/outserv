@@ -297,33 +297,6 @@ message ZeroSnapshot {
   MembershipState state = 5;
 }
 
-message RestoreRequest {
-  uint32 group_id = 1;
-  uint64 restore_ts = 2;
-  string location = 3;
-  string backup_id = 4;
-
-  // Credentials when using a minio or S3 bucket as the backup location.
-  string access_key = 5;
-  string secret_key = 6;
-  string session_token = 7;
-  bool anonymous = 8;
-
-  // Info needed to process encrypted backups.
-  string encryption_key_file = 9;
-  // Vault options
-  string vault_addr = 10;
-  string vault_roleid_file = 11;
-  string vault_secretid_file = 12;
-  string vault_path = 13;
-  string vault_field = 14;
-  string vault_format = 15;
-
-  uint64 backup_num = 16;
-  uint64 incremental_from = 17;
-  bool is_partial = 18;
-}
-
 message Proposal {
   reserved 7;  // Was used for string key.
   Mutations mutations = 2;
@@ -336,7 +309,7 @@ message Proposal {
   uint64 index = 10;      // Used to store Raft index, in raft.Ready.
   // Block an operation until membership reaches this checksum.
   uint64 expected_checksum = 11;
-  RestoreRequest restore = 12;
+  reserved 12; // Was used for restore request
   CDCState cdc_state = 13;
   DeleteNsRequest delete_ns = 14;  // Used to delete namespace.
   uint64 key = 15;
@@ -549,14 +522,11 @@ service Worker {
   rpc StreamSnapshot(stream Snapshot) returns (stream KVS) {}
   rpc Sort(SortMessage) returns (SortResult) {}
   rpc Schema(SchemaRequest) returns (SchemaResult) {}
-  rpc Backup(BackupRequest) returns (BackupResponse) {}
-  rpc Restore(RestoreRequest) returns (Status) {}
   rpc Export(ExportRequest) returns (ExportResponse) {}
   rpc ReceivePredicate(stream KVS) returns (api.Payload) {}
   rpc MovePredicate(MovePredicatePayload) returns (api.Payload) {}
   rpc Subscribe(SubscriptionRequest) returns (stream badgerpb3.KVList) {}
-  rpc UpdateGraphQLSchema(UpdateGraphQLSchemaRequest)
-      returns (UpdateGraphQLSchemaResponse) {}
+  rpc UpdateGraphQLSchema(UpdateGraphQLSchemaRequest) returns (UpdateGraphQLSchemaResponse) {}
   rpc DeleteNamespace(DeleteNsRequest) returns (Status) {}
   rpc TaskStatus(TaskStatusRequest) returns (TaskStatusResponse) {}
 }
@@ -628,34 +598,6 @@ message Status {
   string msg = 2;
 }
 
-// Backups record all data from since_ts to read_ts. With incremental backups,
-// the read_ts of the first backup becomes the since_ts of the second backup.
-// Incremental backups can be disabled using the force_full field.
-message BackupRequest {
-  uint64 read_ts = 1;
-  uint64 since_ts = 2;
-  uint32 group_id = 3;
-  string unix_ts = 4;
-  string destination = 5;
-  string access_key = 6;
-  string secret_key = 7;
-  string session_token = 8;
-
-  // True if no credentials should be used to access the S3 or minio bucket.
-  // For example, when using a bucket with a public policy.
-  bool anonymous = 9;
-
-  // The predicates to backup. All other predicates present in the group (e.g
-  // stale data from a predicate move) will be ignored.
-  repeated string predicates = 10;
-
-  bool force_full = 11;
-}
-
-message BackupResponse {
-  repeated DropOperation drop_operations = 1;
-}
-
 message DropOperation {
   enum DropOp {
     ALL = 0;
@@ -691,37 +633,6 @@ message ExportResponse {
   int32 code = 1;
   string msg = 2;
   repeated string files = 3;
-}
-
-// A key stored in the format used for writing backups.
-message BackupKey {
-  enum KeyType {
-    UNKNOWN = 0;
-    DATA = 1;
-    INDEX = 2;
-    REVERSE = 3;
-    COUNT = 4;
-    COUNT_REV = 5;
-    SCHEMA = 6;
-    TYPE = 7;
-  }
-
-  KeyType type = 1;
-  string attr = 2;
-  uint64 uid = 3;
-  uint64 start_uid = 4;
-  string term = 5;
-  uint32 count = 6;
-  uint64 namespace = 7;
-}
-
-// A posting list stored in the format used for writing backups.
-message BackupPostingList {
-  repeated uint64 uids = 1;
-  repeated Posting postings = 2;
-  uint64 commit_ts = 3;
-  repeated uint64 splits = 4;
-  bytes uid_bytes = 5;
 }
 
 message UpdateGraphQLSchemaRequest {

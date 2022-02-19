@@ -24,8 +24,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-
-	"github.com/outcaste-io/outserv/protos/pb"
 )
 
 const (
@@ -407,71 +405,6 @@ func (p ParsedKey) CountPrefix(reverse bool) []byte {
 		buf[prefixLen] = ByteCount
 	}
 	return buf
-}
-
-// ToBackupKey returns the key in the format used for writing backups.
-func (p ParsedKey) ToBackupKey() *pb.BackupKey {
-	ns, attr := ParseNamespaceAttr(p.Attr)
-	key := pb.BackupKey{}
-	key.Namespace = ns
-	key.Attr = attr
-	key.Uid = p.Uid
-	key.StartUid = p.StartUid
-	key.Term = p.Term
-	key.Count = p.Count
-
-	switch {
-	case p.IsData():
-		key.Type = pb.BackupKey_DATA
-	case p.IsIndex():
-		key.Type = pb.BackupKey_INDEX
-	case p.IsReverse():
-		key.Type = pb.BackupKey_REVERSE
-	case p.IsCount():
-		key.Type = pb.BackupKey_COUNT
-	case p.IsCountRev():
-		key.Type = pb.BackupKey_COUNT_REV
-	case p.IsSchema():
-		key.Type = pb.BackupKey_SCHEMA
-	case p.IsType():
-		key.Type = pb.BackupKey_TYPE
-	}
-
-	return &key
-}
-
-// FromBackupKey takes a key in the format used for backups and converts it to a key.
-func FromBackupKey(backupKey *pb.BackupKey) []byte {
-	if backupKey == nil {
-		return nil
-	}
-
-	attr := NamespaceAttr(backupKey.Namespace, backupKey.Attr)
-
-	var key []byte
-	switch backupKey.Type {
-	case pb.BackupKey_DATA:
-		key = DataKey(attr, backupKey.Uid)
-	case pb.BackupKey_INDEX:
-		key = IndexKey(attr, backupKey.Term)
-	case pb.BackupKey_REVERSE:
-		key = ReverseKey(attr, backupKey.Uid)
-	case pb.BackupKey_COUNT:
-		key = CountKey(attr, backupKey.Count, false)
-	case pb.BackupKey_COUNT_REV:
-		key = CountKey(attr, backupKey.Count, true)
-	case pb.BackupKey_SCHEMA:
-		key = SchemaKey(attr)
-	case pb.BackupKey_TYPE:
-		key = TypeKey(attr)
-	}
-
-	if backupKey.StartUid > 0 {
-		var err error
-		key, err = SplitKey(key, backupKey.StartUid)
-		Check(err)
-	}
-	return key
 }
 
 // SchemaPrefix returns the prefix for Schema keys.
