@@ -28,11 +28,11 @@
 //go:generate Compose -O ../outserv/docker-compose.yml								--num_alphas 3 --num_zeros 3 --acl_secret ../ee/acl/hmac-secret
 //go:generate Compose -O ../systest/backup/filesystem/docker-compose.yml
 //go:generate Compose -O ../systest/backup/minio-large/docker-compose.yml
-//go:generate Compose -O ../systest/backup/minio/docker-compose.yml
+//go:generate Compose -O ../systest/backup/minio/docker-compose.yml --num_alphas 3 --num_zeros 1 --alpha_env_file ../../backup.env --num_replicas 1 --minio --minio_port=9001 --minio_env_file ../../backup.env --custom_alpha_options=1:--tls="ca-cert=/dgraph-tls/alpha1/ca.crt;server-cert=/dgraph-tls/alpha1/node.crt;server-key=/dgraph-tls/alpha1/node.key;internal-port=true;client-cert=/dgraph-tls/alpha1/client.alpha1.crt;client-key=/dgraph-tls/alpha2/client.alpha1.key;" --custom_alpha_options=2:--tls="ca-cert=/dgraph-tls/alpha2/ca.crt;server-cert=/dgraph-tls/alpha2/node.crt;server-key=/dgraph-tls/alpha2/node.key;internal-port=true;client-cert=/dgraph-tls/alpha2/client.alpha2.crt;client-key=/dgraph-tls/alpha2/client.alpha2.key;" --custom_alpha_options=3:--tls="ca-cert=/dgraph-tls/alpha3/ca.crt;server-cert=/dgraph-tls/alpha3/node.crt;server-key=/dgraph-tls/alpha3/node.key;internal-port=true;client-cert=/dgraph-tls/alpha3/client.alpha3.crt;client-key=/dgraph-tls/alpha3/client.alpha3.key;" --custom_zero_options=1:--tls="ca-cert=/dgraph-tls/zero1/ca.crt;server-cert=/dgraph-tls/zero1/node.crt;server-key=/dgraph-tls/zero1/node.key;internal-port=true;client-cert=/dgraph-tls/zero1/client.zero1.crt;client-key=/dgraph-tls/zero2/client.zero1.key;" --alpha_volume ../../../tlstest/mtls_internal/tls:/dgraph-tls:ro --zero_volume ../../../tlstest/mtls_internal/tls:/dgraph/tls:ro
 //go:generate Compose -O ../systest/bgindex/docker-compose.yml
-//go:generate Compose -O ../systest/bulk_live/bulk/docker-compose.yml
-//go:generate Compose -O ../systest/bulk_live/live/docker-compose.yml
-//go:generate Compose -O ../systest/cloud/docker-compose.yml
+//go:generate Compose -O ../systest/bulk_live/bulk/docker-compose.yml --num_alphas 0 --minio --minio_data_dir=.
+//go:generate Compose -O ../systest/bulk_live/live/docker-compose.yml --minio --minio_data_dir=.
+//go:generate Compose -O ../systest/cloud/docker-compose.yml                        --minio --minio_env_file minio.env --extra_alpha_flags='--limit="shared-instance=true;"'
 //go:generate Compose -O ../systest/export/docker-compose.yml                       --num_alphas 3 --alpha_env_file export.env --minio --minio_port=9001 --alpha_volume data:/data
 //go:generate Compose -O ../systest/group-delete/docker-compose.yml					--num_alphas 3
 //go:generate Compose -O ../systest/license/docker-compose.yml
