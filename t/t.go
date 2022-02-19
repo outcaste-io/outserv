@@ -14,6 +14,51 @@
  * limitations under the License.
  */
 
+//go:generate -command Compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --num_zeros 1 --image=outcaste/outserv --tag=test
+//go:generate Compose -O ../graphql/e2e/admin_auth/poorman_auth/docker-compose.yml			--token itIsSecret
+//go:generate Compose -O ../graphql/e2e/admin_auth/poorman_auth_with_acl/docker-compose.yml --acl_secret ../../../../ee/acl/hmac-secret --token itIsSecret
+//go:generate Compose -O ../graphql/e2e/auth/debug_off/docker-compose.yml					--extra_alpha_flags='--graphql="debug=false;"' --names=false
+//go:generate Compose -O ../graphql/e2e/auth/docker-compose.yml								--extra_alpha_flags='--graphql="debug=true;"' --names=false
+//go:generate Compose -O ../graphql/e2e/auth_closed_by_default/docker-compose.yml			--extra_alpha_flags='--graphql="debug=true;"'
+//go:generate Compose -O ../graphql/e2e/custom_logic/docker-compose.yml						--extra_alpha_flags='--lamda="num=2;"'
+//go:generate Compose -O ../graphql/e2e/directives/docker-compose.yml
+//go:generate Compose -O ../graphql/e2e/multi_tenancy/docker-compose.yml					--num_alphas 3 --acl_secret ../../../ee/acl/hmac-secret
+//go:generate Compose -O ../graphql/e2e/normal/docker-compose.yml							--extra_alpha_flags='--lambda="num=2;"'
+//go:generate Compose -O ../graphql/e2e/schema/docker-compose.yml							--num_alphas 3
+//go:generate Compose -O ../graphql/e2e/subscription/docker-compose.yml						--num_alphas 3
+//go:generate Compose -O ../outserv/cmd/alpha/mutations_mode/docker-compose.yml				--custom_alpha_options 1:--mutations=disallow --custom_alpha_options 2:--mutations=strict --custom_alpha_options 2:--mutations=strict
+//go:generate Compose -O ../outserv/docker-compose.yml										--num_alphas 3 --num_zeros 3 --acl_secret ../ee/acl/hmac-secret
+//go:generate Compose -O ../systest/1million/docker-compose.yml
+//go:generate Compose -O ../systest/21million/bulk/docker-compose.yml
+//go:generate Compose -O ../systest/21million/live/docker-compose.yml
+//go:generate Compose -O ../systest/audit/docker-compose.yml
+//go:generate Compose -O ../systest/backup/encryption/docker-compose.yml
+//go:generate Compose -O ../systest/backup/filesystem/docker-compose.yml
+//go:generate Compose -O ../systest/backup/minio-large/docker-compose.yml
+//go:generate Compose -O ../systest/backup/minio/docker-compose.yml
+//go:generate Compose -O ../systest/backup/multi-tenancy/docker-compose.yml
+//go:generate Compose -O ../systest/bgindex/docker-compose.yml
+//go:generate Compose -O ../systest/bulk_live/bulk/docker-compose.yml
+//go:generate Compose -O ../systest/bulk_live/live/docker-compose.yml
+//go:generate Compose -O ../systest/cdc/docker-compose.yml
+//go:generate Compose -O ../systest/cloud/docker-compose.yml
+//go:generate Compose -O ../systest/export/docker-compose.yml
+//go:generate Compose -O ../systest/group-delete/docker-compose.yml
+//go:generate Compose -O ../systest/license/docker-compose.yml
+//go:generate Compose -O ../systest/loader-benchmark/docker-compose.yml
+//go:generate Compose -O ../systest/loader/docker-compose.yml
+//go:generate Compose -O ../systest/online-restore/docker-compose.yml
+//go:generate Compose -O ../systest/plugin/docker-compose.yml
+//go:generate Compose -O ../tlstest/acl/docker-compose.yml
+//go:generate Compose -O ../tlstest/certrequest/docker-compose.yml
+//go:generate Compose -O ../tlstest/certrequireandverify/docker-compose.yml
+//go:generate Compose -O ../tlstest/certverifyifgiven/docker-compose.yml
+//go:generate Compose -O ../tlstest/mtls_internal/ha_6_node/docker-compose.yml
+//go:generate Compose -O ../tlstest/mtls_internal/multi_group/docker-compose.yml
+//go:generate Compose -O ../tlstest/mtls_internal/single_node/docker-compose.yml
+//go:generate Compose -O ../tlstest/zero_https/all_routes_tls/docker-compose.yml
+//go:generate Compose -O ../tlstest/zero_https/no_tls/docker-compose.yml
+//go:generate Compose -O ../worker/docker-compose.yml
 package main
 
 import (
