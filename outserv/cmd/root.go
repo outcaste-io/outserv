@@ -41,7 +41,6 @@ import (
 	"github.com/outcaste-io/outserv/outserv/cmd/migrate"
 	"github.com/outcaste-io/outserv/outserv/cmd/version"
 	"github.com/outcaste-io/outserv/outserv/cmd/zero"
-	"github.com/outcaste-io/outserv/upgrade"
 	"github.com/outcaste-io/outserv/x"
 
 	"github.com/pkg/errors"
@@ -85,7 +84,7 @@ var rootConf = viper.New()
 var subcommands = []*x.SubCommand{
 	&bulk.Bulk, &cert.Cert, &conv.Conv, &live.Live,
 	&alpha.Alpha, &zero.Zero, &version.Version, &debug.Debug, &migrate.Migrate,
-	&debuginfo.DebugInfo, &upgrade.Upgrade, &decrypt.Decrypt, &increment.Increment,
+	&debuginfo.DebugInfo, &decrypt.Decrypt, &increment.Increment,
 }
 
 func initCmds() {
