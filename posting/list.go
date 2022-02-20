@@ -1000,64 +1000,6 @@ func (l *List) Rollup(alloc *z.Allocator) ([]*bpb.KV, error) {
 	return kvs, nil
 }
 
-// ToBackupPostingList uses rollup to generate a single list with no splits.
-// It's used during backup so that each backed up posting list is stored in a single key.
-func (l *List) ToBackupPostingList(
-	bl *pb.BackupPostingList, alloc *z.Allocator, buf *z.Buffer) (*bpb.KV, error) {
-
-	bl.Reset()
-	l.RLock()
-	defer l.RUnlock()
-
-	out, err := l.rollup(math.MaxUint64, false)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed when calling List.rollup")
-	}
-	// out is only nil when the list's minTs is greater than readTs but readTs
-	// is math.MaxUint64 so that's not possible. Assert that's true.
-	x.AssertTrue(out != nil)
-
-	if l.forbid {
-		kv := y.NewKV(alloc)
-		kv.Key = alloc.Copy(l.key)
-		kv.Value = nil
-		kv.Version = out.newMinTs
-		kv.UserMeta = alloc.Copy([]byte{BitForbidPosting})
-		return kv, nil
-	}
-
-	ol := out.plist
-	bm := sroar.NewBitmap()
-	if ol.Bitmap != nil {
-		bm = sroar.FromBuffer(ol.Bitmap)
-	}
-
-	buf.Reset()
-	codec.DecodeToBuffer(buf, bm)
-	bl.UidBytes = buf.Bytes()
-
-	bl.Postings = ol.Postings
-	bl.CommitTs = ol.CommitTs
-	bl.Splits = ol.Splits
-
-	val := alloc.Allocate(bl.Size())
-	n, err := bl.MarshalToSizedBuffer(val)
-	if err != nil {
-		return nil, err
-	}
-
-	kv := y.NewKV(alloc)
-	kv.Key = alloc.Copy(l.key)
-	kv.Value = val[:n]
-	kv.Version = out.newMinTs
-	if isPlistEmpty(ol) {
-		kv.UserMeta = alloc.Copy([]byte{BitEmptyPosting})
-	} else {
-		kv.UserMeta = alloc.Copy([]byte{BitCompletePosting})
-	}
-	return kv, nil
-}
-
 func (out *rollupOutput) marshalPostingListPart(alloc *z.Allocator,
 	baseKey []byte, startUid uint64, plist *pb.PostingList) (*bpb.KV, error) {
 	key, err := x.SplitKey(baseKey, startUid)
@@ -1668,26 +1610,4 @@ func (l *List) PartSplits() []uint64 {
 	splits := make([]uint64, len(l.plist.Splits))
 	copy(splits, l.plist.Splits)
 	return splits
-}
-
-// FromBackupPostingList converts a posting list in the format used for backups to a
-// normal posting list.
-func FromBackupPostingList(bl *pb.BackupPostingList) *pb.PostingList {
-	l := pb.PostingList{}
-	if bl == nil {
-		return &l
-	}
-
-	var r *sroar.Bitmap
-	if len(bl.Uids) > 0 {
-		r = sroar.NewBitmap()
-		r.SetMany(bl.Uids)
-	} else if len(bl.UidBytes) > 0 {
-		r = codec.FromBackup(bl.UidBytes)
-	}
-	l.Bitmap = r.ToBuffer()
-	l.Postings = bl.Postings
-	l.CommitTs = bl.CommitTs
-	l.Splits = bl.Splits
-	return &l
 }

@@ -480,48 +480,6 @@ function test::bulk_loader() {
     log::info "Export succeeded."
   fi
 
-  log::debug "Backing up data."
-
-  local -r backup_path="$TEST_PATH/backup"
-  rm -rf "$backup_path"
-  mkdir -p "$backup_path"
-
-  local backup_result
-  backup_result=$(curl -SsX POST -H 'Content-Type: application/json' -d "
-    {
-      \"query\": \"mutation { backup(input: {destination: \\\"$backup_path\\\"}) { response { message code } } }\"
-    }" 'http://localhost:8081/admin')
-
-  if [ "$(echo "$backup_result" | jq '.data.backup.response.code')" != '"Success"' ]; then
-    log::error 'Backup failed.'
-    echo "$backup_result" | jq || echo "$backup_result"
-    return 1
-  else
-    log::info "Backup succeeded."
-  fi
-
-  setup
-
-  dgraph::start_zeros 1
-
-  sleep 5
-
-  log::info "Restoring data."
-  "$DGRAPH_BIN" \
-    restore \
-    --cwd "$DGRAPH_PATH/restore" \
-    --location "$backup_path" \
-    --postings "$DGRAPH_PATH" \
-    --zero 'localhost:5081' &>"$LOGS_PATH/restore"
-
-  mkdir -p "$DGRAPH_PATH/alpha1"
-  mv "$DGRAPH_PATH/p1" "$DGRAPH_PATH/alpha1/p"
-
-  dgraph::start_alphas 1
-  sleep 5
-
-  dataset::1million::verify
-  log::info "Restore succeeded."
 }
 
 # Run `dgraph increment` in a loop with 1, 2, and 3 groups respectively and verify the result.

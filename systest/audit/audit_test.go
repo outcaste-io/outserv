@@ -66,12 +66,6 @@ func TestAlphaAudit(t *testing.T) {
 	}
 	defer os.Remove(fmt.Sprintf("audit_dir/aa/alpha_audit_1_%s.log", nId))
 	testCommand := map[string][]string{
-		"/admin": []string{"--location", "--request", "POST",
-			fmt.Sprintf("%s/admin", testutil.SockAddrHttp),
-			"--header", "Content-Type: application/json",
-			"--data-raw", `'{"query":"mutation {\n  backup(
-input: {destination: \"/Users/sankalanparajuli/work/backup\"}) {\n    response {\n      message\n      code\n    }\n  }\n}\n","variables":{}}'`},
-
 		"/graphql": []string{"--location", "--request", "POST", fmt.Sprintf("%s/graphql", testutil.SockAddrHttp),
 			"--header", "Content-Type: application/json",
 			"--data-raw", `'{"query":"query {\n  __schema {\n    __typename\n  }\n}","variables":{}}'`},
