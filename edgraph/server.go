@@ -27,11 +27,9 @@ import (
 	"go.opencensus.io/trace"
 	otrace "go.opencensus.io/trace"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/outcaste-io/dgo/v210"
 	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/chunker"
 	"github.com/outcaste-io/outserv/conn"
@@ -807,54 +805,8 @@ func (s *Server) doMutate(ctx context.Context, qc *queryContext, resp *api.Respo
 		resp.Metrics.NumUids["mutation_cost"] = cost
 		resp.Metrics.NumUids["_total"] = resp.Metrics.NumUids["_total"] + cost
 	}
-	if !qc.req.CommitNow {
-		calculateMutationMetrics()
-		if err == x.ErrConflict {
-			err = status.Error(codes.FailedPrecondition, err.Error())
-		}
-
-		return err
-	}
-
-	// The following logic is for committing immediately.
-	if err != nil {
-		// ApplyMutations failed. We now want to abort the transaction,
-		// ignoring any error that might occur during the abort (the user would
-		// care more about the previous error).
-		if resp.Txn == nil {
-			resp.Txn = &api.TxnContext{StartTs: qc.req.StartTs}
-		}
-
-		resp.Txn.Aborted = true
-		_, _ = worker.CommitOverNetwork(ctx, resp.Txn)
-
-		if err == x.ErrConflict {
-			// We have already aborted the transaction, so the error message should reflect that.
-			return dgo.ErrAborted
-		}
-
-		return err
-	}
-
-	qc.span.Annotatef(nil, "Prewrites err: %v. Attempting to commit/abort immediately.", err)
-	ctxn := resp.Txn
-	// zero would assign the CommitTs
-	cts, err := worker.CommitOverNetwork(ctx, ctxn)
-	qc.span.Annotatef(nil, "Status of commit at ts: %d: %v", ctxn.StartTs, err)
-	if err != nil {
-		if err == dgo.ErrAborted {
-			err = status.Errorf(codes.Aborted, err.Error())
-			resp.Txn.Aborted = true
-		}
-
-		return err
-	}
-
-	// CommitNow was true, no need to send keys.
-	resp.Txn.Keys = resp.Txn.Keys[:0]
-	resp.Txn.CommitTs = cts
 	calculateMutationMetrics()
-	return nil
+	return err
 }
 
 // buildUpsertQuery modifies the query to evaluate the
@@ -1730,45 +1682,8 @@ func validateNamespace(ctx context.Context, tc *api.TxnContext) error {
 	return nil
 }
 
-// CommitOrAbort commits or aborts a transaction.
 func (s *Server) CommitOrAbort(ctx context.Context, tc *api.TxnContext) (*api.TxnContext, error) {
-	ctx, span := otrace.StartSpan(ctx, "Server.CommitOrAbort")
-	defer span.End()
-
-	panic("CommitOrAbort should not be called")
-	if err := x.HealthCheck(); err != nil {
-		return &api.TxnContext{}, err
-	}
-
-	tctx := &api.TxnContext{}
-	if tc.StartTs == 0 {
-		return &api.TxnContext{}, errors.Errorf(
-			"StartTs cannot be zero while committing a transaction")
-	}
-	if ns, err := x.ExtractJWTNamespace(ctx); err == nil {
-		annotateNamespace(span, ns)
-	}
-	annotateStartTs(span, tc.StartTs)
-
-	if err := validateNamespace(ctx, tc); err != nil {
-		return &api.TxnContext{}, err
-	}
-
-	span.Annotatef(nil, "Txn Context received: %+v", tc)
-	commitTs, err := worker.CommitOverNetwork(ctx, tc)
-	if err == dgo.ErrAborted {
-		// If err returned is dgo.ErrAborted and tc.Aborted was set, that means the client has
-		// aborted the transaction by calling txn.Discard(). Hence return a nil error.
-		tctx.Aborted = true
-		if tc.Aborted {
-			return tctx, nil
-		}
-
-		return tctx, status.Errorf(codes.Aborted, err.Error())
-	}
-	tctx.StartTs = tc.StartTs
-	tctx.CommitTs = commitTs
-	return tctx, err
+	return tc, nil
 }
 
 // CheckVersion returns the version of this Dgraph instance.

@@ -22,10 +22,10 @@ import (
 	"sort"
 	"time"
 
-	"github.com/outcaste-io/outserv/protos/pb"
-	"github.com/outcaste-io/outserv/x"
 	humanize "github.com/dustin/go-humanize"
 	"github.com/golang/glog"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
 )
@@ -177,19 +177,16 @@ func (s *Server) movePredicate(predicate string, srcGroup, dstGroup uint32) erro
 	var sinceTs uint64
 	counter := 1
 	nonBlockingMove := func() error {
+		return fmt.Errorf("TODO: Add a mechanism to get a fresh timestamp")
 		// Get a new timestamp. Source Alpha leader must reach this timestamp before streaming data.
-		ids, err := s.Timestamps(ctx, &pb.Num{Val: 1})
-		if err != nil || ids.StartId == 0 {
-			return errors.Wrapf(err, "while leasing txn timestamp. Id: %+v", ids)
-		}
 
 		// Move the predicate. Commits on this predicate are not blocked yet. Any data after ReadTs
 		// will be moved in the phase II below.
-		in.ReadTs = ids.StartId
+		in.ReadTs = 0
 		in.SinceTs, sinceTs = sinceTs, in.ReadTs
 		span.Annotatef(nil, "Starting move [1.%d]: %+v", counter, in)
 		glog.Infof("Starting move [1.%d]: %+v", counter, in)
-		_, err = wc.MovePredicate(ctx, in)
+		_, err := wc.MovePredicate(ctx, in)
 		return err
 	}
 
@@ -221,14 +218,11 @@ func (s *Server) movePredicate(predicate string, srcGroup, dstGroup uint32) erro
 
 	// Get a new timestamp, beyond which we are sure that no new txns would be committed for this
 	// predicate. Source Alpha leader must reach this timestamp before streaming the data.
-	ids, err := s.Timestamps(ctx, &pb.Num{Val: 1})
-	if err != nil || ids.StartId == 0 {
-		return errors.Wrapf(err, "while leasing txn timestamp. Id: %+v", ids)
-	}
+	return fmt.Errorf("TODO: Add a mechanism to get a fresh timestamp")
 
 	// We have done a majority of move. Now transfer rest of the data.
 	in.SinceTs = sinceTs
-	in.ReadTs = ids.StartId
+	in.ReadTs = 0
 	span.Annotatef(nil, "Starting move [2]: %+v", in)
 	glog.Infof("Starting move [2]: %+v", in)
 	if _, err := wc.MovePredicate(ctx, in); err != nil {

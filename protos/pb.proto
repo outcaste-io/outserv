@@ -537,9 +537,6 @@ service Zero {
   rpc ShouldServe(Tablet) returns (Tablet) {}
   rpc Inform(TabletRequest) returns (TabletResponse) {}
   rpc AssignIds(Num) returns (AssignedIds) {}
-  rpc Timestamps(Num) returns (AssignedIds) {}
-  rpc CommitOrAbort(api.TxnContext) returns (api.TxnContext) {}
-  rpc TryAbort(TxnTimestamps) returns (OracleDelta) {}
   rpc DeleteNamespace(DeleteNsRequest) returns (Status) {}
   rpc RemoveNode(RemoveNodeRequest) returns (Status) {}
   rpc MoveTablet(MoveTabletRequest) returns (Status) {}

@@ -135,7 +135,7 @@ func newLoader(opt *options) *loader {
 		shards: newShardMap(opt.MapShards),
 		// Lots of gz readers, so not much channel buffer needed.
 		readerChunkCh: make(chan *bytes.Buffer, opt.NumGoroutines),
-		writeTs:       getWriteTimestamp(zero),
+		writeTs:       getWriteTimestamp(),
 		namespaces:    &sync.Map{},
 	}
 	st.schema = newSchemaStore(readSchema(opt), opt, st)
@@ -151,18 +151,8 @@ func newLoader(opt *options) *loader {
 	return ld
 }
 
-func getWriteTimestamp(zero *grpc.ClientConn) uint64 {
-	client := pb.NewZeroClient(zero)
-	for {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		ts, err := client.Timestamps(ctx, &pb.Num{Val: 1})
-		cancel()
-		if err == nil {
-			return ts.GetStartId()
-		}
-		fmt.Printf("Error communicating with dgraph zero, retrying: %v", err)
-		time.Sleep(time.Second)
-	}
+func getWriteTimestamp() uint64 {
+	return uint64(time.Now().UTC().Unix()) << 32
 }
 
 // leaseNamespace is called at the end of map phase. It leases the namespace ids till the maximum

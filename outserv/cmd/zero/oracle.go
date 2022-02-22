@@ -20,7 +20,6 @@ import (
 	"context"
 	"math/rand"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/outcaste-io/ristretto/z"
@@ -31,7 +30,6 @@ import (
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
-	otrace "go.opencensus.io/trace"
 )
 
 type syncMark struct {
@@ -348,100 +346,6 @@ func (s *Server) proposeTxn(ctx context.Context, src *api.TxnContext) error {
 	return nil
 }
 
-func (s *Server) commit(ctx context.Context, src *api.TxnContext) error {
-	span := otrace.FromContext(ctx)
-	span.Annotate([]otrace.Attribute{otrace.Int64Attribute("startTs", int64(src.StartTs))}, "")
-	if src.Aborted {
-		return s.proposeTxn(ctx, src)
-	}
-
-	// Use the start timestamp to check if we have a conflict, before we need to assign a commit ts.
-	s.orc.RLock()
-	conflict := s.orc.hasConflict(src)
-	s.orc.RUnlock()
-	if conflict {
-		span.Annotate([]otrace.Attribute{otrace.BoolAttribute("abort", true)},
-			"Oracle found conflict")
-		src.Aborted = true
-		return s.proposeTxn(ctx, src)
-	}
-
-	checkPreds := func() error {
-		// Check if any of these tablets is being moved. If so, abort the transaction.
-		for _, pkey := range src.Preds {
-			splits := strings.SplitN(pkey, "-", 2)
-			if len(splits) < 2 {
-				return errors.Errorf("Unable to find group id in %s", pkey)
-			}
-			gid, err := strconv.Atoi(splits[0])
-			if err != nil {
-				return errors.Wrapf(err, "unable to parse group id from %s", pkey)
-			}
-			pred := splits[1]
-			tablet := s.ServingTablet(pred)
-			if tablet == nil {
-				return errors.Errorf("Tablet for %s is nil", pred)
-			}
-			if tablet.GroupId != uint32(gid) {
-				return errors.Errorf("Mutation done in group: %d. Predicate %s assigned to %d",
-					gid, pred, tablet.GroupId)
-			}
-			if s.isBlocked(pred) {
-				return errors.Errorf("Commits on predicate %s are blocked due to predicate move", pred)
-			}
-		}
-		return nil
-	}
-	if err := checkPreds(); err != nil {
-		span.Annotate([]otrace.Attribute{otrace.BoolAttribute("abort", true)}, err.Error())
-		src.Aborted = true
-		return s.proposeTxn(ctx, src)
-	}
-
-	num := pb.Num{Val: 1, Type: pb.Num_TXN_TS}
-	assigned, err := s.lease(ctx, &num)
-	if err != nil {
-		return err
-	}
-	src.CommitTs = assigned.StartId
-	// Mark the transaction as done, irrespective of whether the proposal succeeded or not.
-	defer s.orc.doneUntil.Done(src.CommitTs)
-	span.Annotatef([]otrace.Attribute{otrace.Int64Attribute("commitTs", int64(src.CommitTs))},
-		"Node Id: %d. Proposing TxnContext: %+v", s.Node.Id, src)
-
-	if err := s.orc.commit(src); err != nil {
-		span.Annotatef(nil, "Found a conflict. Aborting.")
-		src.Aborted = true
-	}
-	if err := ctx.Err(); err != nil {
-		span.Annotatef(nil, "Aborting txn due to context timing out.")
-		src.Aborted = true
-	}
-	// Propose txn should be used to set watermark as done.
-	return s.proposeTxn(ctx, src)
-}
-
-// CommitOrAbort either commits a transaction or aborts it.
-// The abortion can happen under the following conditions
-// 1) the api.TxnContext.Aborted flag is set in the src argument
-// 2) if there's an error (e.g server is not the leader or there's a conflicting transaction)
-func (s *Server) CommitOrAbort(ctx context.Context, src *api.TxnContext) (*api.TxnContext, error) {
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
-	}
-	ctx, span := otrace.StartSpan(ctx, "Zero.CommitOrAbort")
-	defer span.End()
-
-	if !s.Node.AmLeader() {
-		return nil, errors.Errorf("Only leader can decide to commit or abort")
-	}
-	err := s.commit(ctx, src)
-	if err != nil {
-		span.Annotate([]otrace.Attribute{otrace.BoolAttribute("error", true)}, err.Error())
-	}
-	return src, err
-}
-
 var errClosed = errors.New("Streaming closed by oracle")
 var errNotLeader = errors.New("Node is no longer leader")
 
@@ -478,49 +382,4 @@ func (s *Server) Oracle(_ *api.Payload, server pb.Zero_OracleServer) error {
 			return errServerShutDown
 		}
 	}
-}
-
-// TryAbort attempts to abort the given transactions which are not already committed..
-func (s *Server) TryAbort(ctx context.Context,
-	txns *pb.TxnTimestamps) (*pb.OracleDelta, error) {
-	delta := &pb.OracleDelta{}
-	for _, startTs := range txns.Ts {
-		// Do via proposals to avoid race
-		tctx := &api.TxnContext{StartTs: startTs, Aborted: true}
-		if err := s.proposeTxn(ctx, tctx); err != nil {
-			return delta, err
-		}
-		// Txn should be aborted if not already committed.
-		delta.Txns = append(delta.Txns, &pb.TxnStatus{
-			StartTs:  startTs,
-			CommitTs: s.orc.commitTs(startTs)})
-	}
-	return delta, nil
-}
-
-// Timestamps is used to assign startTs for a new transaction
-func (s *Server) Timestamps(ctx context.Context, num *pb.Num) (*pb.AssignedIds, error) {
-	ctx, span := otrace.StartSpan(ctx, "Zero.Timestamps")
-	defer span.End()
-
-	span.Annotatef(nil, "Zero id: %d. Timestamp request: %+v", s.Node.Id, num)
-	if ctx.Err() != nil {
-		return &emptyAssignedIds, ctx.Err()
-	}
-
-	num.Type = pb.Num_TXN_TS
-	reply, err := s.lease(ctx, num)
-	span.Annotatef(nil, "Response: %+v. Error: %v", reply, err)
-
-	switch err {
-	case nil:
-		s.orc.doneUntil.Done(x.Max(reply.EndId, reply.ReadOnly))
-		go s.orc.storePending(reply)
-	case errServedFromMemory:
-		// Avoid calling doneUntil.Done, and storePending.
-		err = nil
-	default:
-		glog.Errorf("Got error: %v while leasing timestamps: %+v", err, num)
-	}
-	return reply, err
 }

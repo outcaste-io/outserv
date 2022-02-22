@@ -266,19 +266,9 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 	}
 	// mutate the GraphQL schema. As it is a reserved predicate, and we are in group 1,
 	// so this call is gonna come back to all the group 1 servers only
-	tctx, err := MutateOverNetwork(ctx, m)
+	_, err = MutateOverNetwork(ctx, m)
 	if err != nil {
 		return nil, err
-	}
-	// commit the mutation here itself. This has two benefits:
-	// 	1. If there was any concurrent request to update the GraphQL schema, then one of the two
-	//	will fail here itself, and the alter for the failed one won't happen.
-	// 	2. If the commit succeeds, then as alter takes some time to finish, so the badger
-	//	notification for dgraph.graphql.schema predicate will reach all the alphas in the meantime,
-	//	providing every alpha a chance to reflect the current GraphQL schema before the response is
-	//	sent back to the user.
-	if _, err = CommitOverNetwork(ctx, tctx); err != nil {
-		return nil, errors.Wrap(err, errGraphQLSchemaCommitFailed)
 	}
 
 	// perform dgraph schema alter, if required. As the schema could be empty if it only has custom

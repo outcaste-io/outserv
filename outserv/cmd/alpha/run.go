@@ -646,7 +646,6 @@ func setupServer(closer *z.Closer) {
 	baseMux.HandleFunc("/query/", queryHandler)
 	baseMux.HandleFunc("/mutate", mutationHandler)
 	baseMux.HandleFunc("/mutate/", mutationHandler)
-	baseMux.HandleFunc("/commit", commitHandler)
 	baseMux.HandleFunc("/alter", alterHandler)
 	baseMux.HandleFunc("/health", healthCheck)
 	baseMux.HandleFunc("/state", stateHandler)

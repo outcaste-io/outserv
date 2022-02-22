@@ -335,6 +335,9 @@ var errHasPendingTxns = errors.New("Pending transactions found. Please retry ope
 // transactions. We're now applying all updates serially, so blocking for one
 // operation is not an option.
 func detectPendingTxns(attr string) error {
+	return nil
+	// TODO: Check if we still need this?
+
 	tctxs := posting.Oracle().IterateTxns(func(key []byte) bool {
 		pk, err := x.Parse(key)
 		if err != nil {
@@ -346,7 +349,6 @@ func detectPendingTxns(attr string) error {
 	if len(tctxs) == 0 {
 		return nil
 	}
-	go tryAbortTransactions(tctxs)
 	return errHasPendingTxns
 }
 
@@ -1690,44 +1692,6 @@ func (n *node) calculateTabletSizes() {
 }
 
 var errNoConnection = errors.New("No connection exists")
-
-func (n *node) blockingAbort(req *pb.TxnTimestamps) error {
-	pl := groups().Leader(0)
-	if pl == nil {
-		return errNoConnection
-	}
-	zc := pb.NewZeroClient(pl.Get())
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	delta, err := zc.TryAbort(ctx, req)
-	glog.Infof("TryAbort %d txns with start ts. Error: %v\n", len(req.Ts), err)
-	if err != nil || len(delta.Txns) == 0 {
-		return err
-	}
-
-	// Let's propose the txn updates received from Zero. This is important because there are edge
-	// cases where a txn status might have been missed by the group.
-	aborted := &pb.OracleDelta{}
-	for _, txn := range delta.Txns {
-		// Only pick the aborts. DO NOT propose the commits. They must come in the right order via
-		// oracle delta stream, otherwise, we'll end up losing some committed txns.
-		if txn.CommitTs == 0 {
-			aborted.Txns = append(aborted.Txns, txn)
-		}
-	}
-	if len(aborted.Txns) == 0 {
-		glog.Infoln("TryAbort: No aborts found. Quitting.")
-		return nil
-	}
-
-	// We choose not to store the MaxAssigned, because it would cause our Oracle to move ahead
-	// artificially. The Oracle delta stream moves that ahead in the right order, and we shouldn't
-	// muck with that order here.
-	glog.Infof("TryAbort selectively proposing only aborted txns: %+v\n", aborted)
-	proposal := &pb.Proposal{Delta: aborted}
-	return n.proposeAndWait(n.ctx, proposal)
-}
 
 // calculateSnapshot would calculate a snapshot index, considering these factors:
 // - We only start discarding once we have at least discardN entries.

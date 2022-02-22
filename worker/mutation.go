@@ -27,14 +27,11 @@ import (
 	"github.com/outcaste-io/badger/v3/y"
 	"google.golang.org/grpc/metadata"
 
-	ostats "go.opencensus.io/stats"
-
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
 
 	"github.com/outcaste-io/badger/v3"
-	"github.com/outcaste-io/dgo/v210"
 	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/posting"
@@ -806,50 +803,6 @@ func typeSanityCheck(t *pb.TypeUpdate) error {
 	return nil
 }
 
-// CommitOverNetwork makes a proxy call to Zero to commit or abort a transaction.
-func CommitOverNetwork(ctx context.Context, tc *api.TxnContext) (uint64, error) {
-	ctx, span := otrace.StartSpan(ctx, "worker.CommitOverNetwork")
-	defer span.End()
-
-	clientDiscard := false
-	if tc.Aborted {
-		// The client called Discard
-		ostats.Record(ctx, x.TxnDiscards.M(1))
-		clientDiscard = true
-	}
-
-	pl := groups().Leader(0)
-	if pl == nil {
-		return 0, conn.ErrNoConnection
-	}
-
-	// Do de-duplication before sending the request to zero.
-	tc.Keys = x.Unique(tc.Keys)
-	tc.Preds = x.Unique(tc.Preds)
-
-	zc := pb.NewZeroClient(pl.Get())
-	tctx, err := zc.CommitOrAbort(ctx, tc)
-
-	if err != nil {
-		span.Annotatef(nil, "Error=%v", err)
-		return 0, err
-	}
-	var attributes []otrace.Attribute
-	attributes = append(attributes, otrace.Int64Attribute("commitTs", int64(tctx.CommitTs)),
-		otrace.BoolAttribute("committed", tctx.CommitTs > 0))
-	span.Annotate(attributes, "")
-
-	if tctx.Aborted || tctx.CommitTs == 0 {
-		if !clientDiscard {
-			// The server aborted the txn (not the client)
-			ostats.Record(ctx, x.TxnAborts.M(1))
-		}
-		return 0, dgo.ErrAborted
-	}
-	ostats.Record(ctx, x.TxnCommits.M(1))
-	return tctx.CommitTs, nil
-}
-
 func (w *grpcWorker) proposeAndWait(ctx context.Context, txnCtx *api.TxnContext,
 	m *pb.Mutations) error {
 	if x.WorkerConfig.StrictMutations {
@@ -883,12 +836,4 @@ func (w *grpcWorker) Mutate(ctx context.Context, m *pb.Mutations) (*api.TxnConte
 	}
 
 	return txnCtx, w.proposeAndWait(ctx, txnCtx, m)
-}
-
-func tryAbortTransactions(startTimestamps []uint64) {
-	// Aborts if not already committed.
-	req := &pb.TxnTimestamps{Ts: startTimestamps}
-
-	err := groups().Node.blockingAbort(req)
-	glog.Infof("tryAbortTransactions for %d txns. Error: %+v\n", len(req.Ts), err)
 }
