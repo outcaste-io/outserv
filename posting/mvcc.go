@@ -144,6 +144,8 @@ func (ir *incrRollupi) addKeyToBatch(key []byte, priority int) {
 // Process will rollup batches of 64 keys in a go routine.
 func (ir *incrRollupi) Process(closer *z.Closer) {
 	defer closer.Done()
+	// TODO: HACK
+	return
 
 	m := make(map[uint64]int64) // map hash(key) to ts. hash(key) to limit the size of the map.
 
@@ -376,15 +378,21 @@ func ReadPostingList(key []byte, it *badger.Iterator) (*List, error) {
 	}()
 
 	debug.PrintStack()
+	glog.Infof("Key: %s. it: %v\n", key, it.Valid())
 
 	// Iterates from highest Ts to lowest Ts
+	count := 0
 	for it.Valid() {
+		glog.Infof("----> ReadPostingList inside the loop for key: %s cnt: %d", key, count)
+		count++
 		item := it.Item()
 		if !bytes.Equal(item.Key(), l.key) {
+			glog.Infof("Item.Key != l.key")
 			break
 		}
 		l.maxTs = x.Max(l.maxTs, item.Version())
 		if item.IsDeletedOrExpired() {
+			glog.Infof("Deleted or expired")
 			// Don't consider any more versions.
 			break
 		}
@@ -461,6 +469,7 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 	// corresponding to the key in the cache to nil. So, if we get some non-nil value from the cache
 	// then it means that no  writes have happened after the last set of this key in the cache.
 	if val, ok := lCache.Get(key); ok {
+		glog.V(2).Infof("GOT cache for key: %s\n val: %+v\n", key, val)
 		switch val := val.(type) {
 		case *List:
 			l := val
@@ -494,6 +503,7 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 		// registered with cache correctly, before we update the value.
 		lCache.Set(key, uint64(1), 0)
 	}
+	glog.V(2).Infof("Reading key: %s at readTs: %d\n", key, readTs)
 
 	txn := pstore.NewTransactionAt(readTs, false)
 	defer txn.Discard()

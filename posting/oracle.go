@@ -205,16 +205,6 @@ func (o *oracle) ResetTxn(ts uint64) *Txn {
 	return txn
 }
 
-func (o *oracle) CacheAt(ts uint64) *LocalCache {
-	o.RLock()
-	defer o.RUnlock()
-	txn, ok := o.pendingTxns[ts]
-	if !ok {
-		return nil
-	}
-	return txn.cache
-}
-
 // MinPendingStartTs returns the min start ts which is currently pending a commit or abort decision.
 func (o *oracle) MinPendingStartTs() uint64 {
 	o.RLock()

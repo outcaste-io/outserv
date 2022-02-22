@@ -1541,7 +1541,8 @@ func processQuery(ctx context.Context, qc *queryContext) (*api.Response, error) 
 	}
 
 	// TODO: HACK for now. This fixes the null value problem for GraphQL queries.
-	qr.Cache = worker.NoCache
+	glog.V(2).Infof("---> processQuery with cache: %+v\n", qr.Cache)
+	// qr.Cache = worker.NoCache
 
 	if qc.req.StartTs == 0 {
 		qc.req.StartTs = posting.ReadTimestamp()
