@@ -6,7 +6,6 @@ package worker
 import (
 	"bytes"
 	"context"
-	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -502,7 +501,6 @@ func (qs *queryState) handleValuePostings(ctx context.Context, args funcArgs) er
 		out.ValueMatrix = append(out.ValueMatrix, chunk.ValueMatrix...)
 		out.LangMatrix = append(out.LangMatrix, chunk.LangMatrix...)
 	}
-	debug.PrintStack()
 	return nil
 }
 

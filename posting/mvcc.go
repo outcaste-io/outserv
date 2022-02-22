@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"math"
-	"runtime/debug"
 	"sort"
 	"strconv"
 	"sync"
@@ -144,8 +143,6 @@ func (ir *incrRollupi) addKeyToBatch(key []byte, priority int) {
 // Process will rollup batches of 64 keys in a go routine.
 func (ir *incrRollupi) Process(closer *z.Closer) {
 	defer closer.Done()
-	// TODO: HACK
-	return
 
 	m := make(map[uint64]int64) // map hash(key) to ts. hash(key) to limit the size of the map.
 
@@ -298,7 +295,6 @@ func (txn *Txn) ToSkiplist() error {
 			continue
 		}
 
-		glog.Infof("Key: %s CommitTs: %d\n", key, txn.CommitTs)
 		b.Add(y.KeyWithTs(k, txn.CommitTs),
 			y.ValueStruct{
 				Value:    data,
@@ -377,31 +373,19 @@ func ReadPostingList(key []byte, it *badger.Iterator) (*List, error) {
 		}
 	}()
 
-	debug.PrintStack()
-	glog.Infof("Key: %s. it: %v\n", key, it.Valid())
-
 	// Iterates from highest Ts to lowest Ts
 	count := 0
 	for it.Valid() {
-		glog.Infof("----> ReadPostingList inside the loop for key: %s cnt: %d", key, count)
 		count++
 		item := it.Item()
 		if !bytes.Equal(item.Key(), l.key) {
-			glog.Infof("Item.Key != l.key")
 			break
 		}
 		l.maxTs = x.Max(l.maxTs, item.Version())
 		if item.IsDeletedOrExpired() {
-			glog.Infof("Deleted or expired")
 			// Don't consider any more versions.
 			break
 		}
-
-		// TODO: Remove this.
-		val, err := item.ValueCopy(nil)
-		x.Check(err)
-		glog.Infof("---> ReadPostingList Key: %s val: %s Version: %d\n",
-			item.Key(), val, item.Version())
 
 		switch item.UserMeta() {
 		case BitForbidPosting:
@@ -436,7 +420,6 @@ func ReadPostingList(key []byte, it *badger.Iterator) (*List, error) {
 				if l.mutationMap == nil {
 					l.mutationMap = make(map[uint64]*pb.PostingList)
 				}
-				glog.Infof("Key: %s PL: %+v\n", item.Key(), pl)
 				l.mutationMap[pl.CommitTs] = pl
 				return nil
 			})
@@ -469,7 +452,6 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 	// corresponding to the key in the cache to nil. So, if we get some non-nil value from the cache
 	// then it means that no  writes have happened after the last set of this key in the cache.
 	if val, ok := lCache.Get(key); ok {
-		glog.V(2).Infof("GOT cache for key: %s\n val: %+v\n", key, val)
 		switch val := val.(type) {
 		case *List:
 			l := val
@@ -503,7 +485,6 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 		// registered with cache correctly, before we update the value.
 		lCache.Set(key, uint64(1), 0)
 	}
-	glog.V(2).Infof("Reading key: %s at readTs: %d\n", key, readTs)
 
 	txn := pstore.NewTransactionAt(readTs, false)
 	defer txn.Discard()
@@ -549,8 +530,7 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 	// the latest version of the PL. We also check that we're reading a version
 	// from Badger, which is higher than the write registered by the cache.
 	if readTs >= latestTs && latestTs >= seenTs {
-		ok := lCache.SetIfPresent(key, newList(), 0)
-		glog.Infof("----> Cache.SetIfPresent key: %s plist: %+v readTs: %d. OK: %v\n", key, out.plist, readTs, ok)
+		lCache.SetIfPresent(key, newList(), 0)
 	}
 	return newList(), nil
 }
