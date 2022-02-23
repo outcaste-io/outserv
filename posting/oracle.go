@@ -142,7 +142,9 @@ func DoneTimestamp(ts uint64) {
 	o.applied.Done(ts)
 }
 func ReadTimestamp() uint64 {
-	return o.applied.DoneUntil()
+	// Return +1 from whatever the commit timestamp is. This way, we can also
+	// read the rolled up posting lists, which are written at commit ts + 1.
+	return o.applied.DoneUntil() + 1
 }
 func CurTimestamp() uint64 {
 	return atomic.LoadUint64(&o.timestamp)
@@ -227,6 +229,12 @@ func (o *oracle) NumPendingTxns() int {
 func (o *oracle) WaitForTs(ctx context.Context, startTs uint64) error {
 	// TODO: Add a wait here based on the timestamp.
 	return nil
+}
+
+func DeleteTxnWithCommitTs(ts uint64) {
+	o.Lock()
+	delete(o.pendingTxns, ts)
+	o.Unlock()
 }
 
 // DeleteTxnsAndRollupKeys is called via a callback when Skiplist is handled

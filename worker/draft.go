@@ -664,7 +664,11 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 		}
 		if err := n.applyMutations(ctx, proposal); err != nil {
 			span.Annotatef(nil, "While applying mutations: %v", err)
+			posting.DeleteTxnWithCommitTs(proposal.CommitTs)
 			return err
+		}
+		if x.Debug {
+			glog.Infof("Proposal.CommitTs: %d\n", proposal.CommitTs)
 		}
 		if txn := posting.GetTxn(proposal.CommitTs); txn != nil {
 			n.commit(txn)
@@ -1527,7 +1531,7 @@ func (n *node) Run() {
 					// application.
 					txn := posting.RegisterTxn(p.ReadTs, p.CommitTs)
 					if x.Debug {
-						glog.Infof("read ts: %d commit ts: %d txn: %p. mutation: %+v\n",
+						glog.Infof("RegisterTxn ts: %d commit ts: %d txn: %p. mutation: %+v\n",
 							p.ReadTs, p.CommitTs, txn, p.Mutations)
 					}
 
