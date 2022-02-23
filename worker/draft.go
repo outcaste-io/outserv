@@ -1156,9 +1156,41 @@ func (n *node) updateRaftProgress() error {
 	return nil
 }
 
+// proposeBaseTimestamp proposes a base timestamp to use across all replicas.
+// This ensures that the commit timestamps used by all replicas are exactly the
+// same.
+func (n *node) proposeBaseTimestamp() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			if !n.AmLeader() {
+				continue
+			}
+			now := uint64(time.Now().Unix())
+			now = now << 32 // Make space for lower 32 bits.
+			prop := &pb.Proposal{BaseTimestamp: now}
+			err := x.RetryUntilSuccess(10, time.Second, func() error {
+				return n.proposeAndWait(n.closer.Ctx(), prop)
+			})
+			if err != nil {
+				glog.Warningf("Unable to propose base timestamp: %v", err)
+			}
+
+		case <-n.closer.HasBeenClosed():
+			glog.Infof("Returning from proposeBaseTimestamp")
+			return
+		}
+	}
+}
+
 var lastSnapshotTime int64 = time.Now().Unix()
 
 func (n *node) checkpointAndClose(done chan struct{}) {
+	defer glog.Infof("Returning from checkpointAndClose")
+
 	snapshotAfterEntries := x.WorkerConfig.Raft.GetUint64("snapshot-after-entries")
 	x.AssertTruef(snapshotAfterEntries > 10, "raft.snapshot-after must be a number greater than 10")
 
@@ -1260,7 +1292,7 @@ func (n *node) checkpointAndClose(done chan struct{}) {
 			}
 
 		case <-n.closer.HasBeenClosed():
-			glog.Infof("Stopping node.Run")
+			glog.Infof("Stopping checkpointAndClose")
 			if peerId, has := groups().MyPeer(); has && n.AmLeader() {
 				n.Raft().TransferLeadership(n.ctx, n.Id, peerId)
 				time.Sleep(time.Second) // Let transfer happen.
@@ -1296,6 +1328,7 @@ func (n *node) Run() {
 	done := make(chan struct{})
 	go n.checkpointAndClose(done)
 	go n.ReportRaftComms()
+	go n.proposeBaseTimestamp()
 
 	if !x.WorkerConfig.HardSync {
 		closer := z.NewCloser(2)
@@ -1507,6 +1540,14 @@ func (n *node) Run() {
 				var props []*pb.Proposal
 				for _, e := range entries {
 					p := getProposal(e)
+					if p.BaseTimestamp > 0 {
+						glog.V(2).Infof("Setting base timestamp to: %x\n", p.BaseTimestamp)
+						posting.SetTimestamp(p.BaseTimestamp)
+						n.Proposals.Done(p.Key, nil)
+						n.Applied.Done(p.Index)
+						continue
+					}
+
 					p.ReadTs = readTs
 					p.CommitTs = posting.NewTimestamp()
 

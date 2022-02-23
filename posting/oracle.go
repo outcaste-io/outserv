@@ -22,7 +22,6 @@ import (
 	"math"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/golang/glog"
 	"github.com/outcaste-io/badger/v3/skl"
@@ -171,7 +170,6 @@ func (o *oracle) init() {
 	o.waiters = make(map[uint64][]chan struct{})
 	o.pendingTxns = make(map[uint64]*Txn)
 
-	o.timestamp = uint64(time.Now().UTC().Unix()) << 32
 	o.applied.SetDoneUntil(o.timestamp)
 	glog.Infof("Initialized timestamp to: %d %016x\n", o.timestamp, o.timestamp)
 }

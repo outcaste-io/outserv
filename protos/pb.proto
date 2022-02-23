@@ -329,6 +329,7 @@ message Proposal {
   reserved 7;  // Was used for string key.
   reserved 8; // Was used by OracleDelta.
 
+  uint64 base_timestamp = 1; // Use this timestamp to derive commit timestamps.
   Mutations mutations = 2;
   repeated badgerpb3.KV kv = 4;
   MembershipState state = 5;
