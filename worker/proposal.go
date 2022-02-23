@@ -288,20 +288,14 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 	proposeWithLimit := func(i int) error {
 		// Each retry creates a new proposal, which adds to the number of pending proposals. We
 		// should consider this into account, when adding new proposals to the system.
-		switch {
-		case proposal.Delta != nil: // Is a delta.
-			// If a proposal is important (like delta updates), let's not run it via the limiter
-			// below. We should always propose it irrespective of how many pending proposals there
-			// might be.
-		default:
-			span.Annotatef(nil, "incr with %d", i)
-			if err := limiter.incr(ctx, i); err != nil {
-				return err
-			}
-			// We have now acquired slots in limiter. We MUST release them before we retry this
-			// proposal, otherwise we end up with dining philosopher problem.
-			defer limiter.decr(i)
+		span.Annotatef(nil, "incr with %d", i)
+		if err := limiter.incr(ctx, i); err != nil {
+			return err
 		}
+		// We have now acquired slots in limiter. We MUST release them before we retry this
+		// proposal, otherwise we end up with dining philosopher problem.
+		defer limiter.decr(i)
+
 		return propose(newTimeout(i))
 	}
 

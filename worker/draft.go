@@ -405,7 +405,6 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 
 	// Update the applied index that we are seeing.
 	atomic.CompareAndSwapUint64(&txn.AppliedIndexSeen, 0, n.Applied.DoneUntil())
-	atomic.CompareAndSwapUint64(&txn.MaxAssignedSeen, 0, posting.Oracle().MaxAssigned())
 
 	// This txn's Zero assigned start ts could be in the future, because we're
 	// trying to greedily run mutations concurrently as soon as we see them.
@@ -653,6 +652,10 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 	}
 
 	if proposal.Mutations != nil {
+		if proposal.ReadTs == 0 {
+			glog.Infof("Got a mutation with read ts = 0: %+v\n", proposal)
+		}
+		proposal.ReadTs = posting.ReadTimestamp()
 		x.AssertTrue(proposal.ReadTs > 0)
 		// syncmarks for this shouldn't be marked done until it's committed.
 		span.Annotate(nil, "Applying mutations")
@@ -701,13 +704,6 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 			return nil
 		}
 		return posting.DeletePredicate(ctx, proposal.CleanPredicate, proposal.CommitTs)
-
-	case proposal.Delta != nil:
-		n.elog.Printf("Applying Oracle Delta for key: %d", key)
-		if x.Debug {
-			glog.Infof("applyCommitted: Delta: %+v\n", proposal.Delta)
-		}
-		return n.commitOrAbort(key, proposal.Delta)
 
 	case proposal.Snapshot != nil:
 		existing, err := n.Store.Snapshot()
@@ -759,14 +755,7 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 		if err := handleRestoreProposal(ctx, proposal.Restore, proposal.Index); err != nil {
 			return err
 		}
-
-		// Call commitOrAbort to update the group checksums.
-		ts := proposal.Restore.RestoreTs
-		return n.commitOrAbort(key, &pb.OracleDelta{
-			Txns: []*pb.TxnStatus{
-				{StartTs: ts, CommitTs: ts},
-			},
-		})
+		return nil
 
 	case proposal.DeleteNs != nil:
 		x.AssertTrue(proposal.DeleteNs.Namespace != x.GalaxyNamespace)
@@ -833,7 +822,7 @@ func (n *node) processApplyCh() {
 		prev, ok := previous[prop.Key]
 		if ok && prev.err == nil {
 			msg := fmt.Sprintf("Proposal with key: %d already applied. Skipping index: %d."+
-				" Delta: %+v Snapshot: %+v.\n", prop.Key, prop.Index, prop.Delta, prop.Snapshot)
+				" Snapshot: %+v.\n", prop.Key, prop.Index, prop.Snapshot)
 			n.elog.Printf(msg)
 			glog.Infof(msg)
 			previous[prop.Key].seen = time.Now() // Update the ts.
@@ -863,8 +852,6 @@ func (n *node) processApplyCh() {
 					// Don't capture schema updates.
 					tags = append(tags, tag.Upsert(x.KeyMethod, "apply.Mutations"))
 				}
-			case prop.Delta != nil:
-				tags = append(tags, tag.Upsert(x.KeyMethod, "apply.Delta"))
 			}
 			ms := x.SinceMs(start)
 			if err := ostats.RecordWithTags(context.Background(),
@@ -997,19 +984,6 @@ func (n *node) commit(txn *posting.Txn) error {
 	return nil
 }
 
-// commitOrAbort is now only dealing with group checksum.
-func (n *node) commitOrAbort(_ uint64, delta *pb.OracleDelta) error {
-	g := groups()
-	if delta.GroupChecksums != nil && delta.GroupChecksums[g.groupId()] > 0 {
-		atomic.StoreUint64(&g.deltaChecksum, delta.GroupChecksums[g.groupId()])
-	}
-
-	// TODO: Remove this.
-	// Now advance Oracle(), so we can service waiting reads.
-	posting.Oracle().ProcessDelta(delta)
-	return nil
-}
-
 func (n *node) leaderBlocking() (*conn.Pool, error) {
 	pool := groups().Leader(groups().groupId())
 	if pool == nil {
@@ -1088,12 +1062,6 @@ func (n *node) retrieveSnapshot(snap pb.Snapshot) error {
 		return errors.Wrapf(err, "while initializing schema")
 	}
 	groups().triggerMembershipSync()
-	// We set MaxAssignedTs to avoid this case. Right after snapshot, say we have mutation and its
-	// commit. Without a MaxAssigned >= mutation.StartTs, we would enqueue it in pendingProposals.
-	// But, then go an execute its commit. That would result in mutation loss. To avoid that, we
-	// calculate the MaxAssigned and set it corresponding to the snapshot. So, we can apply the
-	// mutation before its commit when we replay logs.
-	posting.Oracle().SetMaxAssigned(snap.MaxAssigned)
 	return nil
 }
 
@@ -1811,12 +1779,6 @@ func (n *node) calculateSnapshot(startIdx, lastIdx, minPendingStart uint64) (*pb
 				if start >= minPendingStart && snapshotIdx == 0 {
 					// This would only be set once. Note the snapshotIdx == 0 condition.
 					snapshotIdx = entry.Index - 1
-				}
-			}
-			if proposal.Delta != nil {
-				maxAssigned = x.Max(maxAssigned, proposal.Delta.MaxAssigned)
-				for _, txn := range proposal.Delta.GetTxns() {
-					maxCommitTs = x.Max(maxCommitTs, txn.CommitTs)
 				}
 			}
 

@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -1164,17 +1165,17 @@ func (s *Server) Health(ctx context.Context, all bool) (*api.Response, error) {
 
 	// Append self.
 	healthAll = append(healthAll, pb.HealthInfo{
-		Instance:    "alpha",
-		Address:     x.WorkerConfig.MyAddr,
-		Status:      "healthy",
-		Group:       strconv.Itoa(int(worker.GroupId())),
-		Version:     x.Version(),
-		Uptime:      int64(time.Since(x.WorkerConfig.StartTime) / time.Second),
-		LastEcho:    time.Now().Unix(),
-		Ongoing:     worker.GetOngoingTasks(),
-		Indexing:    schema.GetIndexingPredicates(),
-		EeFeatures:  worker.GetEEFeaturesList(),
-		MaxAssigned: posting.Oracle().MaxAssigned(),
+		Instance:   "alpha",
+		Address:    x.WorkerConfig.MyAddr,
+		Status:     "healthy",
+		Group:      strconv.Itoa(int(worker.GroupId())),
+		Version:    x.Version(),
+		Uptime:     int64(time.Since(x.WorkerConfig.StartTime) / time.Second),
+		LastEcho:   time.Now().Unix(),
+		Ongoing:    worker.GetOngoingTasks(),
+		Indexing:   schema.GetIndexingPredicates(),
+		EeFeatures: worker.GetEEFeaturesList(),
+		ReadTs:     posting.ReadTimestamp(),
 	})
 
 	var err error
@@ -1320,6 +1321,7 @@ func (s *Server) doQuery(ctx context.Context, req *Request) (resp *api.Response,
 
 	if bool(glog.V(2)) || worker.LogRequestEnabled() {
 		glog.Infof("Got a query: %+v", req.req)
+		debug.PrintStack()
 	}
 
 	glog.Infof("doQuery begin")
@@ -1541,6 +1543,7 @@ func processQuery(ctx context.Context, qc *queryContext) (*api.Response, error) 
 	if err != nil && (qc.gqlField == nil || !x.IsGqlErrorList(err)) {
 		return resp, err
 	}
+	glog.Infof("----> Response: %s\n", resp.Json)
 	qc.span.Annotatef(nil, "Response = %s", resp.Json)
 
 	// varToUID contains a map of variable name to the uids corresponding to it.

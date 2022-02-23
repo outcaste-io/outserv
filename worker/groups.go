@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -58,7 +57,7 @@ type groupi struct {
 var gr = &groupi{
 	blockDeletes: new(sync.Mutex),
 	tablets:      make(map[string]*pb.Tablet),
-	closer:       z.NewCloser(3), // Match CLOSER:1 in this file.
+	closer:       z.NewCloser(2), // Match CLOSER:1 in this file.
 }
 
 func groups() *groupi {
@@ -158,7 +157,6 @@ func StartRaftNodes(walStore *raftwal.DiskStorage, bindall bool) {
 
 	go gr.sendMembershipUpdates()
 	go gr.receiveMembershipUpdates()
-	go gr.processOracleDeltaStream()
 
 	gr.informZeroAboutTablets()
 
@@ -936,180 +934,6 @@ OUTER:
 	}
 	cancel()
 	goto START
-}
-
-// processOracleDeltaStream is used to process oracle delta stream from Zero.
-// Zero sends information about aborted/committed transactions and maxPending.
-func (g *groupi) processOracleDeltaStream() {
-	defer func() {
-		glog.Infoln("Closing processOracleDeltaStream")
-		g.closer.Done() // CLOSER:1
-	}()
-
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-
-	blockingReceiveAndPropose := func() {
-		glog.Infof("Leader idx=%#x of group=%d is connecting to Zero for txn updates\n",
-			g.Node.Id, g.groupId())
-
-		pl := g.connToZeroLeader()
-		if pl == nil {
-			glog.Warningln("Oracle delta stream: No Zero leader known.")
-			if g.IsClosed() {
-				return
-			}
-			time.Sleep(time.Second)
-			return
-		}
-		glog.Infof("Got Zero leader: %s", pl.Addr)
-
-		// The following code creates a stream. Then runs a goroutine to pick up events from the
-		// stream and pushes them to a channel. The main loop loops over the channel, doing smart
-		// batching. Once a batch is created, it gets proposed. Thus, we can reduce the number of
-		// times proposals happen, which is a great optimization to have (and a common one in our
-		// code base).
-		ctx, cancel := context.WithCancel(g.Ctx())
-		defer cancel()
-
-		c := pb.NewZeroClient(pl.Get())
-		stream, err := c.Oracle(ctx, &api.Payload{})
-		if err != nil {
-			glog.Errorf("Error while calling Oracle %v\n", err)
-			time.Sleep(time.Second)
-			return
-		}
-
-		deltaCh := make(chan *pb.OracleDelta, 100)
-		go func() {
-			// This would exit when either a Recv() returns error. Or, cancel() is called by
-			// something outside of this goroutine.
-			defer func() {
-				if err := stream.CloseSend(); err != nil {
-					glog.Errorf("Error closing send stream: %+v", err)
-				}
-			}()
-			defer close(deltaCh)
-
-			for {
-				delta, err := stream.Recv()
-				if err != nil || delta == nil {
-					glog.Errorf("Error in oracle delta stream. Error: %v", err)
-					return
-				}
-
-				select {
-				case deltaCh <- delta:
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
-
-		for {
-			var delta *pb.OracleDelta
-			var batch int
-			select {
-			case delta = <-deltaCh:
-				if delta == nil {
-					return
-				}
-				batch++
-			case <-ticker.C:
-				newLead := g.Leader(0)
-				if newLead == nil || newLead.Addr != pl.Addr {
-					glog.Infof("Zero leadership changed. Renewing oracle delta stream.")
-					return
-				}
-				continue
-
-			case <-ctx.Done():
-				return
-			case <-g.closer.HasBeenClosed():
-				return
-			}
-
-		SLURP:
-			for {
-				select {
-				case more := <-deltaCh:
-					if more == nil {
-						return
-					}
-					batch++
-					if delta.GroupChecksums == nil {
-						delta.GroupChecksums = make(map[uint32]uint64)
-					}
-					delta.Txns = append(delta.Txns, more.Txns...)
-					delta.MaxAssigned = x.Max(delta.MaxAssigned, more.MaxAssigned)
-					for gid, checksum := range more.GroupChecksums {
-						delta.GroupChecksums[gid] = checksum
-					}
-				default:
-					break SLURP
-				}
-			}
-
-			// Only the leader needs to propose the oracleDelta retrieved from Zero.
-			// The leader and the followers would not directly apply or use the
-			// oracleDelta streaming in from Zero. They would wait for the proposal to
-			// go through and be applied via node.Run.  This saves us from many edge
-			// cases around network partitions and race conditions between prewrites and
-			// commits, etc.
-			if !g.Node.AmLeader() {
-				glog.Errorf("No longer the leader of group %d. Exiting", g.groupId())
-				return
-			}
-
-			// We should always sort the txns before applying. Otherwise, we might lose some of
-			// these updates, because we never write over a new version.
-			sort.Slice(delta.Txns, func(i, j int) bool {
-				return delta.Txns[i].CommitTs < delta.Txns[j].CommitTs
-			})
-			if len(delta.Txns) > 0 {
-				last := delta.Txns[len(delta.Txns)-1]
-				// Update MaxAssigned on commit so best effort queries can get back latest data.
-				delta.MaxAssigned = x.Max(delta.MaxAssigned, last.CommitTs)
-			}
-			if glog.V(3) {
-				glog.Infof("Batched %d updates. Max Assigned: %d. Proposing Deltas:",
-					batch, delta.MaxAssigned)
-				for _, txn := range delta.Txns {
-					if txn.CommitTs == 0 {
-						glog.Infof("Aborted: %d", txn.StartTs)
-					} else {
-						glog.Infof("Committed: %d -> %d", txn.StartTs, txn.CommitTs)
-					}
-				}
-			}
-			for {
-				// Block forever trying to propose this. Also this proposal should not be counted
-				// towards num pending proposals and be proposed right away.
-				err := g.Node.proposeAndWait(g.Ctx(), &pb.Proposal{Delta: delta})
-				if err == nil {
-					break
-				}
-				if g.Ctx().Err() != nil {
-					break
-				}
-				glog.Errorf("While proposing delta with MaxAssigned: %d and num txns: %d."+
-					" Error=%v. Retrying...\n", delta.MaxAssigned, len(delta.Txns), err)
-			}
-		}
-	}
-
-	for {
-		select {
-		case <-g.closer.HasBeenClosed():
-			return
-		case <-ticker.C:
-			// Only the leader needs to connect to Zero and get transaction
-			// updates.
-			if g.Node.AmLeader() {
-				blockingReceiveAndPropose()
-			}
-		}
-	}
 }
 
 // GetEEFeaturesList returns a list of Enterprise Features that are available.

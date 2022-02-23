@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/golang/glog"
 	dgoapi "github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/dgraph"
@@ -180,6 +181,7 @@ type dgraphResolver struct {
 }
 
 func (mr *dgraphResolver) Resolve(ctx context.Context, m schema.Mutation) (*Resolved, bool) {
+	glog.Infof("Resolve is being called with mutation: %+v\n", m)
 	span := otrace.FromContext(ctx)
 	stop := x.SpanTimer(span, "resolveMutation")
 	defer stop()

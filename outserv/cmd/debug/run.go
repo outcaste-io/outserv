@@ -28,15 +28,14 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"sync/atomic"
 
+	"github.com/dustin/go-humanize"
 	"github.com/outcaste-io/badger/v3"
 	bpb "github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/ristretto/z"
-	"github.com/dustin/go-humanize"
 
 	"github.com/outcaste-io/outserv/codec"
 	"github.com/outcaste-io/outserv/ee"
@@ -744,28 +743,6 @@ func printAlphaProposal(buf *bytes.Buffer, pr *pb.Proposal, pending map[uint64]b
 		fmt.Fprintf(buf, " KV . Size: %d ", len(pr.Kv))
 	case pr.State != nil:
 		fmt.Fprintf(buf, " State . %+v ", pr.State)
-	case pr.Delta != nil:
-		fmt.Fprintf(buf, " Delta .")
-		sort.Slice(pr.Delta.Txns, func(i, j int) bool {
-			ti := pr.Delta.Txns[i]
-			tj := pr.Delta.Txns[j]
-			return ti.StartTs < tj.StartTs
-		})
-		fmt.Fprintf(buf, " Max: %d .", pr.Delta.GetMaxAssigned())
-		for _, txn := range pr.Delta.Txns {
-			delete(pending, txn.StartTs)
-		}
-		// There could be many thousands of txns within a single delta. We
-		// don't need to print out every single entry, so just show the
-		// first 10.
-		if len(pr.Delta.Txns) >= 10 {
-			fmt.Fprintf(buf, " Num txns: %d .", len(pr.Delta.Txns))
-			pr.Delta.Txns = pr.Delta.Txns[:10]
-		}
-		for _, txn := range pr.Delta.Txns {
-			fmt.Fprintf(buf, " %d → %d .", txn.StartTs, txn.CommitTs)
-		}
-		fmt.Fprintf(buf, " Pending txns: %d .", len(pending))
 	case pr.Snapshot != nil:
 		fmt.Fprintf(buf, " Snapshot . %+v ", pr.Snapshot)
 	}
@@ -789,11 +766,6 @@ func printZeroProposal(buf *bytes.Buffer, zpr *pb.ZeroProposal) {
 		fmt.Fprintf(buf, " MaxNsID: %d .", zpr.MaxNsID)
 	case zpr.MaxRaftId > 0:
 		fmt.Fprintf(buf, " MaxRaftId: %d .", zpr.MaxRaftId)
-	case zpr.MaxTxnTs > 0:
-		fmt.Fprintf(buf, " MaxTxnTs: %d .", zpr.MaxTxnTs)
-	case zpr.Txn != nil:
-		txn := zpr.Txn
-		fmt.Fprintf(buf, " Txn %d → %d .", txn.StartTs, txn.CommitTs)
 	default:
 		fmt.Fprintf(buf, " Proposal: %+v .", zpr)
 	}

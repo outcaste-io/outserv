@@ -27,10 +27,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/outcaste-io/badger/v3/skl"
 	"github.com/outcaste-io/badger/v3/y"
-	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
-	ostats "go.opencensus.io/stats"
 	otrace "go.opencensus.io/trace"
 )
 
@@ -125,9 +123,6 @@ type oracle struct {
 	applied   y.WaterMark
 	timestamp uint64
 
-	// max start ts given out by Zero. Do not use mutex on this, only use atomics.
-	maxAssigned uint64
-
 	// Keeps track of all the startTs we have seen so far, based on the mutations. Then as
 	// transactions are committed or aborted, we delete entries from the startTs map. When taking a
 	// snapshot, we need to know the minimum start ts present in the map, which represents a
@@ -175,6 +170,7 @@ func (o *oracle) init() {
 	o.pendingTxns = make(map[uint64]*Txn)
 
 	o.timestamp = uint64(time.Now().UTC().Unix()) << 32
+	o.applied.SetDoneUntil(o.timestamp)
 	glog.Infof("Initialized timestamp to: %d %016x\n", o.timestamp, o.timestamp)
 }
 
@@ -219,16 +215,7 @@ func (o *oracle) MinPendingStartTs() uint64 {
 }
 
 func (o *oracle) MinMaxAssignedSeenTs() uint64 {
-	o.RLock()
-	defer o.RUnlock()
-	min := o.MaxAssigned()
-	for _, txn := range o.pendingTxns {
-		ts := atomic.LoadUint64(&txn.MaxAssignedSeen)
-		if ts < min {
-			min = ts
-		}
-	}
-	return min
+	return 0
 }
 
 func (o *oracle) NumPendingTxns() int {
@@ -237,49 +224,9 @@ func (o *oracle) NumPendingTxns() int {
 	return len(o.pendingTxns)
 }
 
-func (o *oracle) addToWaiters(startTs uint64) (chan struct{}, bool) {
-	if startTs <= o.MaxAssigned() {
-		return nil, false
-	}
-	o.Lock()
-	defer o.Unlock()
-	// Check again after acquiring lock, because o.waiters is being processed serially. So, if we
-	// don't check here, then it's possible that we add to waiters here, but MaxAssigned has already
-	// moved past startTs.
-	if startTs <= o.MaxAssigned() {
-		return nil, false
-	}
-	ch := make(chan struct{})
-	o.waiters[startTs] = append(o.waiters[startTs], ch)
-	return ch, true
-}
-
-func (o *oracle) MaxAssigned() uint64 {
-	return atomic.LoadUint64(&o.maxAssigned)
-}
-func (o *oracle) SetMaxAssigned(m uint64) {
-	cur := atomic.LoadUint64(&o.maxAssigned)
-	glog.Infof("Current MaxAssigned: %d. SetMaxAssigned: %d.\n", cur, m)
-	if m < cur {
-		return
-	}
-	atomic.StoreUint64(&o.maxAssigned, m)
-}
-
 func (o *oracle) WaitForTs(ctx context.Context, startTs uint64) error {
 	glog.Infof("----> WaitForTs: %d. Returning...\n", startTs)
 	return nil
-
-	ch, ok := o.addToWaiters(startTs)
-	if !ok {
-		return nil
-	}
-	select {
-	case <-ch:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
 }
 
 // DeleteTxnsAndRollupKeys is called via a callback when Skiplist is handled
@@ -296,42 +243,6 @@ func DeleteTxnAndRollupKeys(txn *Txn) {
 		delete(o.pendingTxns, txn.CommitTs)
 	}
 	o.Unlock()
-}
-
-// TODO: Fix this up.
-func (o *oracle) ProcessDelta(delta *pb.OracleDelta) {
-	if glog.V(3) {
-		glog.Infof("ProcessDelta: Max Assigned: %d", delta.MaxAssigned)
-		glog.Infof("ProcessDelta: Group checksum: %v", delta.GroupChecksums)
-		for _, txn := range delta.Txns {
-			if txn.CommitTs == 0 {
-				glog.Infof("ProcessDelta Aborted: %d", txn.StartTs)
-			} else {
-				glog.Infof("ProcessDelta Committed: %d -> %d", txn.StartTs, txn.CommitTs)
-			}
-		}
-	}
-
-	o.Lock()
-	defer o.Unlock()
-	curMax := o.MaxAssigned()
-	if delta.MaxAssigned < curMax {
-		return
-	}
-
-	// Notify the waiting cattle.
-	for startTs, toNotify := range o.waiters {
-		if startTs > delta.MaxAssigned {
-			continue
-		}
-		for _, ch := range toNotify {
-			close(ch)
-		}
-		delete(o.waiters, startTs)
-	}
-	x.AssertTrue(atomic.CompareAndSwapUint64(&o.maxAssigned, curMax, delta.MaxAssigned))
-	ostats.Record(context.Background(),
-		x.MaxAssignedTs.M(int64(delta.MaxAssigned))) // Can't access o.MaxAssigned without atomics.
 }
 
 func (o *oracle) ResetTxns() {

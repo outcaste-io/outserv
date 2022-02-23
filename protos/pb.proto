@@ -156,15 +156,16 @@ message License {
 }
 
 message ZeroProposal {
-  reserved 8;                           // Was used for string key.
+  reserved 5; // Was used by maxTxnTs.
+  reserved 7; // Was used for Txn.
+  reserved 8; // Was used for string key.
+
   map<uint32, uint64> snapshot_ts = 1;  // Group ID -> Snapshot Ts.
   Member member = 2;
   Tablet tablet = 3;
   uint64 maxUID = 4;
-  uint64 maxTxnTs = 5;
   uint64 maxNsID = 12;
   uint64 maxRaftId = 6;
-  api.TxnContext txn = 7;
   string cid = 9;  // Used as unique identifier for the cluster.
   License license = 10;
   ZeroSnapshot snapshot = 11;  // Used to make Zeros take a snapshot.
@@ -208,7 +209,7 @@ message HealthInfo {
   repeated string ongoing = 8;
   repeated string indexing = 9;
   repeated string ee_features = 10;
-  uint64 max_assigned = 11;
+  uint64 read_ts = 11;
 }
 
 message Tablet {
@@ -326,12 +327,13 @@ message RestoreRequest {
 
 message Proposal {
   reserved 7;  // Was used for string key.
+  reserved 8; // Was used by OracleDelta.
+
   Mutations mutations = 2;
   repeated badgerpb3.KV kv = 4;
   MembershipState state = 5;
   // Delete the predicate which was moved to other group.
   string clean_predicate = 6;
-  OracleDelta delta = 8;
   Snapshot snapshot = 9;  // Used to tell the group when to take snapshot.
   // Block an operation until membership reaches this checksum.
   uint64 expected_checksum = 11;
@@ -495,22 +497,6 @@ message MovePredicatePayload {
   uint64 since_ts = 6;
 }
 
-message TxnStatus {
-  uint64 start_ts = 1;
-  uint64 commit_ts = 2;
-}
-
-message OracleDelta {
-  repeated TxnStatus txns = 1;
-  uint64 max_assigned = 2;
-  map<uint32, uint64> group_checksums = 3;
-  // implement tmax.
-}
-
-message TxnTimestamps {
-  repeated uint64 ts = 1;
-}
-
 message PeerResponse {
   bool status = 1;
 }
@@ -533,7 +519,6 @@ service Zero {
   rpc UpdateMembership(Group) returns (api.Payload) {}
   rpc StreamMembership(api.Payload) returns (stream MembershipState) {}
 
-  rpc Oracle(api.Payload) returns (stream OracleDelta) {}
   rpc ShouldServe(Tablet) returns (Tablet) {}
   rpc Inform(TabletRequest) returns (TabletResponse) {}
   rpc AssignIds(Num) returns (AssignedIds) {}
@@ -589,7 +574,7 @@ message Num {
   enum leaseType {
     NS_ID = 0;
     UID = 1;
-    TXN_TS = 2;
+    UNUSED = 2;
   }
   leaseType type = 4;
 }

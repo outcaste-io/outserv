@@ -77,6 +77,8 @@ func (s *Server) rebalanceTablets() {
 	}
 }
 
+var errNotLeader = errors.New("Node is no longer leader")
+
 // MoveTablet can be used to move a tablet to a specific group.
 // It takes in tablet and destination group as argument.
 // It returns a *pb.Status to be used by the `/moveTablet` HTTP handler in Zero.
