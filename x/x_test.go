@@ -197,3 +197,21 @@ func TestToHex(t *testing.T) {
 	require.Equal(t, []byte(`"0xffffffffffffffff"`), ToHex(math.MaxUint64, false))
 	require.Equal(t, []byte(`<0xffffffffffffffff>`), ToHex(math.MaxUint64, true))
 }
+
+func TestTimestamp(t *testing.T) {
+	require.Equal(t, uint64(2), Timestamp(0, 1))
+	require.Equal(t, uint64(4), Timestamp(0, 2))
+
+	base := uint64(16)
+	base = base << 32
+
+	require.Equal(t, base+uint64(256), Timestamp(base, 128))
+	require.Equal(t, base+uint64(1<<32-2), Timestamp(base, 1<<31-1))
+	require.Equal(t, base+uint64(0), Timestamp(base, 1<<31))
+	require.Equal(t, base+uint64(2), Timestamp(base, 1<<31+1))
+
+	msbMask := ^mask
+	require.Equal(t, base, Timestamp(base, 1<<31-1)&msbMask)
+	require.Equal(t, base, Timestamp(base, 1<<32)&msbMask)
+	require.Equal(t, base, Timestamp(base, 1<<32+1)&msbMask)
+}

@@ -26,7 +26,7 @@ import (
 	"github.com/outcaste-io/outserv/protos/pb"
 )
 
-var Debug bool = false
+var Debug bool = true
 
 // VerifyPack works in debug mode. Check out the comment in debug_on.go
 func VerifyPack(plist *pb.PostingList) {

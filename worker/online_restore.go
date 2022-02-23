@@ -170,7 +170,7 @@ func ProcessRestoreRequest(ctx context.Context, req *pb.RestoreRequest, wg *sync
 			"Please retry later.")
 	}
 
-	req.RestoreTs = posting.NewTimestamp()
+	req.RestoreTs = posting.CommitTimestamp(0)
 
 	// TODO: prevent partial restores when proposeRestoreOrSend only sends the restore
 	// request to a subset of groups.

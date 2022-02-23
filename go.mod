@@ -72,7 +72,7 @@ require (
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20210816183151-1e6c022a8912
 	golang.org/x/text v0.3.6
-	golang.org/x/tools v0.1.6-0.20210802203754-9b21a8868e16 // indirect
+	golang.org/x/tools v0.1.6-0.20210802203754-9b21a8868e16
 	google.golang.org/api v0.46.0
 	google.golang.org/genproto v0.0.0-20210510173355-fb37daa5cd7a // indirect
 	google.golang.org/grpc v1.37.1

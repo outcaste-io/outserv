@@ -145,23 +145,18 @@ func ReadTimestamp() uint64 {
 	// read the rolled up posting lists, which are written at commit ts + 1.
 	return o.applied.DoneUntil() + 1
 }
-func CurTimestamp() uint64 {
-	return atomic.LoadUint64(&o.timestamp)
-}
-func NewTimestamp() uint64 {
-	ts := atomic.AddUint64(&o.timestamp, 2)
-	return ts
+
+func CommitTimestamp(raftIdx uint64) uint64 {
+	baseTs := atomic.LoadUint64(&o.timestamp)
+	return x.Timestamp(baseTs, raftIdx)
 }
 func SetTimestamp(newTs uint64) {
-	for {
-		curTs := atomic.LoadUint64(&o.timestamp)
-		if newTs <= curTs {
-			glog.Fatalf("Timestamp to set: %d <= cur ts: %d\n", newTs, curTs)
-		}
-		if atomic.CompareAndSwapUint64(&o.timestamp, curTs, newTs) {
-			return
-		}
+	curTs := atomic.LoadUint64(&o.timestamp)
+	if newTs < curTs {
+		glog.Errorf("Timestamp to set: %#x < cur ts: %#x\n", newTs, curTs)
 	}
+
+	atomic.StoreUint64(&o.timestamp, newTs)
 }
 
 func (o *oracle) init() {

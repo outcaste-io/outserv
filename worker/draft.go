@@ -1095,7 +1095,7 @@ func (n *node) proposeSnapshot() error {
 	// So, we iterate over logs. If we hit MinPendingStartTs, that generates our
 	// snapshotIdx. In any case, we continue picking up txn updates, to generate
 	// a maxCommitTs, which would become the readTs for the snapshot.
-	minPendingStart := x.Min(posting.Oracle().MinPendingStartTs(), n.cdcTracker.getTs())
+	minPendingStart := n.cdcTracker.getTs()
 	snap, err := n.calculateSnapshot(0, lastIdx, minPendingStart)
 	if err != nil {
 		return err
@@ -1106,7 +1106,7 @@ func (n *node) proposeSnapshot() error {
 	proposal := &pb.Proposal{
 		Snapshot: snap,
 	}
-	glog.V(2).Infof("Proposing snapshot: %+v\n", snap)
+	glog.V(2).Infof("Proposing snapshot: %+v. ReadTs: %#x\n", snap, snap.ReadTs)
 	data := make([]byte, 8+proposal.Size())
 	sz, err := proposal.MarshalToSizedBuffer(data[8:])
 	data = data[:8+sz]
@@ -1151,7 +1151,7 @@ func (n *node) updateRaftProgress() error {
 	atomic.StoreUint64(&n.checkpointTs, snap.ReadTs)
 
 	n.Store.SetUint(raftwal.CheckpointIndex, snap.GetIndex())
-	glog.V(2).Infof("[%#x] Set Raft checkpoint to index: %d, ts: %d.",
+	glog.V(2).Infof("[%#x] Set Raft checkpoint to index: %d, ts: %#x.",
 		n.Id, snap.Index, snap.ReadTs)
 	return nil
 }
@@ -1160,24 +1160,29 @@ func (n *node) updateRaftProgress() error {
 // This ensures that the commit timestamps used by all replicas are exactly the
 // same.
 func (n *node) proposeBaseTimestamp() {
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
+	propose := func() {
+		if !n.AmLeader() {
+			return
+		}
+		now := uint64(time.Now().Unix())
+		now = now << 32 // Make space for lower 32 bits.
+		prop := &pb.Proposal{BaseTimestamp: now}
+		err := x.RetryUntilSuccess(10, time.Second, func() error {
+			return n.proposeAndWait(n.closer.Ctx(), prop)
+		})
+		if err != nil {
+			glog.Warningf("Unable to propose base timestamp: %v", err)
+		}
+	}
+
+	propose() // Immediately after start.
 	for {
 		select {
 		case <-ticker.C:
-			if !n.AmLeader() {
-				continue
-			}
-			now := uint64(time.Now().Unix())
-			now = now << 32 // Make space for lower 32 bits.
-			prop := &pb.Proposal{BaseTimestamp: now}
-			err := x.RetryUntilSuccess(10, time.Second, func() error {
-				return n.proposeAndWait(n.closer.Ctx(), prop)
-			})
-			if err != nil {
-				glog.Warningf("Unable to propose base timestamp: %v", err)
-			}
+			propose()
 
 		case <-n.closer.HasBeenClosed():
 			glog.Infof("Returning from proposeBaseTimestamp")
@@ -1541,7 +1546,9 @@ func (n *node) Run() {
 				for _, e := range entries {
 					p := getProposal(e)
 					if p.BaseTimestamp > 0 {
-						glog.V(2).Infof("Setting base timestamp to: %x\n", p.BaseTimestamp)
+						if x.Debug {
+							glog.V(2).Infof("Setting base timestamp to: %#x for index: %d\n", p.BaseTimestamp, e.Index)
+						}
 						posting.SetTimestamp(p.BaseTimestamp)
 						n.Proposals.Done(p.Key, nil)
 						n.Applied.Done(p.Index)
@@ -1549,7 +1556,8 @@ func (n *node) Run() {
 					}
 
 					p.ReadTs = readTs
-					p.CommitTs = posting.NewTimestamp()
+					p.CommitTs = posting.CommitTimestamp(e.Index)
+					glog.Infof("e.Index: %d commit Ts: %#x\n", e.Index, p.CommitTs)
 
 					props = append(props, p)
 
@@ -1708,31 +1716,7 @@ var errNoConnection = errors.New("No connection exists")
 // - We only start discarding once we have at least discardN entries.
 // - We are not overshooting the max applied entry. That is, we're not removing
 // Raft entries before they get applied.
-// - We are considering the minimum start ts that has yet to be committed or
-// aborted. This way, we still keep all the mutations corresponding to this
-// start ts in the Raft logs. This is important, because we don't persist
-// pre-writes to disk in pstore.
-// - In simple terms, this means we MUST keep all pending transactions in the Raft logs.
-// - Find the maximum commit timestamp that we have seen.
-// That would tell us about the maximum timestamp used to do any commits. This
-// ts is what we can use for future reads of this snapshot.
-// - Finally, this function would propose this snapshot index, so the entire
-// group can apply it to their Raft stores.
-//
-// Txn0  | S0 |    |    | C0 |    |    |
-// Txn1  |    | S1 |    |    |    | C1 |
-// Txn2  |    |    | S2 | C2 |    |    |
-// Txn3  |    |    |    |    | S3 |    |
-// Txn4  |    |    |    |    |    |    | S4
-// Index | i1 | i2 | i3 | i4 | i5 | i6 | i7
-//
-// At i7, min pending start ts = S3, therefore snapshotIdx = i5 - 1 = i4.
-// At i7, max commit ts = C1, therefore readTs = C1.
-//
-// This function also takes a startIdx, which can be used an optimization to skip over Raft entries.
-// This is useful when we already have a previous snapshot checkpoint (all txns have concluded up
-// until that last checkpoint) that we can use as a new start point for the snapshot calculation.
-func (n *node) calculateSnapshot(startIdx, lastIdx, minPendingStart uint64) (*pb.Snapshot, error) {
+func (n *node) calculateSnapshot(startIdx, lastIdx, lastCommitTs uint64) (*pb.Snapshot, error) {
 	_, span := otrace.StartSpan(n.ctx, "Calculate.Snapshot",
 		otrace.WithSampler(otrace.AlwaysSample()))
 	defer span.End()
@@ -1779,9 +1763,8 @@ func (n *node) calculateSnapshot(startIdx, lastIdx, minPendingStart uint64) (*pb
 		glog.V(2).Infof("Num pending txns: %d", num)
 	}
 
-	maxCommitTs := snap.ReadTs
+	baseTs := snap.ReadTs
 	var snapshotIdx uint64
-	var maxAssigned uint64
 
 	// Trying to retrieve all entries at once might cause out-of-memory issues in
 	// cases where the raft log is too big to fit into memory. Instead of retrieving
@@ -1805,24 +1788,21 @@ func (n *node) calculateSnapshot(startIdx, lastIdx, minPendingStart uint64) (*pb
 		batchFirst = lastEntry.Index + 1
 
 		for _, entry := range entries {
+			cts := x.Timestamp(baseTs, entry.Index)
+			if cts > lastCommitTs {
+				break
+			}
+			snapshotIdx = entry.Index
+			glog.Infof("CommitTs: %#x Entry: %d\n", cts, entry.Index)
+
 			if entry.Type != raftpb.EntryNormal || len(entry.Data) == 0 {
 				continue
 			}
 			proposal := getProposal(entry)
-
-			// The way this works is, we figured out the Raft's lastIdx and minPendingStart before
-			// calling this function. minPendingStart is calculated by choosing minimum start
-			// timestamp of all the pending transactions. We need to ensure that we leave the
-			// mutations corresponding to this start ts in the Raft log, and not truncate them.
-			// We should however choose all the deltas, even if they occur later in the log, because
-			// they track all the commits we have done.
-			var start uint64
-			if proposal.Mutations != nil {
-				start = proposal.Mutations.StartTs
-				if start >= minPendingStart && snapshotIdx == 0 {
-					// This would only be set once. Note the snapshotIdx == 0 condition.
-					snapshotIdx = entry.Index - 1
-				}
+			if proposal.BaseTimestamp > 0 {
+				baseTs = proposal.BaseTimestamp
+				glog.Infof("BaseTs: %#x Entry: %d\n", baseTs, entry.Index)
+				continue
 			}
 
 			// If we encounter a restore proposal, we can immediately truncate the WAL and create
@@ -1830,10 +1810,9 @@ func (n *node) calculateSnapshot(startIdx, lastIdx, minPendingStart uint64) (*pb
 			if proposal.Restore != nil {
 				restoreTs := proposal.Restore.GetRestoreTs()
 				s := &pb.Snapshot{
-					Context:     n.RaftContext,
-					Index:       entry.Index,
-					ReadTs:      restoreTs,
-					MaxAssigned: restoreTs,
+					Context: n.RaftContext,
+					Index:   entry.Index,
+					ReadTs:  restoreTs,
 				}
 				span.Annotatef(nil, "Found restore proposal with restoreTs: %d", restoreTs)
 				glog.Infof("calculated snapshot from restore proposal: %+v", s)
@@ -1842,34 +1821,27 @@ func (n *node) calculateSnapshot(startIdx, lastIdx, minPendingStart uint64) (*pb
 		}
 	}
 
-	if maxCommitTs == 0 {
-		span.Annotate(nil, "maxCommitTs is zero")
+	if baseTs == 0 || snapshotIdx == 0 {
+		span.Annotate(nil, "maxCommitTs or snapshotIdx is zero")
 		return nil, nil
-	}
-	if snapshotIdx == 0 {
-		// It is possible that there are no pending transactions. In that case,
-		// snapshotIdx would be zero. Instead, set it to last entry's index.
-		snapshotIdx = lastEntry.Index
-		span.Annotatef(nil, "snapshotIdx is zero. Using last entry's index: %d", snapshotIdx)
 	}
 
 	numDiscarding := snapshotIdx - first + 1
 	span.Annotatef(nil,
-		"Got snapshotIdx: %d. MaxCommitTs: %d. Discarding: %d. MinPendingStartTs: %d",
-		snapshotIdx, maxCommitTs, numDiscarding, minPendingStart)
+		"Got snapshotIdx: %d. baseTs: %#x. Discarding: %d. lastCommitTs: %d",
+		snapshotIdx, baseTs, numDiscarding, lastCommitTs)
 
 	if int(numDiscarding) < discardN {
 		span.Annotate(nil, "Skipping snapshot because insufficient discard entries")
 		glog.Infof("Skipping snapshot at index: %d. Insufficient discard entries: %d."+
-			" MinPendingStartTs: %d\n", snapshotIdx, numDiscarding, minPendingStart)
+			" baseTs: %#x\n", snapshotIdx, numDiscarding, baseTs)
 		return nil, nil
 	}
 
 	result := &pb.Snapshot{
-		Context:     n.RaftContext,
-		Index:       snapshotIdx,
-		ReadTs:      maxCommitTs,
-		MaxAssigned: maxAssigned,
+		Context: n.RaftContext,
+		Index:   snapshotIdx,
+		ReadTs:  baseTs,
 	}
 	span.Annotatef(nil, "Got snapshot: %+v", result)
 	return result, nil

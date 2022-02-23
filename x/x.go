@@ -1505,3 +1505,9 @@ func IsJwtExpired(err error) bool {
 	return ok && st.Code() == codes.Unauthenticated &&
 		strings.Contains(err.Error(), "Token is expired")
 }
+
+const mask uint64 = 1<<32 - 1
+
+func Timestamp(baseTs, raftIdx uint64) uint64 {
+	return baseTs + (2*raftIdx)&mask // Always return multiples of 2.
+}
