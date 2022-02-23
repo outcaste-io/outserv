@@ -225,7 +225,7 @@ func (o *oracle) NumPendingTxns() int {
 }
 
 func (o *oracle) WaitForTs(ctx context.Context, startTs uint64) error {
-	glog.Infof("----> WaitForTs: %d. Returning...\n", startTs)
+	// TODO: Add a wait here based on the timestamp.
 	return nil
 }
 

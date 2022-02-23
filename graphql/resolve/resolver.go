@@ -464,10 +464,10 @@ func (r *RequestResolver) Resolve(ctx context.Context, gqlReq *schema.Request) (
 	startTime := time.Now()
 	resp = &schema.Response{
 		Extensions: &schema.Extensions{
-			Tracing: &schema.Trace{
-				Version:   1,
-				StartTime: startTime.Format(time.RFC3339Nano),
-			},
+			// Tracing: &schema.Trace{
+			// 	Version:   1,
+			// 	StartTime: startTime.Format(time.RFC3339Nano),
+			// },
 		},
 	}
 	// Panic Handler for mutation. This ensures that the mutation which causes panic
@@ -479,9 +479,9 @@ func (r *RequestResolver) Resolve(ctx context.Context, gqlReq *schema.Request) (
 		}, gqlReq.Query)
 
 	defer func() {
-		endTime := time.Now()
-		resp.Extensions.Tracing.EndTime = endTime.Format(time.RFC3339Nano)
-		resp.Extensions.Tracing.Duration = endTime.Sub(startTime).Nanoseconds()
+		// endTime := time.Now()
+		// resp.Extensions.Tracing.EndTime = endTime.Format(time.RFC3339Nano)
+		// resp.Extensions.Tracing.Duration = endTime.Sub(startTime).Nanoseconds()
 	}()
 	ctx = context.WithValue(ctx, resolveStartTime, startTime)
 

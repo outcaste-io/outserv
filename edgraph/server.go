@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"math"
 	"net"
-	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -1319,15 +1318,9 @@ func (s *Server) doQuery(ctx context.Context, req *Request) (resp *api.Response,
 		return nil, serverOverloadErr
 	}
 
-	if bool(glog.V(2)) || worker.LogRequestEnabled() {
+	if bool(glog.V(3)) || worker.LogRequestEnabled() {
 		glog.Infof("Got a query: %+v", req.req)
-		debug.PrintStack()
 	}
-
-	glog.Infof("doQuery begin")
-	defer func() {
-		glog.Infof("doQuery done. Resp: %s\n", resp.Json)
-	}()
 
 	isGraphQL, _ := ctx.Value(IsGraphql).(bool)
 	if isGraphQL {
@@ -1439,8 +1432,6 @@ func (s *Server) doQuery(ctx context.Context, req *Request) (resp *api.Response,
 		}()
 	}
 
-	glog.Infof("----> going to call processQuery")
-
 	var gqlErrs error
 	if resp, rerr = processQuery(ctx, qc); rerr != nil {
 		// if rerr is just some error from GraphQL encoding, then we need to continue the normal
@@ -1494,19 +1485,13 @@ func processQuery(ctx context.Context, qc *queryContext) (*api.Response, error) 
 		GqlQuery: &qc.gqlRes,
 	}
 
-	// TODO: HACK for now. This fixes the null value problem for GraphQL queries.
-	glog.V(2).Infof("---> processQuery with cache: %+v\n", qr.Cache)
-	// qr.Cache = worker.NoCache
-
 	if qc.req.StartTs == 0 {
 		qc.req.StartTs = posting.ReadTimestamp()
-		glog.V(2).Infof("---> Using start ts: %d\n", qc.req.StartTs)
 	}
 
 	qr.ReadTs = qc.req.StartTs
 	resp.Txn = &api.TxnContext{StartTs: qc.req.StartTs}
 
-	glog.Infof("---> Going to call Process\n")
 	// Core processing happens here.
 	er, err := qr.Process(ctx)
 
@@ -1543,7 +1528,6 @@ func processQuery(ctx context.Context, qc *queryContext) (*api.Response, error) 
 	if err != nil && (qc.gqlField == nil || !x.IsGqlErrorList(err)) {
 		return resp, err
 	}
-	glog.Infof("----> Response: %s\n", resp.Json)
 	qc.span.Annotatef(nil, "Response = %s", resp.Json)
 
 	// varToUID contains a map of variable name to the uids corresponding to it.

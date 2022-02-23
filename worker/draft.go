@@ -965,7 +965,6 @@ func (n *node) commit(txn *posting.Txn) error {
 			deleteTxn()
 			return nil
 		}
-		glog.Infof("---> HandoverSkiplist: %d\n", txn.CommitTs)
 		// We do the pending txn deletion in the callback, so that our snapshot and checkpoint
 		// tracking would only consider the txns which have been successfully pushed to disk.
 		return pstore.HandoverSkiplist(txn.Skiplist(), deleteTxn)
@@ -1506,7 +1505,6 @@ func (n *node) Run() {
 					p := getProposal(e)
 					p.ReadTs = readTs
 					p.CommitTs = posting.NewTimestamp()
-					glog.Infof("proposal: %+v\n", p)
 
 					props = append(props, p)
 

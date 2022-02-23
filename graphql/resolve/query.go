@@ -91,22 +91,12 @@ func (qr *queryResolver) Resolve(ctx context.Context, query schema.Query) *Resol
 
 	resolved := qr.rewriteAndExecute(ctx, query)
 	qr.resultCompleter.Complete(ctx, resolved)
-	resolverTrace.Dgraph = resolved.Extensions.Tracing.Execution.Resolvers[0].Dgraph
-	resolved.Extensions.Tracing.Execution.Resolvers[0] = resolverTrace
 	return resolved
 }
 
 func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query schema.Query) *Resolved {
 	dgraphQueryDuration := &schema.LabeledOffsetDuration{Label: "query"}
-	ext := &schema.Extensions{
-		Tracing: &schema.Trace{
-			Execution: &schema.ExecutionTrace{
-				Resolvers: []*schema.ResolverTrace{
-					{Dgraph: []*schema.LabeledOffsetDuration{dgraphQueryDuration}},
-				},
-			},
-		},
-	}
+	ext := &schema.Extensions{}
 
 	emptyResult := func(err error) *Resolved {
 		return &Resolved{
@@ -174,23 +164,13 @@ func (qr *customDQLQueryResolver) Resolve(ctx context.Context, query schema.Quer
 	defer timer.Stop()
 
 	resolved := qr.rewriteAndExecute(ctx, query)
-	resolverTrace.Dgraph = resolved.Extensions.Tracing.Execution.Resolvers[0].Dgraph
-	resolved.Extensions.Tracing.Execution.Resolvers[0] = resolverTrace
 	return resolved
 }
 
 func (qr *customDQLQueryResolver) rewriteAndExecute(ctx context.Context,
 	query schema.Query) *Resolved {
 	dgraphQueryDuration := &schema.LabeledOffsetDuration{Label: "query"}
-	ext := &schema.Extensions{
-		Tracing: &schema.Trace{
-			Execution: &schema.ExecutionTrace{
-				Resolvers: []*schema.ResolverTrace{
-					{Dgraph: []*schema.LabeledOffsetDuration{dgraphQueryDuration}},
-				},
-			},
-		},
-	}
+	ext := &schema.Extensions{}
 
 	emptyResult := func(err error) *Resolved {
 		resolved := EmptyResult(query, err)

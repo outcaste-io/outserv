@@ -181,7 +181,6 @@ func (r *Response) Output() interface{} {
 // Extensions represents GraphQL extensions
 type Extensions struct {
 	TouchedUids uint64 `json:"touched_uids,omitempty"`
-	Tracing     *Trace `json:"tracing,omitempty"`
 }
 
 // GetTouchedUids returns TouchedUids
@@ -199,54 +198,6 @@ func (e *Extensions) Merge(ext *Extensions) {
 	}
 
 	e.TouchedUids += ext.TouchedUids
-
-	if e.Tracing == nil {
-		e.Tracing = ext.Tracing
-	} else {
-		e.Tracing.Merge(ext.Tracing)
-	}
-}
-
-// Trace : Apollo Tracing is a GraphQL extension for tracing resolver performance.Response
-// https://github.com/apollographql/apollo-tracing
-// Not part of the standard itself, it gets reported in GraphQL "extensions".
-// It's for reporting tracing data through all the resolvers in a GraphQL query.
-// Our results aren't as 'deep' as a traditional GraphQL server in that the Dgraph
-// layer resolves in a single step, rather than iteratively.  So we'll report on
-// all the top level queries/mutations.
-//
-// Currently, only reporting in the GraphQL result, but also planning to allow
-// exposing to Apollo Engine as per:
-// https://www.apollographql.com/docs/references/setup-analytics/#engine-reporting-endpoint
-type Trace struct {
-	// (comments from Apollo Tracing spec)
-
-	// Apollo Tracing Spec version
-	Version int `json:"version"`
-
-	// Timestamps in RFC 3339 nano format.
-	StartTime string `json:"startTime,"`
-	EndTime   string `json:"endTime"`
-
-	// Duration in nanoseconds, relative to the request start, as an integer.
-	Duration int64 `json:"duration"`
-
-	// Parsing and Validation not required at the moment.
-	//Parsing    *OffsetDuration `json:"parsing,omitempty"`
-	//Validation *OffsetDuration `json:"validation,omitempty"`
-	Execution *ExecutionTrace `json:"execution,omitempty"`
-}
-
-func (t *Trace) Merge(other *Trace) {
-	if t == nil || other == nil {
-		return
-	}
-
-	if t.Execution == nil {
-		t.Execution = other.Execution
-	} else {
-		t.Execution.Merge(other.Execution)
-	}
 }
 
 //ExecutionTrace records all the resolvers
