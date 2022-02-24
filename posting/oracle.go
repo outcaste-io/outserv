@@ -19,7 +19,6 @@ package posting
 import (
 	"context"
 	"encoding/hex"
-	"math"
 	"sync"
 	"sync/atomic"
 
@@ -194,19 +193,6 @@ func (o *oracle) ResetTxn(ts uint64) *Txn {
 	txn := NewTxn(ts)
 	o.pendingTxns[ts] = txn
 	return txn
-}
-
-// MinPendingStartTs returns the min start ts which is currently pending a commit or abort decision.
-func (o *oracle) MinPendingStartTs() uint64 {
-	o.RLock()
-	defer o.RUnlock()
-	min := uint64(math.MaxUint64)
-	for ts := range o.pendingTxns {
-		if ts < min {
-			min = ts
-		}
-	}
-	return min
 }
 
 func (o *oracle) MinMaxAssignedSeenTs() uint64 {

@@ -668,7 +668,7 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 			return err
 		}
 		if x.Debug {
-			glog.Infof("Proposal.CommitTs: %d\n", proposal.CommitTs)
+			glog.Infof("Proposal.CommitTs: %#x\n", proposal.CommitTs)
 		}
 		if txn := posting.GetTxn(proposal.CommitTs); txn != nil {
 			n.commit(txn)
@@ -723,7 +723,7 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 			return nil
 		}
 		n.elog.Printf("Creating snapshot: %+v", snap)
-		glog.Infof("Creating snapshot at Index: %d, ReadTs: %d\n", snap.Index, snap.ReadTs)
+		glog.Infof("Creating snapshot at Index: %d, BaseTs: %d\n", snap.Index, snap.BaseTs)
 
 		data, err := snap.Marshal()
 		x.Check(err)
@@ -737,7 +737,7 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 		}
 		atomic.StoreInt64(&lastSnapshotTime, time.Now().Unix())
 		// We can now discard all invalid versions of keys below this ts.
-		pstore.SetDiscardTs(snap.ReadTs)
+		pstore.SetDiscardTs(snap.BaseTs)
 		return nil
 	case proposal.Restore != nil:
 		// Enable draining mode for the duration of the restore processing.
@@ -1103,10 +1103,12 @@ func (n *node) proposeSnapshot() error {
 	if snap == nil {
 		return nil
 	}
+	// proposeSnapshot is only called if we need to run a snapshot. So, we don't
+	// need to check if we have sufficient entries here. See checkpointAndClose.
 	proposal := &pb.Proposal{
 		Snapshot: snap,
 	}
-	glog.V(2).Infof("Proposing snapshot: %+v. ReadTs: %#x\n", snap, snap.ReadTs)
+	glog.V(2).Infof("Proposing snapshot: %+v. BaseTs: %#x\n", snap, snap.BaseTs)
 	data := make([]byte, 8+proposal.Size())
 	sz, err := proposal.MarshalToSizedBuffer(data[8:])
 	data = data[:8+sz]
@@ -1143,16 +1145,15 @@ func (n *node) updateRaftProgress() error {
 	// stored applied.
 	applied := n.Store.Uint(raftwal.CheckpointIndex)
 
-	snap, err := n.calculateSnapshot(applied, n.Applied.DoneUntil(),
-		posting.Oracle().MinPendingStartTs())
+	snap, err := n.calculateSnapshot(applied, n.Applied.DoneUntil(), math.MaxUint64)
 	if err != nil || snap == nil || snap.Index <= applied {
 		return err
 	}
-	atomic.StoreUint64(&n.checkpointTs, snap.ReadTs)
+	atomic.StoreUint64(&n.checkpointTs, snap.BaseTs)
 
 	n.Store.SetUint(raftwal.CheckpointIndex, snap.GetIndex())
 	glog.V(2).Infof("[%#x] Set Raft checkpoint to index: %d, ts: %#x.",
-		n.Id, snap.Index, snap.ReadTs)
+		n.Id, snap.Index, snap.BaseTs)
 	return nil
 }
 
@@ -1349,6 +1350,14 @@ func (n *node) Run() {
 		glog.Infof("Found Raft checkpoint: %d", applied)
 	}
 
+	snap, err := n.Snapshot()
+	if err != nil {
+		glog.Errorf("While trying to find snapshot: %v", err)
+	} else {
+		glog.Infof("Found snapshot: %+v. BaseTs: %#x", snap, snap.BaseTs)
+	}
+
+	baseTimestamp := snap.BaseTs
 	var timer x.Timer
 	for {
 		select {
@@ -1444,7 +1453,7 @@ func (n *node) Run() {
 						glog.Errorf("Could not retrieve previous snapshot. Setting SinceTs to 0.")
 						snap.SinceTs = 0
 					} else {
-						snap.SinceTs = currSnap.ReadTs
+						snap.SinceTs = currSnap.BaseTs
 					}
 
 					// It's ok to block ticks while retrieving snapshot, since it's a follower.
@@ -1549,14 +1558,14 @@ func (n *node) Run() {
 						if x.Debug {
 							glog.V(2).Infof("Setting base timestamp to: %#x for index: %d\n", p.BaseTimestamp, e.Index)
 						}
-						posting.SetTimestamp(p.BaseTimestamp)
+						baseTimestamp = p.BaseTimestamp
 						n.Proposals.Done(p.Key, nil)
 						n.Applied.Done(p.Index)
 						continue
 					}
 
 					p.ReadTs = readTs
-					p.CommitTs = posting.CommitTimestamp(e.Index)
+					p.CommitTs = x.Timestamp(baseTimestamp, e.Index)
 					glog.Infof("e.Index: %d commit Ts: %#x\n", e.Index, p.CommitTs)
 
 					props = append(props, p)
@@ -1763,7 +1772,7 @@ func (n *node) calculateSnapshot(startIdx, lastIdx, lastCommitTs uint64) (*pb.Sn
 		glog.V(2).Infof("Num pending txns: %d", num)
 	}
 
-	baseTs := snap.ReadTs
+	baseTs := snap.BaseTs
 	var snapshotIdx uint64
 
 	// Trying to retrieve all entries at once might cause out-of-memory issues in
@@ -1793,7 +1802,6 @@ func (n *node) calculateSnapshot(startIdx, lastIdx, lastCommitTs uint64) (*pb.Sn
 				break
 			}
 			snapshotIdx = entry.Index
-			glog.Infof("CommitTs: %#x Entry: %d\n", cts, entry.Index)
 
 			if entry.Type != raftpb.EntryNormal || len(entry.Data) == 0 {
 				continue
@@ -1801,7 +1809,6 @@ func (n *node) calculateSnapshot(startIdx, lastIdx, lastCommitTs uint64) (*pb.Sn
 			proposal := getProposal(entry)
 			if proposal.BaseTimestamp > 0 {
 				baseTs = proposal.BaseTimestamp
-				glog.Infof("BaseTs: %#x Entry: %d\n", baseTs, entry.Index)
 				continue
 			}
 
@@ -1812,7 +1819,7 @@ func (n *node) calculateSnapshot(startIdx, lastIdx, lastCommitTs uint64) (*pb.Sn
 				s := &pb.Snapshot{
 					Context: n.RaftContext,
 					Index:   entry.Index,
-					ReadTs:  restoreTs,
+					BaseTs:  restoreTs,
 				}
 				span.Annotatef(nil, "Found restore proposal with restoreTs: %d", restoreTs)
 				glog.Infof("calculated snapshot from restore proposal: %+v", s)
@@ -1841,7 +1848,7 @@ func (n *node) calculateSnapshot(startIdx, lastIdx, lastCommitTs uint64) (*pb.Sn
 	result := &pb.Snapshot{
 		Context: n.RaftContext,
 		Index:   snapshotIdx,
-		ReadTs:  baseTs,
+		BaseTs:  baseTs,
 	}
 	span.Annotatef(nil, "Got snapshot: %+v", result)
 	return result, nil

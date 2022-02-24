@@ -23,10 +23,10 @@ import (
 	"strconv"
 	"strings"
 
+	humanize "github.com/dustin/go-humanize"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/raftwal"
 	"github.com/outcaste-io/outserv/x"
-	humanize "github.com/dustin/go-humanize"
 	"go.etcd.io/etcd/raft"
 	"go.etcd.io/etcd/raft/raftpb"
 )
@@ -180,7 +180,7 @@ func overwriteSnapshot(store *raftwal.DiskStorage) error {
 	x.Check(err)
 
 	dsnap.Index = ent.Index
-	dsnap.ReadTs = uint64(readTs)
+	dsnap.BaseTs = uint64(readTs)
 
 	fmt.Printf("Setting snapshot to: %+v\n", dsnap)
 	data, err := dsnap.Marshal()

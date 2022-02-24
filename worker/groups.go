@@ -771,7 +771,7 @@ func (g *groupi) doSendMembership(tablets map[string]*pb.Tablet) error {
 		// Do not send tablet information, if I'm not the leader.
 		group.Tablets = tablets
 		if snap, err := g.Node.Snapshot(); err == nil {
-			group.SnapshotTs = snap.ReadTs
+			group.SnapshotTs = snap.BaseTs
 		}
 		group.CheckpointTs = atomic.LoadUint64(&g.Node.checkpointTs)
 	}
