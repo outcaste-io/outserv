@@ -414,10 +414,6 @@ func (s *Server) Alter(ctx context.Context, op *api.Operation) (*api.Payload, er
 		return nil, errors.Wrapf(err, "While altering")
 	}
 
-	// StartTs is not needed if the predicate to be dropped lies on this server but is required
-	// if it lies on some other machine. Let's get it for safety.
-
-	// TODO: Understand this better and see what timestamp should be set.
 	m := &pb.Mutations{}
 	if isDropAll(op) {
 		if x.Config.BlockClusterWideDrop {
@@ -1409,15 +1405,6 @@ func (s *Server) doQuery(ctx context.Context, req *Request) (resp *api.Response,
 	// assigned in the processQuery function called below.
 	defer annotateStartTs(qc.span, qc.req.StartTs)
 
-	// For mutations, we update the startTs if necessary.
-	// NOTE: We don't need to set start ts for mutations. They'd get their own
-	// post proposal.
-	//
-	// if isMutation && req.req.StartTs == 0 {
-	// 	start := time.Now()
-	// 	req.req.StartTs = posting.Timestamp()
-	// 	qc.latency.AssignTimestamp = time.Since(start)
-	// }
 	if x.WorkerConfig.AclEnabled {
 		ns, err := x.ExtractNamespace(ctx)
 		if err != nil {
