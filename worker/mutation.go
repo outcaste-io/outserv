@@ -677,7 +677,7 @@ func MutateOverNetwork(ctx context.Context, m *pb.Mutations) (*api.TxnContext, e
 	ctx, span := otrace.StartSpan(ctx, "worker.MutateOverNetwork")
 	defer span.End()
 
-	tctx := &api.TxnContext{StartTs: m.StartTs}
+	tctx := &api.TxnContext{}
 	if err := verifyTypes(ctx, m); err != nil {
 		return tctx, err
 	}
@@ -694,7 +694,6 @@ func MutateOverNetwork(ctx context.Context, m *pb.Mutations) (*api.TxnContext, e
 			span.Annotatef(nil, "Group id zero for mutation: %+v", mu)
 			return tctx, errNonExistentTablet
 		}
-		mu.StartTs = m.StartTs
 		go proposeOrSend(ctx, gid, mu, resCh)
 	}
 
@@ -818,7 +817,7 @@ func (w *grpcWorker) proposeAndWait(ctx context.Context, txnCtx *api.TxnContext,
 	// MaxAssignedTs >= m.StartTs.
 	node := groups().Node
 	err := node.proposeAndWait(ctx, &pb.Proposal{Mutations: m})
-	fillTxnContext(txnCtx, m.StartTs)
+	fillTxnContext(txnCtx, 0)
 	return err
 }
 

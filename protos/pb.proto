@@ -245,7 +245,6 @@ message DirectedEdge {
 
 message Mutations {
   uint32 group_id = 1;
-  uint64 start_ts = 2;
   repeated DirectedEdge edges = 3;
   repeated SchemaUpdate schema = 4;
   repeated TypeUpdate types = 6;

@@ -724,21 +724,18 @@ func sizeHistogram(db *badger.DB) {
 	fmt.Printf("\nHistogram of value sizes (in bytes) %s\n", valueSizeHistogram.String())
 }
 
-func printAlphaProposal(buf *bytes.Buffer, pr *pb.Proposal, pending map[uint64]bool) {
+func printAlphaProposal(buf *bytes.Buffer, pr *pb.Proposal) {
 	if pr == nil {
 		return
 	}
 
 	switch {
 	case pr.Mutations != nil:
-		fmt.Fprintf(buf, " Mutation . StartTs: %d . Edges: %d .",
-			pr.Mutations.StartTs, len(pr.Mutations.Edges))
+		fmt.Fprintf(buf, " Mutation . Edges: %d .", len(pr.Mutations.Edges))
 		if len(pr.Mutations.Edges) > 0 {
-			pending[pr.Mutations.StartTs] = true
 		} else {
 			fmt.Fprintf(buf, " Mutation: %+v .", pr.Mutations)
 		}
-		fmt.Fprintf(buf, " Pending txns: %d .", len(pending))
 	case len(pr.Kv) > 0:
 		fmt.Fprintf(buf, " KV . Size: %d ", len(pr.Kv))
 	case pr.State != nil:

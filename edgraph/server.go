@@ -418,7 +418,7 @@ func (s *Server) Alter(ctx context.Context, op *api.Operation) (*api.Payload, er
 	// if it lies on some other machine. Let's get it for safety.
 
 	// TODO: Understand this better and see what timestamp should be set.
-	m := &pb.Mutations{StartTs: posting.ReadTimestamp()}
+	m := &pb.Mutations{}
 	if isDropAll(op) {
 		if x.Config.BlockClusterWideDrop {
 			glog.V(2).Info("Blocked drop-all because it is not permitted.")
@@ -788,8 +788,7 @@ func (s *Server) doMutate(ctx context.Context, qc *queryContext, resp *api.Respo
 		}
 	}
 	m := &pb.Mutations{
-		Edges:   edges,
-		StartTs: qc.req.StartTs,
+		Edges: edges,
 		Metadata: &pb.Metadata{
 			PredHints: predHints,
 		},

@@ -250,7 +250,6 @@ func handleRestoreProposal(ctx context.Context, req *pb.RestoreRequest, pidx uin
 		dropProposal := pb.Proposal{
 			Mutations: &pb.Mutations{
 				GroupId: req.GroupId,
-				StartTs: req.RestoreTs,
 				DropOp:  pb.Mutations_ALL,
 			},
 		}
