@@ -107,30 +107,6 @@ func DgraphClientDropAll(serviceAddr string) (*dgo.Dgraph, error) {
 	return dg, err
 }
 
-// DgraphClientWithGroot creates a Dgraph client with groot permissions set up.
-// It is intended to be called from TestMain() to establish a Dgraph connection shared
-// by all tests, so there is no testing.T instance for it to use.
-func DgraphClientWithGroot(serviceAddr string) (*dgo.Dgraph, error) {
-	dg, err := DgraphClient(serviceAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	ctx := context.Background()
-	for {
-		// keep retrying until we succeed or receive a non-retriable error
-		err = dg.LoginIntoNamespace(ctx, x.GrootId, "password", x.GalaxyNamespace)
-		if err == nil || !(strings.Contains(err.Error(), "Please retry") ||
-			strings.Contains(err.Error(), "user not found")) {
-
-			break
-		}
-		time.Sleep(time.Second)
-	}
-
-	return dg, err
-}
-
 // DgraphClient creates a Dgraph client.
 // It is intended to be called from TestMain() to establish a Dgraph connection shared
 // by all tests, so there is no testing.T instance for it to use.

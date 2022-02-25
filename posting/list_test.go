@@ -30,7 +30,6 @@ import (
 	"github.com/outcaste-io/badger/v3"
 	bpb "github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/dgo/v210/protos/api"
-	"github.com/outcaste-io/ristretto/z"
 	"github.com/stretchr/testify/require"
 
 	"github.com/outcaste-io/outserv/codec"
@@ -1487,17 +1486,17 @@ func TestSingleListRollup(t *testing.T) {
 		require.Equal(t, facet, strconv.Itoa(int(i+1)))
 	}
 
-	var bl pb.BackupPostingList
-	buf := z.NewBuffer(10<<10, "TestSingleListRollup")
-	defer buf.Release()
-	kv, err := ol.ToBackupPostingList(&bl, nil, buf)
-	require.NoError(t, err)
-	require.Equal(t, 1, len(kv.UserMeta))
-	require.Equal(t, BitCompletePosting, kv.UserMeta[0])
+	// var bl pb.BackupPostingList
+	// buf := z.NewBuffer(10<<10, "TestSingleListRollup")
+	// defer buf.Release()
+	// kv, err := ol.ToBackupPostingList(&bl, nil, buf)
+	// require.NoError(t, err)
+	// require.Equal(t, 1, len(kv.UserMeta))
+	// require.Equal(t, BitCompletePosting, kv.UserMeta[0])
 
-	plist := FromBackupPostingList(&bl)
-	require.Equal(t, 0, len(plist.Splits))
-	// TODO: Need more testing here.
+	// plist := FromBackupPostingList(&bl)
+	// require.Equal(t, 0, len(plist.Splits))
+	// // TODO: Need more testing here.
 }
 
 func TestRecursiveSplits(t *testing.T) {

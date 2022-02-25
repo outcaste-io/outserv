@@ -26,12 +26,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/raftwal"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 )
 
@@ -136,7 +136,6 @@ type tasks struct {
 
 // Enqueue adds a new task to the queue, waits for 3 seconds, and returns any errors that
 // may have happened in that span of time. The request must be of type:
-// - *pb.BackupRequest
 // - *pb.ExportRequest
 func (t *tasks) Enqueue(req interface{}) (uint64, error) {
 	if t == nil {
@@ -169,13 +168,10 @@ func (t *tasks) Enqueue(req interface{}) (uint64, error) {
 }
 
 // enqueue adds a new task to the queue. This must be of type:
-// - *pb.BackupRequest
 // - *pb.ExportRequest
 func (t *tasks) enqueue(req interface{}) (uint64, error) {
 	var kind TaskKind
 	switch req.(type) {
-	case *pb.BackupRequest:
-		kind = TaskKindBackup
 	case *pb.ExportRequest:
 		kind = TaskKindExport
 	default:
@@ -310,16 +306,12 @@ func (t *tasks) newId() uint64 {
 
 type taskRequest struct {
 	id  uint64
-	req interface{} // *pb.BackupRequest, *pb.ExportRequest
+	req interface{} // *pb.ExportRequest
 }
 
 // run starts a task and blocks till it completes.
 func (t *taskRequest) run() error {
 	switch req := t.req.(type) {
-	case *pb.BackupRequest:
-		if err := ProcessBackupRequest(context.Background(), req); err != nil {
-			return err
-		}
 	case *pb.ExportRequest:
 		files, err := ExportOverNetwork(context.Background(), req)
 		if err != nil {
@@ -368,16 +360,13 @@ func (t TaskMeta) uint64() uint64 {
 
 const (
 	// Reserve the zero value for errors.
-	TaskKindBackup TaskKind = iota + 1
-	TaskKindExport
+	TaskKindExport TaskKind = iota + 1
 )
 
 type TaskKind uint64
 
 func (k TaskKind) String() string {
 	switch k {
-	case TaskKindBackup:
-		return "Backup"
 	case TaskKindExport:
 		return "Export"
 	default:
