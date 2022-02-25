@@ -458,10 +458,6 @@ func ValidateAndConvert(edge *pb.DirectedEdge, su *pb.SchemaUpdate) error {
 
 	// type checks
 	switch {
-	case edge.Lang != "" && !su.GetLang():
-		return errors.Errorf("Attr: [%v] should have @lang directive in schema to mutate edge: [%v]",
-			x.ParseAttr(edge.Attr), edge)
-
 	case !schemaType.IsScalar() && !storageType.IsScalar():
 		return nil
 

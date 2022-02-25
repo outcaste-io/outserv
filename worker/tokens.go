@@ -67,12 +67,9 @@ func verifyCustomIndex(ctx context.Context, attr string, tokenizerName string) b
 
 // Return string tokens from function arguments. It maps function type to correct tokenizer.
 // Note: regexp functions require regexp compilation of argument, not tokenization.
-func getStringTokens(funcArgs []string, lang string, funcType FuncType) ([]string, error) {
-	if lang == "." {
-		lang = "en"
-	}
+func getStringTokens(funcArgs []string, funcType FuncType) ([]string, error) {
 	if funcType == fullTextSearchFn {
-		return tok.GetFullTextTokens(funcArgs, lang)
+		return tok.GetFullTextTokens(funcArgs)
 	}
 	return tok.GetTermTokens(funcArgs)
 }
@@ -125,17 +122,13 @@ func pickTokenizer(ctx context.Context, attr string, f string) (tok.Tokenizer, e
 // getInequalityTokens gets tokens ge/le/between compared to given tokens using the first sortable
 // index that is found for the predicate.
 // In case of ge/gt/le/lt/eq len(ineqValues) should be 1, else(between) len(ineqValues) should be 2.
-func getInequalityTokens(ctx context.Context, readTs uint64, attr, f, lang string,
+func getInequalityTokens(ctx context.Context, readTs uint64, attr, f string,
 	ineqValues []types.Val) ([]string, []string, error) {
 
 	tokenizer, err := pickTokenizer(ctx, attr, f)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	// Get the token for the value passed in function.
-	// XXX: the lang should be query.Langs, but it only matters in edge case test below.
-	tokenizer = tok.GetTokenizerForLang(tokenizer, lang)
 
 	var ineqTokensFinal []string
 	for _, ineqValue := range ineqValues {

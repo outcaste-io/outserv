@@ -43,8 +43,6 @@ type indexMutationInfo struct {
 // index rune, for specific tokenizers.
 func indexTokens(ctx context.Context, info *indexMutationInfo) ([]string, error) {
 	attr := info.edge.Attr
-	lang := info.edge.GetLang()
-
 	schemaType, err := schema.State().TypeOf(attr)
 	if err != nil || !schemaType.IsScalar() {
 		return nil, errors.Errorf("Cannot index attribute %s of type object.", attr)
@@ -60,7 +58,7 @@ func indexTokens(ctx context.Context, info *indexMutationInfo) ([]string, error)
 
 	var tokens []string
 	for _, it := range info.tokenizers {
-		toks, err := tok.BuildTokens(sv.Value, tok.GetTokenizerForLang(it, lang))
+		toks, err := tok.BuildTokens(sv.Value, it)
 		if err != nil {
 			return tokens, err
 		}
@@ -498,11 +496,6 @@ func prefixesToDeleteTokensFor(attr, tokenizerName string, hasLang bool) ([][]by
 	if !ok {
 		return nil, errors.Errorf("Could not find valid tokenizer for %s", tokenizerName)
 	}
-	if hasLang {
-		// We just need the tokenizer identifier for ExactTokenizer having language.
-		// It will be same for all the language.
-		tokenizer = tok.GetTokenizerForLang(tokenizer, "en")
-	}
 	prefix = append(prefix, tokenizer.Identifier())
 	prefixes = append(prefixes, prefix)
 	// All the parts of any list that has been split into multiple parts.
@@ -928,7 +921,6 @@ func rebuildTokIndex(ctx context.Context, rb *IndexRebuild) error {
 				Value: p.Value,
 				Tid:   types.TypeID(p.ValType),
 			}
-			edge.Lang = string(p.LangTag)
 
 			for {
 				err := txn.addIndexMutations(ctx, &indexMutationInfo{

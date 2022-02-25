@@ -106,7 +106,6 @@ func (nq NQuad) createEdgePrototype(subjectUid uint64) *pb.DirectedEdge {
 		Entity:    subjectUid,
 		Attr:      nq.Predicate,
 		Namespace: nq.Namespace,
-		Lang:      nq.Lang,
 	}
 }
 
@@ -143,7 +142,6 @@ func (nq NQuad) ToDeletePredEdge() (*pb.DirectedEdge, error) {
 		Entity:    0,
 		Attr:      nq.Predicate,
 		Namespace: nq.Namespace,
-		Lang:      nq.Lang,
 		Op:        pb.DirectedEdge_DEL,
 	}
 

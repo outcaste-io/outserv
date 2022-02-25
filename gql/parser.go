@@ -2648,8 +2648,7 @@ loop:
 					return nil, it.Errorf("Sorting by an attribute: [%s] "+
 						"can only be done on one language", val)
 				}
-				gq.Order = append(gq.Order,
-					&pb.Order{Attr: attr, Desc: key == "orderdesc", Langs: langs})
+				gq.Order = append(gq.Order, &pb.Order{Attr: attr, Desc: key == "orderdesc"})
 				order[val] = true
 				continue
 			}
@@ -3071,7 +3070,7 @@ func godeep(it *lex.ItemIterator, gq *GraphQuery) error {
 							"can only be done on one language", p.Val)
 					}
 					curp.Order = append(curp.Order,
-						&pb.Order{Attr: attr, Desc: p.Key == "orderdesc", Langs: langs})
+						&pb.Order{Attr: attr, Desc: p.Key == "orderdesc"})
 					order[p.Val] = true
 					continue
 				}

@@ -255,7 +255,6 @@ type SubGraph struct {
 	// TODO: Would make sense to move these to a map.
 	ExpandPreds []*pb.ValueList
 	GroupbyRes  []*groupResults // one result for each uid list.
-	LangTags    []*pb.LangList
 
 	// SrcUIDs is a list of unique source UIDs. They are always copies of destUIDs
 	// of parent nodes in GraphQL structure.
