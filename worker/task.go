@@ -841,12 +841,6 @@ func processTask(ctx context.Context, q *pb.Query, gid uint32) (*pb.Result, erro
 	}
 
 	var qs queryState
-	// if q.Cache == UseTxnCache {
-	// 	qs.cache = posting.Oracle().CacheAt(q.ReadTs)
-	// }
-	// if qs.cache == nil {
-	// 	qs.cache = posting.NoCache(q.ReadTs)
-	// }
 
 	// TODO: Perhaps create a new cache to use, instead of not using any cache?
 	qs.cache = posting.NoCache(q.ReadTs)

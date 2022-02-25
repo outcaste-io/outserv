@@ -152,7 +152,7 @@ func newLoader(opt *options) *loader {
 }
 
 func getWriteTimestamp() uint64 {
-	return uint64(time.Now().UTC().Unix()) << 32
+	return x.Timestamp(uint64(time.Now().Unix())<<32, 0)
 }
 
 // leaseNamespace is called at the end of map phase. It leases the namespace ids till the maximum

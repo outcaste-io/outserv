@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/minio/minio-go/v6/pkg/credentials"
@@ -169,8 +170,7 @@ func ProcessRestoreRequest(ctx context.Context, req *pb.RestoreRequest, wg *sync
 		return errors.Errorf("another restore operation is already running. " +
 			"Please retry later.")
 	}
-
-	req.RestoreTs = posting.CommitTimestamp(0)
+	req.RestoreTs = uint64(time.Now().Unix()) << 32
 
 	// TODO: prevent partial restores when proposeRestoreOrSend only sends the restore
 	// request to a subset of groups.

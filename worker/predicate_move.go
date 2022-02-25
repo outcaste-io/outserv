@@ -203,6 +203,8 @@ func (w *grpcWorker) ReceivePredicate(stream pb.Worker_ReceivePredicateServer) e
 
 func (w *grpcWorker) MovePredicate(ctx context.Context,
 	in *pb.MovePredicatePayload) (*api.Payload, error) {
+	return nil, fmt.Errorf("TODO: Support MovePredicate")
+
 	ctx, span := otrace.StartSpan(ctx, "worker.MovePredicate")
 	defer span.End()
 

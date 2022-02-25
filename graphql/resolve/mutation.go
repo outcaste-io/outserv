@@ -198,8 +198,6 @@ func (mr *dgraphResolver) Resolve(ctx context.Context, m schema.Mutation) (*Reso
 	defer timer.Stop()
 
 	resolved, success := mr.rewriteAndExecute(ctx, m)
-	// resolverTrace.Dgraph = resolved.Extensions.Tracing.Execution.Resolvers[0].Dgraph
-	// resolved.Extensions.Tracing.Execution.Resolvers[0] = resolverTrace
 	return resolved, success
 }
 
@@ -222,21 +220,7 @@ func (mr *dgraphResolver) rewriteAndExecute(
 	dgraphPreMutationQueryDuration := &schema.LabeledOffsetDuration{Label: "preMutationQuery"}
 	dgraphMutationDuration := &schema.LabeledOffsetDuration{Label: "mutation"}
 	dgraphPostMutationQueryDuration := &schema.LabeledOffsetDuration{Label: "query"}
-	ext := &schema.Extensions{
-		// Tracing: &schema.Trace{
-		// 	Execution: &schema.ExecutionTrace{
-		// 		Resolvers: []*schema.ResolverTrace{
-		// 			{
-		// 				Dgraph: []*schema.LabeledOffsetDuration{
-		// 					dgraphPreMutationQueryDuration,
-		// 					dgraphMutationDuration,
-		// 					dgraphPostMutationQueryDuration,
-		// 				},
-		// 			},
-		// 		},
-		// 	},
-		// },
-	}
+	ext := &schema.Extensions{}
 
 	emptyResult := func(err error) *Resolved {
 		return &Resolved{

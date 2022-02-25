@@ -290,9 +290,9 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 		// should consider this into account, when adding new proposals to the system.
 		switch {
 		case proposal.BaseTimestamp > 0:
-			// If a proposal is important (like setting base timestamp), let's not run it via the limiter
-			// below. We should always propose it irrespective of how many pending proposals there
-			// might be.
+			// If a proposal is important (like setting base timestamp), let's
+			// not run it via the limiter below. We should always propose it
+			// irrespective of how many pending proposals there might be.
 		default:
 			span.Annotatef(nil, "incr with %d", i)
 			if err := limiter.incr(ctx, i); err != nil {

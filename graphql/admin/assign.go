@@ -19,6 +19,7 @@ package admin
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -31,7 +32,6 @@ import (
 
 const (
 	uid         = "UID"
-	timestamp   = "TIMESTAMP"
 	namespaceId = "NAMESPACE_ID"
 )
 
@@ -51,14 +51,10 @@ func resolveAssign(ctx context.Context, m schema.Mutation) (*resolve.Resolved, b
 	switch input.What {
 	case uid:
 		resp, err = worker.AssignUidsOverNetwork(ctx, num)
-	case timestamp:
-		if num.Val == 0 {
-			num.ReadOnly = true
-		}
-		// TODO: Figure out what to do here.
-		// resp, err = worker.Timestamps(ctx, num)
 	case namespaceId:
 		resp, err = worker.AssignNsIdsOverNetwork(ctx, num)
+	default:
+		err = fmt.Errorf("Invalid request for resolveAssign")
 	}
 	if err != nil {
 		return resolve.EmptyResult(m, err), false
@@ -67,12 +63,8 @@ func resolveAssign(ctx context.Context, m schema.Mutation) (*resolve.Resolved, b
 	var startId, endId, readOnly interface{}
 	// if it was readonly TIMESTAMP request, then let other output fields be `null`,
 	// otherwise, let readOnly field remain `null`.
-	if input.What == timestamp && num.Val == 0 {
-		readOnly = json.Number(strconv.FormatUint(resp.GetReadOnly(), 10))
-	} else {
-		startId = json.Number(strconv.FormatUint(resp.GetStartId(), 10))
-		endId = json.Number(strconv.FormatUint(resp.GetEndId(), 10))
-	}
+	startId = json.Number(strconv.FormatUint(resp.GetStartId(), 10))
+	endId = json.Number(strconv.FormatUint(resp.GetEndId(), 10))
 
 	return resolve.DataResult(m,
 		map[string]interface{}{m.Name(): map[string]interface{}{

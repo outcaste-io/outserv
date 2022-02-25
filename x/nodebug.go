@@ -1,5 +1,4 @@
 //go:build !debug
-// +build !debug
 
 /*
  * Copyright 2020 Dgraph Labs, Inc. and Contributors
@@ -26,7 +25,7 @@ import (
 	"github.com/outcaste-io/outserv/protos/pb"
 )
 
-var Debug bool = true
+var Debug bool = false
 
 // VerifyPack works in debug mode. Check out the comment in debug_on.go
 func VerifyPack(plist *pb.PostingList) {

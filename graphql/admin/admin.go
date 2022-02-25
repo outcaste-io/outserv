@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	errMsgServerNotReady = "Unavailable: Server not ready per GraphQL."
+	errMsgServerNotReady = "Unavailable: Server not ready."
 
 	errNoGraphQLSchema = "Not resolving %s. There's no GraphQL schema in Dgraph. " +
 		"Use the /admin API to add a GraphQL schema"

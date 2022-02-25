@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/hex"
 	"sync"
-	"sync/atomic"
 
 	"github.com/golang/glog"
 	"github.com/outcaste-io/badger/v3/skl"
@@ -117,9 +116,8 @@ func (txn *Txn) Store(pl *List) *List {
 type oracle struct {
 	x.SafeMutex
 
-	closer    *z.Closer
-	applied   y.WaterMark
-	timestamp uint64
+	closer  *z.Closer
+	applied y.WaterMark
 
 	// Keeps track of all the startTs we have seen so far, based on the mutations. Then as
 	// transactions are committed or aborted, we delete entries from the startTs map. When taking a
@@ -144,18 +142,8 @@ func ReadTimestamp() uint64 {
 	// read the rolled up posting lists, which are written at commit ts + 1.
 	return o.applied.DoneUntil() + 1
 }
-
-func CommitTimestamp(raftIdx uint64) uint64 {
-	baseTs := atomic.LoadUint64(&o.timestamp)
-	return x.Timestamp(baseTs, raftIdx)
-}
-func SetTimestamp(newTs uint64) {
-	curTs := atomic.LoadUint64(&o.timestamp)
-	if newTs < curTs {
-		glog.Errorf("Timestamp to set: %#x < cur ts: %#x\n", newTs, curTs)
-	}
-
-	atomic.StoreUint64(&o.timestamp, newTs)
+func InitApplied(ts uint64) {
+	o.applied.SetDoneUntil(ts)
 }
 
 func (o *oracle) init() {
@@ -163,9 +151,6 @@ func (o *oracle) init() {
 	o.applied.Init(o.closer)
 	o.waiters = make(map[uint64][]chan struct{})
 	o.pendingTxns = make(map[uint64]*Txn)
-
-	o.applied.SetDoneUntil(o.timestamp)
-	glog.Infof("Initialized timestamp to: %d %016x\n", o.timestamp, o.timestamp)
 }
 
 // RegisterCommitTs would return a txn and a bool.

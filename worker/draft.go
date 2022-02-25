@@ -796,17 +796,6 @@ func getProposal(e raftpb.Entry) *pb.Proposal {
 	p.Key = key
 	p.Index = e.Index
 	p.EntrySize = int64(e.Size())
-
-	// switch {
-	// case p.Mutations != nil:
-	// 	p.StartTs = p.Mutations.StartTs
-	// case p.Snapshot != nil:
-	// 	p.StartTs = p.Snapshot.ReadTs
-	// case p.Delta != nil:
-	// 	p.StartTs = 0 // Run this asap.
-	// default:
-	// 	// For now, not covering everything.
-	// }
 	return p
 }
 
@@ -1358,6 +1347,8 @@ func (n *node) Run() {
 	}
 
 	baseTimestamp := snap.BaseTs
+	posting.InitApplied(baseTimestamp)
+
 	var timer x.Timer
 	for {
 		select {
@@ -1556,7 +1547,8 @@ func (n *node) Run() {
 					p := getProposal(e)
 					if p.BaseTimestamp > 0 {
 						if x.Debug {
-							glog.V(2).Infof("Setting base timestamp to: %#x for index: %d\n", p.BaseTimestamp, e.Index)
+							glog.V(2).Infof("Setting base timestamp to: %#x for index: %d\n",
+								p.BaseTimestamp, e.Index)
 						}
 						baseTimestamp = p.BaseTimestamp
 						n.Proposals.Done(p.Key, nil)
@@ -1566,7 +1558,7 @@ func (n *node) Run() {
 
 					p.ReadTs = readTs
 					p.CommitTs = x.Timestamp(baseTimestamp, e.Index)
-					glog.Infof("e.Index: %d commit Ts: %#x\n", e.Index, p.CommitTs)
+					// glog.Infof("e.Index: %d commit Ts: %#x\n", e.Index, p.CommitTs)
 
 					props = append(props, p)
 
