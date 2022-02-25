@@ -146,9 +146,9 @@ func init() {
 	// --tls SuperFlag
 	x.RegisterClientTLSFlags(flag)
 
-	flag.StringP("files", "f", "", "Location of *.rdf(.gz) or *.json(.gz) file(s) to load")
+	flag.StringP("files", "f", "", "Location of *.json(.gz) file(s) to load")
 	flag.StringP("schema", "s", "", "Location of schema file")
-	flag.String("format", "", "Specify file format (rdf or json) instead of getting it "+
+	flag.String("format", "", "Specify file format (json) instead of getting it "+
 		"from filename")
 	flag.StringP("alpha", "a", "127.0.0.1:9080",
 		"Comma-separated list of Dgraph alpha gRPC server addresses")
@@ -456,7 +456,7 @@ func (l *loader) allocateUids(nqs []*api.NQuad) {
 	l.alloc.BumpTo(maxUid)
 }
 
-// processFile forwards a file to the RDF or JSON processor as appropriate
+// processFile forwards a file to the JSON processor as appropriate
 func (l *loader) processFile(ctx context.Context, fs filestore.FileStore, filename string,
 	key x.Sensitive) error {
 
@@ -471,7 +471,7 @@ func (l *loader) processFile(ctx context.Context, fs filestore.FileStore, filena
 			if isJson {
 				loadType = chunker.JsonFormat
 			} else {
-				return errors.Errorf("need --format=rdf or --format=json to load %s", filename)
+				return errors.Errorf("need --format=json to load %s", filename)
 			}
 		}
 	}
@@ -820,12 +820,12 @@ func run() error {
 	}
 
 	if opt.dataFiles == "" {
-		return errors.New("RDF or JSON file(s) location must be specified")
+		return errors.New("JSON file(s) location must be specified")
 	}
 
 	fs := filestore.NewFileStore(opt.dataFiles)
 
-	filesList := fs.FindDataFiles(opt.dataFiles, []string{".rdf", ".rdf.gz", ".json", ".json.gz"})
+	filesList := fs.FindDataFiles(opt.dataFiles, []string{".json", ".json.gz"})
 	totalFiles := len(filesList)
 	if totalFiles == 0 {
 		return errors.Errorf("No data files found in %s", opt.dataFiles)

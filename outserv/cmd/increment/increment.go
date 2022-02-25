@@ -156,7 +156,11 @@ func process(dg *dgo.Dgraph, conf *viper.Viper) (Counter, error) {
 	if len(counter.Uid) == 0 {
 		counter.Uid = "_:new"
 	}
-	mu.SetNquads = []byte(fmt.Sprintf(`<%s> <%s> "%d"^^<xs:int> .`, counter.Uid, pred, counter.Val))
+	mu.SetJson = []byte(fmt.Sprintf(
+		`{
+			"uid" : "%s",
+			"%s"  : "%d"
+		}`, counter.Uid, pred, counter.Val))
 
 	// Don't put any timeout for mutation.
 	resp, err := txn.Mutate(ctx, &mu)

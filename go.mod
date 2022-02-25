@@ -44,7 +44,7 @@ require (
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/mitchellh/panicwrap v1.0.0
 	github.com/outcaste-io/badger/v3 v3.0.0-20220210203236-1b1148a36313
-	github.com/outcaste-io/dgo/v210 v210.0.0-20220207213049-2f4dade232d5
+	github.com/outcaste-io/dgo/v210 v210.0.0-20220225180226-43bd1b427e86
 	github.com/outcaste-io/ristretto v0.2.0
 	github.com/outcaste-io/sroar v0.0.0-20220207092908-fa5c189ea338
 	github.com/paulmach/go.geojson v0.0.0-20170327170536-40612a87147b

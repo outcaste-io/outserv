@@ -527,6 +527,8 @@ github.com/outcaste-io/badger/v3 v3.0.0-20220210203236-1b1148a36313 h1:fff/lOCBV
 github.com/outcaste-io/badger/v3 v3.0.0-20220210203236-1b1148a36313/go.mod h1:YNAh5OAysCCUPVfcSJx91TAPIZTP5ja13LdWEqfM9bQ=
 github.com/outcaste-io/dgo/v210 v210.0.0-20220207213049-2f4dade232d5 h1:MKy7r66kYG34763fDnWblKiHr6G0wjMFDeseM7BpJto=
 github.com/outcaste-io/dgo/v210 v210.0.0-20220207213049-2f4dade232d5/go.mod h1:Zcox8pu5QAEuA7uZAnMw4ekyM768IkQnU+msW5mJ88g=
+github.com/outcaste-io/dgo/v210 v210.0.0-20220225180226-43bd1b427e86 h1:sUjjQrypjiT1ii7opdvvr4oOmWyfgFNjPaqC7WwQRD8=
+github.com/outcaste-io/dgo/v210 v210.0.0-20220225180226-43bd1b427e86/go.mod h1:Zcox8pu5QAEuA7uZAnMw4ekyM768IkQnU+msW5mJ88g=
 github.com/outcaste-io/ristretto v0.2.0 h1:47w059XTZWFt01OucwjcBt8mEa3VUUhntUWEfmgVBFc=
 github.com/outcaste-io/ristretto v0.2.0/go.mod h1:iBZA7RCt6jaOr0z6hiBQ6t662/oZ6Gx/yauuPvIWHAI=
 github.com/outcaste-io/sroar v0.0.0-20220207092908-fa5c189ea338 h1:WCuMQH0sY2ilsEvTmTppIgRGS6yNyo97oBjauZuVmVY=

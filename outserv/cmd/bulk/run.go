@@ -232,7 +232,7 @@ func run() {
 		os.Exit(1)
 	}
 	if opt.DataFiles == "" {
-		fmt.Fprint(os.Stderr, "RDF or JSON file(s) location must be specified.\n")
+		fmt.Fprint(os.Stderr, "JSON file(s) location must be specified.\n")
 		os.Exit(1)
 	} else {
 		fileList := strings.Split(opt.DataFiles, ",")

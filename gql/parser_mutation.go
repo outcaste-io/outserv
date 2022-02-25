@@ -200,9 +200,9 @@ func parseMutationOp(it *lex.ItemIterator, op string, mu *api.Mutation) error {
 
 			switch op {
 			case "set":
-				mu.SetNquads = []byte(item.Val)
+				mu.SetJson = []byte(item.Val)
 			case "delete":
-				mu.DelNquads = []byte(item.Val)
+				mu.DeleteJson = []byte(item.Val)
 			case "schema":
 				return it.Errorf("Altering schema not supported through http client.")
 			case "dropall":
