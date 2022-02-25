@@ -802,13 +802,6 @@ func (qs *queryState) handleUidPostings(
 	return nil
 }
 
-const (
-	// UseTxnCache indicates the transaction cache should be used.
-	UseTxnCache = iota
-	// NoCache indicates no caches should be used.
-	NoCache
-)
-
 // processTask processes the query, accumulates and returns the result.
 func processTask(ctx context.Context, q *pb.Query, gid uint32) (*pb.Result, error) {
 	ctx, span := otrace.StartSpan(ctx, "processTask."+q.Attr)
@@ -823,9 +816,8 @@ func processTask(ctx context.Context, q *pb.Query, gid uint32) (*pb.Result, erro
 		return nil, err
 	}
 	if span != nil {
-		maxAssigned := posting.Oracle().MaxAssigned()
-		span.Annotatef(nil, "Done waiting for maxAssigned. Attr: %q ReadTs: %d Max: %d",
-			q.Attr, q.ReadTs, maxAssigned)
+		span.Annotatef(nil, "Done waiting for ts. Attr: %q ReadTs: %d",
+			q.Attr, q.ReadTs)
 	}
 	if err := groups().ChecksumsMatch(ctx); err != nil {
 		return nil, err
@@ -849,12 +841,9 @@ func processTask(ctx context.Context, q *pb.Query, gid uint32) (*pb.Result, erro
 	}
 
 	var qs queryState
-	if q.Cache == UseTxnCache {
-		qs.cache = posting.Oracle().CacheAt(q.ReadTs)
-	}
-	if qs.cache == nil {
-		qs.cache = posting.NoCache(q.ReadTs)
-	}
+
+	// TODO: Perhaps create a new cache to use, instead of not using any cache?
+	qs.cache = posting.NoCache(q.ReadTs)
 	// For now, remove the query level cache. It is causing contention for queries with high
 	// fan-out.
 	out, err := qs.helpProcessTask(ctx, q, gid)

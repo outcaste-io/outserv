@@ -1,18 +1,5 @@
-/*
- * Copyright 2016-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2016-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart license.
 
 package worker
 
@@ -42,9 +29,6 @@ import (
 
 	"github.com/outcaste-io/badger/v3"
 	bpb "github.com/outcaste-io/badger/v3/pb"
-	"github.com/outcaste-io/badger/v3/skl"
-	"github.com/outcaste-io/badger/v3/table"
-	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -72,7 +56,7 @@ type node struct {
 	*conn.Node
 
 	// Fields which are never changed after init.
-	applyCh      chan []raftpb.Entry
+	applyCh      chan []*pb.Proposal
 	concApplyCh  chan *pb.Proposal
 	drainApplyCh chan struct{}
 	ctx          context.Context
@@ -89,64 +73,7 @@ type node struct {
 	canCampaign bool
 	elog        trace.EventLog
 
-	keysWritten      *keysWritten
-	pendingProposals []pb.Proposal
-}
-
-// keysWritten is always accessed serially via applyCh. So, we don't need to make it thread-safe.
-type keysWritten struct {
-	rejectBeforeIndex uint64
-	keyCommitTs       map[uint64]uint64
-	validTxns         int64
-	invalidTxns       int64
-	totalKeys         int
-}
-
-func newKeysWritten() *keysWritten {
-	return &keysWritten{
-		keyCommitTs: make(map[uint64]uint64),
-	}
-}
-
-// We use keysWritten structure to allow mutations to be run concurrently. Consider this:
-// 1. We receive a txn with mutation at start ts = Ts.
-// 2. The server is at MaxAssignedTs Tm < Ts.
-// 3. Before, we would block proposing until Tm >= Ts.
-// 4. Now, we propose the mutation immediately.
-// 5. Once the mutation goes through raft, it is executed concurrently, and the "seen" MaxAssignedTs
-//    is registered as Tm-seen.
-// 6. The same mutation is also pushed to applyCh.
-// 7. When applyCh sees the mutation, it checks if any reads the txn incurred, have been written to
-//    with a commit ts in the range (Tm-seen, Ts]. If so, the mutation is re-run. In 21M live load,
-//    this happens about 3.6% of the time.
-// 8. If no commits have happened for the read key set, we are done. This happens 96.4% of the time.
-// 9. If multiple mutations happen for the same txn, the sequential mutations are always run
-//    serially by applyCh. This is to avoid edge cases.
-func (kw *keysWritten) StillValid(txn *posting.Txn) bool {
-	if atomic.LoadUint64(&txn.AppliedIndexSeen) < kw.rejectBeforeIndex {
-		kw.invalidTxns++
-		return false
-	}
-	if atomic.LoadUint64(&txn.MaxAssignedSeen) >= txn.StartTs {
-		kw.validTxns++
-		return true
-	}
-
-	c := txn.Cache()
-	c.Lock()
-	defer c.Unlock()
-	for hash := range c.ReadKeys() {
-		// If the commitTs is between (MaxAssignedSeen, StartTs], the txn reads were invalid. If the
-		// commitTs is > StartTs, then it doesn't matter for reads. If the commit ts is <
-		// MaxAssignedSeen, that means our reads are valid.
-		commitTs := kw.keyCommitTs[hash]
-		if commitTs > atomic.LoadUint64(&txn.MaxAssignedSeen) && commitTs <= txn.StartTs {
-			kw.invalidTxns++
-			return false
-		}
-	}
-	kw.validTxns++
-	return true
+	keysWritten *keysWritten
 }
 
 type op int
@@ -326,7 +253,7 @@ func newNode(store *raftwal.DiskStorage, gid uint32, id uint64, myAddr string) *
 		// We need a generous size for applyCh, because raft.Tick happens every
 		// 10ms. If we restrict the size here, then Raft goes into a loop trying
 		// to maintain quorum health.
-		applyCh:      make(chan []raftpb.Entry, 1000),
+		applyCh:      make(chan []*pb.Proposal, 1000),
 		concApplyCh:  make(chan *pb.Proposal, 100),
 		drainApplyCh: make(chan struct{}),
 		elog:         trace.NewEventLog("Dgraph", "ApplyCh"),
@@ -370,6 +297,9 @@ var errHasPendingTxns = errors.New("Pending transactions found. Please retry ope
 // transactions. We're now applying all updates serially, so blocking for one
 // operation is not an option.
 func detectPendingTxns(attr string) error {
+	return nil
+	// TODO: Check if we still need this?
+
 	tctxs := posting.Oracle().IterateTxns(func(key []byte) bool {
 		pk, err := x.Parse(key)
 		if err != nil {
@@ -381,7 +311,6 @@ func detectPendingTxns(attr string) error {
 	if len(tctxs) == 0 {
 		return nil
 	}
-	go tryAbortTransactions(tctxs)
 	return errHasPendingTxns
 }
 
@@ -395,8 +324,8 @@ func (n *node) mutationWorker(workerId int) {
 		span := otrace.FromContext(ctx)
 		span.Annotatef(nil, "Executing mutation from worker id: %d", workerId)
 
-		txn := posting.Oracle().GetTxn(p.Mutations.StartTs)
-		x.AssertTruef(txn != nil, "Unable to find txn with start ts: %d", p.Mutations.StartTs)
+		txn := posting.GetTxn(p.CommitTs)
+		x.AssertTruef(txn != nil, "Unable to find txn with commit ts: %d", p.CommitTs)
 		txn.ErrCh <- n.concMutations(ctx, p.Mutations, txn)
 		close(txn.ErrCh)
 	}
@@ -430,10 +359,6 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 	})
 
 	span := otrace.FromContext(ctx)
-	if txn.ShouldAbort() {
-		span.Annotatef(nil, "Txn %d should abort.", m.StartTs)
-		return x.ErrConflict
-	}
 	// Discard the posting lists from cache to release memory at the end.
 	defer func() {
 		txn.Update(ctx)
@@ -442,7 +367,6 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 
 	// Update the applied index that we are seeing.
 	atomic.CompareAndSwapUint64(&txn.AppliedIndexSeen, 0, n.Applied.DoneUntil())
-	atomic.CompareAndSwapUint64(&txn.MaxAssignedSeen, 0, posting.Oracle().MaxAssigned())
 
 	// This txn's Zero assigned start ts could be in the future, because we're
 	// trying to greedily run mutations concurrently as soon as we see them.
@@ -501,16 +425,16 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 // We don't support schema mutations across nodes in a transaction.
 // Wait for all transactions to either abort or complete and all write transactions
 // involving the predicate are aborted until schema mutations are done.
-func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr error) {
+func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr error) {
 	span := otrace.FromContext(ctx)
 
-	if proposal.Mutations.DropOp == pb.Mutations_DATA {
-		ns, err := strconv.ParseUint(proposal.Mutations.DropValue, 0, 64)
+	if prop.Mutations.DropOp == pb.Mutations_DATA {
+		ns, err := strconv.ParseUint(prop.Mutations.DropValue, 0, 64)
 		if err != nil {
 			return err
 		}
 		// Ensures nothing get written to disk due to commit proposals.
-		n.keysWritten.rejectBeforeIndex = proposal.Index
+		n.keysWritten.rejectBeforeIndex = prop.Index
 
 		// Stop rollups, otherwise we might end up overwriting some new data.
 		n.stopTask(opRollup)
@@ -527,9 +451,9 @@ func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr 
 		return nil
 	}
 
-	if proposal.Mutations.DropOp == pb.Mutations_ALL {
+	if prop.Mutations.DropOp == pb.Mutations_ALL {
 		// Ensures nothing get written to disk due to commit proposals.
-		n.keysWritten.rejectBeforeIndex = proposal.Index
+		n.keysWritten.rejectBeforeIndex = prop.Index
 
 		// Stop rollups, otherwise we might end up overwriting some new data.
 		n.stopTask(opRollup)
@@ -566,43 +490,38 @@ func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr 
 		return nil
 	}
 
-	if proposal.Mutations.DropOp == pb.Mutations_TYPE {
-		n.keysWritten.rejectBeforeIndex = proposal.Index
-		return schema.State().DeleteType(proposal.Mutations.DropValue, proposal.StartTs)
+	if prop.Mutations.DropOp == pb.Mutations_TYPE {
+		n.keysWritten.rejectBeforeIndex = prop.Index
+		return schema.State().DeleteType(prop.Mutations.DropValue, prop.CommitTs)
 	}
 
-	if proposal.Mutations.StartTs == 0 {
-		return errors.New("StartTs must be provided")
+	if prop.ReadTs == 0 || prop.CommitTs == 0 {
+		return errors.New("ReadTs and CommitTs must be provided")
 	}
 
-	if len(proposal.Mutations.Schema) > 0 || len(proposal.Mutations.Types) > 0 {
-		n.keysWritten.rejectBeforeIndex = proposal.Index
-
-		// MaxAssigned would ensure that everything that's committed up until this point
-		// would be picked up in building indexes. Any uncommitted txns would be cancelled
-		// by detectPendingTxns below.
-		startTs := posting.Oracle().MaxAssigned()
+	if len(prop.Mutations.Schema) > 0 || len(prop.Mutations.Types) > 0 {
+		n.keysWritten.rejectBeforeIndex = prop.Index
 
 		span.Annotatef(nil, "Applying schema and types")
-		for _, supdate := range proposal.Mutations.Schema {
+		for _, supdate := range prop.Mutations.Schema {
 			// We should not need to check for predicate move here.
 			if err := detectPendingTxns(supdate.Predicate); err != nil {
 				return err
 			}
 		}
 
-		if err := runSchemaMutation(ctx, proposal.Mutations.Schema, startTs); err != nil {
+		if err := runSchemaMutation(ctx, prop.Mutations.Schema, prop.CommitTs); err != nil {
 			return err
 		}
 
 		// Clear the entire cache if there is a schema update because the index rebuild
 		// will invalidate the state.
-		if len(proposal.Mutations.Schema) > 0 {
+		if len(prop.Mutations.Schema) > 0 {
 			posting.ResetCache()
 		}
 
-		for _, tupdate := range proposal.Mutations.Types {
-			if err := runTypeMutation(ctx, tupdate, startTs); err != nil {
+		for _, tupdate := range prop.Mutations.Types {
+			if err := runTypeMutation(ctx, tupdate, prop.CommitTs); err != nil {
 				return err
 			}
 		}
@@ -618,7 +537,7 @@ func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr 
 
 	// Stores a map of predicate and type of first mutation for each predicate.
 	schemaMap := make(map[string]types.TypeID)
-	for _, edge := range proposal.Mutations.Edges {
+	for _, edge := range prop.Mutations.Edges {
 		if edge.Entity == 0 && bytes.Equal(edge.Value, []byte(x.Star)) {
 			// We should only drop the predicate if there is no pending
 			// transaction.
@@ -627,8 +546,8 @@ func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr 
 				return err
 			}
 			span.Annotatef(nil, "Deleting predicate: %s", edge.Attr)
-			n.keysWritten.rejectBeforeIndex = proposal.Index
-			return posting.DeletePredicate(ctx, edge.Attr, proposal.StartTs)
+			n.keysWritten.rejectBeforeIndex = prop.Index
+			return posting.DeletePredicate(ctx, edge.Attr, prop.CommitTs)
 		}
 		// Don't derive schema when doing deletion.
 		if edge.Op == pb.DirectedEdge_DEL {
@@ -639,7 +558,7 @@ func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr 
 		}
 	}
 
-	total := len(proposal.Mutations.Edges)
+	total := len(prop.Mutations.Edges)
 
 	// TODO: Active mutations values can go up or down but with
 	// OpenCensus stats bucket boundaries start from 0, hence
@@ -655,35 +574,32 @@ func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr 
 	for attr, storageType := range schemaMap {
 		if _, err := schema.State().TypeOf(attr); err != nil {
 			hint := pb.Metadata_DEFAULT
-			if mutHint, ok := proposal.GetMutations().GetMetadata().GetPredHints()[attr]; ok {
+			if mutHint, ok := prop.GetMutations().GetMetadata().GetPredHints()[attr]; ok {
 				hint = mutHint
 			}
-			if err := createSchema(attr, storageType, hint, proposal.StartTs); err != nil {
+			if err := createSchema(attr, storageType, hint, prop.CommitTs); err != nil {
 				return err
 			}
 		}
 	}
 
-	m := proposal.Mutations
-	txn := posting.Oracle().GetTxn(m.StartTs)
-	x.AssertTruef(txn != nil, "Unable to find txn with start ts: %d", m.StartTs)
-	runs := atomic.AddInt32(&txn.Runs, 1)
-	if runs <= 1 {
-		// If we didn't have it in Oracle, then mutation workers won't be processing it either. So,
-		// don't block on txn.ErrCh.
-		err, ok := <-txn.ErrCh
-		x.AssertTrue(ok)
-		if err == nil && n.keysWritten.StillValid(txn) {
-			span.Annotate(nil, "Mutation is still valid.")
-			return nil
-		}
-		// If mutation is invalid or we got an error, reset the txn, so we can run again.
-		txn = posting.Oracle().ResetTxn(m.StartTs)
-		atomic.AddInt32(&txn.Runs, 1) // We have already run this once via serial loop.
+	m := prop.Mutations
+	txn := posting.GetTxn(prop.CommitTs)
+	x.AssertTruef(txn != nil, "Unable to find txn with commit ts: %d", prop.CommitTs)
+
+	// If we didn't have it in Oracle, then mutation workers won't be processing it either. So,
+	// don't block on txn.ErrCh.
+	err, ok := <-txn.ErrCh
+	x.AssertTrue(ok)
+	if err == nil && n.keysWritten.StillValid(txn) {
+		span.Annotate(nil, "Mutation is still valid.")
+		return nil
 	}
+	// If mutation is invalid or we got an error, reset the txn, so we can run again.
+	txn = posting.Oracle().ResetTxn(prop.CommitTs)
 
 	// If we have an error, re-run this.
-	span.Annotatef(nil, "Re-running mutation from applyCh. Runs: %d", runs)
+	span.Annotatef(nil, "Re-running mutation from applyCh.")
 	return n.concMutations(ctx, m, txn)
 }
 
@@ -698,14 +614,26 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 	}
 
 	if proposal.Mutations != nil {
+		if proposal.ReadTs == 0 {
+			glog.Infof("Got a mutation with read ts = 0: %+v\n", proposal)
+		}
+		proposal.ReadTs = posting.ReadTimestamp()
+		x.AssertTrue(proposal.ReadTs > 0)
 		// syncmarks for this shouldn't be marked done until it's committed.
 		span.Annotate(nil, "Applying mutations")
 		if x.Debug {
-			glog.Infof("applyCommitted: Mutation: %+v\n", proposal.Mutations)
+			glog.Infof("applyCommitted: Proposal: %+v\n", proposal)
 		}
 		if err := n.applyMutations(ctx, proposal); err != nil {
 			span.Annotatef(nil, "While applying mutations: %v", err)
+			posting.DeleteTxnWithCommitTs(proposal.CommitTs)
 			return err
+		}
+		if x.Debug {
+			glog.Infof("Proposal.CommitTs: %#x\n", proposal.CommitTs)
+		}
+		if txn := posting.GetTxn(proposal.CommitTs); txn != nil {
+			n.commit(txn)
 		}
 
 		span.Annotate(nil, "Done")
@@ -741,14 +669,7 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 				proposal.CleanPredicate, proposal.ExpectedChecksum)
 			return nil
 		}
-		return posting.DeletePredicate(ctx, proposal.CleanPredicate, proposal.StartTs)
-
-	case proposal.Delta != nil:
-		n.elog.Printf("Applying Oracle Delta for key: %d", key)
-		if x.Debug {
-			glog.Infof("applyCommitted: Delta: %+v\n", proposal.Delta)
-		}
-		return n.commitOrAbort(key, proposal.Delta)
+		return posting.DeletePredicate(ctx, proposal.CleanPredicate, proposal.CommitTs)
 
 	case proposal.Snapshot != nil:
 		existing, err := n.Store.Snapshot()
@@ -764,7 +685,7 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 			return nil
 		}
 		n.elog.Printf("Creating snapshot: %+v", snap)
-		glog.Infof("Creating snapshot at Index: %d, ReadTs: %d\n", snap.Index, snap.ReadTs)
+		glog.Infof("Creating snapshot at Index: %d, BaseTs: %d\n", snap.Index, snap.BaseTs)
 
 		data, err := snap.Marshal()
 		x.Check(err)
@@ -778,7 +699,7 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 		}
 		atomic.StoreInt64(&lastSnapshotTime, time.Now().Unix())
 		// We can now discard all invalid versions of keys below this ts.
-		pstore.SetDiscardTs(snap.ReadTs)
+		pstore.SetDiscardTs(snap.BaseTs)
 		return nil
 
 	case proposal.DeleteNs != nil:
@@ -809,22 +730,13 @@ func (n *node) processTabletSizes() {
 	}
 }
 
-func getProposal(e raftpb.Entry) pb.Proposal {
-	var p pb.Proposal
+func getProposal(e raftpb.Entry) *pb.Proposal {
+	p := &pb.Proposal{}
 	key := binary.BigEndian.Uint64(e.Data[:8])
 	x.Check(p.Unmarshal(e.Data[8:]))
 	p.Key = key
 	p.Index = e.Index
-	switch {
-	case p.Mutations != nil:
-		p.StartTs = p.Mutations.StartTs
-	case p.Snapshot != nil:
-		p.StartTs = p.Snapshot.ReadTs
-	case p.Delta != nil:
-		p.StartTs = 0 // Run this asap.
-	default:
-		// For now, not covering everything.
-	}
+	p.EntrySize = int64(e.Size())
 	return p
 }
 
@@ -844,25 +756,18 @@ func (n *node) processApplyCh() {
 		prev, ok := previous[prop.Key]
 		if ok && prev.err == nil {
 			msg := fmt.Sprintf("Proposal with key: %d already applied. Skipping index: %d."+
-				" Delta: %+v Snapshot: %+v.\n", prop.Key, prop.Index, prop.Delta, prop.Snapshot)
+				" Snapshot: %+v.\n", prop.Key, prop.Index, prop.Snapshot)
 			n.elog.Printf(msg)
 			glog.Infof(msg)
 			previous[prop.Key].seen = time.Now() // Update the ts.
 			// Don't break here. We still need to call the Done below.
 
 		} else {
-			if max := posting.Oracle().MaxAssigned(); prop.StartTs > max {
-				// Wait to run this proposal.
-				if x.Debug {
-					glog.Infof("start ts: %d max: %d. Pushing to pending.\n", prop.StartTs, max)
-				}
-				n.pendingProposals = append(n.pendingProposals, prop)
-				return
-			}
-
 			// if this applyCommited fails, how do we ensure
 			start := time.Now()
-			perr = n.applyCommitted(&prop)
+
+			perr = n.applyCommitted(&prop) // LOGIC is run here.
+
 			if prop.Key != 0 {
 				p := &P{err: perr, seen: time.Now()}
 				previous[prop.Key] = p
@@ -880,8 +785,6 @@ func (n *node) processApplyCh() {
 					// Don't capture schema updates.
 					tags = append(tags, tag.Upsert(x.KeyMethod, "apply.Mutations"))
 				}
-			case prop.Delta != nil:
-				tags = append(tags, tag.Upsert(x.KeyMethod, "apply.Delta"))
 			}
 			ms := x.SinceMs(start)
 			if err := ostats.RecordWithTags(context.Background(),
@@ -892,20 +795,8 @@ func (n *node) processApplyCh() {
 
 		n.Proposals.Done(prop.Key, perr)
 		n.Applied.Done(prop.Index)
+		posting.DoneTimestamp(prop.CommitTs)
 		ostats.Record(context.Background(), x.RaftAppliedIndex.M(int64(n.Applied.DoneUntil())))
-	}
-
-	loopOverPending := func(maxAssigned uint64) {
-		idx := 0
-		for idx < len(n.pendingProposals) {
-			p := n.pendingProposals[idx]
-			if maxAssigned >= p.StartTs {
-				handle(p)
-				n.pendingProposals = append(n.pendingProposals[:idx], n.pendingProposals[idx+1:]...)
-			} else {
-				idx++
-			}
-		}
 	}
 
 	maxAge := 2 * time.Minute
@@ -913,28 +804,19 @@ func (n *node) processApplyCh() {
 	defer tick.Stop()
 
 	var counter int
-	var maxAssigned uint64
-	orc := posting.Oracle()
 	for {
 		select {
 		case <-n.drainApplyCh:
 			numDrained := 0
-			for _, p := range n.pendingProposals {
-				numDrained++
-				n.Proposals.Done(p.Key, nil)
-				n.Applied.Done(p.Index)
-			}
-			n.pendingProposals = n.pendingProposals[:0]
 
 			var done bool
 			for !done {
 				select {
-				case entries := <-n.applyCh:
-					numDrained += len(entries)
-					for _, entry := range entries {
-						key := binary.BigEndian.Uint64(entry.Data[:8])
-						n.Proposals.Done(key, nil)
-						n.Applied.Done(entry.Index)
+				case props := <-n.applyCh:
+					numDrained += len(props)
+					for _, p := range props {
+						n.Proposals.Done(p.Key, nil)
+						n.Applied.Done(p.Index)
 					}
 				default:
 					done = true
@@ -942,24 +824,15 @@ func (n *node) processApplyCh() {
 			}
 			glog.Infof("Drained %d entries. Size of applyCh: %d\n", numDrained, len(n.applyCh))
 
-		case entries, ok := <-n.applyCh:
+		case props, ok := <-n.applyCh:
 			if !ok {
 				return
 			}
 			var totalSize int64
-			for _, e := range entries {
-				x.AssertTrue(len(e.Data) > 0)
-				p := getProposal(e)
-				handle(p)
+			for _, p := range props {
+				handle(*p) // Run the logic.
 
-				if p.Delta != nil && len(n.pendingProposals) > 0 {
-					// MaxAssigned would only change during deltas.
-					if max := orc.MaxAssigned(); max > maxAssigned {
-						loopOverPending(max)
-						maxAssigned = max
-					}
-				}
-				totalSize += int64(e.Size())
+				totalSize += p.EntrySize
 			}
 			if sz := atomic.AddInt64(&n.pendingSize, -totalSize); sz < 0 {
 				glog.Warningf("Pending size should remain above zero: %d", sz)
@@ -977,13 +850,13 @@ func (n *node) processApplyCh() {
 			n.elog.Printf("Size of previous map: %d", len(previous))
 
 			kw := n.keysWritten
-			minSeen := posting.Oracle().MinMaxAssignedSeenTs()
+			minStart := posting.Oracle().MinStartTs()
 			before := len(kw.keyCommitTs)
 			for k, commitTs := range kw.keyCommitTs {
-				// If commitTs is less than the min of all pending Txn's MaxAssignedSeen, then we
+				// If commitTs is less than the min of all pending Txn's StartTs, then we
 				// can safely delete the key. StillValid would only consider the commits with ts >
-				// MaxAssignedSeen.
-				if commitTs < minSeen {
+				// min start ts.
+				if commitTs < minStart {
 					delete(kw.keyCommitTs, k)
 				}
 			}
@@ -997,115 +870,49 @@ func (n *node) processApplyCh() {
 	}
 }
 
-func (n *node) commitOrAbort(_ uint64, delta *pb.OracleDelta) error {
-	_, span := otrace.StartSpan(context.Background(), "node.commitOrAbort")
-	defer span.End()
-
-	span.Annotate(nil, "Start")
+func (n *node) commit(txn *posting.Txn) error {
+	x.AssertTrue(txn != nil)
 	start := time.Now()
-	var numKeys int
 
-	itrStart := time.Now()
-	var itrs []y.Iterator
-	var txns []*posting.Txn
-	var sz int64
-	for _, status := range delta.Txns {
-		txn := posting.Oracle().GetTxn(status.StartTs)
-		if txn == nil || status.CommitTs == 0 {
-			continue
-		}
-		c := txn.Cache()
-		c.RLock()
-		for k := range c.Deltas() {
-			n.keysWritten.keyCommitTs[z.MemHashString(k)] = status.CommitTs
-		}
-		num := len(c.Deltas())
-		c.RUnlock()
-
-		n.keysWritten.totalKeys += num
-		numKeys += num
-		if num == 0 {
-			continue
-		}
-		txns = append(txns, txn)
-
-		sz += txn.Skiplist().MemSize()
-		// Iterate to set the commit timestamp for all keys.
-		// Skiplist can block if the conversion to Skiplist isn't done yet.
-		itr := txn.Skiplist().NewIterator()
-		for itr.SeekToFirst(); itr.Valid(); itr.Next() {
-			key := itr.Key()
-			// We don't expect the ordering of the keys to change due to setting their commit
-			// timestamps. Each key in the skiplist should be unique already.
-			y.SetKeyTs(key, status.CommitTs)
-		}
-		itr.Close()
-
-		itrs = append(itrs, txn.Skiplist().NewUniIterator(false))
+	c := txn.Cache()
+	c.RLock()
+	for k := range c.Deltas() {
+		n.keysWritten.keyCommitTs[z.MemHashString(k)] = txn.CommitTs
 	}
-	span.Annotatef(nil, "Num keys: %d Itr: %s\n", numKeys, time.Since(itrStart))
+	numKeys := len(c.Deltas())
+	c.RUnlock()
+
+	n.keysWritten.totalKeys += numKeys
+
+	// span.Annotatef(nil, "Num keys: %d\n", numKeys)
 	ostats.Record(n.ctx, x.NumEdges.M(int64(numKeys)))
 
 	// This would be used for callback via Badger when skiplist is pushed to
 	// disk.
-	deleteTxns := func() {
-		posting.Oracle().DeleteTxnsAndRollupKeys(delta)
+	deleteTxn := func() {
+		posting.DeleteTxnAndRollupKeys(txn)
 	}
 
-	if len(itrs) == 0 {
-		deleteTxns()
-
-	} else {
-		sn := time.Now()
-		mi := table.NewMergeIterator(itrs, false)
-		mi.Rewind()
-
-		var keys int
-		b := skl.NewBuilder(int64(float64(sz) * 1.1))
-		for mi.Valid() {
-			b.Add(mi.Key(), mi.Value())
-			keys++
-			mi.Next()
+	err := x.RetryUntilSuccess(3600, time.Second, func() error {
+		if numKeys == 0 {
+			deleteTxn()
+			return nil
 		}
-		span.Annotatef(nil, "Iterating and skiplist over %d keys took: %s", keys, time.Since(sn))
-		err := x.RetryUntilSuccess(3600, time.Second, func() error {
-			if numKeys == 0 {
-				return nil
-			}
-			// We do the pending txn deletion in the callback, so that our snapshot and checkpoint
-			// tracking would only consider the txns which have been successfully pushed to disk.
-			return pstore.HandoverSkiplist(b.Skiplist(), deleteTxns)
-		})
-		if err != nil {
-			glog.Errorf("while handing over skiplist: %v\n", err)
-		}
-		span.Annotatef(nil, "Handover skiplist done for %d txns, %d keys", len(delta.Txns), numKeys)
+		// We do the pending txn deletion in the callback, so that our snapshot and checkpoint
+		// tracking would only consider the txns which have been successfully pushed to disk.
+		return pstore.HandoverSkiplist(txn.Skiplist(), deleteTxn)
+	})
+	if err != nil {
+		glog.Errorf("while handing over skiplist: %v\n", err)
 	}
-
-	ms := x.SinceMs(start)
-	tags := []tag.Mutator{tag.Upsert(x.KeyMethod, "apply.toDisk")}
-	x.Check(ostats.RecordWithTags(context.Background(), tags, x.LatencyMs.M(ms)))
+	txn.UpdateCachedKeys()
 
 	// Before, we used to call pstore.Sync() here. We don't need to do that
 	// anymore because we're not using Badger's WAL.
 
-	g := groups()
-	if delta.GroupChecksums != nil && delta.GroupChecksums[g.groupId()] > 0 {
-		atomic.StoreUint64(&g.deltaChecksum, delta.GroupChecksums[g.groupId()])
-	}
-
-	// Clear all the cached lists that were touched by this transaction.
-	for _, status := range delta.Txns {
-		txn := posting.Oracle().GetTxn(status.StartTs)
-		if status.CommitTs > 0 {
-			txn.UpdateCachedKeys(status.CommitTs)
-		}
-	}
-	span.Annotate(nil, "cache keys removed")
-
-	// Now advance Oracle(), so we can service waiting reads.
-	posting.Oracle().ProcessDelta(delta)
-	span.Annotate(nil, "process delta done")
+	ms := x.SinceMs(start)
+	tags := []tag.Mutator{tag.Upsert(x.KeyMethod, "commit")}
+	x.Check(ostats.RecordWithTags(context.Background(), tags, x.LatencyMs.M(ms)))
 	return nil
 }
 
@@ -1187,12 +994,6 @@ func (n *node) retrieveSnapshot(snap pb.Snapshot) error {
 		return errors.Wrapf(err, "while initializing schema")
 	}
 	groups().triggerMembershipSync()
-	// We set MaxAssignedTs to avoid this case. Right after snapshot, say we have mutation and its
-	// commit. Without a MaxAssigned >= mutation.StartTs, we would enqueue it in pendingProposals.
-	// But, then go an execute its commit. That would result in mutation loss. To avoid that, we
-	// calculate the MaxAssigned and set it corresponding to the snapshot. So, we can apply the
-	// mutation before its commit when we replay logs.
-	posting.Oracle().SetMaxAssigned(snap.MaxAssigned)
 	return nil
 }
 
@@ -1223,7 +1024,7 @@ func (n *node) proposeSnapshot() error {
 	// So, we iterate over logs. If we hit MinPendingStartTs, that generates our
 	// snapshotIdx. In any case, we continue picking up txn updates, to generate
 	// a maxCommitTs, which would become the readTs for the snapshot.
-	minPendingStart := x.Min(posting.Oracle().MinPendingStartTs(), n.cdcTracker.getTs())
+	minPendingStart := n.cdcTracker.getTs()
 	snap, err := n.calculateSnapshot(0, lastIdx, minPendingStart)
 	if err != nil {
 		return err
@@ -1231,10 +1032,12 @@ func (n *node) proposeSnapshot() error {
 	if snap == nil {
 		return nil
 	}
+	// proposeSnapshot is only called if we need to run a snapshot. So, we don't
+	// need to check if we have sufficient entries here. See checkpointAndClose.
 	proposal := &pb.Proposal{
 		Snapshot: snap,
 	}
-	glog.V(2).Infof("Proposing snapshot: %+v\n", snap)
+	glog.V(2).Infof("Proposing snapshot: %+v. BaseTs: %#x\n", snap, snap.BaseTs)
 	data := make([]byte, 8+proposal.Size())
 	sz, err := proposal.MarshalToSizedBuffer(data[8:])
 	data = data[:8+sz]
@@ -1271,22 +1074,58 @@ func (n *node) updateRaftProgress() error {
 	// stored applied.
 	applied := n.Store.Uint(raftwal.CheckpointIndex)
 
-	snap, err := n.calculateSnapshot(applied, n.Applied.DoneUntil(),
-		posting.Oracle().MinPendingStartTs())
+	snap, err := n.calculateSnapshot(applied, n.Applied.DoneUntil(), math.MaxUint64)
 	if err != nil || snap == nil || snap.Index <= applied {
 		return err
 	}
-	atomic.StoreUint64(&n.checkpointTs, snap.ReadTs)
+	atomic.StoreUint64(&n.checkpointTs, snap.BaseTs)
 
 	n.Store.SetUint(raftwal.CheckpointIndex, snap.GetIndex())
-	glog.V(2).Infof("[%#x] Set Raft checkpoint to index: %d, ts: %d.",
-		n.Id, snap.Index, snap.ReadTs)
+	glog.V(2).Infof("[%#x] Set Raft checkpoint to index: %d, ts: %#x.",
+		n.Id, snap.Index, snap.BaseTs)
 	return nil
+}
+
+// proposeBaseTimestamp proposes a base timestamp to use across all replicas.
+// This ensures that the commit timestamps used by all replicas are exactly the
+// same.
+func (n *node) proposeBaseTimestamp() {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+
+	propose := func() {
+		if !n.AmLeader() {
+			return
+		}
+		now := uint64(time.Now().Unix())
+		now = now << 32 // Make space for lower 32 bits.
+		prop := &pb.Proposal{BaseTimestamp: now}
+		err := x.RetryUntilSuccess(10, time.Second, func() error {
+			return n.proposeAndWait(n.closer.Ctx(), prop)
+		})
+		if err != nil {
+			glog.Warningf("Unable to propose base timestamp: %v", err)
+		}
+	}
+
+	propose() // Immediately after start.
+	for {
+		select {
+		case <-ticker.C:
+			propose()
+
+		case <-n.closer.HasBeenClosed():
+			glog.Infof("Returning from proposeBaseTimestamp")
+			return
+		}
+	}
 }
 
 var lastSnapshotTime int64 = time.Now().Unix()
 
 func (n *node) checkpointAndClose(done chan struct{}) {
+	defer glog.Infof("Returning from checkpointAndClose")
+
 	snapshotAfterEntries := x.WorkerConfig.Raft.GetUint64("snapshot-after-entries")
 	x.AssertTruef(snapshotAfterEntries > 10, "raft.snapshot-after must be a number greater than 10")
 
@@ -1385,11 +1224,10 @@ func (n *node) checkpointAndClose(done chan struct{}) {
 						atomic.StoreInt64(&lastSnapshotTime, time.Now().Unix())
 					}
 				}
-				go n.abortOldTransactions()
 			}
 
 		case <-n.closer.HasBeenClosed():
-			glog.Infof("Stopping node.Run")
+			glog.Infof("Stopping checkpointAndClose")
 			if peerId, has := groups().MyPeer(); has && n.AmLeader() {
 				n.Raft().TransferLeadership(n.ctx, n.Id, peerId)
 				time.Sleep(time.Second) // Let transfer happen.
@@ -1425,6 +1263,7 @@ func (n *node) Run() {
 	done := make(chan struct{})
 	go n.checkpointAndClose(done)
 	go n.ReportRaftComms()
+	go n.proposeBaseTimestamp()
 
 	if !x.WorkerConfig.HardSync {
 		closer := z.NewCloser(2)
@@ -1439,6 +1278,16 @@ func (n *node) Run() {
 	} else {
 		glog.Infof("Found Raft checkpoint: %d", applied)
 	}
+
+	snap, err := n.Snapshot()
+	if err != nil {
+		glog.Errorf("While trying to find snapshot: %v", err)
+	} else {
+		glog.Infof("Found snapshot: %+v. BaseTs: %#x", snap, snap.BaseTs)
+	}
+
+	baseTimestamp := snap.BaseTs
+	posting.InitApplied(baseTimestamp)
 
 	var timer x.Timer
 	for {
@@ -1535,7 +1384,7 @@ func (n *node) Run() {
 						glog.Errorf("Could not retrieve previous snapshot. Setting SinceTs to 0.")
 						snap.SinceTs = 0
 					} else {
-						snap.SinceTs = currSnap.ReadTs
+						snap.SinceTs = currSnap.BaseTs
 					}
 
 					// It's ok to block ticks while retrieving snapshot, since it's a follower.
@@ -1631,8 +1480,28 @@ func (n *node) Run() {
 					glog.Warningf("Inflight proposal size: %d. There would be some throttling.", sz)
 				}
 
+				readTs := posting.ReadTimestamp()
+
+				var props []*pb.Proposal
 				for _, e := range entries {
 					p := getProposal(e)
+					if p.BaseTimestamp > 0 {
+						if x.Debug {
+							glog.V(2).Infof("Setting base timestamp to: %#x for index: %d\n",
+								p.BaseTimestamp, e.Index)
+						}
+						baseTimestamp = p.BaseTimestamp
+						n.Proposals.Done(p.Key, nil)
+						n.Applied.Done(p.Index)
+						continue
+					}
+
+					p.ReadTs = readTs
+					p.CommitTs = x.Timestamp(baseTimestamp, e.Index)
+					// glog.Infof("e.Index: %d commit Ts: %#x\n", e.Index, p.CommitTs)
+
+					props = append(props, p)
+
 					if len(p.Mutations.GetEdges()) == 0 {
 						continue
 					}
@@ -1650,28 +1519,15 @@ func (n *node) Run() {
 					}
 					// We should register this txn before sending it over for concurrent
 					// application.
-					txn, has := posting.Oracle().RegisterStartTs(p.StartTs)
+					txn := posting.RegisterTxn(p.ReadTs, p.CommitTs)
 					if x.Debug {
-						glog.Infof("Registered start ts: %d txn: %p. has: %v. mutation: %+v\n",
-							p.StartTs, txn, has, p.Mutations)
+						glog.Infof("RegisterTxn ts: %d commit ts: %d txn: %p. mutation: %+v\n",
+							p.ReadTs, p.CommitTs, txn, p.Mutations)
 					}
 
-					if has {
-						// We have already registered this txn before. That means, this txn would
-						// either have already been run via apply channel, or would be on its way.
-						// It could even be currently being executed via concurrent mutation
-						// workers.  Moreover, in concurrent execution, when MaxAssigned <
-						// txn.StartTs, we might have to waste the work done, and reset the txn.
-						// To avoid edge cases, it is just simpler to NOT run the txn mutation
-						// concurrently.
-						// There's an optimization here where if startTs < MaxAssigned, then we
-						// could run it concurrently. But, we won't use that to avoid complexity of
-						// figuring out whether we set it up for concurrent execution or serial.
-					} else {
-						n.concApplyCh <- &p
-					}
+					n.concApplyCh <- p
 				}
-				n.applyCh <- entries
+				n.applyCh <- props
 			}
 
 			if span != nil {
@@ -1797,90 +1653,11 @@ func (n *node) calculateTabletSizes() {
 
 var errNoConnection = errors.New("No connection exists")
 
-func (n *node) blockingAbort(req *pb.TxnTimestamps) error {
-	pl := groups().Leader(0)
-	if pl == nil {
-		return errNoConnection
-	}
-	zc := pb.NewZeroClient(pl.Get())
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	delta, err := zc.TryAbort(ctx, req)
-	glog.Infof("TryAbort %d txns with start ts. Error: %v\n", len(req.Ts), err)
-	if err != nil || len(delta.Txns) == 0 {
-		return err
-	}
-
-	// Let's propose the txn updates received from Zero. This is important because there are edge
-	// cases where a txn status might have been missed by the group.
-	aborted := &pb.OracleDelta{}
-	for _, txn := range delta.Txns {
-		// Only pick the aborts. DO NOT propose the commits. They must come in the right order via
-		// oracle delta stream, otherwise, we'll end up losing some committed txns.
-		if txn.CommitTs == 0 {
-			aborted.Txns = append(aborted.Txns, txn)
-		}
-	}
-	if len(aborted.Txns) == 0 {
-		glog.Infoln("TryAbort: No aborts found. Quitting.")
-		return nil
-	}
-
-	// We choose not to store the MaxAssigned, because it would cause our Oracle to move ahead
-	// artificially. The Oracle delta stream moves that ahead in the right order, and we shouldn't
-	// muck with that order here.
-	glog.Infof("TryAbort selectively proposing only aborted txns: %+v\n", aborted)
-	proposal := &pb.Proposal{Delta: aborted}
-	return n.proposeAndWait(n.ctx, proposal)
-}
-
-// abortOldTransactions would find txns which have done pre-writes, but have been pending for a
-// while. The time that is used is based on the last pre-write seen, so if a txn is doing a
-// pre-write multiple times, we'll pick the timestamp of the last pre-write. Thus, this function
-// would only act on the txns which have not been active in the last N minutes, and send them for
-// abort. Note that only the leader runs this function.
-func (n *node) abortOldTransactions() {
-	// Aborts if not already committed.
-	starts := posting.Oracle().TxnOlderThan(x.WorkerConfig.AbortOlderThan)
-	if len(starts) == 0 {
-		return
-	}
-	glog.Infof("Found %d old transactions. Acting to abort them.\n", len(starts))
-	req := &pb.TxnTimestamps{Ts: starts}
-	err := n.blockingAbort(req)
-	glog.Infof("Done abortOldTransactions for %d txns. Error: %v\n", len(req.Ts), err)
-}
-
 // calculateSnapshot would calculate a snapshot index, considering these factors:
 // - We only start discarding once we have at least discardN entries.
 // - We are not overshooting the max applied entry. That is, we're not removing
 // Raft entries before they get applied.
-// - We are considering the minimum start ts that has yet to be committed or
-// aborted. This way, we still keep all the mutations corresponding to this
-// start ts in the Raft logs. This is important, because we don't persist
-// pre-writes to disk in pstore.
-// - In simple terms, this means we MUST keep all pending transactions in the Raft logs.
-// - Find the maximum commit timestamp that we have seen.
-// That would tell us about the maximum timestamp used to do any commits. This
-// ts is what we can use for future reads of this snapshot.
-// - Finally, this function would propose this snapshot index, so the entire
-// group can apply it to their Raft stores.
-//
-// Txn0  | S0 |    |    | C0 |    |    |
-// Txn1  |    | S1 |    |    |    | C1 |
-// Txn2  |    |    | S2 | C2 |    |    |
-// Txn3  |    |    |    |    | S3 |    |
-// Txn4  |    |    |    |    |    |    | S4
-// Index | i1 | i2 | i3 | i4 | i5 | i6 | i7
-//
-// At i7, min pending start ts = S3, therefore snapshotIdx = i5 - 1 = i4.
-// At i7, max commit ts = C1, therefore readTs = C1.
-//
-// This function also takes a startIdx, which can be used an optimization to skip over Raft entries.
-// This is useful when we already have a previous snapshot checkpoint (all txns have concluded up
-// until that last checkpoint) that we can use as a new start point for the snapshot calculation.
-func (n *node) calculateSnapshot(startIdx, lastIdx, minPendingStart uint64) (*pb.Snapshot, error) {
+func (n *node) calculateSnapshot(startIdx, lastIdx, lastCommitTs uint64) (*pb.Snapshot, error) {
 	_, span := otrace.StartSpan(n.ctx, "Calculate.Snapshot",
 		otrace.WithSampler(otrace.AlwaysSample()))
 	defer span.End()
@@ -1927,9 +1704,8 @@ func (n *node) calculateSnapshot(startIdx, lastIdx, minPendingStart uint64) (*pb
 		glog.V(2).Infof("Num pending txns: %d", num)
 	}
 
-	maxCommitTs := snap.ReadTs
+	baseTs := snap.BaseTs
 	var snapshotIdx uint64
-	var maxAssigned uint64
 
 	// Trying to retrieve all entries at once might cause out-of-memory issues in
 	// cases where the raft log is too big to fit into memory. Instead of retrieving
@@ -1953,62 +1729,44 @@ func (n *node) calculateSnapshot(startIdx, lastIdx, minPendingStart uint64) (*pb
 		batchFirst = lastEntry.Index + 1
 
 		for _, entry := range entries {
+			cts := x.Timestamp(baseTs, entry.Index)
+			if cts > lastCommitTs {
+				break
+			}
+			snapshotIdx = entry.Index
+
 			if entry.Type != raftpb.EntryNormal || len(entry.Data) == 0 {
 				continue
 			}
 			proposal := getProposal(entry)
-
-			// The way this works is, we figured out the Raft's lastIdx and minPendingStart before
-			// calling this function. minPendingStart is calculated by choosing minimum start
-			// timestamp of all the pending transactions. We need to ensure that we leave the
-			// mutations corresponding to this start ts in the Raft log, and not truncate them.
-			// We should however choose all the deltas, even if they occur later in the log, because
-			// they track all the commits we have done.
-			var start uint64
-			if proposal.Mutations != nil {
-				start = proposal.Mutations.StartTs
-				if start >= minPendingStart && snapshotIdx == 0 {
-					// This would only be set once. Note the snapshotIdx == 0 condition.
-					snapshotIdx = entry.Index - 1
-				}
-			}
-			if proposal.Delta != nil {
-				maxAssigned = x.Max(maxAssigned, proposal.Delta.MaxAssigned)
-				for _, txn := range proposal.Delta.GetTxns() {
-					maxCommitTs = x.Max(maxCommitTs, txn.CommitTs)
-				}
+			if proposal.BaseTimestamp > 0 {
+				baseTs = proposal.BaseTimestamp
+				continue
 			}
 		}
 	}
 
-	if maxCommitTs == 0 {
-		span.Annotate(nil, "maxCommitTs is zero")
+	if baseTs == 0 || snapshotIdx == 0 {
+		span.Annotate(nil, "maxCommitTs or snapshotIdx is zero")
 		return nil, nil
-	}
-	if snapshotIdx == 0 {
-		// It is possible that there are no pending transactions. In that case,
-		// snapshotIdx would be zero. Instead, set it to last entry's index.
-		snapshotIdx = lastEntry.Index
-		span.Annotatef(nil, "snapshotIdx is zero. Using last entry's index: %d", snapshotIdx)
 	}
 
 	numDiscarding := snapshotIdx - first + 1
 	span.Annotatef(nil,
-		"Got snapshotIdx: %d. MaxCommitTs: %d. Discarding: %d. MinPendingStartTs: %d",
-		snapshotIdx, maxCommitTs, numDiscarding, minPendingStart)
+		"Got snapshotIdx: %d. baseTs: %#x. Discarding: %d. lastCommitTs: %d",
+		snapshotIdx, baseTs, numDiscarding, lastCommitTs)
 
 	if int(numDiscarding) < discardN {
 		span.Annotate(nil, "Skipping snapshot because insufficient discard entries")
 		glog.Infof("Skipping snapshot at index: %d. Insufficient discard entries: %d."+
-			" MinPendingStartTs: %d\n", snapshotIdx, numDiscarding, minPendingStart)
+			" baseTs: %#x\n", snapshotIdx, numDiscarding, baseTs)
 		return nil, nil
 	}
 
 	result := &pb.Snapshot{
-		Context:     n.RaftContext,
-		Index:       snapshotIdx,
-		ReadTs:      maxCommitTs,
-		MaxAssigned: maxAssigned,
+		Context: n.RaftContext,
+		Index:   snapshotIdx,
+		BaseTs:  baseTs,
 	}
 	span.Annotatef(nil, "Got snapshot: %+v", result)
 	return result, nil

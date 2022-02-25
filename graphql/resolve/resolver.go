@@ -1,18 +1,5 @@
-/*
- * Copyright 2019 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2019 Dgraph Labs, Inc. are available under the Apache 2.0 license.
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
 
 package resolve
 
@@ -178,19 +165,9 @@ func (aex *adminExecutor) Execute(ctx context.Context, req *dgoapi.Request, fiel
 	return aex.dg.Execute(ctx, req, field)
 }
 
-func (aex *adminExecutor) CommitOrAbort(ctx context.Context,
-	tc *dgoapi.TxnContext) (*dgoapi.TxnContext, error) {
-	return aex.dg.CommitOrAbort(ctx, tc)
-}
-
 func (de *dgraphExecutor) Execute(ctx context.Context, req *dgoapi.Request, field schema.Field) (
 	*dgoapi.Response, error) {
 	return de.dg.Execute(ctx, req, field)
-}
-
-func (de *dgraphExecutor) CommitOrAbort(ctx context.Context,
-	tc *dgoapi.TxnContext) (*dgoapi.TxnContext, error) {
-	return de.dg.CommitOrAbort(ctx, tc)
 }
 
 func (rf *resolverFactory) WithQueryResolver(
@@ -473,12 +450,7 @@ func (r *RequestResolver) Resolve(ctx context.Context, gqlReq *schema.Request) (
 
 	startTime := time.Now()
 	resp = &schema.Response{
-		Extensions: &schema.Extensions{
-			Tracing: &schema.Trace{
-				Version:   1,
-				StartTime: startTime.Format(time.RFC3339Nano),
-			},
-		},
+		Extensions: &schema.Extensions{},
 	}
 	// Panic Handler for mutation. This ensures that the mutation which causes panic
 	// gets logged in Alpha logs. This panic handler overrides the default Panic Handler
@@ -488,11 +460,6 @@ func (r *RequestResolver) Resolve(ctx context.Context, gqlReq *schema.Request) (
 			resp.Errors = schema.AsGQLErrors(schema.AppendGQLErrs(resp.Errors, err))
 		}, gqlReq.Query)
 
-	defer func() {
-		endTime := time.Now()
-		resp.Extensions.Tracing.EndTime = endTime.Format(time.RFC3339Nano)
-		resp.Extensions.Tracing.Duration = endTime.Sub(startTime).Nanoseconds()
-	}()
 	ctx = context.WithValue(ctx, resolveStartTime, startTime)
 
 	// Pass in GraphQL @auth information

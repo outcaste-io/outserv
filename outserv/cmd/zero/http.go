@@ -24,10 +24,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/outcaste-io/outserv/protos/pb"
-	"github.com/outcaste-io/outserv/x"
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/golang/glog"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/x"
 )
 
 // intFromQueryParam checks for name as a query param, converts it to uint64 and returns it.
@@ -76,12 +76,6 @@ func (st *state) assign(w http.ResponseWriter, r *http.Request) {
 	case "uids":
 		num.Type = pb.Num_UID
 		ids, err = st.zero.AssignIds(ctx, num)
-	case "timestamps":
-		num.Type = pb.Num_TXN_TS
-		if num.Val == 0 {
-			num.ReadOnly = true
-		}
-		ids, err = st.zero.Timestamps(ctx, num)
 	case "nsids":
 		num.Type = pb.Num_NS_ID
 		ids, err = st.zero.AssignIds(ctx, num)

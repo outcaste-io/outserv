@@ -1,18 +1,5 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
 
 package zero
 
@@ -53,7 +40,6 @@ type license struct {
 type Server struct {
 	x.SafeMutex
 	Node *node
-	orc  *Oracle
 
 	NumReplicas int
 	state       *pb.MembershipState
@@ -62,7 +48,6 @@ type Server struct {
 	// nextUint is the uint64 which we can hand out next. See maxLease for the
 	// max ID leased via Zero quorum.
 	nextUint    map[pb.NumLeaseType]uint64
-	readOnlyTs  uint64
 	leaseLock   sync.Mutex // protects nextUID, nextTxnTs, nextNsID and corresponding proposals.
 	rateLimiter *x.RateLimiter
 
@@ -86,8 +71,6 @@ func (s *Server) Init() {
 	s.Lock()
 	defer s.Unlock()
 
-	s.orc = &Oracle{}
-	s.orc.Init()
 	s.state = &pb.MembershipState{
 		Groups: make(map[uint32]*pb.Group),
 		Zeros:  make(map[uint64]*pb.Member),
@@ -95,7 +78,6 @@ func (s *Server) Init() {
 	s.nextUint = make(map[pb.NumLeaseType]uint64)
 	s.nextRaftId = 1
 	s.nextUint[pb.Num_UID] = 1
-	s.nextUint[pb.Num_TXN_TS] = 1
 	s.nextUint[pb.Num_NS_ID] = 1
 	s.nextGroup = 1
 	s.leaderChangeCh = make(chan struct{}, 1)
@@ -530,8 +512,7 @@ func (s *Server) Connect(ctx context.Context,
 		// This request only wants to access the membership state, and nothing else. Most likely
 		// from our clients.
 		cs := &pb.ConnectionState{
-			State:      ms,
-			MaxPending: s.orc.MaxPending(),
+			State: ms,
 		}
 		return cs, err
 	}

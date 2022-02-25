@@ -39,13 +39,13 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/ee/enc"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/raftwal"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
 
@@ -394,6 +394,5 @@ func run() {
 
 	audit.Close()
 
-	st.zero.orc.close()
 	glog.Infoln("All done. Goodbye!")
 }

@@ -801,13 +801,8 @@ func ExportOverNetwork(ctx context.Context, input *pb.ExportRequest) (ExportedFi
 		return nil, err
 	}
 	// Get ReadTs from zero and wait for stream to catch up.
-	ts, err := Timestamps(ctx, &pb.Num{ReadOnly: true})
-	if err != nil {
-		glog.Errorf("Unable to retrieve readonly ts for export: %v\n", err)
-		return nil, err
-	}
-	readTs := ts.ReadOnly
-	glog.Infof("Got readonly ts from Zero: %d\n", readTs)
+	readTs := posting.ReadTimestamp()
+	glog.Infof("Using readTs: %d\n", readTs)
 
 	// Let's first collect all groups.
 	gids := groups().KnownGroups()

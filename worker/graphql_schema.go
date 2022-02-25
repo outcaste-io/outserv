@@ -1,18 +1,5 @@
-/*
- * Copyright 2020 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache 2.0 license.
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
 
 package worker
 
@@ -230,7 +217,6 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 
 	// prepare GraphQL schema mutation
 	m := &pb.Mutations{
-		StartTs: req.StartTs,
 		Edges: []*pb.DirectedEdge{
 			{
 				Entity:    schemaNodeUid,
@@ -265,28 +251,17 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 	}
 	// mutate the GraphQL schema. As it is a reserved predicate, and we are in group 1,
 	// so this call is gonna come back to all the group 1 servers only
-	tctx, err := MutateOverNetwork(ctx, m)
+	_, err = MutateOverNetwork(ctx, m)
 	if err != nil {
 		return nil, err
-	}
-	// commit the mutation here itself. This has two benefits:
-	// 	1. If there was any concurrent request to update the GraphQL schema, then one of the two
-	//	will fail here itself, and the alter for the failed one won't happen.
-	// 	2. If the commit succeeds, then as alter takes some time to finish, so the badger
-	//	notification for dgraph.graphql.schema predicate will reach all the alphas in the meantime,
-	//	providing every alpha a chance to reflect the current GraphQL schema before the response is
-	//	sent back to the user.
-	if _, err = CommitOverNetwork(ctx, tctx); err != nil {
-		return nil, errors.Wrap(err, errGraphQLSchemaCommitFailed)
 	}
 
 	// perform dgraph schema alter, if required. As the schema could be empty if it only has custom
 	// types/queries/mutations.
 	if len(req.DgraphPreds) != 0 && len(req.DgraphTypes) != 0 {
 		if _, err = MutateOverNetwork(ctx, &pb.Mutations{
-			StartTs: State.GetTimestamp(false), // StartTs must be provided
-			Schema:  req.DgraphPreds,
-			Types:   req.DgraphTypes,
+			Schema: req.DgraphPreds,
+			Types:  req.DgraphTypes,
 		}); err != nil {
 			return nil, errors.Wrap(err, ErrGraphQLSchemaAlterFailed)
 		}

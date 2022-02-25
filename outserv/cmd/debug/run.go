@@ -1,18 +1,5 @@
-/*
- * Copyright 2021 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2021 Dgraph Labs, Inc. are available under the Apache 2.0 license.
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
 
 package debug
 
@@ -28,15 +15,14 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"sync/atomic"
 
+	"github.com/dustin/go-humanize"
 	"github.com/outcaste-io/badger/v3"
 	bpb "github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/ristretto/z"
-	"github.com/dustin/go-humanize"
 
 	"github.com/outcaste-io/outserv/codec"
 	"github.com/outcaste-io/outserv/ee"
@@ -725,47 +711,22 @@ func sizeHistogram(db *badger.DB) {
 	fmt.Printf("\nHistogram of value sizes (in bytes) %s\n", valueSizeHistogram.String())
 }
 
-func printAlphaProposal(buf *bytes.Buffer, pr *pb.Proposal, pending map[uint64]bool) {
+func printAlphaProposal(buf *bytes.Buffer, pr *pb.Proposal) {
 	if pr == nil {
 		return
 	}
 
 	switch {
 	case pr.Mutations != nil:
-		fmt.Fprintf(buf, " Mutation . StartTs: %d . Edges: %d .",
-			pr.Mutations.StartTs, len(pr.Mutations.Edges))
+		fmt.Fprintf(buf, " Mutation . Edges: %d .", len(pr.Mutations.Edges))
 		if len(pr.Mutations.Edges) > 0 {
-			pending[pr.Mutations.StartTs] = true
 		} else {
 			fmt.Fprintf(buf, " Mutation: %+v .", pr.Mutations)
 		}
-		fmt.Fprintf(buf, " Pending txns: %d .", len(pending))
 	case len(pr.Kv) > 0:
 		fmt.Fprintf(buf, " KV . Size: %d ", len(pr.Kv))
 	case pr.State != nil:
 		fmt.Fprintf(buf, " State . %+v ", pr.State)
-	case pr.Delta != nil:
-		fmt.Fprintf(buf, " Delta .")
-		sort.Slice(pr.Delta.Txns, func(i, j int) bool {
-			ti := pr.Delta.Txns[i]
-			tj := pr.Delta.Txns[j]
-			return ti.StartTs < tj.StartTs
-		})
-		fmt.Fprintf(buf, " Max: %d .", pr.Delta.GetMaxAssigned())
-		for _, txn := range pr.Delta.Txns {
-			delete(pending, txn.StartTs)
-		}
-		// There could be many thousands of txns within a single delta. We
-		// don't need to print out every single entry, so just show the
-		// first 10.
-		if len(pr.Delta.Txns) >= 10 {
-			fmt.Fprintf(buf, " Num txns: %d .", len(pr.Delta.Txns))
-			pr.Delta.Txns = pr.Delta.Txns[:10]
-		}
-		for _, txn := range pr.Delta.Txns {
-			fmt.Fprintf(buf, " %d → %d .", txn.StartTs, txn.CommitTs)
-		}
-		fmt.Fprintf(buf, " Pending txns: %d .", len(pending))
 	case pr.Snapshot != nil:
 		fmt.Fprintf(buf, " Snapshot . %+v ", pr.Snapshot)
 	}
@@ -789,11 +750,6 @@ func printZeroProposal(buf *bytes.Buffer, zpr *pb.ZeroProposal) {
 		fmt.Fprintf(buf, " MaxNsID: %d .", zpr.MaxNsID)
 	case zpr.MaxRaftId > 0:
 		fmt.Fprintf(buf, " MaxRaftId: %d .", zpr.MaxRaftId)
-	case zpr.MaxTxnTs > 0:
-		fmt.Fprintf(buf, " MaxTxnTs: %d .", zpr.MaxTxnTs)
-	case zpr.Txn != nil:
-		txn := zpr.Txn
-		fmt.Fprintf(buf, " Txn %d → %d .", txn.StartTs, txn.CommitTs)
 	default:
 		fmt.Fprintf(buf, " Proposal: %+v .", zpr)
 	}

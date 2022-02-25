@@ -1,18 +1,5 @@
-/*
- * Copyright 2019 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2019 Dgraph Labs, Inc. are available under the Apache 2.0 license.
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
 
 package resolve
 
@@ -91,22 +78,12 @@ func (qr *queryResolver) Resolve(ctx context.Context, query schema.Query) *Resol
 
 	resolved := qr.rewriteAndExecute(ctx, query)
 	qr.resultCompleter.Complete(ctx, resolved)
-	resolverTrace.Dgraph = resolved.Extensions.Tracing.Execution.Resolvers[0].Dgraph
-	resolved.Extensions.Tracing.Execution.Resolvers[0] = resolverTrace
 	return resolved
 }
 
 func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query schema.Query) *Resolved {
 	dgraphQueryDuration := &schema.LabeledOffsetDuration{Label: "query"}
-	ext := &schema.Extensions{
-		Tracing: &schema.Trace{
-			Execution: &schema.ExecutionTrace{
-				Resolvers: []*schema.ResolverTrace{
-					{Dgraph: []*schema.LabeledOffsetDuration{dgraphQueryDuration}},
-				},
-			},
-		},
-	}
+	ext := &schema.Extensions{}
 
 	emptyResult := func(err error) *Resolved {
 		return &Resolved{
@@ -174,23 +151,13 @@ func (qr *customDQLQueryResolver) Resolve(ctx context.Context, query schema.Quer
 	defer timer.Stop()
 
 	resolved := qr.rewriteAndExecute(ctx, query)
-	resolverTrace.Dgraph = resolved.Extensions.Tracing.Execution.Resolvers[0].Dgraph
-	resolved.Extensions.Tracing.Execution.Resolvers[0] = resolverTrace
 	return resolved
 }
 
 func (qr *customDQLQueryResolver) rewriteAndExecute(ctx context.Context,
 	query schema.Query) *Resolved {
 	dgraphQueryDuration := &schema.LabeledOffsetDuration{Label: "query"}
-	ext := &schema.Extensions{
-		Tracing: &schema.Trace{
-			Execution: &schema.ExecutionTrace{
-				Resolvers: []*schema.ResolverTrace{
-					{Dgraph: []*schema.LabeledOffsetDuration{dgraphQueryDuration}},
-				},
-			},
-		},
-	}
+	ext := &schema.Extensions{}
 
 	emptyResult := func(err error) *Resolved {
 		resolved := EmptyResult(query, err)

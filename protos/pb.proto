@@ -1,18 +1,5 @@
-/*
- * Copyright (C) 2017 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017 Dgraph Labs, Inc. are available under the Apache 2.0 license.
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart license.
 
 // Style guide for Protocol Buffer 3.
 // Use CamelCase (with an initial capital) for message names – for example,
@@ -156,15 +143,16 @@ message License {
 }
 
 message ZeroProposal {
-  reserved 8;                           // Was used for string key.
+  reserved 5; // Was used by maxTxnTs.
+  reserved 7; // Was used for Txn.
+  reserved 8; // Was used for string key.
+
   map<uint32, uint64> snapshot_ts = 1;  // Group ID -> Snapshot Ts.
   Member member = 2;
   Tablet tablet = 3;
   uint64 maxUID = 4;
-  uint64 maxTxnTs = 5;
   uint64 maxNsID = 12;
   uint64 maxRaftId = 6;
-  api.TxnContext txn = 7;
   string cid = 9;  // Used as unique identifier for the cluster.
   License license = 10;
   ZeroSnapshot snapshot = 11;  // Used to make Zeros take a snapshot.
@@ -208,7 +196,7 @@ message HealthInfo {
   repeated string ongoing = 8;
   repeated string indexing = 9;
   repeated string ee_features = 10;
-  uint64 max_assigned = 11;
+  uint64 read_ts = 11;
 }
 
 message Tablet {
@@ -244,7 +232,6 @@ message DirectedEdge {
 
 message Mutations {
   uint32 group_id = 1;
-  uint64 start_ts = 2;
   repeated DirectedEdge edges = 3;
   repeated SchemaUpdate schema = 4;
   repeated TypeUpdate types = 6;
@@ -282,13 +269,11 @@ message Metadata {
 message Snapshot {
   RaftContext context = 1;
   uint64 index = 2;
-  uint64 read_ts = 3;
+  uint64 base_ts = 3;
   // done is used to indicate that snapshot stream was a success.
   bool done = 4;
   // since_ts stores the ts of the last snapshot to support diff snap updates.
   uint64 since_ts = 5;
-  // max_assigned stores the ts as seen as of snapshot read_ts.
-  uint64 max_assigned = 6;
 }
 
 message ZeroSnapshot {
@@ -299,21 +284,27 @@ message ZeroSnapshot {
 
 message Proposal {
   reserved 7;  // Was used for string key.
+  reserved 8; // Was used by OracleDelta.
+
+  uint64 base_timestamp = 1; // Use this timestamp to derive commit timestamps.
   Mutations mutations = 2;
   repeated badgerpb3.KV kv = 4;
   MembershipState state = 5;
   // Delete the predicate which was moved to other group.
   string clean_predicate = 6;
-  OracleDelta delta = 8;
   Snapshot snapshot = 9;  // Used to tell the group when to take snapshot.
-  uint64 index = 10;      // Used to store Raft index, in raft.Ready.
   // Block an operation until membership reaches this checksum.
   uint64 expected_checksum = 11;
   reserved 12; // Was used for restore request
   CDCState cdc_state = 13;
   DeleteNsRequest delete_ns = 14;  // Used to delete namespace.
+
+  // These following are used during processing.
+  uint64 index = 10;      // Used to store Raft index, in raft.Ready.
   uint64 key = 15;
-  uint64 start_ts = 16;
+  uint64 read_ts = 16;
+  uint64 commit_ts = 17;
+  int64 entry_size = 18;
 }
 
 message CDCState {
@@ -464,22 +455,6 @@ message MovePredicatePayload {
   uint64 since_ts = 6;
 }
 
-message TxnStatus {
-  uint64 start_ts = 1;
-  uint64 commit_ts = 2;
-}
-
-message OracleDelta {
-  repeated TxnStatus txns = 1;
-  uint64 max_assigned = 2;
-  map<uint32, uint64> group_checksums = 3;
-  // implement tmax.
-}
-
-message TxnTimestamps {
-  repeated uint64 ts = 1;
-}
-
 message PeerResponse {
   bool status = 1;
 }
@@ -502,13 +477,9 @@ service Zero {
   rpc UpdateMembership(Group) returns (api.Payload) {}
   rpc StreamMembership(api.Payload) returns (stream MembershipState) {}
 
-  rpc Oracle(api.Payload) returns (stream OracleDelta) {}
   rpc ShouldServe(Tablet) returns (Tablet) {}
   rpc Inform(TabletRequest) returns (TabletResponse) {}
   rpc AssignIds(Num) returns (AssignedIds) {}
-  rpc Timestamps(Num) returns (AssignedIds) {}
-  rpc CommitOrAbort(api.TxnContext) returns (api.TxnContext) {}
-  rpc TryAbort(TxnTimestamps) returns (OracleDelta) {}
   rpc DeleteNamespace(DeleteNsRequest) returns (Status) {}
   rpc RemoveNode(RemoveNodeRequest) returns (Status) {}
   rpc MoveTablet(MoveTabletRequest) returns (Status) {}
@@ -558,7 +529,7 @@ message Num {
   enum leaseType {
     NS_ID = 0;
     UID = 1;
-    TXN_TS = 2;
+    UNUSED = 2;
   }
   leaseType type = 4;
 }

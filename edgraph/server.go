@@ -27,11 +27,9 @@ import (
 	"go.opencensus.io/trace"
 	otrace "go.opencensus.io/trace"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/outcaste-io/dgo/v210"
 	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/chunker"
 	"github.com/outcaste-io/outserv/conn"
@@ -221,7 +219,8 @@ func UpdateGQLSchema(ctx context.Context, gqlSchema,
 	}
 
 	return worker.UpdateGQLSchemaOverNetwork(ctx, &pb.UpdateGraphQLSchemaRequest{
-		StartTs:       worker.State.GetTimestamp(false),
+		// TODO: Understand this better and see what timestamp should be set.
+		StartTs:       posting.ReadTimestamp(),
 		GraphqlSchema: gqlSchema,
 		DgraphPreds:   parsedDgraphSchema.Preds,
 		DgraphTypes:   parsedDgraphSchema.Types,
@@ -238,7 +237,8 @@ func UpdateLambdaScript(
 	}
 
 	return worker.UpdateGQLSchemaOverNetwork(ctx, &pb.UpdateGraphQLSchemaRequest{
-		StartTs:      worker.State.GetTimestamp(false),
+		// TODO: Understand this better and see what timestamp should be set.
+		StartTs:      posting.ReadTimestamp(),
 		LambdaScript: script,
 		Op:           pb.UpdateGraphQLSchemaRequest_SCRIPT,
 	})
@@ -414,9 +414,7 @@ func (s *Server) Alter(ctx context.Context, op *api.Operation) (*api.Payload, er
 		return nil, errors.Wrapf(err, "While altering")
 	}
 
-	// StartTs is not needed if the predicate to be dropped lies on this server but is required
-	// if it lies on some other machine. Let's get it for safety.
-	m := &pb.Mutations{StartTs: worker.State.GetTimestamp(false)}
+	m := &pb.Mutations{}
 	if isDropAll(op) {
 		if x.Config.BlockClusterWideDrop {
 			glog.V(2).Info("Blocked drop-all because it is not permitted.")
@@ -786,8 +784,7 @@ func (s *Server) doMutate(ctx context.Context, qc *queryContext, resp *api.Respo
 		}
 	}
 	m := &pb.Mutations{
-		Edges:   edges,
-		StartTs: qc.req.StartTs,
+		Edges: edges,
 		Metadata: &pb.Metadata{
 			PredHints: predHints,
 		},
@@ -803,54 +800,8 @@ func (s *Server) doMutate(ctx context.Context, qc *queryContext, resp *api.Respo
 		resp.Metrics.NumUids["mutation_cost"] = cost
 		resp.Metrics.NumUids["_total"] = resp.Metrics.NumUids["_total"] + cost
 	}
-	if !qc.req.CommitNow {
-		calculateMutationMetrics()
-		if err == x.ErrConflict {
-			err = status.Error(codes.FailedPrecondition, err.Error())
-		}
-
-		return err
-	}
-
-	// The following logic is for committing immediately.
-	if err != nil {
-		// ApplyMutations failed. We now want to abort the transaction,
-		// ignoring any error that might occur during the abort (the user would
-		// care more about the previous error).
-		if resp.Txn == nil {
-			resp.Txn = &api.TxnContext{StartTs: qc.req.StartTs}
-		}
-
-		resp.Txn.Aborted = true
-		_, _ = worker.CommitOverNetwork(ctx, resp.Txn)
-
-		if err == x.ErrConflict {
-			// We have already aborted the transaction, so the error message should reflect that.
-			return dgo.ErrAborted
-		}
-
-		return err
-	}
-
-	qc.span.Annotatef(nil, "Prewrites err: %v. Attempting to commit/abort immediately.", err)
-	ctxn := resp.Txn
-	// zero would assign the CommitTs
-	cts, err := worker.CommitOverNetwork(ctx, ctxn)
-	qc.span.Annotatef(nil, "Status of commit at ts: %d: %v", ctxn.StartTs, err)
-	if err != nil {
-		if err == dgo.ErrAborted {
-			err = status.Errorf(codes.Aborted, err.Error())
-			resp.Txn.Aborted = true
-		}
-
-		return err
-	}
-
-	// CommitNow was true, no need to send keys.
-	resp.Txn.Keys = resp.Txn.Keys[:0]
-	resp.Txn.CommitTs = cts
 	calculateMutationMetrics()
-	return nil
+	return err
 }
 
 // buildUpsertQuery modifies the query to evaluate the
@@ -1208,17 +1159,17 @@ func (s *Server) Health(ctx context.Context, all bool) (*api.Response, error) {
 
 	// Append self.
 	healthAll = append(healthAll, pb.HealthInfo{
-		Instance:    "alpha",
-		Address:     x.WorkerConfig.MyAddr,
-		Status:      "healthy",
-		Group:       strconv.Itoa(int(worker.GroupId())),
-		Version:     x.Version(),
-		Uptime:      int64(time.Since(x.WorkerConfig.StartTime) / time.Second),
-		LastEcho:    time.Now().Unix(),
-		Ongoing:     worker.GetOngoingTasks(),
-		Indexing:    schema.GetIndexingPredicates(),
-		EeFeatures:  worker.GetEEFeaturesList(),
-		MaxAssigned: posting.Oracle().MaxAssigned(),
+		Instance:   "alpha",
+		Address:    x.WorkerConfig.MyAddr,
+		Status:     "healthy",
+		Group:      strconv.Itoa(int(worker.GroupId())),
+		Version:    x.Version(),
+		Uptime:     int64(time.Since(x.WorkerConfig.StartTime) / time.Second),
+		LastEcho:   time.Now().Unix(),
+		Ongoing:    worker.GetOngoingTasks(),
+		Indexing:   schema.GetIndexingPredicates(),
+		EeFeatures: worker.GetEEFeaturesList(),
+		ReadTs:     posting.ReadTimestamp(),
 	})
 
 	var err error
@@ -1453,12 +1404,7 @@ func (s *Server) doQuery(ctx context.Context, req *Request) (resp *api.Response,
 	// We use defer here because for queries, startTs will be
 	// assigned in the processQuery function called below.
 	defer annotateStartTs(qc.span, qc.req.StartTs)
-	// For mutations, we update the startTs if necessary.
-	if isMutation && req.req.StartTs == 0 {
-		start := time.Now()
-		req.req.StartTs = worker.State.GetTimestamp(false)
-		qc.latency.AssignTimestamp = time.Since(start)
-	}
+
 	if x.WorkerConfig.AclEnabled {
 		ns, err := x.ExtractNamespace(ctx)
 		if err != nil {
@@ -1498,11 +1444,10 @@ func (s *Server) doQuery(ctx context.Context, req *Request) (resp *api.Response,
 	// TODO(martinmr): Include Transport as part of the latency. Need to do
 	// this separately since it involves modifying the API protos.
 	resp.Latency = &api.Latency{
-		AssignTimestampNs: uint64(l.AssignTimestamp.Nanoseconds()),
-		ParsingNs:         uint64(l.Parsing.Nanoseconds()),
-		ProcessingNs:      uint64(l.Processing.Nanoseconds()),
-		EncodingNs:        uint64(l.Json.Nanoseconds()),
-		TotalNs:           uint64((time.Since(l.Start)).Nanoseconds()),
+		ParsingNs:    uint64(l.Parsing.Nanoseconds()),
+		ProcessingNs: uint64(l.Processing.Nanoseconds()),
+		EncodingNs:   uint64(l.Json.Nanoseconds()),
+		TotalNs:      uint64((time.Since(l.Start)).Nanoseconds()),
 	}
 	md := metadata.Pairs(x.DgraphCostHeader, fmt.Sprint(resp.Metrics.NumUids["_total"]))
 	grpc.SendHeader(ctx, md)
@@ -1526,33 +1471,8 @@ func processQuery(ctx context.Context, qc *queryContext) (*api.Response, error) 
 		GqlQuery: &qc.gqlRes,
 	}
 
-	// Here we try our best effort to not contact Zero for a timestamp. If we succeed,
-	// then we use the max known transaction ts value (from ProcessDelta) for a read-only query.
-	// If we haven't processed any updates yet then fall back to getting TS from Zero.
-	switch {
-	case qc.req.BestEffort:
-		qc.span.Annotate([]otrace.Attribute{otrace.BoolAttribute("be", true)}, "")
-	case qc.req.ReadOnly:
-		qc.span.Annotate([]otrace.Attribute{otrace.BoolAttribute("ro", true)}, "")
-	default:
-		qc.span.Annotate([]otrace.Attribute{otrace.BoolAttribute("no", true)}, "")
-	}
-
-	if qc.req.BestEffort {
-		// Sanity: check that request is read-only too.
-		if !qc.req.ReadOnly {
-			return resp, errors.Errorf("A best effort query must be read-only.")
-		}
-		if qc.req.StartTs == 0 {
-			qc.req.StartTs = posting.Oracle().MaxAssigned()
-		}
-		qr.Cache = worker.NoCache
-	}
-
 	if qc.req.StartTs == 0 {
-		assignTimestampStart := time.Now()
-		qc.req.StartTs = worker.State.GetTimestamp(qc.req.ReadOnly)
-		qc.latency.AssignTimestamp = time.Since(assignTimestampStart)
+		qc.req.StartTs = posting.ReadTimestamp()
 	}
 
 	qr.ReadTs = qc.req.StartTs
@@ -1735,44 +1655,8 @@ func validateNamespace(ctx context.Context, tc *api.TxnContext) error {
 	return nil
 }
 
-// CommitOrAbort commits or aborts a transaction.
 func (s *Server) CommitOrAbort(ctx context.Context, tc *api.TxnContext) (*api.TxnContext, error) {
-	ctx, span := otrace.StartSpan(ctx, "Server.CommitOrAbort")
-	defer span.End()
-
-	if err := x.HealthCheck(); err != nil {
-		return &api.TxnContext{}, err
-	}
-
-	tctx := &api.TxnContext{}
-	if tc.StartTs == 0 {
-		return &api.TxnContext{}, errors.Errorf(
-			"StartTs cannot be zero while committing a transaction")
-	}
-	if ns, err := x.ExtractJWTNamespace(ctx); err == nil {
-		annotateNamespace(span, ns)
-	}
-	annotateStartTs(span, tc.StartTs)
-
-	if err := validateNamespace(ctx, tc); err != nil {
-		return &api.TxnContext{}, err
-	}
-
-	span.Annotatef(nil, "Txn Context received: %+v", tc)
-	commitTs, err := worker.CommitOverNetwork(ctx, tc)
-	if err == dgo.ErrAborted {
-		// If err returned is dgo.ErrAborted and tc.Aborted was set, that means the client has
-		// aborted the transaction by calling txn.Discard(). Hence return a nil error.
-		tctx.Aborted = true
-		if tc.Aborted {
-			return tctx, nil
-		}
-
-		return tctx, status.Errorf(codes.Aborted, err.Error())
-	}
-	tctx.StartTs = tc.StartTs
-	tctx.CommitTs = commitTs
-	return tctx, err
+	return tc, nil
 }
 
 // CheckVersion returns the version of this Dgraph instance.

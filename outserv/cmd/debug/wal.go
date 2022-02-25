@@ -23,15 +23,15 @@ import (
 	"strconv"
 	"strings"
 
+	humanize "github.com/dustin/go-humanize"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/raftwal"
 	"github.com/outcaste-io/outserv/x"
-	humanize "github.com/dustin/go-humanize"
 	"go.etcd.io/etcd/raft"
 	"go.etcd.io/etcd/raft/raftpb"
 )
 
-func printEntry(es raftpb.Entry, pending map[uint64]bool, isZero bool) {
+func printEntry(es raftpb.Entry, isZero bool) {
 	var buf bytes.Buffer
 	defer func() {
 		fmt.Printf("%s\n", buf.Bytes())
@@ -54,7 +54,7 @@ func printEntry(es raftpb.Entry, pending map[uint64]bool, isZero bool) {
 	} else {
 		var pr pb.Proposal
 		if err = pr.Unmarshal(es.Data[8:]); err == nil {
-			printAlphaProposal(&buf, &pr, pending)
+			printAlphaProposal(&buf, &pr)
 			return
 		}
 	}
@@ -123,14 +123,13 @@ func printBasic(store RaftStore) (uint64, uint64) {
 func printRaft(store *raftwal.DiskStorage) {
 	isZero := store.Uint(raftwal.GroupId) == 0
 
-	pending := make(map[uint64]bool)
 	startIdx, lastIdx := printBasic(store)
 
 	for startIdx < lastIdx-1 {
 		entries, err := store.Entries(startIdx, lastIdx+1, 64<<20)
 		x.Check(err)
 		for _, ent := range entries {
-			printEntry(ent, pending, isZero)
+			printEntry(ent, isZero)
 			startIdx = x.Max(startIdx, ent.Index)
 		}
 	}
@@ -180,7 +179,7 @@ func overwriteSnapshot(store *raftwal.DiskStorage) error {
 	x.Check(err)
 
 	dsnap.Index = ent.Index
-	dsnap.ReadTs = uint64(readTs)
+	dsnap.BaseTs = uint64(readTs)
 
 	fmt.Printf("Setting snapshot to: %+v\n", dsnap)
 	data, err := dsnap.Marshal()

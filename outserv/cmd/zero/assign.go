@@ -24,9 +24,9 @@ import (
 	otrace "go.opencensus.io/trace"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 )
 
@@ -37,17 +37,13 @@ const (
 )
 
 func (s *Server) updateLeases() {
-	var startTs uint64
 	s.Lock()
 	s.nextUint[pb.Num_UID] = s.state.MaxUID + 1
-	s.nextUint[pb.Num_TXN_TS] = s.state.MaxTxnTs + 1
 	s.nextUint[pb.Num_NS_ID] = s.state.MaxNsID + 1
 
-	startTs = s.nextUint[pb.Num_TXN_TS]
-	glog.Infof("Updated UID: %d. Txn Ts: %d. NsID: %d.",
-		s.nextUint[pb.Num_UID], s.nextUint[pb.Num_TXN_TS], s.nextUint[pb.Num_NS_ID])
+	glog.Infof("Updated UID: %d. NsID: %d.",
+		s.nextUint[pb.Num_UID], s.nextUint[pb.Num_NS_ID])
 	s.Unlock()
-	s.orc.updateStartTxnTs(startTs)
 }
 
 // maxLease keeps track of the various ID leases that we have already achieved
@@ -61,8 +57,6 @@ func (s *Server) maxLease(typ pb.NumLeaseType) uint64 {
 	switch typ {
 	case pb.Num_UID:
 		maxlease = s.state.MaxUID
-	case pb.Num_TXN_TS:
-		maxlease = s.state.MaxTxnTs
 	case pb.Num_NS_ID:
 		maxlease = s.state.MaxNsID
 	}
@@ -95,22 +89,7 @@ func (s *Server) lease(ctx context.Context, num *pb.Num) (*pb.AssignedIds, error
 	s.leaseLock.Lock()
 	defer s.leaseLock.Unlock()
 
-	if typ == pb.Num_TXN_TS {
-		if num.Val == 0 && num.ReadOnly {
-			// If we're only asking for a readonly timestamp, we can potentially
-			// service it directly.
-			if glog.V(3) {
-				glog.Infof("Attempting to serve read only txn ts [%d, %d]",
-					s.readOnlyTs, s.nextUint[pb.Num_TXN_TS])
-			}
-			if s.readOnlyTs > 0 && s.readOnlyTs == s.nextUint[pb.Num_TXN_TS]-1 {
-				return &pb.AssignedIds{ReadOnly: s.readOnlyTs}, errServedFromMemory
-			}
-		}
-		// We couldn't service it. So, let's request an extra timestamp for
-		// readonly transactions, if needed.
-	}
-	if s.nextUint[pb.Num_UID] == 0 || s.nextUint[pb.Num_TXN_TS] == 0 ||
+	if s.nextUint[pb.Num_UID] == 0 ||
 		s.nextUint[pb.Num_NS_ID] == 0 {
 		return nil, errors.New("Server not initialized")
 	}
@@ -137,8 +116,6 @@ func (s *Server) lease(ctx context.Context, num *pb.Num) (*pb.AssignedIds, error
 
 		var proposal pb.ZeroProposal
 		switch typ {
-		case pb.Num_TXN_TS:
-			proposal.MaxTxnTs = maxLease + howMany
 		case pb.Num_UID:
 			proposal.MaxUID = maxLease + howMany
 		case pb.Num_NS_ID:
@@ -151,19 +128,7 @@ func (s *Server) lease(ctx context.Context, num *pb.Num) (*pb.AssignedIds, error
 	}
 
 	out := &pb.AssignedIds{}
-	if typ == pb.Num_TXN_TS {
-		if num.Val > 0 {
-			out.StartId = s.nextUint[pb.Num_TXN_TS]
-			out.EndId = out.StartId + num.Val - 1
-			s.nextUint[pb.Num_TXN_TS] = out.EndId + 1
-		}
-		if num.ReadOnly {
-			s.readOnlyTs = s.nextUint[pb.Num_TXN_TS]
-			s.nextUint[pb.Num_TXN_TS]++
-			out.ReadOnly = s.readOnlyTs
-		}
-		s.orc.doneUntil.Begin(x.Max(out.EndId, out.ReadOnly))
-	} else if typ == pb.Num_UID {
+	if typ == pb.Num_UID {
 		out.StartId = s.nextUint[pb.Num_UID]
 		out.EndId = out.StartId + num.Val - 1
 		s.nextUint[pb.Num_UID] = out.EndId + 1

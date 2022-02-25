@@ -1,18 +1,5 @@
-/*
- * Copyright 2019 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2019 Dgraph Labs, Inc. are available under the Apache 2.0 license.
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
 
 package schema
 
@@ -181,7 +168,6 @@ func (r *Response) Output() interface{} {
 // Extensions represents GraphQL extensions
 type Extensions struct {
 	TouchedUids uint64 `json:"touched_uids,omitempty"`
-	Tracing     *Trace `json:"tracing,omitempty"`
 }
 
 // GetTouchedUids returns TouchedUids
@@ -199,54 +185,6 @@ func (e *Extensions) Merge(ext *Extensions) {
 	}
 
 	e.TouchedUids += ext.TouchedUids
-
-	if e.Tracing == nil {
-		e.Tracing = ext.Tracing
-	} else {
-		e.Tracing.Merge(ext.Tracing)
-	}
-}
-
-// Trace : Apollo Tracing is a GraphQL extension for tracing resolver performance.Response
-// https://github.com/apollographql/apollo-tracing
-// Not part of the standard itself, it gets reported in GraphQL "extensions".
-// It's for reporting tracing data through all the resolvers in a GraphQL query.
-// Our results aren't as 'deep' as a traditional GraphQL server in that the Dgraph
-// layer resolves in a single step, rather than iteratively.  So we'll report on
-// all the top level queries/mutations.
-//
-// Currently, only reporting in the GraphQL result, but also planning to allow
-// exposing to Apollo Engine as per:
-// https://www.apollographql.com/docs/references/setup-analytics/#engine-reporting-endpoint
-type Trace struct {
-	// (comments from Apollo Tracing spec)
-
-	// Apollo Tracing Spec version
-	Version int `json:"version"`
-
-	// Timestamps in RFC 3339 nano format.
-	StartTime string `json:"startTime,"`
-	EndTime   string `json:"endTime"`
-
-	// Duration in nanoseconds, relative to the request start, as an integer.
-	Duration int64 `json:"duration"`
-
-	// Parsing and Validation not required at the moment.
-	//Parsing    *OffsetDuration `json:"parsing,omitempty"`
-	//Validation *OffsetDuration `json:"validation,omitempty"`
-	Execution *ExecutionTrace `json:"execution,omitempty"`
-}
-
-func (t *Trace) Merge(other *Trace) {
-	if t == nil || other == nil {
-		return
-	}
-
-	if t.Execution == nil {
-		t.Execution = other.Execution
-	} else {
-		t.Execution.Merge(other.Execution)
-	}
 }
 
 //ExecutionTrace records all the resolvers

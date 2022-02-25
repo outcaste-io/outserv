@@ -1,18 +1,5 @@
-/*
- * Copyright 2019 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2019 Dgraph Labs, Inc. are available under the Apache 2.0 license.
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
 
 package resolve
 
@@ -24,11 +11,11 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/golang/glog"
 	dgoapi "github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
@@ -129,7 +116,6 @@ type DgraphExecutor interface {
 	// occurs, that indicates that the execution failed in some way significant enough
 	// way as to not continue processing this query/mutation or others in the same request.
 	Execute(ctx context.Context, req *dgoapi.Request, field schema.Field) (*dgoapi.Response, error)
-	CommitOrAbort(ctx context.Context, tc *dgoapi.TxnContext) (*dgoapi.TxnContext, error)
 }
 
 // An UpsertMutation is the query and mutations needed for a Dgraph upsert.
@@ -199,8 +185,6 @@ func (mr *dgraphResolver) Resolve(ctx context.Context, m schema.Mutation) (*Reso
 	defer timer.Stop()
 
 	resolved, success := mr.rewriteAndExecute(ctx, m)
-	resolverTrace.Dgraph = resolved.Extensions.Tracing.Execution.Resolvers[0].Dgraph
-	resolved.Extensions.Tracing.Execution.Resolvers[0] = resolverTrace
 	return resolved, success
 }
 
@@ -219,36 +203,11 @@ func (mr *dgraphResolver) rewriteAndExecute(
 	mutation schema.Mutation) (*Resolved, bool) {
 	var mutResp, qryResp *dgoapi.Response
 	req := &dgoapi.Request{}
-	commit := false
-
-	defer func() {
-		if !commit && mutResp != nil && mutResp.Txn != nil {
-			mutResp.Txn.Aborted = true
-			_, err := mr.executor.CommitOrAbort(ctx, mutResp.Txn)
-			if err != nil {
-				glog.Errorf("Error occurred while aborting transaction: %s", err)
-			}
-		}
-	}()
 
 	dgraphPreMutationQueryDuration := &schema.LabeledOffsetDuration{Label: "preMutationQuery"}
 	dgraphMutationDuration := &schema.LabeledOffsetDuration{Label: "mutation"}
 	dgraphPostMutationQueryDuration := &schema.LabeledOffsetDuration{Label: "query"}
-	ext := &schema.Extensions{
-		Tracing: &schema.Trace{
-			Execution: &schema.ExecutionTrace{
-				Resolvers: []*schema.ResolverTrace{
-					{
-						Dgraph: []*schema.LabeledOffsetDuration{
-							dgraphPreMutationQueryDuration,
-							dgraphMutationDuration,
-							dgraphPostMutationQueryDuration,
-						},
-					},
-				},
-			},
-		},
-	}
+	ext := &schema.Extensions{}
 
 	emptyResult := func(err error) *Resolved {
 		return &Resolved{
@@ -493,19 +452,14 @@ func (mr *dgraphResolver) rewriteAndExecute(
 		return emptyResult(queryErrs), resolverFailed
 	}
 
-	txnCtx, err := mr.executor.CommitOrAbort(ctx, mutResp.Txn)
-	if err != nil {
-		return emptyResult(
-				schema.GQLWrapf(err, "mutation failed, couldn't commit transaction")),
-			resolverFailed
-	}
-	commit = true
-
 	// once committed, send async updates to configured webhooks, if any.
 	if mutation.HasLambdaOnMutate() {
 		rootUIDs := mr.mutationRewriter.MutatedRootUIDs(mutation, mutResp.GetUids(), result)
 		// NOTE: This is an async operation. We can't extract logs from webhooks.
-		go sendWebhookEvent(ctx, mutation, txnCtx.CommitTs, rootUIDs)
+		//
+		// TODO: Check if we can just send a readtimestamp, or do we need to
+		// send the exact commit timestamp.
+		go sendWebhookEvent(ctx, mutation, posting.ReadTimestamp(), rootUIDs)
 	}
 
 	// For delete mutation, we would have already populated qryResp if query field was requested.

@@ -29,14 +29,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	farm "github.com/dgryski/go-farm"
+	"github.com/golang/glog"
+	"github.com/google/uuid"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/ee/audit"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
-	farm "github.com/dgryski/go-farm"
-	"github.com/golang/glog"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"go.etcd.io/etcd/raft"
 	"go.etcd.io/etcd/raft/raftpb"
@@ -288,14 +288,6 @@ func (n *node) regenerateChecksum() {
 		sort.Strings(preds)
 		g.Checksum = farm.Fingerprint64([]byte(strings.Join(preds, "")))
 	}
-
-	if n.AmLeader() {
-		// It is important to push something to Oracle updates channel, so the subscribers would
-		// get the latest checksum that we calculated above. Otherwise, if all the queries are
-		// best effort queries which don't create any transaction, then the OracleDelta never
-		// gets sent to Alphas, causing their group checksum to mismatch and never converge.
-		n.server.orc.updates <- &pb.OracleDelta{}
-	}
 }
 
 func (n *node) handleBulkTabletProposal(tablets []*pb.Tablet) error {
@@ -385,7 +377,6 @@ func (n *node) applySnapshot(snap *pb.ZeroSnapshot) error {
 			snap.Index, existing.Metadata.Index)
 		return nil
 	}
-	n.server.orc.purgeBelow(snap.CheckpointTs)
 
 	data, err := snap.Marshal()
 	x.Check(err)
@@ -494,19 +485,14 @@ func (n *node) applyProposal(e raftpb.Entry) (uint64, error) {
 	switch {
 	case p.MaxUID > state.MaxUID:
 		state.MaxUID = p.MaxUID
-	case p.MaxTxnTs > state.MaxTxnTs:
-		state.MaxTxnTs = p.MaxTxnTs
 	case p.MaxNsID > state.MaxNsID:
 		state.MaxNsID = p.MaxNsID
-	case p.MaxUID != 0 || p.MaxTxnTs != 0 || p.MaxNsID != 0:
+	case p.MaxUID != 0 || p.MaxNsID != 0:
 		// Could happen after restart when some entries were there in WAL and did not get
 		// snapshotted.
-		glog.Infof("Could not apply proposal, ignoring: p.MaxUID=%v, p.MaxTxnTs=%v"+
+		glog.Infof("Could not apply proposal, ignoring: p.MaxUID=%v, "+
 			"p.MaxNsID=%v, maxUID=%d maxTxnTs=%d maxNsID=%d\n",
-			p.MaxUID, p.MaxTxnTs, p.MaxNsID, state.MaxUID, state.MaxTxnTs, state.MaxNsID)
-	}
-	if p.Txn != nil {
-		n.server.orc.updateCommitStatus(e.Index, p.Txn)
+			p.MaxUID, p.MaxNsID, state.MaxUID, state.MaxTxnTs, state.MaxNsID)
 	}
 
 	return key, nil
@@ -863,11 +849,6 @@ func (n *node) calculateAndProposeSnapshot() error {
 			if err := p.Unmarshal(entry.Data[8:]); err != nil {
 				span.Annotatef(nil, "Error: %v", err)
 				return err
-			}
-			if txn := p.Txn; txn != nil {
-				if txn.CommitTs > 0 && txn.CommitTs < discardBelow {
-					snapshotIndex = entry.Index
-				}
 			}
 		}
 		batchFirst = entries[len(entries)-1].Index + 1

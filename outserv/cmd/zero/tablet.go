@@ -1,18 +1,5 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
 
 package zero
 
@@ -22,10 +9,10 @@ import (
 	"sort"
 	"time"
 
-	"github.com/outcaste-io/outserv/protos/pb"
-	"github.com/outcaste-io/outserv/x"
 	humanize "github.com/dustin/go-humanize"
 	"github.com/golang/glog"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
 )
@@ -76,6 +63,8 @@ func (s *Server) rebalanceTablets() {
 		}
 	}
 }
+
+var errNotLeader = errors.New("Node is no longer leader")
 
 // MoveTablet can be used to move a tablet to a specific group.
 // It takes in tablet and destination group as argument.
@@ -177,19 +166,16 @@ func (s *Server) movePredicate(predicate string, srcGroup, dstGroup uint32) erro
 	var sinceTs uint64
 	counter := 1
 	nonBlockingMove := func() error {
+		return fmt.Errorf("TODO: Add a mechanism to get a fresh timestamp")
 		// Get a new timestamp. Source Alpha leader must reach this timestamp before streaming data.
-		ids, err := s.Timestamps(ctx, &pb.Num{Val: 1})
-		if err != nil || ids.StartId == 0 {
-			return errors.Wrapf(err, "while leasing txn timestamp. Id: %+v", ids)
-		}
 
 		// Move the predicate. Commits on this predicate are not blocked yet. Any data after ReadTs
 		// will be moved in the phase II below.
-		in.ReadTs = ids.StartId
+		in.ReadTs = 0
 		in.SinceTs, sinceTs = sinceTs, in.ReadTs
 		span.Annotatef(nil, "Starting move [1.%d]: %+v", counter, in)
 		glog.Infof("Starting move [1.%d]: %+v", counter, in)
-		_, err = wc.MovePredicate(ctx, in)
+		_, err := wc.MovePredicate(ctx, in)
 		return err
 	}
 
@@ -221,14 +207,11 @@ func (s *Server) movePredicate(predicate string, srcGroup, dstGroup uint32) erro
 
 	// Get a new timestamp, beyond which we are sure that no new txns would be committed for this
 	// predicate. Source Alpha leader must reach this timestamp before streaming the data.
-	ids, err := s.Timestamps(ctx, &pb.Num{Val: 1})
-	if err != nil || ids.StartId == 0 {
-		return errors.Wrapf(err, "while leasing txn timestamp. Id: %+v", ids)
-	}
+	return fmt.Errorf("TODO: Add a mechanism to get a fresh timestamp")
 
 	// We have done a majority of move. Now transfer rest of the data.
 	in.SinceTs = sinceTs
-	in.ReadTs = ids.StartId
+	in.ReadTs = 0
 	span.Annotatef(nil, "Starting move [2]: %+v", in)
 	glog.Infof("Starting move [2]: %+v", in)
 	if _, err := wc.MovePredicate(ctx, in); err != nil {
