@@ -1068,43 +1068,6 @@ func TestParseQueryWithMultipleVar(t *testing.T) {
 	require.Equal(t, []string{"B"}, res.QueryVars[2].Needs)
 }
 
-func TestParseQueryWithAttrLang(t *testing.T) {
-	query := `
-	{
-		me(func: uid(0x1)) {
-			name
-			friend(first:5, orderasc: name@en) {
-				name@en
-			}
-		}
-	}
-`
-	res, err := Parse(Request{Str: query})
-	require.NoError(t, err)
-	require.NotNil(t, res.Query)
-	require.Equal(t, 1, len(res.Query))
-	require.Equal(t, "name", res.Query[0].Children[1].Order[0].Attr)
-	require.Equal(t, []string{"en"}, res.Query[0].Children[1].Order[0].Langs)
-}
-
-func TestParseQueryWithAttrLang2(t *testing.T) {
-	query := `
-	{
-	  me(func:regexp(name, /^[a-zA-z]*[^Kk ]?[Nn]ight/), orderasc: name@en, first:5) {
-		name@en
-		name@de
-		name@it
-	  }
-	}
-`
-	res, err := Parse(Request{Str: query})
-	require.NoError(t, err)
-	require.NotNil(t, res.Query)
-	require.Equal(t, 1, len(res.Query))
-	require.Equal(t, "name", res.Query[0].Order[0].Attr)
-	require.Equal(t, []string{"en"}, res.Query[0].Order[0].Langs)
-}
-
 func TestParseMutationError(t *testing.T) {
 	query := `
 		mutation {

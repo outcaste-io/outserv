@@ -110,9 +110,6 @@ type params struct {
 	GetUid bool
 	// Order is the list of predicates to sort by and their sort order.
 	Order []*pb.Order
-	// Langs is the list of languages and their preferred order for looking up a predicate value.
-	Langs []string
-
 	// Var is the name of the variable defined in this SubGraph
 	// (e.g. in "x as name", this would be x).
 	Var string
@@ -320,10 +317,6 @@ func (sg *SubGraph) createSrcFunction(gf *gql.Function) {
 		sg.SrcFunc.IsValueVar = false
 		sg.SrcFunc.IsLenVar = false
 		return
-	}
-
-	if gf.Lang != "" {
-		sg.Params.Langs = append(sg.Params.Langs, gf.Lang)
 	}
 }
 
@@ -925,7 +918,6 @@ func createTaskQuery(ctx context.Context, sg *SubGraph) (*pb.Query, error) {
 		ReadTs:    sg.ReadTs,
 		Cache:     int32(sg.Cache),
 		Attr:      x.NamespaceAttr(namespace, attr),
-		Langs:     sg.Params.Langs,
 		Reverse:   reverse,
 		SrcFunc:   srcFunc,
 		AfterUid:  sg.Params.AfterUID,
@@ -2066,7 +2058,6 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 			sg.uidMatrix = result.UidMatrix
 			sg.valueMatrix = result.ValueMatrix
 			sg.counts = result.Counts
-			sg.LangTags = result.LangMatrix
 			sg.List = result.List
 
 			if sg.Params.DoCount {
@@ -2235,7 +2226,6 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 				Params: params{
 					Alias:        it.Alias,
 					IgnoreResult: true,
-					Langs:        it.Langs,
 				},
 			})
 		}
@@ -2419,9 +2409,8 @@ func (sg *SubGraph) createOrderForTask(ns uint64) []*pb.Order {
 	out := []*pb.Order{}
 	for _, o := range sg.Params.Order {
 		oc := &pb.Order{
-			Attr:  x.NamespaceAttr(ns, o.Attr),
-			Desc:  o.Desc,
-			Langs: o.Langs,
+			Attr: x.NamespaceAttr(ns, o.Attr),
+			Desc: o.Desc,
 		}
 		out = append(out, oc)
 	}
@@ -2461,7 +2450,7 @@ func (sg *SubGraph) sortAndPaginateUsingVar(ctx context.Context) error {
 		if len(values) == 0 {
 			continue
 		}
-		if err := types.Sort(values, &uids, []bool{sg.Params.Order[0].Desc}, ""); err != nil {
+		if err := types.Sort(values, &uids, []bool{sg.Params.Order[0].Desc}); err != nil {
 			return err
 		}
 		sg.uidMatrix[i].SortedUids = uids

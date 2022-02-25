@@ -375,10 +375,7 @@ func (m *mapper) createPostings(nq gql.NQuad,
 	p := posting.NewPosting(de)
 	sch := m.schema.getSchema(x.NamespaceAttr(nq.GetNamespace(), nq.GetPredicate()))
 	if nq.GetObjectValue() != nil {
-		lang := de.GetLang()
 		switch {
-		case len(lang) > 0:
-			p.Uid = farm.Fingerprint64([]byte(lang))
 		case sch.List:
 			p.Uid = farm.Fingerprint64(de.Value)
 		default:
@@ -428,7 +425,7 @@ func (m *mapper) addIndexMapEntries(nq gql.NQuad, de *pb.DirectedEdge) {
 		x.Check(err)
 
 		// Extract tokens.
-		toks, err := tok.BuildTokens(schemaVal.Value, tok.GetTokenizerForLang(toker, nq.Lang))
+		toks, err := tok.BuildTokens(schemaVal.Value, toker)
 		x.Check(err)
 
 		attr := x.NamespaceAttr(nq.Namespace, nq.Predicate)

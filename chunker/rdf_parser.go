@@ -103,7 +103,7 @@ L:
 
 		case itemPredicate:
 			// Here we split predicate and lang directive (ex: "name@en"), if needed.
-			rnq.Predicate, rnq.Lang = x.PredicateLang(strings.TrimFunc(item.Val, isSpaceRune))
+			rnq.Predicate = strings.TrimFunc(item.Val, isSpaceRune)
 
 		case itemObject:
 			rnq.ObjectId = strings.TrimFunc(item.Val, isSpaceRune)

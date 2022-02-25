@@ -340,9 +340,6 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 					Namespace:   namespace,
 					ObjectValue: &api.Value{Val: &api.Value_DefaultVal{DefaultVal: x.Star}},
 				}
-				// Here we split predicate and lang directive (ex: "name@en"), if needed. With JSON
-				// mutations that's the only way to send language for a value.
-				nq.Predicate, nq.Lang = x.PredicateLang(nq.Predicate)
 				buf.Push(nq)
 				continue
 			}
@@ -356,10 +353,6 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 			Predicate: pred,
 			Namespace: namespace,
 		}
-
-		// Here we split predicate and lang directive (ex: "name@en"), if needed. With JSON
-		// mutations that's the only way to send language for a value.
-		nq.Predicate, nq.Lang = x.PredicateLang(nq.Predicate)
 
 		switch v := v.(type) {
 		// these int64/float64 cases are needed for FastParseJSON, which doesn't use json.Number

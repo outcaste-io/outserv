@@ -202,7 +202,6 @@ func createUidEdge(nq *api.NQuad, sid, oid uint64) *pb.DirectedEdge {
 		Entity:    sid,
 		Attr:      nq.Predicate,
 		Namespace: nq.Namespace,
-		Lang:      nq.Lang,
 		ValueId:   oid,
 		ValueType: pb.Posting_UID,
 	}
@@ -213,7 +212,6 @@ func createValueEdge(nq *api.NQuad, sid uint64) (*pb.DirectedEdge, error) {
 		Entity:    sid,
 		Attr:      nq.Predicate,
 		Namespace: nq.Namespace,
-		Lang:      nq.Lang,
 	}
 	val, err := getTypeVal(nq.ObjectValue)
 	if err != nil {
@@ -227,11 +225,7 @@ func createValueEdge(nq *api.NQuad, sid uint64) (*pb.DirectedEdge, error) {
 
 func fingerprintEdge(t *pb.DirectedEdge, pred *predicate) uint64 {
 	var id uint64 = math.MaxUint64
-
-	// Value with a lang type.
-	if len(t.Lang) > 0 {
-		id = farm.Fingerprint64([]byte(t.Lang))
-	} else if pred.List {
+	if pred.List {
 		id = farm.Fingerprint64(t.Value)
 	}
 	return id
@@ -308,7 +302,7 @@ func (l *loader) conflictKeysForNQuad(nq *api.NQuad) ([]uint64, error) {
 		if err != nil {
 			errs = append(errs, err.Error())
 		}
-		toks, err := tok.BuildTokens(schemaVal.Value, tok.GetTokenizerForLang(token, nq.Lang))
+		toks, err := tok.BuildTokens(schemaVal.Value, token)
 		if err != nil {
 			errs = append(errs, err.Error())
 		}

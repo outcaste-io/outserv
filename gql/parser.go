@@ -95,7 +95,6 @@ type ShortestPathArgs struct {
 type GroupByAttr struct {
 	Attr  string
 	Alias string
-	Langs []string
 }
 
 // FacetOrder stores ordering for single facet key.
@@ -162,7 +161,6 @@ type Arg struct {
 // Function holds the information about gql functions.
 type Function struct {
 	Attr       string
-	Lang       string // language of the attribute value
 	Name       string // Specifies the name of the function.
 	Args       []Arg  // Contains the arguments of the function.
 	UID        []uint64
@@ -1408,10 +1406,6 @@ func (f *FilterTree) stringHelper(buf *bytes.Buffer) {
 			if f.Func.IsCount || f.Func.IsValueVar || f.Func.IsLenVar {
 				x.Check2(buf.WriteRune(')'))
 			}
-			if len(f.Func.Lang) > 0 {
-				x.Check2(buf.WriteRune('@'))
-				x.Check2(buf.WriteString(f.Func.Lang))
-			}
 
 			for _, arg := range f.Func.Args {
 				if arg.IsValueVar {
@@ -1648,7 +1642,7 @@ func parseRegexArgs(val string) (regexArgs, error) {
 
 func parseFunction(it *lex.ItemIterator, gq *GraphQuery) (*Function, error) {
 	function := &Function{}
-	var expectArg, seenFuncArg, expectLang, isDollar bool
+	var expectArg, seenFuncArg, isDollar bool
 L:
 	for it.Next() {
 		item := it.Item()
@@ -1752,7 +1746,6 @@ L:
 					return nil, itemInFunc.Errorf("Invalid usage of '@' in function " +
 						"argument, must only appear immediately after attr.")
 				}
-				expectLang = true
 				continue
 			case itemMathOp:
 				val = itemInFunc.Val
@@ -1816,9 +1809,8 @@ L:
 				continue
 			}
 
-			if !expectArg && !expectLang {
-				return nil, itemInFunc.Errorf("Expected comma or language but got: %s",
-					itemInFunc.Val)
+			if !expectArg {
+				return nil, itemInFunc.Errorf("Expected comma but got: %s", itemInFunc.Val)
 			}
 
 			vname := collectName(it, itemInFunc.Val)
@@ -1861,13 +1853,6 @@ L:
 				}
 				function.Attr = val
 				attrItemsAgo = 0
-			case expectLang:
-				if val == "*" {
-					return nil, errors.Errorf(
-						"The * symbol cannot be used as a valid language inside functions")
-				}
-				function.Lang = val
-				expectLang = false
 			case function.Name != uidFunc:
 				// For UID function. we set g.UID
 				function.Args = append(function.Args, Arg{Value: val})
@@ -2038,12 +2023,10 @@ loop:
 				continue
 			}
 
-			var langs []string
 			items, err := it.Peek(1)
 			if err == nil && items[0].Typ == itemAt {
 				it.Next() // consume '@'
 				it.Next() // move forward
-				langs, err = parseLanguageList(it)
 				if err != nil {
 					return err
 				}
@@ -2051,7 +2034,6 @@ loop:
 			attrLang := GroupByAttr{
 				Attr:  val,
 				Alias: alias,
-				Langs: langs,
 			}
 			alias = ""
 			gq.GroupbyAttrs = append(gq.GroupbyAttrs, attrLang)
@@ -2341,14 +2323,6 @@ func parseDirective(it *lex.ItemIterator, curp *GraphQuery) error {
 			}
 		default:
 			return item.Errorf("Unknown directive [%s]", item.Val)
-		}
-	case len(curp.Attr) > 0 && len(curp.Langs) == 0:
-		// this is language list
-		if curp.Langs, err = parseLanguageList(it); err != nil {
-			return err
-		}
-		if len(curp.Langs) == 0 {
-			return item.Errorf("Expected at least 1 language in list for %s", curp.Attr)
 		}
 	default:
 		return item.Errorf("Expected directive or language list, got @%s", item.Val)
