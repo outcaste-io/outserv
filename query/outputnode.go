@@ -441,7 +441,7 @@ func (enc *encoder) getScalarVal(fj fastJsonNode) ([]byte, error) {
 	}
 	if (fj.meta & uidNodeBit) > 0 {
 		uid := binary.BigEndian.Uint64(data)
-		return x.ToHex(uid, false), nil
+		return x.ToHex(uid), nil
 	}
 	return data, nil
 }

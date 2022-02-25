@@ -1504,8 +1504,6 @@ func processQuery(ctx context.Context, qc *queryContext) (*api.Response, error) 
 			respMap["types"] = formatTypes(er.Types)
 		}
 		resp.Json, err = json.Marshal(respMap)
-	} else if qc.req.RespFormat == api.Request_RDF {
-		resp.Rdf, err = query.ToRDF(qc.latency, er.Subgraphs)
 	} else {
 		resp.Json, err = query.ToJson(ctx, qc.latency, er.Subgraphs, qc.gqlField)
 	}
@@ -1740,22 +1738,6 @@ func parseMutationObject(mu *api.Mutation, qc *queryContext) (*gql.Mutation, err
 		}
 		res.Del = append(res.Del, nqs...)
 	}
-	if len(mu.SetNquads) > 0 {
-		nqs, md, err := chunker.ParseRDFs(mu.SetNquads)
-		if err != nil {
-			return nil, err
-		}
-		res.Set = append(res.Set, nqs...)
-		res.Metadata = md
-	}
-	if len(mu.DelNquads) > 0 {
-		nqs, _, err := chunker.ParseRDFs(mu.DelNquads)
-		if err != nil {
-			return nil, err
-		}
-		res.Del = append(res.Del, nqs...)
-	}
-
 	res.Set = append(res.Set, mu.Set...)
 	res.Del = append(res.Del, mu.Del...)
 	if err := validateNQuads(res.Set, res.Del, qc); err != nil {

@@ -17,7 +17,6 @@
 package worker
 
 import (
-	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -34,8 +33,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/require"
-
-	"github.com/outcaste-io/dgo/v210/protos/api"
 
 	"github.com/outcaste-io/outserv/chunker"
 	"github.com/outcaste-io/outserv/gql"
@@ -234,111 +231,6 @@ func checkExportGqlSchema(t *testing.T, gqlSchemaFiles []string) {
 	require.JSONEq(t, string(b), buf.String())
 }
 
-func TestExportRdf(t *testing.T) {
-	// Index the name predicate. We ensure it doesn't show up on export.
-	initTestExport(t, `
-		name: string @index(exact) .
-		age: int .
-		[0x2] name: string @index(exact) .
-		`)
-
-	bdir, err := ioutil.TempDir("", "export")
-	require.NoError(t, err)
-	defer os.RemoveAll(bdir)
-
-	time.Sleep(1 * time.Second)
-
-	// We have 4 friend type edges. FP("friends")%10 = 2.
-	x.WorkerConfig.ExportPath = bdir
-	readTs := timestamp()
-	// Do the following so export won't block forever for readTs.
-	posting.Oracle().ProcessDelta(&pb.OracleDelta{MaxAssigned: readTs})
-	files, err := export(context.Background(), &pb.ExportRequest{ReadTs: readTs, GroupId: 1,
-		Namespace: math.MaxUint64, Format: "rdf"})
-	require.NoError(t, err)
-
-	fileList, schemaFileList, gqlSchema := getExportFileList(t, bdir)
-	require.Equal(t, len(files), len(fileList)+len(schemaFileList)+len(gqlSchema))
-
-	file := fileList[0]
-	f, err := os.Open(file)
-	require.NoError(t, err)
-
-	r, err := gzip.NewReader(f)
-	require.NoError(t, err)
-
-	scanner := bufio.NewScanner(r)
-	count := 0
-
-	l := &lex.Lexer{}
-	for scanner.Scan() {
-		nq, err := chunker.ParseRDF(scanner.Text(), l)
-		require.NoError(t, err)
-		require.Contains(t, []string{"0x1", "0x2", "0x3", "0x4", "0x5", "0x6", "0x9"}, nq.Subject)
-		if nq.ObjectValue != nil {
-			switch nq.Subject {
-			case "0x1", "0x2":
-				require.Equal(t, &api.Value{Val: &api.Value_DefaultVal{DefaultVal: "pho\ton"}},
-					nq.ObjectValue)
-			case "0x3":
-				require.Equal(t, &api.Value{Val: &api.Value_DefaultVal{DefaultVal: "First Line\nSecondLine"}},
-					nq.ObjectValue)
-			case "0x4":
-			case "0x5":
-				require.Equal(t, `<0x5> <name> "" <0x0> .`, scanner.Text())
-			case "0x6":
-				require.Equal(t, `<0x6> <name> "Ding!\u0007Ding!\u0007Ding!\u0007" <0x0> .`,
-					scanner.Text())
-			case "0x9":
-				require.Equal(t, `<0x9> <name> "ns2" <0x2> .`, scanner.Text())
-			default:
-				t.Errorf("Unexpected subject: %v", nq.Subject)
-			}
-			if nq.Subject == "_:uid1" || nq.Subject == "0x2" {
-				require.Equal(t, &api.Value{Val: &api.Value_DefaultVal{DefaultVal: "pho\ton"}},
-					nq.ObjectValue)
-			}
-		}
-
-		// The only objectId we set was uid 5.
-		if nq.ObjectId != "" {
-			require.Equal(t, "0x5", nq.ObjectId)
-		}
-		// Test lang.
-		if nq.Subject == "0x2" && nq.Predicate == "name" {
-			require.Equal(t, "en", nq.Lang)
-		}
-		// Test facets.
-		if nq.Subject == "0x4" {
-			require.Equal(t, "age", nq.Facets[0].Key)
-			require.Equal(t, "close", nq.Facets[1].Key)
-			require.Equal(t, "game", nq.Facets[2].Key)
-			require.Equal(t, "poem", nq.Facets[3].Key)
-			require.Equal(t, "since", nq.Facets[4].Key)
-			// byte representation for facets.
-			require.Equal(t, []byte{0x21, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, nq.Facets[0].Value)
-			require.Equal(t, []byte{0x1}, nq.Facets[1].Value)
-			require.Equal(t, []byte("football"), nq.Facets[2].Value)
-			require.Equal(t, []byte("roses are red\nviolets are blue"), nq.Facets[3].Value)
-			require.Equal(t, "\x01\x00\x00\x00\x0e\xba\b8e\x00\x00\x00\x00\xff\xff",
-				string(nq.Facets[4].Value))
-			// valtype for facets.
-			require.Equal(t, 1, int(nq.Facets[0].ValType))
-			require.Equal(t, 3, int(nq.Facets[1].ValType))
-			require.Equal(t, 0, int(nq.Facets[2].ValType))
-			require.Equal(t, 4, int(nq.Facets[4].ValType))
-		}
-		// Labels have been removed.
-		count++
-	}
-	require.NoError(t, scanner.Err())
-	// This order will be preserved due to file naming.
-	require.Equal(t, 10, count)
-
-	checkExportSchema(t, schemaFileList)
-	checkExportGqlSchema(t, gqlSchema)
-}
-
 func TestExportJson(t *testing.T) {
 	// Index the name predicate. We ensure it doesn't show up on export.
 	initTestExport(t, `name: string @index(exact) .
@@ -432,7 +324,7 @@ func TestExportFormat(t *testing.T) {
 	taskId := testutil.JsonGet(data, "data", "export", "taskId").(string)
 	testutil.WaitForTask(t, taskId, false)
 
-	params.Variables["format"] = "rdf"
+	params.Variables["format"] = "json"
 	b, err = json.Marshal(params)
 	require.NoError(t, err)
 
