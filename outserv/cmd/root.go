@@ -40,7 +40,6 @@ import (
 	"github.com/outcaste-io/outserv/outserv/cmd/live"
 	"github.com/outcaste-io/outserv/outserv/cmd/migrate"
 	"github.com/outcaste-io/outserv/outserv/cmd/version"
-	"github.com/outcaste-io/outserv/outserv/cmd/zero"
 	"github.com/outcaste-io/outserv/x"
 
 	"github.com/pkg/errors"
@@ -83,7 +82,7 @@ var rootConf = viper.New()
 // subcommands initially contains all default sub-commands.
 var subcommands = []*x.SubCommand{
 	&bulk.Bulk, &cert.Cert, &conv.Conv, &live.Live,
-	&alpha.Alpha, &zero.Zero, &version.Version, &debug.Debug, &migrate.Migrate,
+	&alpha.Alpha, &version.Version, &debug.Debug, &migrate.Migrate,
 	&debuginfo.DebugInfo, &decrypt.Decrypt, &increment.Increment,
 }
 

@@ -29,6 +29,7 @@ import (
 	"github.com/outcaste-io/badger/v3"
 	"github.com/outcaste-io/outserv/ee"
 	"github.com/outcaste-io/outserv/ee/audit"
+	"github.com/outcaste-io/outserv/zero"
 
 	"github.com/golang/glog"
 	"github.com/outcaste-io/dgo/v210/protos/api"
@@ -951,8 +952,10 @@ func run() {
 		}
 	}()
 
-	updaters := z.NewCloser(2)
+	updaters := z.NewCloser(3)
 	go func() {
+		zero.Run(updaters)
+
 		worker.StartRaftNodes(worker.State.WALstore, bindall)
 		atomic.AddUint32(&initDone, 1)
 
