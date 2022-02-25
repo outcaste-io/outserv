@@ -180,8 +180,16 @@ func (o *oracle) ResetTxn(ts uint64) *Txn {
 	return txn
 }
 
-func (o *oracle) MinMaxAssignedSeenTs() uint64 {
-	return 0
+func (o *oracle) MinStartTs() uint64 {
+	o.RLock()
+	defer o.RUnlock()
+	min := ReadTimestamp()
+	for _, txn := range o.pendingTxns {
+		if ts := txn.StartTs; ts < min {
+			min = ts
+		}
+	}
+	return min
 }
 
 func (o *oracle) NumPendingTxns() int {

@@ -850,13 +850,13 @@ func (n *node) processApplyCh() {
 			n.elog.Printf("Size of previous map: %d", len(previous))
 
 			kw := n.keysWritten
-			minSeen := posting.Oracle().MinMaxAssignedSeenTs()
+			minStart := posting.Oracle().MinStartTs()
 			before := len(kw.keyCommitTs)
 			for k, commitTs := range kw.keyCommitTs {
-				// If commitTs is less than the min of all pending Txn's MaxAssignedSeen, then we
+				// If commitTs is less than the min of all pending Txn's StartTs, then we
 				// can safely delete the key. StillValid would only consider the commits with ts >
-				// MaxAssignedSeen.
-				if commitTs < minSeen {
+				// min start ts.
+				if commitTs < minStart {
 					delete(kw.keyCommitTs, k)
 				}
 			}
