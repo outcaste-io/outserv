@@ -340,6 +340,8 @@ message Posting {
     PASSWORD = 8;
     STRING = 9;
     OBJECT = 10;
+    BigInt = 11;
+    Uint = 12;
   }
   ValType val_type = 3;
   enum PostingType {
