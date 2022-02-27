@@ -32,7 +32,6 @@ import (
 	"github.com/outcaste-io/outserv/outserv/cmd/alpha"
 	"github.com/outcaste-io/outserv/outserv/cmd/bulk"
 	"github.com/outcaste-io/outserv/outserv/cmd/cert"
-	"github.com/outcaste-io/outserv/outserv/cmd/conv"
 	"github.com/outcaste-io/outserv/outserv/cmd/debug"
 	"github.com/outcaste-io/outserv/outserv/cmd/debuginfo"
 	"github.com/outcaste-io/outserv/outserv/cmd/decrypt"
@@ -82,7 +81,7 @@ var rootConf = viper.New()
 
 // subcommands initially contains all default sub-commands.
 var subcommands = []*x.SubCommand{
-	&bulk.Bulk, &cert.Cert, &conv.Conv, &live.Live,
+	&bulk.Bulk, &cert.Cert, &live.Live,
 	&alpha.Alpha, &zero.Zero, &version.Version, &debug.Debug, &migrate.Migrate,
 	&debuginfo.DebugInfo, &decrypt.Decrypt, &increment.Increment,
 }

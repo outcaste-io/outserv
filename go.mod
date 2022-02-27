@@ -47,7 +47,6 @@ require (
 	github.com/outcaste-io/dgo/v210 v210.0.0-20220225180226-43bd1b427e86
 	github.com/outcaste-io/ristretto v0.2.0
 	github.com/outcaste-io/sroar v0.0.0-20220207092908-fa5c189ea338
-	github.com/paulmach/go.geojson v0.0.0-20170327170536-40612a87147b
 	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/profile v1.2.1
