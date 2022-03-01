@@ -200,13 +200,6 @@ func (n *node) applyProposal(e raftpb.Entry) (uint64, error) {
 		}
 		state.Cid = p.Cid
 	}
-	// if p.MaxRaftId > 0 {
-	// 	if p.MaxRaftId <= state.MaxRaftId {
-	// 		return key, errInvalidProposal
-	// 	}
-	// 	state.MaxRaftId = p.MaxRaftId
-	// 	n.server.nextRaftId = x.Max(n.server.nextRaftId, p.MaxRaftId+1)
-	// }
 	if p.SnapshotTs != nil {
 		for gid, ts := range p.SnapshotTs {
 			if group, ok := state.Groups[gid]; ok {
@@ -429,6 +422,9 @@ func (n *node) Run() {
 			n.Raft().Tick()
 
 		case <-slowTicker.C:
+			// We should calculate the snapshot in the same loop, to ensure that
+			// we have applied all the Raft committed entries to the state, and
+			// that we're picking up the correct state.
 			if err := n.calculateAndProposeSnapshot(); err != nil {
 				glog.Errorf("While calculating snapshot: %v\n", err)
 			}
@@ -486,6 +482,7 @@ func (n *node) Run() {
 						glog.Errorf("While applying proposal: %v\n", err)
 					}
 					n.Proposals.Done(key, err)
+
 					if took := time.Since(start); took > time.Second {
 						var p pb.ZeroProposal
 						// Raft commits empty entry on becoming a leader.
@@ -576,7 +573,7 @@ func (n *node) calculateAndProposeSnapshot() error {
 		return nil
 	}
 
-	state := n.state.membershipState()
+	state := n.state.MembershipCopy()
 	zs := &pb.ZeroSnapshot{
 		Index: last,
 		State: state,
@@ -617,9 +614,9 @@ func (n *node) applyConfChange(e raftpb.Entry) {
 			GroupId: 0,
 			Learner: rc.IsLearner,
 		}
-		for _, member := range n.server.membershipState().Removed {
-			// It is not recommended to reuse RAFT ids.
-			if member.GroupId == 0 && m.Id == member.Id {
+		for _, member := range n.state.Membership().Removed {
+			// Reusing Raft IDs is not allowed.
+			if m.Id == member.Id {
 				err := errors.Errorf("REUSE_RAFTID: Reusing removed id: %d.\n", m.Id)
 				n.DoneConfChange(cc.ID, err)
 				// Cancel configuration change.
@@ -629,15 +626,10 @@ func (n *node) applyConfChange(e raftpb.Entry) {
 			}
 		}
 
-		n.server.storeZero(m)
+		n.state.StoreZero(m)
 	}
 
 	cs := n.Raft().ApplyConfChange(cc)
 	n.SetConfState(cs)
 	n.DoneConfChange(cc.ID, nil)
-
-	// The following doesn't really trigger leader change. It's just capturing a leader change
-	// event. The naming is poor. TODO: Fix naming, and see if we can simplify this leader change
-	// logic.
-	n.triggerLeaderChange()
 }
