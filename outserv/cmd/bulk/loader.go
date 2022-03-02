@@ -214,19 +214,19 @@ func (ld *loader) mapStage() {
 
 	fs := filestore.NewFileStore(ld.opt.DataFiles)
 
-	files := fs.FindDataFiles(ld.opt.DataFiles, []string{".rdf", ".rdf.gz", ".json", ".json.gz"})
+	files := fs.FindDataFiles(ld.opt.DataFiles, []string{".json", ".json.gz"})
 	if len(files) == 0 {
 		fmt.Printf("No data files found in %s.\n", ld.opt.DataFiles)
 		os.Exit(1)
 	}
 
 	// Because mappers must handle chunks that may be from different input files, they must all
-	// assume the same data format, either RDF or JSON. Use the one specified by the user or by
+	// assume the same data format, JSON. Use the one specified by the user or by
 	// the first load file.
 	loadType := chunker.DataFormat(files[0], ld.opt.DataFormat)
 	if loadType == chunker.UnknownFormat {
 		// Dont't try to detect JSON input in bulk loader.
-		fmt.Printf("Need --format=rdf or --format=json to load %s", files[0])
+		fmt.Printf("Need --format=json to load %s", files[0])
 		os.Exit(1)
 	}
 
@@ -334,11 +334,6 @@ func (ld *loader) processGqlSchema(loadType chunker.InputFormat) {
 	buf, err := ioutil.ReadAll(r)
 	x.Check(err)
 
-	rdfSchema := `_:gqlschema <dgraph.type> "dgraph.graphql" <%#x> .
-	_:gqlschema <dgraph.graphql.xid> "dgraph.graphql.schema" <%#x> .
-	_:gqlschema <dgraph.graphql.schema> %s <%#x> .
-	`
-
 	jsonSchema := `{
 		"namespace": "%#x",
 		"dgraph.type": "dgraph.graphql",
@@ -364,8 +359,6 @@ func (ld *loader) processGqlSchema(loadType chunker.InputFormat) {
 		}
 		quotedSch := strconv.Quote(string(b))
 		switch loadType {
-		case chunker.RdfFormat:
-			x.Check2(gqlBuf.Write([]byte(fmt.Sprintf(rdfSchema, ns, ns, quotedSch, ns))))
 		case chunker.JsonFormat:
 			x.Check2(gqlBuf.Write([]byte(fmt.Sprintf(jsonSchema, ns, quotedSch))))
 		}

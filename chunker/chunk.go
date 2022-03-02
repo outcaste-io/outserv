@@ -29,7 +29,6 @@ import (
 	"unicode"
 
 	"github.com/outcaste-io/outserv/ee/enc"
-	"github.com/outcaste-io/outserv/lex"
 	"github.com/outcaste-io/outserv/x"
 
 	"github.com/pkg/errors"
@@ -40,15 +39,6 @@ type Chunker interface {
 	Chunk(r *bufio.Reader) (*bytes.Buffer, error)
 	Parse(chunkBuf *bytes.Buffer) error
 	NQuads() *NQuadBuffer
-}
-
-type rdfChunker struct {
-	lexer *lex.Lexer
-	nqs   *NQuadBuffer
-}
-
-func (rc *rdfChunker) NQuads() *NQuadBuffer {
-	return rc.nqs
 }
 
 type jsonChunker struct {
@@ -66,8 +56,6 @@ type InputFormat byte
 const (
 	// UnknownFormat is a constant to denote a format not supported by the bulk/live loaders.
 	UnknownFormat InputFormat = iota
-	// RdfFormat is a constant to denote the input to the live/bulk loader is in the RDF format.
-	RdfFormat
 	// JsonFormat is a constant to denote the input to the live/bulk loader is in the JSON format.
 	JsonFormat
 )
@@ -75,11 +63,6 @@ const (
 // NewChunker returns a new chunker for the specified format.
 func NewChunker(inputFormat InputFormat, batchSize int) Chunker {
 	switch inputFormat {
-	case RdfFormat:
-		return &rdfChunker{
-			nqs:   NewNQuadBuffer(batchSize),
-			lexer: &lex.Lexer{},
-		}
 	case JsonFormat:
 		return &jsonChunker{
 			nqs: NewNQuadBuffer(batchSize),
@@ -88,77 +71,6 @@ func NewChunker(inputFormat InputFormat, batchSize int) Chunker {
 		x.Panic(errors.New("unknown input format"))
 		return nil
 	}
-}
-
-// Chunk reads the input line by line until one of the following 3 conditions happens
-// 1) the EOF is reached
-// 2) 1e5 lines have been read
-// 3) some unexpected error happened
-func (*rdfChunker) Chunk(r *bufio.Reader) (*bytes.Buffer, error) {
-	batch := new(bytes.Buffer)
-	batch.Grow(1 << 20)
-	for lineCount := 0; lineCount < 1e5; lineCount++ {
-		slc, err := r.ReadSlice('\n')
-		if err == io.EOF {
-			if _, err := batch.Write(slc); err != nil {
-				return nil, err
-			}
-			return batch, err
-		}
-		if err == bufio.ErrBufferFull {
-			// This should only happen infrequently.
-			if _, err := batch.Write(slc); err != nil {
-				return nil, err
-			}
-			var str string
-			str, err = r.ReadString('\n')
-			if err == io.EOF {
-				if _, err := batch.WriteString(str); err != nil {
-					return nil, err
-				}
-				return batch, err
-			}
-			if err != nil {
-				return nil, err
-			}
-			if _, err := batch.WriteString(str); err != nil {
-				return nil, err
-			}
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		if _, err := batch.Write(slc); err != nil {
-			return nil, err
-		}
-	}
-	return batch, nil
-}
-
-// Parse is not thread-safe. Only call it serially, because it reuses lexer object.
-func (rc *rdfChunker) Parse(chunkBuf *bytes.Buffer) error {
-	if chunkBuf == nil || chunkBuf.Len() == 0 {
-		return nil
-	}
-
-	for chunkBuf.Len() > 0 {
-		str, err := chunkBuf.ReadString('\n')
-		if err != nil && err != io.EOF {
-			x.Check(err)
-		}
-
-		nq, err := ParseRDF(str, rc.lexer)
-		switch {
-		case err == ErrEmpty:
-			continue // blank line or comment
-		case err != nil:
-			return errors.Wrapf(err, "while parsing line %q", str)
-		default:
-			rc.nqs.Push(&nq)
-		}
-	}
-	return nil
 }
 
 // Chunk tries to consume multiple top-level maps from the reader until a size threshold is
@@ -408,14 +320,12 @@ func IsJSONData(r *bufio.Reader) (bool, error) {
 	return err == nil, nil
 }
 
-// DataFormat returns a file's data format (RDF, JSON, or unknown) based on the filename
+// DataFormat returns a file's data format (JSON, or unknown) based on the filename
 // or the user-provided format option. The file extension has precedence.
 func DataFormat(filename string, format string) InputFormat {
 	format = strings.ToLower(format)
 	filename = strings.TrimSuffix(strings.ToLower(filename), ".gz")
 	switch {
-	case strings.HasSuffix(filename, ".rdf") || format == "rdf":
-		return RdfFormat
 	case strings.HasSuffix(filename, ".json") || format == "json":
 		return JsonFormat
 	default:

@@ -34,7 +34,7 @@ import (
 )
 
 // DefaultExportFormat stores the name of the default format for exports.
-const DefaultExportFormat = "rdf"
+const DefaultExportFormat = "json"
 
 type exportFormat struct {
 	ext  string // file extension
@@ -48,11 +48,6 @@ var exportFormats = map[string]exportFormat{
 		pre:  "[\n",
 		post: "\n]\n",
 	},
-	"rdf": {
-		ext:  ".rdf",
-		pre:  "",
-		post: "",
-	},
 }
 
 type exporter struct {
@@ -63,22 +58,7 @@ type exporter struct {
 	readTs    uint64
 }
 
-// Map from our types to RDF type. Useful when writing storage types
-// for RDF's in export. This is the dgraph type name and rdf storage type
-// might not be the same always (e.g. - datetime and bool).
-var rdfTypeMap = map[types.TypeID]string{
-	types.StringID:   "xs:string",
-	types.DateTimeID: "xs:dateTime",
-	types.IntID:      "xs:int",
-	types.FloatID:    "xs:float",
-	types.BoolID:     "xs:boolean",
-	types.GeoID:      "geo:geojson",
-	types.BinaryID:   "xs:base64Binary",
-	types.PasswordID: "xs:password",
-}
-
 // UIDs like 0x1 look weird but 64-bit ones like 0x0000000000000001 are too long.
-var uidFmtStrRdf = "<%#x>"
 var uidFmtStrJson = "\"%#x\""
 
 // valToStr converts a posting value to a string.
@@ -150,47 +130,6 @@ func (e *exporter) toJSON() (*bpb.KVList, error) {
 		}
 
 		fmt.Fprint(bp, "}")
-		return nil
-	})
-
-	kv := &bpb.KV{
-		Value:   bp.Bytes(),
-		Version: 1,
-	}
-	return listWrap(kv), err
-}
-
-func (e *exporter) toRDF() (*bpb.KVList, error) {
-	bp := new(bytes.Buffer)
-
-	prefix := fmt.Sprintf(uidFmtStrRdf+" <%s> ", e.uid, e.attr)
-	err := e.pl.IterateAll(e.readTs, 0, func(p *pb.Posting) error {
-		fmt.Fprint(bp, prefix)
-		if p.PostingType == pb.Posting_REF {
-			fmt.Fprintf(bp, uidFmtStrRdf, p.Uid)
-		} else {
-			val := types.Val{Tid: types.TypeID(p.ValType), Value: p.Value}
-			str, err := valToStr(val)
-			if err != nil {
-				glog.Errorf("Ignoring error: %+v\n", err)
-				return nil
-			}
-			fmt.Fprintf(bp, "%s", escapedString(str))
-
-			tid := types.TypeID(p.ValType)
-			if p.PostingType == pb.Posting_VALUE_LANG {
-				fmt.Fprint(bp, "@"+string(p.LangTag))
-			} else if tid != types.DefaultID {
-				rdfType, ok := rdfTypeMap[tid]
-				x.AssertTruef(ok, "Didn't find RDF type for dgraph type: %+v", tid.Name())
-				fmt.Fprint(bp, "^^<"+rdfType+">")
-			}
-		}
-		// Use label for storing namespace.
-		fmt.Fprintf(bp, " <%#x>", e.namespace)
-
-		// End dot.
-		fmt.Fprint(bp, " .\n")
 		return nil
 	})
 
@@ -323,7 +262,7 @@ func (writer *ExportWriter) Close() error {
 // ExportedFiles has the relative path of files that were written during export
 type ExportedFiles []string
 
-// export creates a export of data by exporting it as an RDF gzip.
+// export creates a export of data by exporting it as an JSON gzip.
 func export(ctx context.Context, in *pb.ExportRequest) (ExportedFiles, error) {
 	if in.GroupId != groups().groupId() {
 		return nil, errors.Errorf("Export request group mismatch. Mine: %d. Requested: %d",
@@ -422,8 +361,6 @@ func ToExportKvList(pk x.ParsedKey, pl *posting.List, in *pb.ExportRequest) (*bp
 		switch in.Format {
 		case "json":
 			return e.toJSON()
-		case "rdf":
-			return e.toRDF()
 		default:
 			glog.Fatalf("Invalid export format found: %s", in.Format)
 		}
@@ -445,9 +382,6 @@ func WriteExport(writers *Writers, kv *bpb.KV, format string) error {
 	switch format {
 	case "json":
 		dataSeparator = []byte(",\n")
-	case "rdf":
-		// The separator for RDF should be empty since the toRDF function already
-		// adds newline to each RDF entry.
 	default:
 		glog.Fatalf("Invalid export format found: %s", format)
 	}
