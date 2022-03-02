@@ -5,13 +5,13 @@ main() {
 
   set -e
   build_compose_tool $@
-  build_dgraph_docker_image
+  build_outserv_docker_image
   launch_environment
 }
 
 setup() {
   readonly ME=${0##*/}
-  DGRAPH_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+  OUTSERV_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
   readonly COMPOSE_FILE="./docker-compose.yml"
 
   if [[ $1 == "-h" || $1 == "--help" ]]; then usage; fi
@@ -29,11 +29,11 @@ usage: ./run.sh [./compose args ...]
 
 description:
 
-    Without arguments, rebuild dgraph and bring up the docker-compose.yml
+    Without arguments, rebuild outserv and bring up the docker-compose.yml
     config found here.
 
     With arguments, pass them all to ./compose to create a docker-compose.yml
-    file first, then rebuild dgraph and bring up the config.
+    file first, then rebuild outserv and bring up the config.
 EOF
     exit 0
 }
@@ -66,32 +66,32 @@ build_compose_tool() {
   fi
 }
 
-build_dgraph_docker_image() {
+build_outserv_docker_image() {
   ## linux binary required for docker image
   export GOOS=linux
-  Info "rebuilding dgraph ..."
-  ( cd $DGRAPH_ROOT/dgraph && make install )
+  Info "rebuilding outserv ..."
+  ( cd $OUTSERV_ROOT/outserv && make install )
 }
 
 launch_environment() {
   # Detect if $GOPATH/bin/$GOOS_$GOARCH path
-  if [[ -f $GOPATH/bin/linux_amd64/dgraph ]]; then
-    Info "Found '$GOPATH/bin/linux_amd64/dgraph'. Updating $COMPOSE_FILE."
+  if [[ -f $GOPATH/bin/linux_amd64/outserv ]]; then
+    Info "Found '$GOPATH/bin/linux_amd64/outserv'. Updating $COMPOSE_FILE."
     sed -i 's/\$GOPATH\/bin$/\$GOPATH\/bin\/linux_amd64/' $COMPOSE_FILE
-  # if no dgraph binary found, abort
-  elif ! [[ -f $GOPATH/bin/dgraph ]]; then
-    echo "ERROR: '$GOPATH/bin/dgraph' not found. Exiting" 1>&2
+  # if no outserv binary found, abort
+  elif ! [[ -f $GOPATH/bin/outserv ]]; then
+    echo "ERROR: '$GOPATH/bin/outserv' not found. Exiting" 1>&2
     exit 1
   else
-    Info "Found '$GOPATH/bin/dgraph'"
+    Info "Found '$GOPATH/bin/outserv'"
   fi
 
   # No need to down existing containers, if any.
   # The up command handles that automatically
 
   Info "Bringing up containers"
-  docker-compose -p dgraph down
-  docker-compose --compatibility -p dgraph up --force-recreate --remove-orphans
+  docker-compose -p outserv down
+  docker-compose --compatibility -p outserv up --force-recreate --remove-orphans
 }
 
 main $@

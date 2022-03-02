@@ -570,7 +570,7 @@ func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr erro
 
 	// Go through all the predicates and their first observed schema type. If we are unable to find
 	// these predicates in the current schema state, add them to the schema state. Note that the
-	// schema deduction is done by RDF/JSON chunker.
+	// schema deduction is done by JSON chunker.
 	for attr, storageType := range schemaMap {
 		if _, err := schema.State().TypeOf(attr); err != nil {
 			hint := pb.Metadata_DEFAULT

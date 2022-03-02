@@ -25,7 +25,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/edgraph"
-	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/query"
 	"github.com/outcaste-io/outserv/x"
@@ -232,16 +231,6 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// If rdf is set true, then response will be in rdf format.
-	rdfResponse, err := parseBool(r, "rdf")
-	if err != nil {
-		x.SetStatus(w, x.ErrorInvalidRequest, err.Error())
-		return
-	}
-	if rdfResponse {
-		req.RespFormat = api.Request_RDF
-	}
-
 	// Core processing happens here.
 	resp, err := (&edgraph.Server{}).Query(ctx, &req)
 	if err != nil {
@@ -271,11 +260,7 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 		x.Check2(out.Write(js))
 	}
 	x.Check2(out.WriteRune('{'))
-	if rdfResponse {
-		writeEntry("data", resp.Rdf)
-	} else {
-		writeEntry("data", resp.Json)
-	}
+	writeEntry("data", resp.Json)
 	x.Check2(out.WriteRune(','))
 	writeEntry("extensions", js)
 	x.Check2(out.WriteRune('}'))
@@ -391,17 +376,9 @@ func mutationHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-	case "application/rdf":
-		// Parse N-Quads.
-		req, err = gql.ParseMutation(string(body))
-		if err != nil {
-			x.SetStatus(w, x.ErrorInvalidRequest, err.Error())
-			return
-		}
-
 	default:
 		x.SetStatus(w, x.ErrorInvalidRequest, "Unsupported Content-Type. "+
-			"Supported content types are application/json, application/rdf")
+			"Supported content types are application/json")
 		return
 	}
 

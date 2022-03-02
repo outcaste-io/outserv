@@ -33,20 +33,21 @@ func TestMetricTxnCommits(t *testing.T) {
 	mt := `
     {
 	  set {
-		<0x71>  <name> "Bob" .
+		"uid":"0x71",
+		"name":"Bob"
 	  }
 	}
 	`
 
 	// first normal commit
-	mr, err := mutationWithTs(mutationInp{body: mt, typ: "application/rdf"})
+	mr, err := mutationWithTs(mutationInp{body: mt, typ: "application/json"})
 	require.NoError(t, err)
 	require.NoError(t, commitWithTs(mr, false))
 
 	metrics := fetchMetrics(t, metricName)
 
 	// second normal commit
-	mr, err = mutationWithTs(mutationInp{body: mt, typ: "application/rdf"})
+	mr, err = mutationWithTs(mutationInp{body: mt, typ: "application/json"})
 	require.NoError(t, err)
 	require.NoError(t, commitWithTs(mr, false))
 
@@ -60,20 +61,21 @@ func TestMetricTxnDiscards(t *testing.T) {
 	mt := `
     {
 	  set {
-		<0x71>  <name> "Bob" .
+		"uid":"0x71",
+		"name":"Bob"
 	  }
 	}
 	`
 
 	// first normal commit
-	mr, err := mutationWithTs(mutationInp{body: mt, typ: "application/rdf"})
+	mr, err := mutationWithTs(mutationInp{body: mt, typ: "application/json"})
 	require.NoError(t, err)
 	require.NoError(t, commitWithTs(mr, false))
 
 	metrics := fetchMetrics(t, metricName)
 
 	// second commit discarded
-	mr, err = mutationWithTs(mutationInp{body: mt, typ: "application/rdf"})
+	mr, err = mutationWithTs(mutationInp{body: mt, typ: "application/json"})
 	require.NoError(t, err)
 	require.NoError(t, commitWithTs(mr, true))
 
@@ -87,23 +89,24 @@ func TestMetricTxnAborts(t *testing.T) {
 	mt := `
     {
 	  set {
-		<0x71>  <name> "Bob" .
+		"uid":"0x71",
+		"name":"Bob"
 	  }
 	}
 	`
 
-	mr1, err := mutationWithTs(mutationInp{body: mt, typ: "application/rdf"})
+	mr1, err := mutationWithTs(mutationInp{body: mt, typ: "application/json"})
 	require.NoError(t, err)
-	mr2, err := mutationWithTs(mutationInp{body: mt, typ: "application/rdf"})
+	mr2, err := mutationWithTs(mutationInp{body: mt, typ: "application/json"})
 	require.NoError(t, err)
 	require.NoError(t, commitWithTs(mr1, false))
 	require.Error(t, commitWithTs(mr2, false))
 
 	metrics := fetchMetrics(t, metricName)
 
-	mr1, err = mutationWithTs(mutationInp{body: mt, typ: "application/rdf"})
+	mr1, err = mutationWithTs(mutationInp{body: mt, typ: "application/json"})
 	require.NoError(t, err)
-	mr2, err = mutationWithTs(mutationInp{body: mt, typ: "application/rdf"})
+	mr2, err = mutationWithTs(mutationInp{body: mt, typ: "application/json"})
 	require.NoError(t, err)
 	require.NoError(t, commitWithTs(mr1, false))
 	require.Error(t, commitWithTs(mr2, false))
