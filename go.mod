@@ -27,7 +27,6 @@ require (
 	github.com/docker/docker v1.13.1
 	github.com/dustin/go-humanize v1.0.0
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
-	github.com/getsentry/sentry-go v0.6.0
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/geo v0.0.0-20190916061304-5b978397cfec
@@ -42,7 +41,6 @@ require (
 	github.com/graph-gophers/graphql-go v0.0.0-20201113091052-beb923fada29
 	github.com/minio/minio-go/v6 v6.0.55
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
-	github.com/mitchellh/panicwrap v1.0.0
 	github.com/outcaste-io/badger/v3 v3.0.0-20220210203236-1b1148a36313
 	github.com/outcaste-io/dgo/v210 v210.0.0-20220225180226-43bd1b427e86
 	github.com/outcaste-io/ristretto v0.2.0

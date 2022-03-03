@@ -35,7 +35,6 @@ import (
 	"github.com/outcaste-io/outserv/filestore"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
-	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/ristretto/z"
 
 	"github.com/outcaste-io/outserv/tok"
@@ -214,12 +213,6 @@ func run() {
 		// Need to set zero addr in WorkerConfig before checking the license.
 		x.WorkerConfig.ZeroAddr = []string{opt.ZeroAddr}
 		x.WorkerConfig.TLSClientConfig = tlsConf
-		if !worker.EnterpriseEnabled() {
-			// Crash since the enterprise license is not enabled..
-			log.Fatal("Enterprise License needed for the Encryption feature.")
-		} else {
-			log.Printf("Encryption feature enabled.")
-		}
 	}
 	fmt.Printf("Encrypted input: %v; Encrypted output: %v\n", opt.Encrypted, opt.EncryptedOut)
 
