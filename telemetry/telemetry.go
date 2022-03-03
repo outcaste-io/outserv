@@ -34,12 +34,10 @@ import (
 type Telemetry struct {
 	Arch         string `json:",omitempty"`
 	Cid          string `json:",omitempty"`
-	ClusterSize  int    `json:",omitempty"`
 	DiskUsageMB  int64  `json:",omitempty"`
-	NumAlphas    int    `json:",omitempty"`
+	NumMembers   int    `json:",omitempty"`
 	NumGroups    int    `json:",omitempty"`
 	NumTablets   int    `json:",omitempty"`
-	NumZeros     int    `json:",omitempty"`
 	OS           string `json:",omitempty"`
 	SinceHours   int    `json:",omitempty"`
 	Version      string `json:",omitempty"`
@@ -56,22 +54,20 @@ func NewZero(ms *pb.MembershipState) *Telemetry {
 		return nil
 	}
 	t := &Telemetry{
-		Cid:       ms.GetCid(),
-		NumGroups: len(ms.GetGroups()),
-		NumZeros:  len(ms.GetZeros()),
-		Version:   x.Version(),
-		OS:        runtime.GOOS,
-		Arch:      runtime.GOARCH,
+		Cid:        ms.GetCid(),
+		NumGroups:  len(ms.GetGroups()),
+		NumMembers: len(ms.GetMembers()),
+		Version:    x.Version(),
+		OS:         runtime.GOOS,
+		Arch:       runtime.GOARCH,
 	}
 	for _, g := range ms.GetGroups() {
-		t.NumAlphas += len(g.GetMembers())
 		for _, tablet := range g.GetTablets() {
 			t.NumTablets++
 			t.DiskUsageMB += tablet.GetOnDiskBytes()
 		}
 	}
 	t.DiskUsageMB /= (1 << 20)
-	t.ClusterSize = t.NumAlphas + t.NumZeros
 	return t
 }
 

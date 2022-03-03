@@ -20,6 +20,7 @@ import (
 	"github.com/outcaste-io/outserv/raftwal"
 	"github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/outserv/zero"
 	"github.com/outcaste-io/ristretto/z"
 	"github.com/pkg/errors"
 )
@@ -73,34 +74,30 @@ func StartRaftNodes(walStore *raftwal.DiskStorage, bindall bool) {
 		m.ForceGroupId = true
 	}
 	glog.Infof("Sending member request to Zero: %+v\n", m)
-	var connState *pb.ConnectionState
-	var err error
 
 	// TODO: The following should directly interact with the zero package.
 
-	for { // Keep on retrying. See: https://github.com/dgraph-io/dgraph/issues/2289
-		pl := gr.connToZeroLeader()
-		if pl == nil {
-			continue
-		}
-		zc := pb.NewZeroClient(pl.Get())
-		connState, err = zc.Connect(gr.Ctx(), m)
-		if err == nil || x.ShouldCrash(err) {
-			break
-		}
-	}
+	connState, err := zero.LatestMembershipState(gr.Ctx())
+	// for { // Keep on retrying. See: https://github.com/dgraph-io/dgraph/issues/2289
+	// 	pl := gr.connToZeroLeader()
+	// 	if pl == nil {
+	// 		continue
+	// 	}
+	// 	zc := pb.NewZeroClient(pl.Get())
+	// 	connState, err = zc.Connect(gr.Ctx(), m)
+	// 	if err == nil || x.ShouldCrash(err) {
+	// 		break
+	// 	}
+	// }
 	x.CheckfNoTrace(err)
-	if connState.GetMember() == nil || connState.GetState() == nil {
+	if connState == nil {
 		x.Fatalf("Unable to join cluster via dgraphzero")
 	}
-	glog.Infof("Connected to group zero. Assigned group: %+v\n", connState.GetMember().GetGroupId())
-	raftIdx = connState.GetMember().GetId()
-	glog.Infof("Raft Id after connection to Zero: %#x\n", raftIdx)
 
 	// This timestamp would be used for reading during snapshot after bulk load.
 	// The stream is async, we need this information before we start or else replica might
 	// not get any data.
-	gr.applyState(raftIdx, connState.GetState())
+	gr.applyState(raftIdx, connState)
 
 	gid := gr.groupId()
 	gr.triggerCh = make(chan struct{}, 1)
@@ -273,13 +270,6 @@ func (g *groupi) applyState(myId uint64, state *pb.MembershipState) {
 		return
 	}
 
-	invalid := state.License != nil && !state.License.Enabled
-	if g.Node != nil && g.Node.RaftContext.IsLearner && invalid {
-		glog.Errorf("ENTERPRISE_ONLY_LEARNER: License Expired. Cannot run learner nodes.")
-		x.ServerCloser.Signal()
-		return
-	}
-
 	oldState := g.state
 	g.state = state
 
@@ -287,15 +277,6 @@ func (g *groupi) applyState(myId uint64, state *pb.MembershipState) {
 	var foundSelf bool
 	g.tablets = make(map[string]*pb.Tablet)
 	for gid, group := range g.state.Groups {
-		for _, member := range group.Members {
-			if myId == member.Id {
-				foundSelf = true
-				atomic.StoreUint32(&g.gid, gid)
-			}
-			if x.WorkerConfig.MyAddr != member.Addr {
-				conn.GetPools().Connect(member.Addr, x.WorkerConfig.TLSClientConfig)
-			}
-		}
 		for _, tablet := range group.Tablets {
 			g.tablets[tablet.Predicate] = tablet
 		}
@@ -304,7 +285,7 @@ func (g *groupi) applyState(myId uint64, state *pb.MembershipState) {
 			atomic.StoreUint64(&g.membershipChecksum, group.Checksum)
 		}
 	}
-	for _, member := range g.state.Zeros {
+	for _, member := range g.state.Members {
 		if x.WorkerConfig.MyAddr != member.Addr {
 			conn.GetPools().Connect(member.Addr, x.WorkerConfig.TLSClientConfig)
 		}
@@ -396,33 +377,37 @@ func (g *groupi) BelongsToReadOnly(key string, ts uint64) (uint32, error) {
 		}
 		return tablet.GetGroupId(), nil
 	}
+	return 0, nil
 
 	// We don't know about this tablet. Talk to dgraphzero to find out who is
 	// serving this tablet.
-	pl := g.connToZeroLeader()
-	zc := pb.NewZeroClient(pl.Get())
 
-	tablet = &pb.Tablet{
-		Predicate: key,
-		ReadOnly:  true,
-	}
-	out, err := zc.ShouldServe(g.Ctx(), tablet)
-	if err != nil {
-		glog.Errorf("Error while ShouldServe grpc call %v", err)
-		return 0, err
-	}
-	if out.GetGroupId() == 0 {
-		return 0, nil
-	}
+	// TODO: Fix up below.
 
-	g.Lock()
-	defer g.Unlock()
-	g.tablets[key] = out
-	if out != nil && ts > 0 && ts < out.MoveTs {
-		return 0, errors.Errorf("StartTs: %d is from before MoveTs: %d for pred: %q",
-			ts, out.MoveTs, key)
-	}
-	return out.GetGroupId(), nil
+	// pl := g.connToZeroLeader()
+	// zc := pb.NewZeroClient(pl.Get())
+
+	// tablet = &pb.Tablet{
+	// 	Predicate: key,
+	// 	ReadOnly:  true,
+	// }
+	// out, err := zc.ShouldServe(g.Ctx(), tablet)
+	// if err != nil {
+	// 	glog.Errorf("Error while ShouldServe grpc call %v", err)
+	// 	return 0, err
+	// }
+	// if out.GetGroupId() == 0 {
+	// 	return 0, nil
+	// }
+
+	// g.Lock()
+	// defer g.Unlock()
+	// g.tablets[key] = out
+	// if out != nil && ts > 0 && ts < out.MoveTs {
+	// 	return 0, errors.Errorf("StartTs: %d is from before MoveTs: %d for pred: %q",
+	// 		ts, out.MoveTs, key)
+	// }
+	// return out.GetGroupId(), nil
 }
 
 func (g *groupi) ServesTablet(key string) (bool, error) {
@@ -435,27 +420,30 @@ func (g *groupi) ServesTablet(key string) (bool, error) {
 }
 
 func (g *groupi) sendTablet(tablet *pb.Tablet) (*pb.Tablet, error) {
-	pl := g.connToZeroLeader()
-	zc := pb.NewZeroClient(pl.Get())
+	return nil, nil
+	// TODO: Fix up below.
 
-	out, err := zc.ShouldServe(g.Ctx(), tablet)
-	if err != nil {
-		glog.Errorf("Error while ShouldServe grpc call %v", err)
-		return nil, err
-	}
+	// pl := g.connToZeroLeader()
+	// zc := pb.NewZeroClient(pl.Get())
 
-	// Do not store tablets with group ID 0, as they are just dummy tablets for
-	// predicates that do no exist.
-	if out.GroupId > 0 {
-		g.Lock()
-		g.tablets[out.GetPredicate()] = out
-		g.Unlock()
-	}
+	// out, err := zc.ShouldServe(g.Ctx(), tablet)
+	// if err != nil {
+	// 	glog.Errorf("Error while ShouldServe grpc call %v", err)
+	// 	return nil, err
+	// }
 
-	if out.GroupId == groups().groupId() {
-		glog.Infof("Serving tablet for: %v\n", tablet.GetPredicate())
-	}
-	return out, nil
+	// // Do not store tablets with group ID 0, as they are just dummy tablets for
+	// // predicates that do no exist.
+	// if out.GroupId > 0 {
+	// 	g.Lock()
+	// 	g.tablets[out.GetPredicate()] = out
+	// 	g.Unlock()
+	// }
+
+	// if out.GroupId == groups().groupId() {
+	// 	glog.Infof("Serving tablet for: %v\n", tablet.GetPredicate())
+	// }
+	// return out, nil
 }
 
 func (g *groupi) Inform(preds []string) ([]*pb.Tablet, error) {
@@ -479,32 +467,35 @@ func (g *groupi) Inform(preds []string) ([]*pb.Tablet, error) {
 		return nil, nil
 	}
 
-	pl := g.connToZeroLeader()
-	zc := pb.NewZeroClient(pl.Get())
-	out, err := zc.Inform(g.Ctx(), &pb.TabletRequest{
-		Tablets: unknownPreds,
-		GroupId: g.groupId(),
-	})
-	if err != nil {
-		glog.Errorf("Error while Inform grpc call %v", err)
-		return nil, err
-	}
+	return nil, nil
+	// TODO: Fix up below.
 
-	// Do not store tablets with group ID 0, as they are just dummy tablets for
-	// predicates that do no exist.
-	g.Lock()
-	for _, t := range out.Tablets {
-		if t.GroupId > 0 {
-			g.tablets[t.GetPredicate()] = t
-			tablets = append(tablets, t)
-		}
+	// pl := g.connToZeroLeader()
+	// zc := pb.NewZeroClient(pl.Get())
+	// out, err := zc.Inform(g.Ctx(), &pb.TabletRequest{
+	// 	Tablets: unknownPreds,
+	// 	GroupId: g.groupId(),
+	// })
+	// if err != nil {
+	// 	glog.Errorf("Error while Inform grpc call %v", err)
+	// 	return nil, err
+	// }
 
-		if t.GroupId == groups().groupId() {
-			glog.Infof("Serving tablet for: %v\n", t.GetPredicate())
-		}
-	}
-	g.Unlock()
-	return tablets, nil
+	// // Do not store tablets with group ID 0, as they are just dummy tablets for
+	// // predicates that do no exist.
+	// g.Lock()
+	// for _, t := range out.Tablets {
+	// 	if t.GroupId > 0 {
+	// 		g.tablets[t.GetPredicate()] = t
+	// 		tablets = append(tablets, t)
+	// 	}
+
+	// 	if t.GroupId == groups().groupId() {
+	// 		glog.Infof("Serving tablet for: %v\n", t.GetPredicate())
+	// 	}
+	// }
+	// g.Unlock()
+	// return tablets, nil
 }
 
 // Do not modify the returned Tablet
@@ -534,11 +525,7 @@ func (g *groupi) HasMeInState() bool {
 		return false
 	}
 
-	group, has := g.state.Groups[g.groupId()]
-	if !has {
-		return false
-	}
-	_, has = group.Members[g.Node.Id]
+	_, has := g.state.Members[g.Node.Id]
 	return has
 }
 
@@ -550,12 +537,11 @@ func (g *groupi) AnyTwoServers(gid uint32) []string {
 	if g.state == nil {
 		return []string{}
 	}
-	group, has := g.state.Groups[gid]
-	if !has {
-		return []string{}
-	}
 	var res []string
-	for _, m := range group.Members {
+	for _, m := range g.state.Members {
+		if m.GroupId != gid {
+			continue
+		}
 		// map iteration gives us members in no particular order.
 		res = append(res, m.Addr)
 		if len(res) >= 2 {
@@ -573,13 +559,18 @@ func (g *groupi) members(gid uint32) map[uint64]*pb.Member {
 		return nil
 	}
 	if gid == 0 {
-		return g.state.Zeros
+		return g.state.Members
 	}
-	group, has := g.state.Groups[gid]
-	if !has {
-		return nil
+
+	res := make(map[uint64]*pb.Member)
+	for _, m := range g.state.Members {
+		if m.GroupId != gid {
+			continue
+		}
+		// map iteration gives us members in no particular order.
+		res[m.Id] = m
 	}
-	return group.Members
+	return res
 }
 
 func (g *groupi) AnyServer(gid uint32) *conn.Pool {
@@ -658,17 +649,14 @@ func (g *groupi) triggerMembershipSync() {
 
 func (g *groupi) doSendMembership(tablets map[string]*pb.Tablet) error {
 	leader := g.Node.AmLeader()
-	member := &pb.Member{
-		Id:         g.Node.Id,
-		GroupId:    g.groupId(),
-		Addr:       x.WorkerConfig.MyAddr,
-		Leader:     leader,
-		LastUpdate: uint64(time.Now().Unix()),
-	}
-	group := &pb.Group{
-		Members: make(map[uint64]*pb.Member),
-	}
-	group.Members[member.Id] = member
+	// member := &pb.Member{
+	// 	Id:         g.Node.Id,
+	// 	GroupId:    g.groupId(),
+	// 	Addr:       x.WorkerConfig.MyAddr,
+	// 	Leader:     leader,
+	// 	LastUpdate: uint64(time.Now().Unix()),
+	// }
+	group := &pb.Group{}
 	if leader {
 		// Do not send tablet information, if I'm not the leader.
 		group.Tablets = tablets
@@ -678,21 +666,24 @@ func (g *groupi) doSendMembership(tablets map[string]*pb.Tablet) error {
 		group.CheckpointTs = atomic.LoadUint64(&g.Node.checkpointTs)
 	}
 
-	pl := g.connToZeroLeader()
-	if pl == nil {
-		return errNoConnection
-	}
-	c := pb.NewZeroClient(pl.Get())
-	ctx, cancel := context.WithTimeout(g.Ctx(), 10*time.Second)
-	defer cancel()
-	reply, err := c.UpdateMembership(ctx, group)
-	if err != nil {
-		return err
-	}
-	if string(reply.GetData()) == "OK" {
-		return nil
-	}
-	return errors.Errorf(string(reply.GetData()))
+	return nil
+	// TODO: Fix up below.
+
+	// pl := g.connToZeroLeader()
+	// if pl == nil {
+	// 	return errNoConnection
+	// }
+	// c := pb.NewZeroClient(pl.Get())
+	// ctx, cancel := context.WithTimeout(g.Ctx(), 10*time.Second)
+	// defer cancel()
+	// reply, err := c.UpdateMembership(ctx, group)
+	// if err != nil {
+	// 	return err
+	// }
+	// if string(reply.GetData()) == "OK" {
+	// 	return nil
+	// }
+	// return errors.Errorf(string(reply.GetData()))
 }
 
 // sendMembershipUpdates sends the membership update to Zero leader. If this Alpha is the leader, it
@@ -750,6 +741,13 @@ func (g *groupi) receiveMembershipUpdates() {
 		g.closer.Done() // CLOSER:1
 	}()
 
+	ms, err := zero.LatestMembershipState(g.Ctx())
+	if err != nil {
+		glog.Errorf("While receiving membership state from Zero: %v\n", err)
+	}
+	glog.Infof(" ---------> Got membership state: %+v\n", ms)
+	return
+
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
@@ -760,8 +758,9 @@ START:
 	default:
 	}
 
-	pl := g.connToZeroLeader()
+	// pl := g.connToZeroLeader()
 	// We should always have some connection to dgraphzero.
+	var pl *conn.Pool
 	if pl == nil {
 		glog.Warningln("Membership update: No Zero server known.")
 		time.Sleep(time.Second)

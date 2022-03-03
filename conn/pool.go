@@ -106,12 +106,7 @@ func (p *Pools) RemoveInvalid(state *pb.MembershipState) {
 	// Keeps track of valid IP addresses, assigned to active nodes. We do this
 	// to avoid removing valid IP addresses from the Removed list.
 	validAddr := make(map[string]struct{})
-	for _, group := range state.Groups {
-		for _, member := range group.Members {
-			validAddr[member.Addr] = struct{}{}
-		}
-	}
-	for _, member := range state.Zeros {
+	for _, member := range state.Members {
 		validAddr[member.Addr] = struct{}{}
 	}
 	for _, member := range state.Removed {

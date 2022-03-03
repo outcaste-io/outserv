@@ -55,12 +55,8 @@ func TaskStatusOverNetwork(ctx context.Context, req *pb.TaskStatusRequest,
 
 	// Find the Alpha with the required Raft ID.
 	var addr string
-	for _, group := range groups().state.GetGroups() {
-		for _, member := range group.GetMembers() {
-			if member.GetId() == raftId {
-				addr = member.GetAddr()
-			}
-		}
+	if member, has := groups().state.Members[raftId]; has {
+		addr = member.Addr
 	}
 	if addr == "" {
 		return nil, fmt.Errorf("the Alpha that served that task is not available")

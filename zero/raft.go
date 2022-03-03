@@ -225,8 +225,8 @@ func (n *node) applyProposal(e raftpb.Entry) (uint64, error) {
 		// Could happen after restart when some entries were there in WAL and did not get
 		// snapshotted.
 		glog.Infof("Could not apply proposal, ignoring: p.MaxUID=%v, "+
-			"p.MaxNsID=%v, maxUID=%d maxTxnTs=%d maxNsID=%d\n",
-			p.MaxUID, p.MaxNsID, state.MaxUID, state.MaxTxnTs, state.MaxNsID)
+			"p.MaxNsID=%v, maxUID=%d maxNsID=%d\n",
+			p.MaxUID, p.MaxNsID, state.MaxUID, state.MaxNsID)
 	}
 
 	// Now assign the new state back.
@@ -236,7 +236,6 @@ func (n *node) applyProposal(e raftpb.Entry) (uint64, error) {
 
 func newGroup() *pb.Group {
 	return &pb.Group{
-		Members: make(map[uint64]*pb.Member),
 		Tablets: make(map[string]*pb.Tablet),
 	}
 }
@@ -250,15 +249,11 @@ func (n *node) handleMemberProposal(member *pb.Member) error {
 	if m != nil && m.Id != member.Id {
 		return errors.Errorf("Found another member %d with same address: %v", m.Id, m.Addr)
 	}
-	group := state.Groups[member.GroupId]
-	if group == nil {
-		group = newGroup()
-		state.Groups[member.GroupId] = group
-	}
-	m, has := group.Members[member.Id]
+
+	m, has := state.Members[member.Id]
 	if member.AmDead {
 		if has {
-			delete(group.Members, member.Id)
+			delete(state.Members, member.Id)
 			state.Removed = append(state.Removed, m)
 		}
 		return nil
@@ -267,11 +262,11 @@ func (n *node) handleMemberProposal(member *pb.Member) error {
 	// Create a connection to this server.
 	go conn.GetPools().Connect(member.Addr, n.state.tlsClientConfig)
 
-	group.Members[member.Id] = member
+	state.Members[member.Id] = member
 	if member.Leader {
 		// Unset leader flag for other nodes, there can be only one
 		// leader at a time.
-		for _, m := range group.Members {
+		for _, m := range state.Members {
 			if m.Id != member.Id {
 				m.Leader = false
 			}
@@ -334,7 +329,7 @@ func (n *node) initAndStartNode() error {
 			x.Check(zs.Unmarshal(sp.Data))
 			n.state.SetMembershipState(zs.State)
 			for _, id := range sp.Metadata.ConfState.Nodes {
-				n.Connect(id, zs.State.Zeros[id].Addr)
+				n.Connect(id, zs.State.Members[id].Addr)
 			}
 		}
 		n.SetRaft(raft.RestartNode(n.Cfg))
@@ -398,20 +393,24 @@ func (n *node) Run() {
 
 	// snapshot can cause select loop to block while deleting entries, so run
 	// it in goroutine
-	closer := z.NewCloser(1)
-	// defer func() {
-	// 	closer.SignalAndWait()
-	// 	n.closer.Done()
-	// 	glog.Infof("Zero Node.Run finished.")
-	// }()
+	closer := z.NewCloser(2)
+
+	defer func() {
+		closer.SignalAndWait()
+		glog.Infof("Zero Node.Run finished.")
+		n.closer.Done()
+	}()
 
 	go n.snapshotPeriodically(closer)
 	if !x.WorkerConfig.HardSync {
 		closer.AddRunning(1)
 		go x.StoreSync(n.Store, closer)
 	}
+
 	// We only stop runReadIndexLoop after the for loop below has finished interacting with it.
 	// That way we know sending to readStateCh will not deadlock.
+	readStateCh := make(chan raft.ReadState, 100)
+	go n.RunReadIndexLoop(closer, readStateCh)
 
 	glog.Infof("Zero.Run")
 	var leader bool
@@ -438,6 +437,13 @@ func (n *node) Run() {
 			timer.Start()
 			_, span := otrace.StartSpan(n.ctx, "Zero.RunLoop",
 				otrace.WithSampler(otrace.ProbabilitySampler(0.001)))
+			for _, rs := range rd.ReadStates {
+				// No need to use select-case-default on pushing to readStateCh. It is typically
+				// empty.
+				readStateCh <- rs
+			}
+			glog.Infof("Read states: %d\n", len(rd.ReadStates))
+			span.Annotatef(nil, "Pushed %d readstates", len(rd.ReadStates))
 
 			if rd.SoftState != nil {
 				leader = rd.RaftState == raft.StateLeader
@@ -634,7 +640,7 @@ func (n *node) applyConfChange(e raftpb.Entry) {
 			}
 		}
 
-		n.state.StoreZero(m)
+		n.state.StoreMember(m)
 	}
 
 	cs := n.Raft().ApplyConfChange(cc)

@@ -81,13 +81,9 @@ func printBasic(store RaftStore) (uint64, uint64) {
 		} else if err := zs.Unmarshal(snap.Data); err == nil {
 			for gid, group := range zs.State.GetGroups() {
 				fmt.Printf("\nGROUP: %d\n", gid)
-				for _, member := range group.GetMembers() {
-					fmt.Printf("Member: %+v .\n", member)
-				}
 				for _, tablet := range group.GetTablets() {
 					fmt.Printf("Tablet: %+v .\n", tablet)
 				}
-				group.Members = nil
 				group.Tablets = nil
 				fmt.Printf("Group: %d %+v .\n", gid, group)
 			}

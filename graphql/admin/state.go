@@ -5,32 +5,28 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/gogo/protobuf/jsonpb"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/gogo/protobuf/jsonpb"
 	"github.com/pkg/errors"
 )
 
 type membershipState struct {
 	Counter    uint64         `json:"counter,omitempty"`
 	Groups     []clusterGroup `json:"groups,omitempty"`
-	Zeros      []*pb.Member   `json:"zeros,omitempty"`
+	Members    []*pb.Member   `json:"zeros,omitempty"`
 	MaxUID     uint64         `json:"maxUID,omitempty"`
 	MaxNsID    uint64         `json:"maxNsID,omitempty"`
-	MaxTxnTs   uint64         `json:"maxTxnTs,omitempty"`
-	MaxRaftId  uint64         `json:"maxRaftId,omitempty"`
 	Removed    []*pb.Member   `json:"removed,omitempty"`
 	Cid        string         `json:"cid,omitempty"`
-	License    *pb.License    `json:"license,omitempty"`
 	Namespaces []uint64       `json:"namespaces,omitempty"`
 }
 
 type clusterGroup struct {
 	Id         uint32       `json:"id,omitempty"`
-	Members    []*pb.Member `json:"members,omitempty"`
 	Tablets    []*pb.Tablet `json:"tablets,omitempty"`
 	SnapshotTs uint64       `json:"snapshotTs,omitempty"`
 	Checksum   uint64       `json:"checksum,omitempty"`
@@ -84,10 +80,6 @@ func convertToGraphQLResp(ms pb.MembershipState, listNs bool) membershipState {
 
 	state.Counter = ms.Counter
 	for k, v := range ms.Groups {
-		var members = make([]*pb.Member, 0, len(v.Members))
-		for _, v1 := range v.Members {
-			members = append(members, v1)
-		}
 		var tablets = make([]*pb.Tablet, 0, len(v.Tablets))
 		for name, v1 := range v.Tablets {
 			tablets = append(tablets, v1)
@@ -97,23 +89,19 @@ func convertToGraphQLResp(ms pb.MembershipState, listNs bool) membershipState {
 		}
 		state.Groups = append(state.Groups, clusterGroup{
 			Id:         k,
-			Members:    members,
 			Tablets:    tablets,
 			SnapshotTs: v.SnapshotTs,
 			Checksum:   v.Checksum,
 		})
 	}
-	state.Zeros = make([]*pb.Member, 0, len(ms.Zeros))
-	for _, v := range ms.Zeros {
-		state.Zeros = append(state.Zeros, v)
+	state.Members = make([]*pb.Member, 0, len(ms.Members))
+	for _, v := range ms.Members {
+		state.Members = append(state.Members, v)
 	}
 	state.MaxUID = ms.MaxUID
-	state.MaxTxnTs = ms.MaxTxnTs
 	state.MaxNsID = ms.MaxNsID
-	state.MaxRaftId = ms.MaxRaftId
 	state.Removed = ms.Removed
 	state.Cid = ms.Cid
-	state.License = ms.License
 
 	state.Namespaces = []uint64{}
 	for ns := range namespaces {

@@ -1,6 +1,7 @@
 package zero
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -10,7 +11,6 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/conn"
-	"github.com/outcaste-io/outserv/ee/audit"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/raftwal"
 	"github.com/outcaste-io/outserv/x"
@@ -44,8 +44,9 @@ type State struct {
 func NewState() *State {
 	s := &State{}
 	s._state = &pb.MembershipState{
-		Groups: make(map[uint32]*pb.Group),
-		Zeros:  make(map[uint64]*pb.Member),
+		Groups:  make(map[uint32]*pb.Group),
+		Members: make(map[uint64]*pb.Member),
+		Leaders: make(map[uint32]uint64),
 	}
 	s.nextUint = make(map[pb.NumLeaseType]uint64)
 	s.nextUint[pb.Num_UID] = 1
@@ -66,11 +67,9 @@ func NewState() *State {
 
 func (s *State) member(addr string) *pb.Member {
 	s.AssertRLock()
-	for _, g := range s._state.Groups {
-		for _, m := range g.Members {
-			if m.Addr == addr {
-				return m
-			}
+	for _, m := range s._state.Members {
+		if m.Addr == addr {
+			return m
 		}
 	}
 	return nil
@@ -83,19 +82,21 @@ func (s *State) SetMembershipState(state *pb.MembershipState) {
 
 	s._state = state
 
-	if state.Zeros == nil {
-		state.Zeros = make(map[uint64]*pb.Member)
+	if state.Members == nil {
+		state.Members = make(map[uint64]*pb.Member)
 	}
 	if state.Groups == nil {
 		state.Groups = make(map[uint32]*pb.Group)
 	}
+	if state.Leaders == nil {
+		state.Leaders = make(map[uint32]uint64)
+	}
 
 	// Create connections to all members.
+	for _, m := range state.Members {
+		conn.GetPools().Connect(m.Addr, s.tlsClientConfig)
+	}
 	for _, g := range state.Groups {
-		for _, m := range g.Members {
-			conn.GetPools().Connect(m.Addr, s.tlsClientConfig)
-		}
-
 		if g.Tablets == nil {
 			g.Tablets = make(map[string]*pb.Tablet)
 		}
@@ -115,15 +116,15 @@ func (s *State) MembershipCopy() *pb.MembershipState {
 	return proto.Clone(s._state).(*pb.MembershipState)
 }
 
-func (s *State) StoreZero(m *pb.Member) {
+func (s *State) StoreMember(m *pb.Member) {
 	s.Lock()
 	defer s.Unlock()
 
 	st := proto.Clone(s._state).(*pb.MembershipState)
-	if st.Zeros == nil {
-		st.Zeros = make(map[uint64]*pb.Member)
+	if st.Members == nil {
+		st.Members = make(map[uint64]*pb.Member)
 	}
-	st.Zeros[m.Id] = m
+	st.Members[m.Id] = m
 	s._state = st
 }
 
@@ -133,7 +134,19 @@ func setupListener(addr string, port int, kind string) (listener net.Listener, e
 	return net.Listen("tcp", laddr)
 }
 
-var state *State
+var inode *node
+
+func LatestMembershipState(ctx context.Context) (*pb.MembershipState, error) {
+	glog.Infof("Called LatestMembershipState")
+	if err := inode.WaitLinearizableRead(ctx); err != nil {
+		return nil, err
+	}
+	ms := inode.state.Membership()
+	if ms == nil {
+		return &pb.MembershipState{}, nil
+	}
+	return ms, nil
+}
 
 func Run(closer *z.Closer, bindall bool) {
 	glog.Infof("Starting Zero...")
@@ -156,7 +169,6 @@ func Run(closer *z.Closer, bindall bool) {
 		grpc.MaxSendMsgSize(x.GrpcMaxSize),
 		grpc.MaxConcurrentStreams(1000),
 		grpc.StatsHandler(&ocgrpc.ServerHandler{}),
-		grpc.UnaryInterceptor(audit.AuditRequestGRPC),
 	}
 
 	if x.WorkerConfig.TLSServerConfig != nil {
@@ -200,11 +212,11 @@ func Run(closer *z.Closer, bindall bool) {
 	}()
 
 	// This must be here. It does not work if placed before Grpc init.
-	node := &node{
+	inode = &node{
 		Node:   cn,
 		closer: nodeCloser,
 		ctx:    nodeCloser.Ctx(),
 		state:  NewState(),
 	}
-	x.Check(node.initAndStartNode())
+	x.Check(inode.initAndStartNode())
 }
