@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/binary"
+	"fmt"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -196,12 +197,12 @@ func (n *node) applyProposal(e raftpb.Entry) (uint64, error) {
 	n.state.Lock()
 	defer n.state.Unlock()
 
-	state := proto.Clone(n.state._state).(*pb.MembershipState)
+	dst := proto.Clone(n.state._state).(*pb.MembershipState)
 	if len(p.Cid) > 0 {
-		if len(state.Cid) > 0 {
+		if len(dst.Cid) > 0 {
 			return key, errInvalidProposal
 		}
-		state.Cid = p.Cid
+		dst.Cid = p.Cid
 	}
 	// TODO: Do we need SnapshotTs?
 	// if p.SnapshotTs != nil {
@@ -212,35 +213,44 @@ func (n *node) applyProposal(e raftpb.Entry) (uint64, error) {
 	// 	}
 	// }
 	if p.Member != nil {
-		if err := n.handleMemberProposal(p.Member); err != nil {
+		if err := n.handleMemberProposal(dst, p.Member); err != nil {
 			span.Annotatef(nil, "While applying membership proposal: %+v", err)
 			glog.Errorf("While applying membership proposal: %+v", err)
 			return key, err
 		}
 	}
 	// TODO: Support tablets and others.
+	if len(p.Tablets) > 0 {
+		glog.Infof("Applying proposal: %+v\n", p.Tablets)
+		if err := n.handleTabletProposal(dst, p.Tablets); err != nil {
+			span.Annotatef(nil, "While applying tablet proposal: %+v", err)
+			glog.Errorf("While applying tablet proposal: %+v", err)
+			return key, err
+		}
+		glog.Infof("Proposal applied: %+v\n", p.Tablets)
+	}
 
 	switch {
-	case p.MaxUID > state.MaxUID:
-		state.MaxUID = p.MaxUID
-	case p.MaxNsID > state.MaxNsID:
-		state.MaxNsID = p.MaxNsID
+	case p.MaxUID > dst.MaxUID:
+		dst.MaxUID = p.MaxUID
+	case p.MaxNsID > dst.MaxNsID:
+		dst.MaxNsID = p.MaxNsID
 	case p.MaxUID != 0 || p.MaxNsID != 0:
 		// Could happen after restart when some entries were there in WAL and did not get
 		// snapshotted.
 		glog.Infof("Could not apply proposal, ignoring: p.MaxUID=%v, "+
 			"p.MaxNsID=%v, maxUID=%d maxNsID=%d\n",
-			p.MaxUID, p.MaxNsID, state.MaxUID, state.MaxNsID)
+			p.MaxUID, p.MaxNsID, dst.MaxUID, dst.MaxNsID)
 	}
 
 	// Now assign the new state back.
-	n.state._state = state
+	glog.Infof("Updated state: %+v\n", dst)
+	n.state._state = dst
 	return key, nil
 }
 
-func (n *node) handleMemberProposal(member *pb.Member) error {
+func (n *node) handleMemberProposal(dst *pb.MembershipState, member *pb.Member) error {
 	n.state.AssertLock()
-	state := proto.Clone(n.state._state).(*pb.MembershipState)
 
 	m := n.state.member(member.Addr)
 	// Ensures that different nodes don't have same address.
@@ -248,11 +258,11 @@ func (n *node) handleMemberProposal(member *pb.Member) error {
 		return errors.Errorf("Found another member %d with same address: %v", m.Id, m.Addr)
 	}
 
-	m, has := state.Members[member.Id]
+	m, has := dst.Members[member.Id]
 	if member.AmDead {
 		if has {
-			delete(state.Members, member.Id)
-			state.Removed = append(state.Removed, m)
+			delete(dst.Members, member.Id)
+			dst.Removed = append(dst.Removed, m)
 		}
 		return nil
 	}
@@ -260,14 +270,52 @@ func (n *node) handleMemberProposal(member *pb.Member) error {
 	// Create a connection to this server.
 	go conn.GetPools().Connect(member.Addr, n.state.tlsClientConfig)
 
-	state.Members[member.Id] = member
+	dst.Members[member.Id] = member
 	if member.Leader {
 		// Unset leader flag for other nodes, there can be only one
 		// leader at a time.
-		for _, m := range state.Members {
+		for _, m := range dst.Members {
 			if m.Id != member.Id {
 				m.Leader = false
 			}
+		}
+	}
+	return nil
+}
+
+func (n *node) handleTabletProposal(dst *pb.MembershipState, tablets []*pb.Tablet) error {
+	n.state.AssertLock()
+
+	handleOne := func(tablet *pb.Tablet) error {
+		if tablet.GroupId == 0 {
+			return errors.Errorf("Tablet group id is zero: %+v", tablet)
+		}
+		if tablet.Remove {
+			glog.Infof("Removing tablet for attr: [%v], gid: [%v]\n", tablet.Predicate, tablet.GroupId)
+			delete(dst.Tablets, tablet.Predicate)
+			return nil
+		}
+
+		// There's a edge case that we're handling.
+		// Two servers ask to serve the same tablet, then we need to ensure that
+		// only the first one succeeds.
+		//
+		// TODO: Do we need tablet.Force?
+		if prev := dst.Tablets[tablet.Predicate]; prev != nil && !tablet.Force {
+			return fmt.Errorf("Tablet %s is already served. Prev: %+v New: %+v\n",
+				tablet.Predicate, prev, tablet)
+		}
+		tablet.Force = false
+		dst.Tablets[tablet.Predicate] = tablet
+		return nil
+	}
+
+	if dst.Tablets == nil {
+		dst.Tablets = make(map[string]*pb.Tablet)
+	}
+	for _, tablet := range tablets {
+		if err := handleOne(tablet); err != nil {
+			return err
 		}
 	}
 	return nil

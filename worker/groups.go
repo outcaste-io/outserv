@@ -59,6 +59,7 @@ func StartRaftNodes(walStore *raftwal.DiskStorage, bindall bool) {
 	groupIdx := x.WorkerConfig.Raft.GetUint32("group")
 	x.AssertTruef(raftIdx > 0 && groupIdx > 0, "Raft ID and Group ID must be provided")
 	glog.Infof("Current Raft Id: %#x Group ID: %#x\n", raftIdx, groupIdx)
+	atomic.StoreUint32(&gr.gid, groupIdx)
 
 	// Successfully connect with dgraphzero, before doing anything else.
 	// Connect with Zero leader and figure out what group we should belong to.
@@ -76,19 +77,27 @@ func StartRaftNodes(walStore *raftwal.DiskStorage, bindall bool) {
 
 	// TODO: The following should directly interact with the zero package.
 
-	connState, err := zero.LatestMembershipState(gr.Ctx())
-	// for { // Keep on retrying. See: https://github.com/dgraph-io/dgraph/issues/2289
-	// 	pl := gr.connToZeroLeader()
-	// 	if pl == nil {
-	// 		continue
-	// 	}
-	// 	zc := pb.NewZeroClient(pl.Get())
-	// 	connState, err = zc.Connect(gr.Ctx(), m)
-	// 	if err == nil || x.ShouldCrash(err) {
-	// 		break
-	// 	}
-	// }
-	x.CheckfNoTrace(err)
+	var connState *pb.MembershipState
+	var err error
+	for i := 0; i < 120; i++ {
+		connState, err = zero.LatestMembershipState(gr.Ctx())
+		// for { // Keep on retrying. See: https://github.com/dgraph-io/dgraph/issues/2289
+		// 	pl := gr.connToZeroLeader()
+		// 	if pl == nil {
+		// 		continue
+		// 	}
+		// 	zc := pb.NewZeroClient(pl.Get())
+		// 	connState, err = zc.Connect(gr.Ctx(), m)
+		// 	if err == nil || x.ShouldCrash(err) {
+		// 		break
+		// 	}
+		// }
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	x.Checkf(err, "Unable to get latest membership state")
 	if connState == nil {
 		x.Fatalf("Unable to join cluster via dgraphzero")
 	}
@@ -145,6 +154,7 @@ func (g *groupi) informZeroAboutTablets() {
 
 	for range ticker.C {
 		preds := schema.State().Predicates()
+		glog.Infof("----> Going to inform about preds: %+v\n", preds)
 		if _, err := g.Inform(preds); err != nil {
 			glog.Errorf("Error while getting tablet for preds %v", err)
 		} else {
@@ -170,6 +180,10 @@ func (g *groupi) applyInitialTypes() {
 func (g *groupi) applyInitialSchema() {
 	if g.groupId() != 1 {
 		return
+	}
+
+	if _, err := zero.LatestMembershipState(g.Ctx()); err != nil {
+		glog.Fatalf("While getting latest membership state: %v\n", err)
 	}
 	initialSchema := schema.InitialSchema(x.GalaxyNamespace)
 	ctx := g.Ctx()
@@ -457,6 +471,7 @@ func (g *groupi) Inform(preds []string) ([]*pb.Tablet, error) {
 	prop := &pb.ZeroProposal{
 		Tablets: unknownPreds,
 	}
+	glog.Infof("Sending proposal: %+v\n", prop)
 	if err := zero.ProposeAndWait(g.Ctx(), prop); err != nil {
 		return nil, errors.Wrapf(err, "Unable to propose: %+v\n", prop)
 	}
@@ -503,8 +518,11 @@ func (g *groupi) Tablet(key string) (*pb.Tablet, error) {
 
 	// We don't know about this tablet.
 	// Check with dgraphzero if we can serve it.
-	tablet = &pb.Tablet{GroupId: g.groupId(), Predicate: key}
-	return g.sendTablet(tablet)
+	tablets, err := g.Inform([]string{key})
+	if err != nil {
+		return nil, errors.Wrapf(err, "while informing Zero")
+	}
+	return tablets[0], nil
 }
 
 func (g *groupi) ForceTablet(key string) (*pb.Tablet, error) {
