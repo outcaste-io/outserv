@@ -204,14 +204,6 @@ func (n *node) applyProposal(e raftpb.Entry) (uint64, error) {
 		}
 		dst.Cid = p.Cid
 	}
-	// TODO: Do we need SnapshotTs?
-	// if p.SnapshotTs != nil {
-	// 	for gid, ts := range p.SnapshotTs {
-	// 		if group, ok := state.Groups[gid]; ok {
-	// 			group.SnapshotTs = x.Max(group.SnapshotTs, ts)
-	// 		}
-	// 	}
-	// }
 	if p.Member != nil {
 		if err := n.handleMemberProposal(dst, p.Member); err != nil {
 			span.Annotatef(nil, "While applying membership proposal: %+v", err)
@@ -219,7 +211,6 @@ func (n *node) applyProposal(e raftpb.Entry) (uint64, error) {
 			return key, err
 		}
 	}
-	// TODO: Support tablets and others.
 	if len(p.Tablets) > 0 {
 		glog.Infof("Applying proposal: %+v\n", p.Tablets)
 		if err := n.handleTabletProposal(dst, p.Tablets); err != nil {
@@ -262,7 +253,7 @@ func (n *node) handleMemberProposal(dst *pb.MembershipState, member *pb.Member) 
 	if member.AmDead {
 		if has {
 			delete(dst.Members, member.Id)
-			dst.Removed = append(dst.Removed, m)
+			dst.Removed = append(dst.Removed, m.Id)
 		}
 		return nil
 	}
@@ -660,8 +651,7 @@ func (n *node) applyConfChange(e raftpb.Entry) {
 			glog.Fatalf("I [id:%#x group:0] have been removed. Goodbye!", n.Id)
 		}
 		n.DeletePeer(cc.NodeID)
-		// TODO: Figure out how to remove Zero.
-		// n.state.removeZero(cc.NodeID)
+		n.state.RemoveMember(cc.NodeID)
 
 	} else if len(cc.Context) > 0 {
 		var rc pb.RaftContext
@@ -674,10 +664,10 @@ func (n *node) applyConfChange(e raftpb.Entry) {
 			GroupId: 0,
 			Learner: rc.IsLearner,
 		}
-		for _, member := range n.state.Membership().Removed {
+		for _, mid := range n.state.Membership().Removed {
 			// Reusing Raft IDs is not allowed.
-			if m.Id == member.Id {
-				err := errors.Errorf("REUSE_RAFTID: Reusing removed id: %d.\n", m.Id)
+			if m.Id == mid {
+				err := errors.Errorf("REUSE_RAFTID: Reusing removed id: %d.\n", mid)
 				n.DoneConfChange(cc.ID, err)
 				// Cancel configuration change.
 				cc.NodeID = raft.None

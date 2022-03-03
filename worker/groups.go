@@ -81,17 +81,6 @@ func StartRaftNodes(walStore *raftwal.DiskStorage, bindall bool) {
 	var err error
 	for i := 0; i < 120; i++ {
 		connState, err = zero.LatestMembershipState(gr.Ctx())
-		// for { // Keep on retrying. See: https://github.com/dgraph-io/dgraph/issues/2289
-		// 	pl := gr.connToZeroLeader()
-		// 	if pl == nil {
-		// 		continue
-		// 	}
-		// 	zc := pb.NewZeroClient(pl.Get())
-		// 	connState, err = zc.Connect(gr.Ctx(), m)
-		// 	if err == nil || x.ShouldCrash(err) {
-		// 		break
-		// 	}
-		// }
 		if err == nil {
 			break
 		}
@@ -284,14 +273,15 @@ func (g *groupi) applyState(myId uint64, state *pb.MembershipState) {
 			myId, g.groupId(), state)
 	}
 
-	oldState := g.state
+	// oldState := g.state
 	g.state = state
 
 	// Sometimes this can cause us to lose latest tablet info, but that shouldn't cause any issues.
 	for _, member := range g.state.Members {
-		if x.WorkerConfig.MyAddr != member.Addr {
-			conn.GetPools().Connect(member.Addr, x.WorkerConfig.TLSClientConfig)
-		}
+		conn.GetPools().Connect(member.Addr, x.WorkerConfig.TLSClientConfig)
+		// if x.WorkerConfig.MyAddr != member.Addr {
+		// 	conn.GetPools().Connect(member.Addr, x.WorkerConfig.TLSClientConfig)
+		// }
 	}
 
 	// While restarting we fill Node information after retrieving initial state.
@@ -299,27 +289,32 @@ func (g *groupi) applyState(myId uint64, state *pb.MembershipState) {
 		// Lets have this block before the one that adds the new members, else we may end up
 		// removing a freshly added node.
 
-		for _, member := range g.state.GetRemoved() {
-			// TODO: This leader check can be done once instead of repeatedly.
-			if member.GetGroupId() == g.Node.gid && g.Node.AmLeader() {
-				go func() {
-					// Don't try to remove a member if it's already marked as removed in
-					// the membership state and is not a current peer of the node.
-					_, isPeer := g.Node.Peer(member.GetId())
-					// isPeer should only be true if the rmeoved node is not the same as this node.
-					isPeer = isPeer && member.GetId() != g.Node.RaftContext.Id
-
-					for _, oldMember := range oldState.GetRemoved() {
-						if oldMember.GetId() == member.GetId() && !isPeer {
-							return
-						}
-					}
-
-					if err := g.Node.ProposePeerRemoval(g.Ctx(), member.GetId()); err != nil {
-						glog.Errorf("Error while proposing node removal: %+v", err)
-					}
-				}()
+		for _, removedId := range g.state.GetRemoved() {
+			if !g.Node.AmLeader() {
+				break
 			}
+			// Don't try to remove a member if it's already marked as removed in
+			// the membership state and is not a current peer of the node.
+			_, isPeer := g.Node.Peer(removedId)
+			// isPeer should only be true if the removed node is not the same as this node.
+			isPeer = isPeer && removedId != g.Node.RaftContext.Id
+			if !isPeer {
+				glog.Infof("%#x is not my peer. So, not removing.\n", removedId)
+				continue
+			}
+
+			go func(rid uint64) {
+				// Note: Not sure why we need to check here again.
+				// for _, oldMember := range oldState.GetRemoved() {
+				// 	if oldMember.GetId() == member.GetId() && !isPeer {
+				// 		return
+				// 	}
+				// }
+				glog.Infof("Proposing removal of peer %#x\n", rid)
+				if err := g.Node.ProposePeerRemoval(g.Ctx(), rid); err != nil {
+					glog.Errorf("Error while proposing node removal: %+v", err)
+				}
+			}(removedId)
 		}
 		conn.GetPools().RemoveInvalid(g.state)
 	}

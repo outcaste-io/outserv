@@ -126,6 +126,28 @@ func (s *State) StoreMember(m *pb.Member) {
 	s._state = st
 }
 
+func (s *State) RemoveMember(raftId uint64) {
+	s.Lock()
+	defer s.Unlock()
+
+	st := proto.Clone(s._state).(*pb.MembershipState)
+	if st.Members == nil {
+		st.Members = make(map[uint64]*pb.Member)
+	}
+	delete(st.Members, raftId)
+
+	var has bool
+	for _, id := range st.Removed {
+		if id == raftId {
+			has = true
+		}
+	}
+	if !has {
+		st.Removed = append(st.Removed, raftId)
+	}
+	s._state = st
+}
+
 // func (s *State) createProposals(dst *pb.MembershipState) ([]*pb.ZeroProposal, error) {
 // 	var res []*pb.ZeroProposal
 // 	if len(dst.Members) > 1 {

@@ -168,7 +168,7 @@ message MembershipState {
   map<uint64, Member> members = 1;
   map<uint32, uint64> leaders = 2;
   map<string, Tablet> tablets = 3;
-  repeated Member removed = 4;
+  repeated uint64 removed = 4; // Raft IDs of removed members.
 
   uint64 maxUID = 7;
   uint64 maxNsID = 8;

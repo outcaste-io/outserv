@@ -19,7 +19,7 @@ type membershipState struct {
 	Members    []*pb.Member `json:"zeros,omitempty"`
 	MaxUID     uint64       `json:"maxUID,omitempty"`
 	MaxNsID    uint64       `json:"maxNsID,omitempty"`
-	Removed    []*pb.Member `json:"removed,omitempty"`
+	Removed    []uint64     `json:"removed,omitempty"`
 	Cid        string       `json:"cid,omitempty"`
 	Namespaces []uint64     `json:"namespaces,omitempty"`
 }

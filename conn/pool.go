@@ -109,10 +109,9 @@ func (p *Pools) RemoveInvalid(state *pb.MembershipState) {
 	for _, member := range state.Members {
 		validAddr[member.Addr] = struct{}{}
 	}
-	for _, member := range state.Removed {
-		// Some nodes could have the same IP address. So, check before disconnecting.
-		if _, valid := validAddr[member.Addr]; !valid {
-			p.remove(member.Addr)
+	for _, pool := range p.GetAll() {
+		if _, has := validAddr[pool.Addr]; !has {
+			p.remove(pool.Addr)
 		}
 	}
 }
