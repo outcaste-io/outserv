@@ -34,7 +34,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/edgraph"
-	"github.com/outcaste-io/outserv/ee/enc"
 	"github.com/outcaste-io/outserv/graphql/admin"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/schema"
@@ -735,7 +734,7 @@ func setupServer(closer *z.Closer) {
 	for {
 		if x.HealthCheck() == nil {
 			// Audit is enterprise feature.
-			x.Check(audit.InitAuditorIfNecessary(worker.Config.Audit, worker.EnterpriseEnabled))
+			x.Check(audit.InitAuditorIfNecessary(worker.Config.Audit, nil))
 			break
 		}
 		time.Sleep(500 * time.Millisecond)
@@ -748,13 +747,6 @@ func run() {
 
 	telemetry := z.NewSuperFlag(Alpha.Conf.GetString("telemetry")).MergeAndCheckDefault(
 		x.TelemetryDefaults)
-	if telemetry.GetBool("sentry") {
-		x.InitSentry(enc.EeBuild)
-		defer x.FlushSentry()
-		x.ConfigureSentryScope("alpha")
-		x.WrapPanics()
-		x.SentryOptOutNote()
-	}
 
 	bindall = Alpha.Conf.GetBool("bindall")
 	cache := z.NewSuperFlag(Alpha.Conf.GetString("cache")).MergeAndCheckDefault(
@@ -986,7 +978,6 @@ func run() {
 	audit.Close()
 
 	worker.State.Dispose()
-	x.RemoveCidFile()
 	glog.Info("worker.State disposed.")
 
 	updaters.Wait()

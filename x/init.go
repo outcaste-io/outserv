@@ -72,8 +72,7 @@ func Init() {
 
 // BuildDetails returns a string containing details about the Dgraph binary.
 func BuildDetails() string {
-	licenseInfo := `Licensed under Smart License and Apache Public License 2.0`
-
+	licenseInfo := `Licensed under Smart License 1.0 and Apache Public License 2.0`
 	buf := z.CallocNoRef(1, "X.BuildDetails")
 	jem := len(buf) > 0
 	z.Free(buf)
