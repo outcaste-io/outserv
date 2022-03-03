@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,7 +31,6 @@ type groupi struct {
 	state        *pb.MembershipState
 	Node         *node
 	gid          uint32
-	tablets      map[string]*pb.Tablet
 	triggerCh    chan struct{} // Used to trigger membership sync
 	blockDeletes *sync.Mutex   // Ensure that deletion won't happen when move is going on.
 	closer       *z.Closer
@@ -43,7 +43,6 @@ type groupi struct {
 
 var gr = &groupi{
 	blockDeletes: new(sync.Mutex),
-	tablets:      make(map[string]*pb.Tablet),
 	closer:       z.NewCloser(2), // Match CLOSER:1 in this file.
 }
 
@@ -263,37 +262,22 @@ func (g *groupi) applyState(myId uint64, state *pb.MembershipState) {
 	x.AssertTrue(state != nil)
 	g.Lock()
 	defer g.Unlock()
-	// We don't update state if we get any old state. Counter stores the raftindex of
-	// last update. For leader changes at zero since we don't propose, state can get
-	// updated at same counter value. So ignore only if counter is less.
-	if g.state != nil && g.state.Counter > state.Counter {
-		return
+
+	glog.Infof("Got membership state: %+v\n", state)
+	if _, has := state.Members[myId]; !has {
+		// I'm not part of this cluster. I should crash myself.
+		glog.Fatalf("Unable to find myself [id:%d group:%d] in membership state: %+v. Goodbye!",
+			myId, g.groupId(), state)
 	}
 
 	oldState := g.state
 	g.state = state
 
 	// Sometimes this can cause us to lose latest tablet info, but that shouldn't cause any issues.
-	var foundSelf bool
-	g.tablets = make(map[string]*pb.Tablet)
-	for gid, group := range g.state.Groups {
-		for _, tablet := range group.Tablets {
-			g.tablets[tablet.Predicate] = tablet
-		}
-		if gid == g.groupId() {
-			glog.V(3).Infof("group %d checksum: %d", g.groupId(), group.Checksum)
-			atomic.StoreUint64(&g.membershipChecksum, group.Checksum)
-		}
-	}
 	for _, member := range g.state.Members {
 		if x.WorkerConfig.MyAddr != member.Addr {
 			conn.GetPools().Connect(member.Addr, x.WorkerConfig.TLSClientConfig)
 		}
-	}
-	if !foundSelf {
-		// I'm not part of this cluster. I should crash myself.
-		glog.Fatalf("Unable to find myself [id:%d group:%d] in membership state: %+v. Goodbye!",
-			myId, g.groupId(), state)
 	}
 
 	// While restarting we fill Node information after retrieving initial state.
@@ -368,7 +352,7 @@ func (g *groupi) BelongsTo(key string) (uint32, error) {
 // should reject that query.
 func (g *groupi) BelongsToReadOnly(key string, ts uint64) (uint32, error) {
 	g.RLock()
-	tablet := g.tablets[key]
+	tablet := g.state.Tablets[key]
 	g.RUnlock()
 	if tablet != nil {
 		if ts > 0 && ts < tablet.MoveTs {
@@ -447,18 +431,21 @@ func (g *groupi) sendTablet(tablet *pb.Tablet) (*pb.Tablet, error) {
 }
 
 func (g *groupi) Inform(preds []string) ([]*pb.Tablet, error) {
+	// Don't need to use its result. Just ensure that Zero's information is up
+	// to date.
+	if _, err := zero.LatestMembershipState(g.Ctx()); err != nil {
+		return nil, errors.Wrapf(err, "while getting latest membership state")
+	}
+
 	unknownPreds := make([]*pb.Tablet, 0)
-	tablets := make([]*pb.Tablet, 0)
 	g.RLock()
 	for _, p := range preds {
 		if len(p) == 0 {
 			continue
 		}
 
-		if tab, ok := g.tablets[p]; !ok {
+		if _, ok := g.state.Tablets[p]; !ok {
 			unknownPreds = append(unknownPreds, &pb.Tablet{GroupId: g.groupId(), Predicate: p})
-		} else {
-			tablets = append(tablets, tab)
 		}
 	}
 	g.RUnlock()
@@ -467,19 +454,25 @@ func (g *groupi) Inform(preds []string) ([]*pb.Tablet, error) {
 		return nil, nil
 	}
 
-	return nil, nil
-	// TODO: Fix up below.
+	prop := &pb.ZeroProposal{
+		Tablets: unknownPreds,
+	}
+	if err := zero.ProposeAndWait(g.Ctx(), prop); err != nil {
+		return nil, errors.Wrapf(err, "Unable to propose: %+v\n", prop)
+	}
 
-	// pl := g.connToZeroLeader()
-	// zc := pb.NewZeroClient(pl.Get())
-	// out, err := zc.Inform(g.Ctx(), &pb.TabletRequest{
-	// 	Tablets: unknownPreds,
-	// 	GroupId: g.groupId(),
-	// })
-	// if err != nil {
-	// 	glog.Errorf("Error while Inform grpc call %v", err)
-	// 	return nil, err
-	// }
+	state, err := zero.LatestMembershipState(g.Ctx())
+	if err != nil {
+		return nil, errors.Wrapf(err, "while getting latest membership state")
+	}
+	var res []*pb.Tablet
+	for _, t := range state.Tablets {
+		if t.GroupId == g.groupId() {
+			glog.Infof("Serving tablet for: %v\n", t.GetPredicate())
+			res = append(res, t)
+		}
+	}
+	return res, nil
 
 	// // Do not store tablets with group ID 0, as they are just dummy tablets for
 	// // predicates that do no exist.
@@ -502,7 +495,7 @@ func (g *groupi) Inform(preds []string) ([]*pb.Tablet, error) {
 func (g *groupi) Tablet(key string) (*pb.Tablet, error) {
 	// TODO: Remove all this later, create a membership state and apply it
 	g.RLock()
-	tablet, ok := g.tablets[key]
+	tablet, ok := g.state.Tablets[key]
 	g.RUnlock()
 	if ok {
 		return tablet, nil
@@ -617,7 +610,7 @@ func (g *groupi) KnownGroups() (gids []uint32) {
 	if g.state == nil {
 		return
 	}
-	for gid := range g.state.Groups {
+	for gid := range g.state.Leaders {
 		gids = append(gids, gid)
 	}
 	return
@@ -649,22 +642,70 @@ func (g *groupi) triggerMembershipSync() {
 
 func (g *groupi) doSendMembership(tablets map[string]*pb.Tablet) error {
 	leader := g.Node.AmLeader()
-	// member := &pb.Member{
-	// 	Id:         g.Node.Id,
-	// 	GroupId:    g.groupId(),
-	// 	Addr:       x.WorkerConfig.MyAddr,
-	// 	Leader:     leader,
-	// 	LastUpdate: uint64(time.Now().Unix()),
-	// }
-	group := &pb.Group{}
-	if leader {
-		// Do not send tablet information, if I'm not the leader.
-		group.Tablets = tablets
-		if snap, err := g.Node.Snapshot(); err == nil {
-			group.SnapshotTs = snap.BaseTs
-		}
-		group.CheckpointTs = atomic.LoadUint64(&g.Node.checkpointTs)
+	src, err := zero.LatestMembershipState(g.Ctx())
+	if err != nil {
+		return errors.Wrapf(err, "while getting latest membership state")
 	}
+	srcMember, ok := src.Members[g.Node.Id]
+	if !ok {
+		return errors.Wrapf(err, "Unknown member: %#x", g.Node.Id)
+	}
+	member := &pb.Member{
+		Id:         g.Node.Id,
+		GroupId:    g.groupId(),
+		Addr:       x.WorkerConfig.MyAddr,
+		Leader:     leader,
+		LastUpdate: uint64(time.Now().Unix()),
+	}
+	if srcMember.Addr != member.Addr ||
+		srcMember.Leader != member.Leader ||
+		srcMember.GroupId != member.GroupId {
+
+		prop := &pb.ZeroProposal{
+			Member: member,
+		}
+		if err := zero.ProposeAndWait(g.Ctx(), prop); err != nil {
+			return errors.Wrapf(err, "Proposal %+v failed", prop)
+		}
+		glog.Infof("Proposal applied: %+v\n", prop)
+	}
+
+	// Only send tablet info, if I'm the leader.
+	if !leader {
+		return nil
+	}
+
+	var changes []*pb.Tablet
+	for key, dstTablet := range tablets {
+		srcTablet, has := src.Tablets[key]
+		if !has {
+			continue
+		}
+		s := float64(srcTablet.OnDiskBytes)
+		d := float64(dstTablet.OnDiskBytes)
+		if dstTablet.Remove || (s == 0 && d > 0) || (s > 0 && math.Abs(d/s-1) > 0.1) {
+			dstTablet.Force = false
+			changes = append(changes, dstTablet)
+		}
+	}
+	if len(changes) == 0 {
+		return nil
+	}
+	prop := &pb.ZeroProposal{
+		Tablets: changes,
+	}
+	if err := zero.ProposeAndWait(g.Ctx(), prop); err != nil {
+		return errors.Wrapf(err, "Proposal %+v failed", prop)
+	}
+	glog.Infof("Proposal applied: %+v\n", prop)
+
+	// TODO: Look into snapshot timestamps.
+	// if snap, err := g.Node.Snapshot(); err == nil {
+	// 	group.SnapshotTs = snap.BaseTs
+	// }
+	// group.CheckpointTs = atomic.LoadUint64(&g.Node.checkpointTs)
+
+	// zero.ProposeAndWait(g.Ctx(),
 
 	return nil
 	// TODO: Fix up below.

@@ -1,3 +1,6 @@
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart license.
+
 package zero
 
 import (
@@ -44,7 +47,7 @@ type State struct {
 func NewState() *State {
 	s := &State{}
 	s._state = &pb.MembershipState{
-		Groups:  make(map[uint32]*pb.Group),
+		Tablets: make(map[string]*pb.Tablet),
 		Members: make(map[uint64]*pb.Member),
 		Leaders: make(map[uint32]uint64),
 	}
@@ -85,8 +88,8 @@ func (s *State) SetMembershipState(state *pb.MembershipState) {
 	if state.Members == nil {
 		state.Members = make(map[uint64]*pb.Member)
 	}
-	if state.Groups == nil {
-		state.Groups = make(map[uint32]*pb.Group)
+	if state.Tablets == nil {
+		state.Tablets = make(map[string]*pb.Tablet)
 	}
 	if state.Leaders == nil {
 		state.Leaders = make(map[uint32]uint64)
@@ -95,11 +98,6 @@ func (s *State) SetMembershipState(state *pb.MembershipState) {
 	// Create connections to all members.
 	for _, m := range state.Members {
 		conn.GetPools().Connect(m.Addr, s.tlsClientConfig)
-	}
-	for _, g := range state.Groups {
-		if g.Tablets == nil {
-			g.Tablets = make(map[string]*pb.Tablet)
-		}
 	}
 }
 
@@ -127,6 +125,71 @@ func (s *State) StoreMember(m *pb.Member) {
 	st.Members[m.Id] = m
 	s._state = st
 }
+
+// func (s *State) createProposals(dst *pb.MembershipState) ([]*pb.ZeroProposal, error) {
+// 	var res []*pb.ZeroProposal
+// 	if len(dst.Members) > 1 {
+// 		return res, errors.Errorf("Create Proposal: Invalid group: %+v", dst)
+// 	}
+
+// 	s.Lock()
+// 	defer s.Unlock()
+
+// 	src := s._state
+
+// 	// There is only one member. We use for loop because we don't know what the mid is.
+// 	for mid, dstMember := range dst.Members {
+// 		if dstMember.GroupId == 0 {
+// 			return res, errors.Errorf("Unknown group for member: %+v", dstMember)
+// 		}
+// 		srcMember, has := src.Members[mid]
+// 		if !has {
+// 			return res, errors.Errorf("Unknown member: %+v", dstMember)
+// 		}
+
+// 		// Should we also check the group ID, if that changed?
+// 		if srcMember.Addr != dstMember.Addr ||
+// 			srcMember.Leader != dstMember.Leader ||
+// 			srcMember.GroupId != dstMember.GroupId {
+
+// 			proposal := &pb.ZeroProposal{
+// 				Member: dstMember,
+// 			}
+// 			res = append(res, proposal)
+// 		}
+// 		if !dstMember.Leader {
+// 			// Don't continue to tablets if request is not from the leader.
+// 			return res, nil
+// 		}
+// 	}
+
+// 	var tablets []*pb.Tablet
+// 	for gid, dstGrp := range dst.Groups {
+// 		srcGrp, has := src.Groups[gid]
+// 		if !has {
+// 			return res, errors.Errorf("Unknown group: %+v", gid)
+// 		}
+// 		for key, dstTablet := range dstGrp.Tablets {
+// 			srcTablet, has := srcGrp.Tablets[key]
+// 			if !has {
+// 				// Tablet moved to new group
+// 				continue
+// 			}
+
+// 			s := float64(srcTablet.OnDiskBytes)
+// 			d := float64(dstTablet.OnDiskBytes)
+// 			if dstTablet.Remove || (s == 0 && d > 0) || (s > 0 && math.Abs(d/s-1) > 0.1) {
+// 				dstTablet.Force = false
+// 				tablets = append(tablets, dstTablet)
+// 			}
+// 		}
+// 	}
+
+// 	if len(tablets) > 0 {
+// 		res = append(res, &pb.ZeroProposal{Tablets: tablets})
+// 	}
+// 	return res, nil
+// }
 
 func setupListener(addr string, port int, kind string) (listener net.Listener, err error) {
 	laddr := fmt.Sprintf("%s:%d", addr, port)

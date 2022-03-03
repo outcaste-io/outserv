@@ -55,17 +55,15 @@ func NewZero(ms *pb.MembershipState) *Telemetry {
 	}
 	t := &Telemetry{
 		Cid:        ms.GetCid(),
-		NumGroups:  len(ms.GetGroups()),
+		NumGroups:  len(ms.GetLeaders()),
 		NumMembers: len(ms.GetMembers()),
 		Version:    x.Version(),
 		OS:         runtime.GOOS,
 		Arch:       runtime.GOARCH,
 	}
-	for _, g := range ms.GetGroups() {
-		for _, tablet := range g.GetTablets() {
-			t.NumTablets++
-			t.DiskUsageMB += tablet.GetOnDiskBytes()
-		}
+	for _, tablet := range ms.GetTablets() {
+		t.NumTablets++
+		t.DiskUsageMB += tablet.GetOnDiskBytes()
 	}
 	t.DiskUsageMB /= (1 << 20)
 	return t

@@ -87,6 +87,10 @@ func (n *node) uniqueKey() uint64 {
 
 var errInternalRetry = errors.New("Retry Raft proposal internally")
 
+func ProposeAndWait(ctx context.Context, proposal *pb.ZeroProposal) error {
+	return inode.proposeAndWait(ctx, proposal)
+}
+
 // proposeAndWait makes a proposal to the quorum for Group Zero and waits for it to be accepted by
 // the group before returning. It is safe to call concurrently.
 func (n *node) proposeAndWait(ctx context.Context, proposal *pb.ZeroProposal) error {
@@ -193,20 +197,20 @@ func (n *node) applyProposal(e raftpb.Entry) (uint64, error) {
 	defer n.state.Unlock()
 
 	state := proto.Clone(n.state._state).(*pb.MembershipState)
-	state.Counter = e.Index
 	if len(p.Cid) > 0 {
 		if len(state.Cid) > 0 {
 			return key, errInvalidProposal
 		}
 		state.Cid = p.Cid
 	}
-	if p.SnapshotTs != nil {
-		for gid, ts := range p.SnapshotTs {
-			if group, ok := state.Groups[gid]; ok {
-				group.SnapshotTs = x.Max(group.SnapshotTs, ts)
-			}
-		}
-	}
+	// TODO: Do we need SnapshotTs?
+	// if p.SnapshotTs != nil {
+	// 	for gid, ts := range p.SnapshotTs {
+	// 		if group, ok := state.Groups[gid]; ok {
+	// 			group.SnapshotTs = x.Max(group.SnapshotTs, ts)
+	// 		}
+	// 	}
+	// }
 	if p.Member != nil {
 		if err := n.handleMemberProposal(p.Member); err != nil {
 			span.Annotatef(nil, "While applying membership proposal: %+v", err)
@@ -232,12 +236,6 @@ func (n *node) applyProposal(e raftpb.Entry) (uint64, error) {
 	// Now assign the new state back.
 	n.state._state = state
 	return key, nil
-}
-
-func newGroup() *pb.Group {
-	return &pb.Group{
-		Tablets: make(map[string]*pb.Tablet),
-	}
 }
 
 func (n *node) handleMemberProposal(member *pb.Member) error {

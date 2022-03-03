@@ -127,11 +127,12 @@ message Member {
   bool force_group_id = 14 [(gogoproto.jsontag) = "forceGroupId,omitempty"];
 }
 
+// Todo: Perhaps remove Group.
 message Group {
-  map<string, Tablet> tablets = 1;  // Predicate + others are key.
-  uint64 snapshot_ts = 2;           // Stores Snapshot transaction ts.
-  uint64 checksum = 3;              // Stores a checksum.
-  uint64 checkpoint_ts = 4;         // Stores checkpoint ts as seen by leader.
+  uint32 group_id = 1;
+  uint64 snapshot_ts = 3;           // Stores Snapshot transaction ts.
+  uint64 checksum = 4;              // Stores a checksum.
+  uint64 checkpoint_ts = 5;         // Stores checkpoint ts as seen by leader.
 }
 
 message License {
@@ -164,11 +165,10 @@ message ZeroProposal {
 // the nodes in the caller server; and the membership updates recorded by the
 // callee server since the provided lastUpdate.
 message MembershipState {
-  uint64 counter = 1;  // Used to find latest membershipState in case of race.
-  map<uint32, Group> groups = 2;
-  map<uint64, Member> members = 3;
-  map<uint32, uint64> leaders = 4;
-  repeated Member removed = 5;
+  map<uint64, Member> members = 1;
+  map<uint32, uint64> leaders = 2;
+  map<string, Tablet> tablets = 3;
+  repeated Member removed = 4;
 
   uint64 maxUID = 7;
   uint64 maxNsID = 8;

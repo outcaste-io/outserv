@@ -15,14 +15,13 @@ import (
 )
 
 type membershipState struct {
-	Counter    uint64         `json:"counter,omitempty"`
-	Groups     []clusterGroup `json:"groups,omitempty"`
-	Members    []*pb.Member   `json:"zeros,omitempty"`
-	MaxUID     uint64         `json:"maxUID,omitempty"`
-	MaxNsID    uint64         `json:"maxNsID,omitempty"`
-	Removed    []*pb.Member   `json:"removed,omitempty"`
-	Cid        string         `json:"cid,omitempty"`
-	Namespaces []uint64       `json:"namespaces,omitempty"`
+	Tablets    []*pb.Tablet `json:"groups,omitempty"`
+	Members    []*pb.Member `json:"zeros,omitempty"`
+	MaxUID     uint64       `json:"maxUID,omitempty"`
+	MaxNsID    uint64       `json:"maxNsID,omitempty"`
+	Removed    []*pb.Member `json:"removed,omitempty"`
+	Cid        string       `json:"cid,omitempty"`
+	Namespaces []uint64     `json:"namespaces,omitempty"`
 }
 
 type clusterGroup struct {
@@ -78,23 +77,12 @@ func convertToGraphQLResp(ms pb.MembershipState, listNs bool) membershipState {
 	// namespaces stores set of namespaces
 	namespaces := make(map[uint64]struct{})
 
-	state.Counter = ms.Counter
-	for k, v := range ms.Groups {
-		var tablets = make([]*pb.Tablet, 0, len(v.Tablets))
-		for name, v1 := range v.Tablets {
-			tablets = append(tablets, v1)
-			if listNs {
-				namespaces[x.ParseNamespace(name)] = struct{}{}
-			}
+	for name, v1 := range ms.Tablets {
+		state.Tablets = append(state.Tablets, v1)
+		if listNs {
+			namespaces[x.ParseNamespace(name)] = struct{}{}
 		}
-		state.Groups = append(state.Groups, clusterGroup{
-			Id:         k,
-			Tablets:    tablets,
-			SnapshotTs: v.SnapshotTs,
-			Checksum:   v.Checksum,
-		})
 	}
-	state.Members = make([]*pb.Member, 0, len(ms.Members))
 	for _, v := range ms.Members {
 		state.Members = append(state.Members, v)
 	}

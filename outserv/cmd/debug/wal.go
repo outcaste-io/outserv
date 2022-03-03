@@ -78,16 +78,11 @@ func printBasic(store RaftStore) (uint64, uint64) {
 		var zs pb.ZeroSnapshot
 		if err := ds.Unmarshal(snap.Data); err == nil {
 			fmt.Printf("Snapshot Alpha: %+v\n", ds)
+
 		} else if err := zs.Unmarshal(snap.Data); err == nil {
-			for gid, group := range zs.State.GetGroups() {
-				fmt.Printf("\nGROUP: %d\n", gid)
-				for _, tablet := range group.GetTablets() {
-					fmt.Printf("Tablet: %+v .\n", tablet)
-				}
-				group.Tablets = nil
-				fmt.Printf("Group: %d %+v .\n", gid, group)
+			for _, tablet := range zs.State.GetTablets() {
+				fmt.Printf("Tablet: %+v .\n", tablet)
 			}
-			zs.State.Groups = nil
 			fmt.Printf("\nSnapshot Zero: %+v\n", zs)
 		} else {
 			fmt.Printf("Unable to unmarshal Dgraph snapshot: %v", err)

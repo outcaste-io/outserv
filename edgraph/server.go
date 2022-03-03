@@ -1192,16 +1192,14 @@ func filterTablets(ctx context.Context, ms *pb.MembershipState) error {
 		// For galaxy namespace, we don't want to filter out the predicates.
 		return nil
 	}
-	for _, group := range ms.GetGroups() {
-		tablets := make(map[string]*pb.Tablet)
-		for pred, tablet := range group.GetTablets() {
-			if ns, attr := x.ParseNamespaceAttr(pred); namespace == ns {
-				tablets[attr] = tablet
-				tablets[attr].Predicate = attr
-			}
+	tablets := make(map[string]*pb.Tablet)
+	for pred, tablet := range ms.GetTablets() {
+		if ns, attr := x.ParseNamespaceAttr(pred); namespace == ns {
+			tablets[attr] = tablet
+			tablets[attr].Predicate = attr
 		}
-		group.Tablets = tablets
 	}
+	ms.Tablets = tablets
 	return nil
 }
 
