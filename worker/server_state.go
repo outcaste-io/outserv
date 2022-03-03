@@ -79,17 +79,6 @@ func setBadgerOptions(opt badger.Options) badger.Options {
 func (s *ServerState) initStorage() {
 	var err error
 
-	if x.WorkerConfig.EncryptionKey != nil {
-		// non-nil key file
-		if !EnterpriseEnabled() {
-			// not licensed --> crash.
-			glog.Fatal("Valid Enterprise License needed for the Encryption feature.")
-		} else {
-			// licensed --> OK.
-			glog.Infof("Encryption feature enabled.")
-		}
-	}
-
 	{
 		// Write Ahead Log directory
 		x.Checkf(os.MkdirAll(Config.WALDir, 0700), "Error while creating WAL dir.")

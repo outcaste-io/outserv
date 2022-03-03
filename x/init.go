@@ -23,10 +23,9 @@ import (
 	"os"
 	"regexp"
 	"runtime"
-	"strings"
 
-	"github.com/outcaste-io/ristretto/z"
 	"github.com/golang/glog"
+	"github.com/outcaste-io/ristretto/z"
 )
 
 var (
@@ -73,32 +72,23 @@ func Init() {
 
 // BuildDetails returns a string containing details about the Dgraph binary.
 func BuildDetails() string {
-	licenseInfo := `Licensed under the Apache Public License 2.0`
-	if !strings.HasSuffix(dgraphVersion, "-oss") {
-		licenseInfo = "Licensed variously under the Apache Public License 2.0 and Dgraph " +
-			"Community License"
-	}
-
+	licenseInfo := `Licensed under Smart License 1.0 and Apache Public License 2.0`
 	buf := z.CallocNoRef(1, "X.BuildDetails")
 	jem := len(buf) > 0
 	z.Free(buf)
 
 	return fmt.Sprintf(`
-Dgraph version   : %v
-Dgraph codename  : %v
-Dgraph SHA-256   : %x
+Outserv version   : %v
+Outserv codename  : %v
+Outserv SHA-256   : %x
 Commit SHA-1     : %v
 Commit timestamp : %v
 Branch           : %v
 Go version       : %v
 jemalloc enabled : %v
 
-For Dgraph official documentation, visit https://dgraph.io/docs.
-For discussions about Dgraph     , visit https://discuss.dgraph.io.
-For fully-managed Dgraph Cloud   , visit https://dgraph.io/cloud.
-
 %s.
-Copyright 2015-2021 Dgraph Labs, Inc.
+Copyright 2022 Outcaste, Inc.
 
 `,
 		dgraphVersion, dgraphCodename, ExecutableChecksum(), lastCommitSHA, lastCommitTime, gitBranch,

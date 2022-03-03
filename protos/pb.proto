@@ -193,10 +193,9 @@ message HealthInfo {
   string version = 5;
   int64 uptime = 6;
   int64 lastEcho = 7;
-  repeated string ongoing = 8;
-  repeated string indexing = 9;
-  repeated string ee_features = 10;
-  uint64 read_ts = 11;
+  uint64 read_ts = 8;
+  repeated string ongoing = 9;
+  repeated string indexing = 10;
 }
 
 message Tablet {

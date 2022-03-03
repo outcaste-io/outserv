@@ -16,7 +16,6 @@ import (
 	badgerpb "github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/conn"
-	"github.com/outcaste-io/outserv/ee/enc"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/raftwal"
 	"github.com/outcaste-io/outserv/schema"
@@ -884,7 +883,6 @@ START:
 			}
 			if i == 0 {
 				glog.Infof("Received first state update from Zero: %+v", state)
-				x.WriteCidFile(state.Cid)
 			}
 			select {
 			case stateCh <- state:
@@ -924,73 +922,6 @@ OUTER:
 	}
 	cancel()
 	goto START
-}
-
-// GetEEFeaturesList returns a list of Enterprise Features that are available.
-func GetEEFeaturesList() []string {
-	if !EnterpriseEnabled() {
-		return nil
-	}
-	var ee []string
-	if len(Config.HmacSecret) > 0 {
-		ee = append(ee, "acl")
-		ee = append(ee, "multi_tenancy")
-	}
-	if x.WorkerConfig.Audit {
-		ee = append(ee, "audit")
-	}
-	if Config.ChangeDataConf != "" {
-		ee = append(ee, "cdc")
-	}
-	return ee
-}
-
-// EnterpriseEnabled returns whether enterprise features can be used or not.
-func EnterpriseEnabled() bool {
-	if !enc.EeBuild {
-		return false
-	}
-	state := GetMembershipState()
-	if state == nil {
-		return groups().askZeroForEE()
-	}
-	return state.GetLicense().GetEnabled()
-}
-
-func (g *groupi) askZeroForEE() bool {
-	var err error
-	var connState *pb.ConnectionState
-
-	createConn := func() bool {
-		pl := g.connToZeroLeader()
-		if pl == nil {
-			return false
-		}
-		zc := pb.NewZeroClient(pl.Get())
-
-		ctx, cancel := context.WithTimeout(g.Ctx(), 10*time.Second)
-		defer cancel()
-
-		connState, err = zc.Connect(ctx, &pb.Member{ClusterInfoOnly: true})
-		if connState == nil ||
-			connState.GetState() == nil ||
-			connState.GetState().GetLicense() == nil {
-			glog.Info("Retry Zero Connection")
-			return false
-		}
-		if err == nil || x.ShouldCrash(err) {
-			return true
-		}
-		return false
-	}
-
-	for !g.IsClosed() {
-		if createConn() {
-			break
-		}
-		time.Sleep(time.Second)
-	}
-	return connState.GetState().GetLicense().GetEnabled()
 }
 
 // SubscribeForUpdates will listen for updates for the given group.
