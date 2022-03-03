@@ -948,6 +948,8 @@ func run() {
 	go func() {
 		zero.Run(updaters, bindall)
 
+		time.Sleep(time.Hour)
+
 		worker.StartRaftNodes(worker.State.WALstore, bindall)
 		atomic.AddUint32(&initDone, 1)
 

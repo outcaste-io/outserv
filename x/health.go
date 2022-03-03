@@ -18,6 +18,7 @@ package x
 
 import (
 	"sync/atomic"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -56,6 +57,15 @@ func HealthCheck() error {
 		return errDrainingMode
 	}
 	return nil
+}
+
+func BlockUntilHealthy() {
+	for {
+		if err := HealthCheck(); err == nil {
+			return
+		}
+		time.Sleep(time.Second)
+	}
 }
 
 func setStatus(v *uint32, ok bool) {

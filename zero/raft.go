@@ -312,6 +312,7 @@ func (n *node) ensureClusterID() {
 }
 
 func (n *node) initAndStartNode() error {
+	glog.Infof("-----> initAndStartNode")
 	x.Check(n.initProposalKey(n.Id))
 	_, restart, err := n.PastLife()
 	x.Check(err)
@@ -339,6 +340,7 @@ func (n *node) initAndStartNode() error {
 		n.SetRaft(raft.RestartNode(n.Cfg))
 
 	case len(peer) > 0:
+		glog.Infoln("Connecting to an existing peer: %+v\n", x.WorkerConfig.ZeroAddr)
 		p := conn.GetPools().Connect(peer, x.WorkerConfig.TLSClientConfig)
 		if p == nil {
 			return errors.Errorf("Unhealthy connection to %v", peer)
@@ -371,7 +373,7 @@ func (n *node) initAndStartNode() error {
 		n.SetRaft(raft.StartNode(n.Cfg, nil))
 
 	default:
-		glog.Infof("Starting a brand new node")
+		glog.Infof("Starting a brand new Zero node.")
 		data, err := n.RaftContext.Marshal()
 		x.Check(err)
 		peers := []raft.Peer{{ID: n.Id, Context: data}}
@@ -396,12 +398,12 @@ func (n *node) Run() {
 
 	// snapshot can cause select loop to block while deleting entries, so run
 	// it in goroutine
-	closer := z.NewCloser(5)
-	defer func() {
-		closer.SignalAndWait()
-		n.closer.Done()
-		glog.Infof("Zero Node.Run finished.")
-	}()
+	closer := z.NewCloser(1)
+	// defer func() {
+	// 	closer.SignalAndWait()
+	// 	n.closer.Done()
+	// 	glog.Infof("Zero Node.Run finished.")
+	// }()
 
 	go n.snapshotPeriodically(closer)
 	if !x.WorkerConfig.HardSync {
@@ -411,10 +413,13 @@ func (n *node) Run() {
 	// We only stop runReadIndexLoop after the for loop below has finished interacting with it.
 	// That way we know sending to readStateCh will not deadlock.
 
+	glog.Infof("Zero.Run")
+	var leader bool
 	var timer x.Timer
 	for {
 		select {
 		case <-n.closer.HasBeenClosed():
+			glog.Infof("Exiting Zero.Run")
 			n.Raft().Stop()
 			return
 
@@ -434,7 +439,10 @@ func (n *node) Run() {
 			_, span := otrace.StartSpan(n.ctx, "Zero.RunLoop",
 				otrace.WithSampler(otrace.ProbabilitySampler(0.001)))
 
-			leader := rd.RaftState == raft.StateLeader
+			if rd.SoftState != nil {
+				leader = rd.RaftState == raft.StateLeader
+				glog.Infof("Am I leader? %v\n", leader)
+			}
 			if leader {
 				ostats.Record(n.ctx, x.RaftIsLeader.M(1))
 				// Leader can send messages in parallel with writing to disk.

@@ -876,6 +876,8 @@ func generateGQLSchema(sch *worker.GqlSchema, ns uint64) (schema.Schema, error) 
 }
 
 func (as *adminServer) initServer() {
+	x.BlockUntilHealthy()
+
 	// Nothing else should be able to lock before here.  The admin resolvers aren't yet
 	// set up (they all just error), so we will obtain the lock here without contention.
 	// We then setup the admin resolvers and they must wait until we are done before the

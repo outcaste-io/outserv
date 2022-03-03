@@ -1,7 +1,6 @@
 package zero
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -23,7 +22,6 @@ import (
 
 type State struct {
 	x.SafeMutex
-	Node *node
 
 	_state *pb.MembershipState
 
@@ -43,10 +41,8 @@ type State struct {
 }
 
 // Init initializes the zero server.
-func (s *State) Init() {
-	s.Lock()
-	defer s.Unlock()
-
+func NewState() *State {
+	s := &State{}
 	s._state = &pb.MembershipState{
 		Groups: make(map[uint32]*pb.Group),
 		Zeros:  make(map[uint64]*pb.Member),
@@ -65,6 +61,7 @@ func (s *State) Init() {
 
 	// TODO: Add functionality to rebalance types.
 	// go s.rebalanceTablets()
+	return s
 }
 
 func (s *State) member(addr string) *pb.Member {
@@ -123,6 +120,9 @@ func (s *State) StoreZero(m *pb.Member) {
 	defer s.Unlock()
 
 	st := proto.Clone(s._state).(*pb.MembershipState)
+	if st.Zeros == nil {
+		st.Zeros = make(map[uint64]*pb.Member)
+	}
 	st.Zeros[m.Id] = m
 	s._state = st
 }
@@ -133,7 +133,11 @@ func setupListener(addr string, port int, kind string) (listener net.Listener, e
 	return net.Listen("tcp", laddr)
 }
 
+var state *State
+
 func Run(closer *z.Closer, bindall bool) {
+	glog.Infof("Starting Zero...")
+
 	wdir := "zw"
 	nodeId := x.WorkerConfig.Raft.GetUint64("idx")
 
@@ -196,6 +200,11 @@ func Run(closer *z.Closer, bindall bool) {
 	}()
 
 	// This must be here. It does not work if placed before Grpc init.
-	node := &node{Node: cn, ctx: context.Background(), closer: nodeCloser}
+	node := &node{
+		Node:   cn,
+		closer: nodeCloser,
+		ctx:    nodeCloser.Ctx(),
+		state:  NewState(),
+	}
 	x.Check(node.initAndStartNode())
 }

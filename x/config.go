@@ -18,9 +18,11 @@ package x
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/badger/v3"
 	"github.com/outcaste-io/ristretto/z"
 	"github.com/spf13/viper"
@@ -132,9 +134,6 @@ type WorkerOptions struct {
 	HmacSecret Sensitive
 	// AbortOlderThan tells Dgraph to discard transactions that are older than this duration.
 	AbortOlderThan time.Duration
-	// ProposedGroupId will be used if there's a file in the p directory called group_id with the
-	// proposed group ID for this server.
-	ProposedGroupId uint32
 	// StartTime is the start time of the alpha
 	StartTime time.Time
 	// Security options:
@@ -160,10 +159,28 @@ var WorkerConfig WorkerOptions
 
 func (w *WorkerOptions) Parse(conf *viper.Viper) {
 	w.MyAddr = conf.GetString("my")
+	if w.MyAddr == "" {
+		w.MyAddr = fmt.Sprintf("localhost:%d", Config.PortOffset+PortInternal)
+
+	} else {
+		// check if address is valid or not
+		Check(ValidateAddress(w.MyAddr))
+		bindall := conf.GetBool("bindall")
+		if !bindall {
+			glog.Errorln("--my flag is provided without bindall, Did you forget to specify bindall?")
+		}
+	}
 	w.Trace = z.NewSuperFlag(conf.GetString("trace")).MergeAndCheckDefault(TraceDefaults)
 
 	survive := conf.GetString("survive")
 	AssertTruef(survive == "process" || survive == "filesystem",
 		"Invalid survival mode: %s", survive)
 	w.HardSync = survive == "filesystem"
+
+	AssertTruef(len(w.ZeroAddr) > 0, "Provide at least one peer node address")
+	for _, zeroAddr := range w.ZeroAddr {
+		AssertTruef(zeroAddr != w.MyAddr,
+			"Peer address %s and my address (IP:Port) %s can't be the same.",
+			zeroAddr, w.MyAddr)
+	}
 }

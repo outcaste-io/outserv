@@ -55,52 +55,28 @@ func groups() *groupi {
 // This function triggers RAFT nodes to be created, and is the entrance to the RAFT
 // world from main.go.
 func StartRaftNodes(walStore *raftwal.DiskStorage, bindall bool) {
-	if x.WorkerConfig.MyAddr == "" {
-		x.WorkerConfig.MyAddr = fmt.Sprintf("localhost:%d", workerPort())
-	} else {
-		// check if address is valid or not
-		x.Check(x.ValidateAddress(x.WorkerConfig.MyAddr))
-		if !bindall {
-			glog.Errorln("--my flag is provided without bindall, Did you forget to specify bindall?")
-		}
-	}
-
-	x.AssertTruef(len(x.WorkerConfig.ZeroAddr) > 0, "Providing dgraphzero address is mandatory.")
-	for _, zeroAddr := range x.WorkerConfig.ZeroAddr {
-		x.AssertTruef(zeroAddr != x.WorkerConfig.MyAddr,
-			"Dgraph Zero address %s and Dgraph address (IP:Port) %s can't be the same.",
-			zeroAddr, x.WorkerConfig.MyAddr)
-	}
-
 	raftIdx := x.WorkerConfig.Raft.GetUint64("idx")
-	if raftIdx == 0 {
-		raftIdx = walStore.Uint(raftwal.RaftId)
+	groupIdx := x.WorkerConfig.Raft.GetUint32("group")
+	x.AssertTruef(raftIdx > 0 && groupIdx > 0, "Raft ID and Group ID must be provided")
+	glog.Infof("Current Raft Id: %#x Group ID: %#x\n", raftIdx, groupIdx)
 
-		// If the w directory already contains raft information, ignore the proposed
-		// group ID stored inside the p directory.
-		if raftIdx > 0 {
-			x.WorkerConfig.ProposedGroupId = 0
-		}
-	}
-	glog.Infof("Current Raft Id: %#x\n", raftIdx)
-
-	if x.WorkerConfig.ProposedGroupId == 0 {
-		x.WorkerConfig.ProposedGroupId = x.WorkerConfig.Raft.GetUint32("group")
-	}
 	// Successfully connect with dgraphzero, before doing anything else.
 	// Connect with Zero leader and figure out what group we should belong to.
 	m := &pb.Member{
 		Id:      raftIdx,
-		GroupId: x.WorkerConfig.ProposedGroupId,
+		GroupId: x.WorkerConfig.Raft.GetUint32("group"),
 		Addr:    x.WorkerConfig.MyAddr,
 		Learner: x.WorkerConfig.Raft.GetBool("learner"),
 	}
 	if m.GroupId > 0 {
+		// TODO: Remove the concept of forced group id.
 		m.ForceGroupId = true
 	}
 	glog.Infof("Sending member request to Zero: %+v\n", m)
 	var connState *pb.ConnectionState
 	var err error
+
+	// TODO: The following should directly interact with the zero package.
 
 	for { // Keep on retrying. See: https://github.com/dgraph-io/dgraph/issues/2289
 		pl := gr.connToZeroLeader()
@@ -680,66 +656,6 @@ func (g *groupi) triggerMembershipSync() {
 	}
 }
 
-const connBaseDelay = 100 * time.Millisecond
-
-func (g *groupi) connToZeroLeader() *conn.Pool {
-	pl := g.Leader(0)
-	if pl != nil {
-		return pl
-	}
-	glog.V(1).Infof("No healthy Zero leader found. Trying to find a Zero leader...")
-
-	getLeaderConn := func(zc pb.ZeroClient) *conn.Pool {
-		ctx, cancel := context.WithTimeout(g.Ctx(), 10*time.Second)
-		defer cancel()
-
-		connState, err := zc.Connect(ctx, &pb.Member{ClusterInfoOnly: true})
-		if err != nil || connState == nil {
-			glog.V(1).Infof("While retrieving Zero leader info. Error: %v. Retrying...", err)
-			return nil
-		}
-		for _, mz := range connState.State.GetZeros() {
-			if mz.Leader {
-				return conn.GetPools().Connect(mz.GetAddr(), x.WorkerConfig.TLSClientConfig)
-			}
-		}
-		return nil
-	}
-
-	// No leader found. Let's get the latest membership state from Zero.
-	delay := connBaseDelay
-	maxHalfDelay := time.Second
-	for i := 0; ; i++ { // Keep on retrying. See: https://github.com/dgraph-io/dgraph/issues/2289
-		if g.IsClosed() {
-			return nil
-		}
-
-		time.Sleep(delay)
-		if delay <= maxHalfDelay {
-			delay *= 2
-		}
-
-		zAddrList := x.WorkerConfig.ZeroAddr
-		// Pick addresses in round robin manner.
-		addr := zAddrList[i%len(zAddrList)]
-
-		pl := g.AnyServer(0)
-		if pl == nil {
-			pl = conn.GetPools().Connect(addr, x.WorkerConfig.TLSClientConfig)
-		}
-		if pl == nil {
-			glog.V(1).Infof("No healthy Zero server found. Retrying...")
-			continue
-		}
-		zc := pb.NewZeroClient(pl.Get())
-		if pl := getLeaderConn(zc); pl != nil {
-			glog.V(1).Infof("Found connection to leader: %s", pl.Addr)
-			return pl
-		}
-		glog.V(1).Infof("Unable to connect to a healthy Zero leader. Retrying...")
-	}
-}
-
 func (g *groupi) doSendMembership(tablets map[string]*pb.Tablet) error {
 	leader := g.Node.AmLeader()
 	member := &pb.Member{
@@ -927,6 +843,8 @@ OUTER:
 // SubscribeForUpdates will listen for updates for the given group.
 func SubscribeForUpdates(prefixes [][]byte, ignore string, cb func(kvs *badgerpb.KVList),
 	group uint32, closer *z.Closer) {
+
+	x.BlockUntilHealthy() // No need to proceed if server is still coming up.
 
 	var prefix []byte
 	if len(prefixes) > 0 {
