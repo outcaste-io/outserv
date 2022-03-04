@@ -596,7 +596,6 @@ func serveGRPC(l net.Listener, tlsCfg *tls.Config, closer *z.Closer) {
 	s := grpc.NewServer(opt...)
 	api.RegisterDgraphServer(s, &edgraph.Server{})
 	hapi.RegisterHealthServer(s, health.NewServer())
-	worker.RegisterZeroProxyServer(s)
 
 	err := s.Serve(l)
 	glog.Errorf("GRPC listener canceled: %v\n", err)

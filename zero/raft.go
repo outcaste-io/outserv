@@ -38,6 +38,7 @@ type node struct {
 	state  *State
 	ctx    context.Context
 	closer *z.Closer // to stop Run.
+	ch     chan *pb.MembershipState
 
 	// The last timestamp when this Zero was able to reach quorum.
 	mu         sync.RWMutex
@@ -237,6 +238,7 @@ func (n *node) applyProposal(e raftpb.Entry) (uint64, error) {
 	// Now assign the new state back.
 	glog.Infof("Updated state: %+v\n", dst)
 	n.state._state = dst
+	n.ch <- dst
 	return key, nil
 }
 
@@ -332,7 +334,7 @@ func (n *node) ensureClusterID() {
 	}
 
 	for range tick.C {
-		if cid := n.state.Membership().GetCid(); len(cid) > 0 {
+		if cid := n.state.membership().GetCid(); len(cid) > 0 {
 			glog.Infof("Found Cluster ID: %s\n", cid)
 			return
 		}
@@ -428,6 +430,7 @@ func (n *node) Run() {
 	slowTicker := time.NewTicker(time.Minute)
 	defer slowTicker.Stop()
 
+	n.ch = make(chan *pb.MembershipState, 16)
 	// snapshot can cause select loop to block while deleting entries, so run
 	// it in goroutine
 	closer := z.NewCloser(2)
@@ -624,7 +627,7 @@ func (n *node) calculateAndProposeSnapshot() error {
 		return nil
 	}
 
-	state := n.state.MembershipCopy()
+	state := n.state.membershipCopy()
 	zs := &pb.ZeroSnapshot{
 		Index: last,
 		State: state,
@@ -664,7 +667,7 @@ func (n *node) applyConfChange(e raftpb.Entry) {
 			GroupId: 0,
 			Learner: rc.IsLearner,
 		}
-		for _, mid := range n.state.Membership().Removed {
+		for _, mid := range n.state.membership().Removed {
 			// Reusing Raft IDs is not allowed.
 			if m.Id == mid {
 				err := errors.Errorf("REUSE_RAFTID: Reusing removed id: %d.\n", mid)

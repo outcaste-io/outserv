@@ -801,10 +801,9 @@ func newAdminResolverFactory() resolve.ResolverFactory {
 		"shutdown":           resolveShutdown,
 		"updateLambdaScript": resolveUpdateLambda,
 
-		"removeNode":        resolveRemoveNode,
-		"moveTablet":        resolveMoveTablet,
-		"assign":            resolveAssign,
-		"enterpriseLicense": resolveEnterpriseLicense,
+		"removeNode": resolveRemoveNode,
+		"moveTablet": resolveMoveTablet,
+		"assign":     resolveAssign,
 	}
 
 	rf := resolverFactoryWithErrorMsg(errResolverNotFound).

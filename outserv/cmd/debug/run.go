@@ -725,8 +725,6 @@ func printAlphaProposal(buf *bytes.Buffer, pr *pb.Proposal) {
 		}
 	case len(pr.Kv) > 0:
 		fmt.Fprintf(buf, " KV . Size: %d ", len(pr.Kv))
-	case pr.State != nil:
-		fmt.Fprintf(buf, " State . %+v ", pr.State)
 	case pr.Snapshot != nil:
 		fmt.Fprintf(buf, " Snapshot . %+v ", pr.Snapshot)
 	}

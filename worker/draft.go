@@ -36,6 +36,7 @@ import (
 	"github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/outserv/zero"
 	"github.com/outcaste-io/ristretto/z"
 )
 
@@ -644,13 +645,6 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 	case len(proposal.Kv) > 0:
 		return populateKeyValues(ctx, proposal.Kv)
 
-	case proposal.State != nil:
-		n.elog.Printf("Applying state for key: %s", key)
-		// This state needn't be snapshotted in this group, on restart we would fetch
-		// a state which is latest or equal to this.
-		groups().applyState(groups().Node.Id, proposal.State)
-		return nil
-
 	case len(proposal.CleanPredicate) > 0:
 		n.elog.Printf("Cleaning predicate: %s", proposal.CleanPredicate)
 		end := time.Now().Add(10 * time.Second)
@@ -917,17 +911,24 @@ func (n *node) commit(txn *posting.Txn) error {
 }
 
 func (n *node) leaderBlocking() (*conn.Pool, error) {
+	if _, err := zero.LatestMembershipState(n.ctx); err != nil {
+		return nil, errors.Wrapf(err, "while getting latest membership state")
+	}
 	pool := groups().Leader(groups().groupId())
 	if pool == nil {
-		// Functions like retrieveSnapshot and joinPeers are blocking at initial start and
-		// leader election for a group might not have happened when it is called. If we can't
-		// find a leader, get latest state from Zero.
-		if err := UpdateMembershipState(context.Background()); err != nil {
-			return nil, errors.Errorf("Error while trying to update membership state: %+v", err)
-		}
 		return nil, errors.Errorf("Unable to reach leader in group %d", n.gid)
 	}
 	return pool, nil
+	// if pool == nil {
+	// 	// Functions like retrieveSnapshot and joinPeers are blocking at initial start and
+	// 	// leader election for a group might not have happened when it is called. If we can't
+	// 	// find a leader, get latest state from Zero.
+	// 	if err := UpdateMembershipState(context.Background()); err != nil {
+	// 		return nil, errors.Errorf("Error while trying to update membership state: %+v", err)
+	// 	}
+	// 	return nil, errors.Errorf("Unable to reach leader in group %d", n.gid)
+	// }
+	// return pool, nil
 }
 
 func (n *node) Snapshot() (*pb.Snapshot, error) {

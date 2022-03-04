@@ -92,7 +92,6 @@ type state struct {
 type loader struct {
 	*state
 	mappers []*mapper
-	zero    *grpc.ClientConn
 }
 
 func newLoader(opt *options) *loader {

@@ -56,7 +56,6 @@ type XidMap struct {
 	dg         *dgo.Dgraph
 	shards     []*shard
 	newRanges  chan *pb.AssignedIds
-	zc         pb.ZeroClient
 	maxUidSeen uint64
 
 	// Optionally, these can be set to persist the mappings.
@@ -147,7 +146,6 @@ func New(opts XidMapOptions) *XidMap {
 		})
 		x.Check(err)
 	}
-	xm.zc = pb.NewZeroClient(opts.UidAssigner)
 
 	go func() {
 		const initBackoff = 10 * time.Millisecond
@@ -156,9 +154,14 @@ func New(opts XidMapOptions) *XidMap {
 		for {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			ctx = xm.attachNamespace(ctx)
-			assigned, err := xm.zc.AssignIds(ctx, &pb.Num{Val: 1e5, Type: pb.Num_UID})
-			glog.V(2).Infof("Assigned Uids: %+v. Err: %v", assigned, err)
 			cancel()
+
+			// TODO: Assign UIDs here &pb.Num{Val: 1e5, Type: pb.Num_UID}
+			// assigned, err := xm.zc.AssignIds(ctx, &pb.Num{Val: 1e5, Type: pb.Num_UID})
+			// glog.V(2).Infof("Assigned Uids: %+v. Err: %v", assigned, err)
+			// cancel()
+			var assigned *pb.AssignedIds
+			var err error
 			if err == nil {
 				backoff = initBackoff
 				xm.updateMaxSeen(assigned.EndId)
@@ -323,8 +326,11 @@ func (m *XidMap) BumpTo(uid uint64) {
 		num := x.Max(uid-curMax, 1e4)
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		ctx = m.attachNamespace(ctx)
-		assigned, err := m.zc.AssignIds(ctx, &pb.Num{Val: num, Type: pb.Num_UID})
 		cancel()
+
+		// TODO: Figure out a way to assign ids.
+		var assigned *pb.AssignedIds
+		var err error
 		if err == nil {
 			glog.V(1).Infof("Requested bump: %d. Got assigned: %v", uid, assigned)
 			m.updateMaxSeen(assigned.EndId)

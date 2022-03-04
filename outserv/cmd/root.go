@@ -30,7 +30,6 @@ import (
 	"unicode"
 
 	"github.com/outcaste-io/outserv/outserv/cmd/alpha"
-	"github.com/outcaste-io/outserv/outserv/cmd/bulk"
 	"github.com/outcaste-io/outserv/outserv/cmd/cert"
 	"github.com/outcaste-io/outserv/outserv/cmd/debug"
 	"github.com/outcaste-io/outserv/outserv/cmd/debuginfo"
@@ -80,7 +79,8 @@ var rootConf = viper.New()
 
 // subcommands initially contains all default sub-commands.
 var subcommands = []*x.SubCommand{
-	&bulk.Bulk, &cert.Cert, &live.Live,
+	// TODO: Support Bulk loader.
+	&cert.Cert, &live.Live,
 	&alpha.Alpha, &version.Version, &debug.Debug, &migrate.Migrate,
 	&debuginfo.DebugInfo, &decrypt.Decrypt, &increment.Increment,
 }

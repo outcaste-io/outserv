@@ -101,13 +101,13 @@ func (s *State) SetMembershipState(state *pb.MembershipState) {
 	}
 }
 
-func (s *State) Membership() *pb.MembershipState {
+func (s *State) membership() *pb.MembershipState {
 	s.Lock()
 	defer s.Unlock()
 
 	return s._state
 }
-func (s *State) MembershipCopy() *pb.MembershipState {
+func (s *State) membershipCopy() *pb.MembershipState {
 	s.Lock()
 	defer s.Unlock()
 
@@ -148,71 +148,6 @@ func (s *State) RemoveMember(raftId uint64) {
 	s._state = st
 }
 
-// func (s *State) createProposals(dst *pb.MembershipState) ([]*pb.ZeroProposal, error) {
-// 	var res []*pb.ZeroProposal
-// 	if len(dst.Members) > 1 {
-// 		return res, errors.Errorf("Create Proposal: Invalid group: %+v", dst)
-// 	}
-
-// 	s.Lock()
-// 	defer s.Unlock()
-
-// 	src := s._state
-
-// 	// There is only one member. We use for loop because we don't know what the mid is.
-// 	for mid, dstMember := range dst.Members {
-// 		if dstMember.GroupId == 0 {
-// 			return res, errors.Errorf("Unknown group for member: %+v", dstMember)
-// 		}
-// 		srcMember, has := src.Members[mid]
-// 		if !has {
-// 			return res, errors.Errorf("Unknown member: %+v", dstMember)
-// 		}
-
-// 		// Should we also check the group ID, if that changed?
-// 		if srcMember.Addr != dstMember.Addr ||
-// 			srcMember.Leader != dstMember.Leader ||
-// 			srcMember.GroupId != dstMember.GroupId {
-
-// 			proposal := &pb.ZeroProposal{
-// 				Member: dstMember,
-// 			}
-// 			res = append(res, proposal)
-// 		}
-// 		if !dstMember.Leader {
-// 			// Don't continue to tablets if request is not from the leader.
-// 			return res, nil
-// 		}
-// 	}
-
-// 	var tablets []*pb.Tablet
-// 	for gid, dstGrp := range dst.Groups {
-// 		srcGrp, has := src.Groups[gid]
-// 		if !has {
-// 			return res, errors.Errorf("Unknown group: %+v", gid)
-// 		}
-// 		for key, dstTablet := range dstGrp.Tablets {
-// 			srcTablet, has := srcGrp.Tablets[key]
-// 			if !has {
-// 				// Tablet moved to new group
-// 				continue
-// 			}
-
-// 			s := float64(srcTablet.OnDiskBytes)
-// 			d := float64(dstTablet.OnDiskBytes)
-// 			if dstTablet.Remove || (s == 0 && d > 0) || (s > 0 && math.Abs(d/s-1) > 0.1) {
-// 				dstTablet.Force = false
-// 				tablets = append(tablets, dstTablet)
-// 			}
-// 		}
-// 	}
-
-// 	if len(tablets) > 0 {
-// 		res = append(res, &pb.ZeroProposal{Tablets: tablets})
-// 	}
-// 	return res, nil
-// }
-
 func setupListener(addr string, port int, kind string) (listener net.Listener, err error) {
 	laddr := fmt.Sprintf("%s:%d", addr, port)
 	glog.Infof("Setting up %s listener at: %v\n", kind, laddr)
@@ -221,16 +156,28 @@ func setupListener(addr string, port int, kind string) (listener net.Listener, e
 
 var inode *node
 
+func MembershipState() *pb.MembershipState {
+	ms := inode.state.membership()
+	if ms == nil {
+		return &pb.MembershipState{}
+	}
+	return ms
+}
+
 func LatestMembershipState(ctx context.Context) (*pb.MembershipState, error) {
 	glog.Infof("Called LatestMembershipState")
 	if err := inode.WaitLinearizableRead(ctx); err != nil {
 		return nil, err
 	}
-	ms := inode.state.Membership()
+	ms := inode.state.membership()
 	if ms == nil {
 		return &pb.MembershipState{}, nil
 	}
 	return ms, nil
+}
+
+func Subscribe() <-chan *pb.MembershipState {
+	return inode.ch
 }
 
 func Run(closer *z.Closer, bindall bool) {

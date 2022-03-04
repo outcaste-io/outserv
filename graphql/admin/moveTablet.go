@@ -25,8 +25,6 @@ import (
 
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
-	"github.com/outcaste-io/outserv/protos/pb"
-	"github.com/outcaste-io/outserv/worker"
 )
 
 type moveTabletInput struct {
@@ -36,25 +34,26 @@ type moveTabletInput struct {
 }
 
 func resolveMoveTablet(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
-	input, err := getMoveTabletInput(m)
-	if err != nil {
-		return resolve.EmptyResult(m, err), false
-	}
+	// input, err := getMoveTabletInput(m)
+	// if err != nil {
+	// 	return resolve.EmptyResult(m, err), false
+	// }
+	panic("TODO: implement this")
 
 	// gRPC call returns a nil status if the error is non-nil
-	status, err := worker.MoveTabletOverNetwork(ctx, &pb.MoveTabletRequest{
-		Namespace: input.Namespace,
-		Tablet:    input.Tablet,
-		DstGroup:  input.GroupId,
-	})
-	if err != nil {
-		return resolve.EmptyResult(m, err), false
-	}
+	// status, err := worker.MoveTabletOverNetwork(ctx, &pb.MoveTabletRequest{
+	// 	Namespace: input.Namespace,
+	// 	Tablet:    input.Tablet,
+	// 	DstGroup:  input.GroupId,
+	// })
+	// if err != nil {
+	// 	return resolve.EmptyResult(m, err), false
+	// }
 
-	return resolve.DataResult(m,
-		map[string]interface{}{m.Name(): response("Success", status.GetMsg())},
-		nil,
-	), true
+	// return resolve.DataResult(m,
+	// 	map[string]interface{}{m.Name(): response("Success", status.GetMsg())},
+	// 	nil,
+	// ), true
 }
 
 func getMoveTabletInput(m schema.Mutation) (*moveTabletInput, error) {

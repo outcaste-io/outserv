@@ -31,6 +31,7 @@ import (
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/raftwal"
 	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/outserv/zero"
 	"github.com/outcaste-io/ristretto/z"
 	"github.com/pkg/errors"
 )
@@ -54,8 +55,9 @@ func TaskStatusOverNetwork(ctx context.Context, req *pb.TaskStatusRequest,
 	}
 
 	// Find the Alpha with the required Raft ID.
+	st := zero.MembershipState()
 	var addr string
-	if member, has := groups().state.Members[raftId]; has {
+	if member, has := st.Members[raftId]; has {
 		addr = member.Addr
 	}
 	if addr == "" {

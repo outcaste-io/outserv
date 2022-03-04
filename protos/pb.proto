@@ -135,13 +135,6 @@ message Group {
   uint64 checkpoint_ts = 5;         // Stores checkpoint ts as seen by leader.
 }
 
-message License {
-  string user = 1;
-  uint64 maxNodes = 2;
-  int64 expiryTs = 3;
-  bool enabled = 4;
-}
-
 message ZeroProposal {
   reserved 5; // Was used by maxTxnTs.
   reserved 7; // Was used for Txn.
@@ -155,7 +148,6 @@ message ZeroProposal {
   uint64 maxNsID = 12;
   uint64 maxRaftId = 6;
   string cid = 9;  // Used as unique identifier for the cluster.
-  License license = 10;
   ZeroSnapshot snapshot = 11;  // Used to make Zeros take a snapshot.
   // 12 has already been used.
   DeleteNsRequest delete_ns = 13;  // Used to delete namespace.
@@ -175,12 +167,12 @@ message MembershipState {
   string cid = 9;  // Used to uniquely identify the Dgraph cluster.
 }
 
-message ConnectionState {
-  Member member = 1;
-  MembershipState state = 2;
-  // Used to determine the timstamp for reading after bulk load.
-  uint64 max_pending = 3;
-}
+/* message ConnectionState { */
+/*   Member member = 1; */
+/*   MembershipState state = 2; */
+/*   // Used to determine the timstamp for reading after bulk load. */
+/*   uint64 max_pending = 3; */
+/* } */
 
 message HealthInfo {
   string instance = 1;
@@ -285,7 +277,6 @@ message Proposal {
   uint64 base_timestamp = 1; // Use this timestamp to derive commit timestamps.
   Mutations mutations = 2;
   repeated badgerpb3.KV kv = 4;
-  MembershipState state = 5;
   // Delete the predicate which was moved to other group.
   string clean_predicate = 6;
   Snapshot snapshot = 9;  // Used to tell the group when to take snapshot.
@@ -465,21 +456,6 @@ service Raft {
   rpc RaftMessage(stream RaftBatch) returns (api.Payload) {}
   rpc JoinCluster(RaftContext) returns (api.Payload) {}
   rpc IsPeer(RaftContext) returns (PeerResponse) {}
-}
-
-service Zero {
-  // These 3 endpoints are for handling membership.
-  rpc Connect(Member) returns (ConnectionState) {}
-  rpc UpdateMembership(Group) returns (api.Payload) {}
-  rpc StreamMembership(api.Payload) returns (stream MembershipState) {}
-
-  rpc ShouldServe(Tablet) returns (Tablet) {}
-  rpc Inform(TabletRequest) returns (TabletResponse) {}
-  rpc AssignIds(Num) returns (AssignedIds) {}
-  rpc DeleteNamespace(DeleteNsRequest) returns (Status) {}
-  rpc RemoveNode(RemoveNodeRequest) returns (Status) {}
-  rpc MoveTablet(MoveTabletRequest) returns (Status) {}
-  rpc ApplyLicense(ApplyLicenseRequest) returns (Status) {}
 }
 
 service Worker {

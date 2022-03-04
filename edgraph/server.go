@@ -43,6 +43,7 @@ import (
 	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/outserv/zero"
 )
 
 const (
@@ -106,7 +107,7 @@ func PeriodicallyPostTelemetry() {
 		if time.Since(lastPostedAt) < time.Hour {
 			continue
 		}
-		ms := worker.GetMembershipState()
+		ms := zero.MembershipState()
 		t := telemetry.NewAlpha(ms)
 		t.NumGraphQLPM = atomic.SwapUint64(&numGraphQLPM, 0)
 		t.NumGraphQL = atomic.SwapUint64(&numGraphQL, 0)
@@ -1213,7 +1214,7 @@ func (s *Server) State(ctx context.Context) (*api.Response, error) {
 		return nil, err
 	}
 
-	ms := worker.GetMembershipState()
+	ms := zero.MembershipState()
 	if ms == nil {
 		return nil, errors.Errorf("No membership state found")
 	}

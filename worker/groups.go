@@ -6,7 +6,6 @@ package worker
 import (
 	"context"
 	"fmt"
-	"io"
 	"math"
 	"sync"
 	"sync/atomic"
@@ -15,7 +14,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	badgerpb "github.com/outcaste-io/badger/v3/pb"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/raftwal"
@@ -28,7 +26,6 @@ import (
 
 type groupi struct {
 	x.SafeMutex
-	state        *pb.MembershipState
 	Node         *node
 	gid          uint32
 	triggerCh    chan struct{} // Used to trigger membership sync
@@ -91,11 +88,6 @@ func StartRaftNodes(walStore *raftwal.DiskStorage, bindall bool) {
 		x.Fatalf("Unable to join cluster via dgraphzero")
 	}
 
-	// This timestamp would be used for reading during snapshot after bulk load.
-	// The stream is async, we need this information before we start or else replica might
-	// not get any data.
-	gr.applyState(raftIdx, connState)
-
 	gid := gr.groupId()
 	gr.triggerCh = make(chan struct{}, 1)
 
@@ -104,6 +96,11 @@ func StartRaftNodes(walStore *raftwal.DiskStorage, bindall bool) {
 	walStore.SetUint(raftwal.GroupId, uint64(gid))
 
 	gr.Node = newNode(walStore, gid, raftIdx, x.WorkerConfig.MyAddr)
+
+	// This timestamp would be used for reading during snapshot after bulk load.
+	// The stream is async, we need this information before we start or else replica might
+	// not get any data.
+	gr.applyState(connState)
 
 	x.Checkf(schema.LoadFromDb(), "Error while initializing schema")
 	glog.Infof("Load schema from DB: OK")
@@ -225,43 +222,25 @@ func (g *groupi) groupId() uint32 {
 	return atomic.LoadUint32(&g.gid)
 }
 
+// TODO: Remove this func.
 // MaxLeaseId returns the maximum UID that has been leased.
 func MaxLeaseId() uint64 {
-	g := groups()
-	g.RLock()
-	defer g.RUnlock()
-	if g.state == nil {
-		return 0
-	}
-	return g.state.MaxUID
+	st := zero.MembershipState()
+	return st.MaxUID
 }
 
-// GetMembershipState returns the current membership state.
-func GetMembershipState() *pb.MembershipState {
-	g := groups()
-	g.RLock()
-	defer g.RUnlock()
-	return proto.Clone(g.state).(*pb.MembershipState)
-}
+// // UpdateMembershipState contacts zero for an update on membership state.
+// func UpdateMembershipState(ctx context.Context) error {
+// 	st, err := zero.LatestMembershipState(gr.Ctx())
+// 	if err != nil {
+// 		return errors.Wrapf(err, "while retrieving membership")
+// 	}
+// 	gr.applyState(st)
+// 	return nil
+// }
 
-// UpdateMembershipState contacts zero for an update on membership state.
-func UpdateMembershipState(ctx context.Context) error {
-	g := groups()
-	p := g.Leader(0)
-	if p == nil {
-		return errors.Errorf("don't have the address of any dgraph zero leader")
-	}
-
-	c := pb.NewZeroClient(p.Get())
-	state, err := c.Connect(ctx, &pb.Member{ClusterInfoOnly: true})
-	if err != nil {
-		return err
-	}
-	g.applyState(g.Node.Id, state.GetState())
-	return nil
-}
-
-func (g *groupi) applyState(myId uint64, state *pb.MembershipState) {
+func (g *groupi) applyState(state *pb.MembershipState) {
+	myId := g.Node.Id
 	x.AssertTrue(state != nil)
 	g.Lock()
 	defer g.Unlock()
@@ -273,11 +252,8 @@ func (g *groupi) applyState(myId uint64, state *pb.MembershipState) {
 			myId, g.groupId(), state)
 	}
 
-	// oldState := g.state
-	g.state = state
-
 	// Sometimes this can cause us to lose latest tablet info, but that shouldn't cause any issues.
-	for _, member := range g.state.Members {
+	for _, member := range state.Members {
 		conn.GetPools().Connect(member.Addr, x.WorkerConfig.TLSClientConfig)
 		// if x.WorkerConfig.MyAddr != member.Addr {
 		// 	conn.GetPools().Connect(member.Addr, x.WorkerConfig.TLSClientConfig)
@@ -289,7 +265,7 @@ func (g *groupi) applyState(myId uint64, state *pb.MembershipState) {
 		// Lets have this block before the one that adds the new members, else we may end up
 		// removing a freshly added node.
 
-		for _, removedId := range g.state.GetRemoved() {
+		for _, removedId := range state.GetRemoved() {
 			if !g.Node.AmLeader() {
 				break
 			}
@@ -316,7 +292,7 @@ func (g *groupi) applyState(myId uint64, state *pb.MembershipState) {
 				}
 			}(removedId)
 		}
-		conn.GetPools().RemoveInvalid(g.state)
+		conn.GetPools().RemoveInvalid(state)
 	}
 }
 
@@ -360,47 +336,16 @@ func (g *groupi) BelongsTo(key string) (uint32, error) {
 // tablet move timestamp. If the tablet was moved to this group after the start ts of the query, we
 // should reject that query.
 func (g *groupi) BelongsToReadOnly(key string, ts uint64) (uint32, error) {
-	g.RLock()
-	tablet := g.state.Tablets[key]
-	g.RUnlock()
-	if tablet != nil {
-		if ts > 0 && ts < tablet.MoveTs {
-			return 0, errors.Errorf("StartTs: %d is from before MoveTs: %d for pred: %q",
-				ts, tablet.MoveTs, key)
-		}
-		return tablet.GetGroupId(), nil
+	st := zero.MembershipState()
+	tablet := st.Tablets[key]
+	if tablet == nil {
+		return 0, nil
 	}
-	return 0, nil
-
-	// We don't know about this tablet. Talk to dgraphzero to find out who is
-	// serving this tablet.
-
-	// TODO: Fix up below.
-
-	// pl := g.connToZeroLeader()
-	// zc := pb.NewZeroClient(pl.Get())
-
-	// tablet = &pb.Tablet{
-	// 	Predicate: key,
-	// 	ReadOnly:  true,
-	// }
-	// out, err := zc.ShouldServe(g.Ctx(), tablet)
-	// if err != nil {
-	// 	glog.Errorf("Error while ShouldServe grpc call %v", err)
-	// 	return 0, err
-	// }
-	// if out.GetGroupId() == 0 {
-	// 	return 0, nil
-	// }
-
-	// g.Lock()
-	// defer g.Unlock()
-	// g.tablets[key] = out
-	// if out != nil && ts > 0 && ts < out.MoveTs {
-	// 	return 0, errors.Errorf("StartTs: %d is from before MoveTs: %d for pred: %q",
-	// 		ts, out.MoveTs, key)
-	// }
-	// return out.GetGroupId(), nil
+	if ts > 0 && ts < tablet.MoveTs {
+		return 0, errors.Errorf("StartTs: %d is from before MoveTs: %d for pred: %q",
+			ts, tablet.MoveTs, key)
+	}
+	return tablet.GetGroupId(), nil
 }
 
 func (g *groupi) ServesTablet(key string) (bool, error) {
@@ -442,7 +387,8 @@ func (g *groupi) sendTablet(tablet *pb.Tablet) (*pb.Tablet, error) {
 func (g *groupi) Inform(preds []string) ([]*pb.Tablet, error) {
 	// Don't need to use its result. Just ensure that Zero's information is up
 	// to date.
-	if _, err := zero.LatestMembershipState(g.Ctx()); err != nil {
+	st, err := zero.LatestMembershipState(g.Ctx())
+	if err != nil {
 		return nil, errors.Wrapf(err, "while getting latest membership state")
 	}
 
@@ -453,7 +399,7 @@ func (g *groupi) Inform(preds []string) ([]*pb.Tablet, error) {
 			continue
 		}
 
-		if _, ok := g.state.Tablets[p]; !ok {
+		if _, ok := st.Tablets[p]; !ok {
 			unknownPreds = append(unknownPreds, &pb.Tablet{GroupId: g.groupId(), Predicate: p})
 		}
 	}
@@ -471,48 +417,31 @@ func (g *groupi) Inform(preds []string) ([]*pb.Tablet, error) {
 		return nil, errors.Wrapf(err, "Unable to propose: %+v\n", prop)
 	}
 
-	state, err := zero.LatestMembershipState(g.Ctx())
+	st, err = zero.LatestMembershipState(g.Ctx())
 	if err != nil {
 		return nil, errors.Wrapf(err, "while getting latest membership state")
 	}
 	var res []*pb.Tablet
-	for _, t := range state.Tablets {
+	for _, t := range st.Tablets {
 		if t.GroupId == g.groupId() {
 			glog.Infof("Serving tablet for: %v\n", t.GetPredicate())
 			res = append(res, t)
 		}
 	}
 	return res, nil
-
-	// // Do not store tablets with group ID 0, as they are just dummy tablets for
-	// // predicates that do no exist.
-	// g.Lock()
-	// for _, t := range out.Tablets {
-	// 	if t.GroupId > 0 {
-	// 		g.tablets[t.GetPredicate()] = t
-	// 		tablets = append(tablets, t)
-	// 	}
-
-	// 	if t.GroupId == groups().groupId() {
-	// 		glog.Infof("Serving tablet for: %v\n", t.GetPredicate())
-	// 	}
-	// }
-	// g.Unlock()
-	// return tablets, nil
 }
 
 // Do not modify the returned Tablet
 func (g *groupi) Tablet(key string) (*pb.Tablet, error) {
 	// TODO: Remove all this later, create a membership state and apply it
-	g.RLock()
-	tablet, ok := g.state.Tablets[key]
-	g.RUnlock()
+	st := zero.MembershipState()
+	tablet, ok := st.Tablets[key]
 	if ok {
 		return tablet, nil
 	}
 
 	// We don't know about this tablet.
-	// Check with dgraphzero if we can serve it.
+	// Check with Zero if we can serve it.
 	tablets, err := g.Inform([]string{key})
 	if err != nil {
 		return nil, errors.Wrapf(err, "while informing Zero")
@@ -525,26 +454,16 @@ func (g *groupi) ForceTablet(key string) (*pb.Tablet, error) {
 }
 
 func (g *groupi) HasMeInState() bool {
-	g.RLock()
-	defer g.RUnlock()
-	if g.state == nil {
-		return false
-	}
-
-	_, has := g.state.Members[g.Node.Id]
+	st := zero.MembershipState()
+	_, has := st.Members[g.Node.Id]
 	return has
 }
 
 // Returns 0, 1, or 2 valid server addrs.
 func (g *groupi) AnyTwoServers(gid uint32) []string {
-	g.RLock()
-	defer g.RUnlock()
-
-	if g.state == nil {
-		return []string{}
-	}
+	st := zero.MembershipState()
 	var res []string
-	for _, m := range g.state.Members {
+	for _, m := range st.Members {
 		if m.GroupId != gid {
 			continue
 		}
@@ -558,18 +477,9 @@ func (g *groupi) AnyTwoServers(gid uint32) []string {
 }
 
 func (g *groupi) members(gid uint32) map[uint64]*pb.Member {
-	g.RLock()
-	defer g.RUnlock()
-
-	if g.state == nil {
-		return nil
-	}
-	if gid == 0 {
-		return g.state.Members
-	}
-
+	st := zero.MembershipState()
 	res := make(map[uint64]*pb.Member)
-	for _, m := range g.state.Members {
+	for _, m := range st.Members {
 		if m.GroupId != gid {
 			continue
 		}
@@ -618,12 +528,8 @@ func (g *groupi) Leader(gid uint32) *conn.Pool {
 }
 
 func (g *groupi) KnownGroups() (gids []uint32) {
-	g.RLock()
-	defer g.RUnlock()
-	if g.state == nil {
-		return
-	}
-	for gid := range g.state.Leaders {
+	st := zero.MembershipState()
+	for gid := range st.Leaders {
 		gids = append(gids, gid)
 	}
 	return
@@ -795,102 +701,15 @@ func (g *groupi) receiveMembershipUpdates() {
 		g.closer.Done() // CLOSER:1
 	}()
 
-	ms, err := zero.LatestMembershipState(g.Ctx())
-	if err != nil {
-		glog.Errorf("While receiving membership state from Zero: %v\n", err)
-	}
-	glog.Infof(" ---------> Got membership state: %+v\n", ms)
-	return
-
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-
-START:
-	select {
-	case <-g.closer.HasBeenClosed():
-		return
-	default:
-	}
-
-	// pl := g.connToZeroLeader()
-	// We should always have some connection to dgraphzero.
-	var pl *conn.Pool
-	if pl == nil {
-		glog.Warningln("Membership update: No Zero server known.")
-		time.Sleep(time.Second)
-		goto START
-	}
-	glog.Infof("Got address of a Zero leader: %s", pl.Addr)
-
-	c := pb.NewZeroClient(pl.Get())
-	ctx, cancel := context.WithCancel(g.Ctx())
-	stream, err := c.StreamMembership(ctx, &api.Payload{})
-	if err != nil {
-		cancel()
-		glog.Errorf("Error while calling update %v\n", err)
-		time.Sleep(time.Second)
-		goto START
-	}
-
-	stateCh := make(chan *pb.MembershipState, 10)
-	go func() {
-		glog.Infof("Starting a new membership stream receive from %s.", pl.Addr)
-		for i := 0; ; i++ {
-			// Blocking, should return if sending on stream fails(Need to verify).
-			state, err := stream.Recv()
-			if err != nil || state == nil {
-				if err == io.EOF {
-					glog.Infoln("Membership sync stream closed.")
-				} else {
-					glog.Errorf("Unable to sync memberships. Error: %v. State: %v", err, state)
-				}
-				// If zero server is lagging behind leader.
-				if ctx.Err() == nil {
-					cancel()
-				}
-				return
-			}
-			if i == 0 {
-				glog.Infof("Received first state update from Zero: %+v", state)
-			}
-			select {
-			case stateCh <- state:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	lastRecv := time.Now()
-OUTER:
+	ch := zero.Subscribe()
 	for {
 		select {
 		case <-g.closer.HasBeenClosed():
-			if err := stream.CloseSend(); err != nil {
-				glog.Errorf("Error closing send stream: %+v", err)
-			}
-			break OUTER
-		case <-ctx.Done():
-			if err := stream.CloseSend(); err != nil {
-				glog.Errorf("Error closing send stream: %+v", err)
-			}
-			break OUTER
-		case state := <-stateCh:
-			lastRecv = time.Now()
-			g.applyState(g.Node.Id, state)
-		case <-ticker.C:
-			if time.Since(lastRecv) > 10*time.Second {
-				// Zero might have gone under partition. We should recreate our connection.
-				glog.Warningf("No membership update for 10s. Closing connection to Zero.")
-				if err := stream.CloseSend(); err != nil {
-					glog.Errorf("Error closing send stream: %+v", err)
-				}
-				break OUTER
-			}
+			return
+		case st := <-ch:
+			g.applyState(st)
 		}
 	}
-	cancel()
-	goto START
 }
 
 // SubscribeForUpdates will listen for updates for the given group.
