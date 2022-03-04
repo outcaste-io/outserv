@@ -104,11 +104,16 @@ they form a Raft group and provide synchronous replication.
 	// --encryption and --vault Superflag
 	ee.RegisterAclAndEncFlags(flag)
 
-	flag.StringP("postings", "p", "p", "Directory to store posting lists.")
-	flag.String("tmp", "t", "Directory to store temporary buffers.")
+	flag.String("data", x.DataDefaults, z.NewSuperFlagHelp(x.DataDefaults).
+		Head("Directories to store data in").
+		Flag("dir", "If provided, all data goes into this directory.").
+		Flag("p", "Directory to store state").
+		Flag("w", "Directory to store Alpha Raft write-ahead logs").
+		Flag("zw", "Directory to store Zero Raft write-ahead logs").
+		Flag("t", "Directory to store temporary files and buffers").
+		Flag("export", "Directory to store exports").
+		String())
 
-	flag.StringP("wal", "w", "w", "Directory to store raft write-ahead logs.")
-	flag.String("export", "export", "Folder in which to store exports.")
 	flag.StringP("zero", "z", fmt.Sprintf("localhost:%d", x.PortZeroGrpc),
 		"Comma separated list of Dgraph Zero addresses of the form IP_ADDRESS:PORT.")
 
@@ -460,6 +465,8 @@ func setupLambdaServer(closer *z.Closer) {
 		return
 	}
 
+	tmpDir := x.WorkerConfig.Dir.Tmp
+
 	// Copy over all the embedded files to actual files.
 	dir := "dist"
 	files, err := jsLambda.ReadDir(dir)
@@ -468,7 +475,7 @@ func setupLambdaServer(closer *z.Closer) {
 		// The separator for embedded files is forward-slash even on Windows.
 		data, err := jsLambda.ReadFile(dir + "/" + file.Name())
 		x.Check(err)
-		filename := filepath.Join(x.WorkerConfig.TmpDir, file.Name())
+		filename := filepath.Join(tmpDir, file.Name())
 		file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 		x.Check(err)
 		_, err = file.Write(data)
@@ -495,9 +502,10 @@ func setupLambdaServer(closer *z.Closer) {
 	}
 
 	// Entry point of the script is index.js.
-	filename := filepath.Join(x.WorkerConfig.TmpDir, "index.js")
+	filename := filepath.Join(tmpDir, "index.js")
 	dgraphUrl := fmt.Sprintf("http://127.0.0.1:%d", httpPort())
 
+	// TODO: If node is not installed, we should not run any lambda servers.
 	glog.Infoln("Setting up lambda servers")
 	for i := range lambdas {
 		go func(i int) {
@@ -767,9 +775,8 @@ func run() {
 	security := z.NewSuperFlag(Alpha.Conf.GetString("security")).MergeAndCheckDefault(
 		worker.SecurityDefaults)
 	conf := audit.GetAuditConf(Alpha.Conf.GetString("audit"))
+
 	opts := worker.Options{
-		PostingDir:      Alpha.Conf.GetString("postings"),
-		WALDir:          Alpha.Conf.GetString("wal"),
 		CacheMb:         totalCache,
 		CachePercentage: cachePercentage,
 
@@ -816,8 +823,6 @@ func run() {
 
 	raft := z.NewSuperFlag(Alpha.Conf.GetString("raft")).MergeAndCheckDefault(worker.RaftDefaults)
 	x.WorkerConfig = x.WorkerOptions{
-		TmpDir:              Alpha.Conf.GetString("tmp"),
-		ExportPath:          Alpha.Conf.GetString("export"),
 		ZeroAddr:            strings.Split(Alpha.Conf.GetString("zero"), ","),
 		Raft:                raft,
 		WhiteListedIPRanges: ips,
@@ -839,7 +844,7 @@ func run() {
 	}
 
 	// Set the directory for temporary buffers.
-	z.SetTmpDir(x.WorkerConfig.TmpDir)
+	z.SetTmpDir(x.WorkerConfig.Dir.Tmp)
 
 	x.WorkerConfig.EncryptionKey = keys.EncKey
 

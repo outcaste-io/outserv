@@ -183,12 +183,11 @@ func Subscribe() <-chan *pb.MembershipState {
 func Run(closer *z.Closer, bindall bool) {
 	glog.Infof("Starting Zero...")
 
-	wdir := "zw"
+	wdir := x.WorkerConfig.Dir.ZeroRaftWal
 	nodeId := x.WorkerConfig.Raft.GetUint64("idx")
 
 	// Create and initialize write-ahead log.
-	// TODO: Use a zw directory.
-	x.Checkf(os.MkdirAll(wdir, 0700), "Error while creating WAL dir.")
+	x.Checkf(os.MkdirAll(wdir, 0700), "Error while creating Zero Raft WAL dir.")
 	store := raftwal.Init(wdir)
 	store.SetUint(raftwal.RaftId, nodeId)
 	store.SetUint(raftwal.GroupId, 0) // All zeros have group zero.

@@ -427,7 +427,7 @@ func NewWriters(req *pb.ExportRequest) (*Writers, error) {
 	// Create a UriHandler for the given destination.
 	destination := req.GetDestination()
 	if destination == "" {
-		destination = x.WorkerConfig.ExportPath
+		destination = x.WorkerConfig.Dir.Export
 	}
 	uri, err := url.Parse(destination)
 	if err != nil {

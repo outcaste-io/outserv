@@ -36,10 +36,6 @@ const (
 
 // Options contains options for the Dgraph server.
 type Options struct {
-	// PostingDir is the path to the directory storing the postings..
-	PostingDir string
-	// WALDir is the path to the directory storing the write-ahead log.
-	WALDir string
 	// MutationsMode is the mode used to handle mutation requests.
 	MutationsMode int
 	// AuthToken is the token to be passed for Alter HTTP requests.
@@ -80,26 +76,8 @@ func SetConfiguration(newConfig *Options) {
 var AvailableMemory int64
 
 func (opt *Options) validate() {
-	pd, err := filepath.Abs(opt.PostingDir)
-	x.Check(err)
-	wd, err := filepath.Abs(opt.WALDir)
-	x.Check(err)
-	td, err := filepath.Abs(x.WorkerConfig.TmpDir)
-	x.Check(err)
-	x.AssertTruef(pd != wd,
-		"Posting and WAL directory cannot be the same ('%s').", opt.PostingDir)
-	x.AssertTruef(pd != td,
-		"Posting and Tmp directory cannot be the same ('%s').", opt.PostingDir)
-	x.AssertTruef(wd != td,
-		"WAL and Tmp directory cannot be the same ('%s').", opt.WALDir)
 	if opt.Audit != nil {
-		ad, err := filepath.Abs(opt.Audit.Output)
+		_, err := filepath.Abs(opt.Audit.Output)
 		x.Check(err)
-		x.AssertTruef(ad != pd,
-			"Posting directory and Audit Output cannot be the same ('%s').", opt.Audit.Output)
-		x.AssertTruef(ad != wd,
-			"WAL directory and Audit Output cannot be the same ('%s').", opt.Audit.Output)
-		x.AssertTruef(ad != td,
-			"Tmp directory and Audit Output cannot be the same ('%s').", opt.Audit.Output)
 	}
 }

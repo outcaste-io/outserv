@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"path/filepath"
 	"time"
 
 	"github.com/golang/glog"
@@ -97,13 +98,21 @@ type IPRange struct {
 	Lower, Upper net.IP
 }
 
+var DataDefaults = `dir=data; p=; w=; t=; zw=; export=;`
+
+type Dir struct {
+	Posting     string
+	RaftWal     string
+	Tmp         string
+	ZeroRaftWal string
+	Export      string
+}
+
 // WorkerOptions stores the options for the worker package. It's declared here
 // since it's used by multiple packages.
 type WorkerOptions struct {
-	// TmpDir is a directory to store temporary buffers.
-	TmpDir string
-	// ExportPath indicates the folder to which exported data will be saved.
-	ExportPath string
+	// Data stores the list of directories to use.
+	Dir Dir
 	// Trace options:
 	//
 	// ratio float64 - the ratio of queries to trace (must be between 0 and 1)
@@ -182,5 +191,30 @@ func (w *WorkerOptions) Parse(conf *viper.Viper) {
 		AssertTruef(zeroAddr != w.MyAddr,
 			"Peer address %s and my address (IP:Port) %s can't be the same.",
 			zeroAddr, w.MyAddr)
+	}
+
+	data := z.NewSuperFlag(conf.GetString("data")).MergeAndCheckDefault(DataDefaults)
+	dir := data.GetPath("dir")
+
+	paths := make(map[string]int)
+	getAbsPath := func(v string) string {
+		var res string
+		if d := data.GetPath(v); len(d) > 0 {
+			res = d
+		} else {
+			res = filepath.Join(dir, v)
+		}
+		paths[res]++
+		return res
+	}
+	w.Dir.Posting = getAbsPath("p")
+	w.Dir.RaftWal = getAbsPath("w")
+	w.Dir.Tmp = getAbsPath("t")
+	w.Dir.ZeroRaftWal = getAbsPath("zw")
+	w.Dir.Export = getAbsPath("export")
+
+	for path, count := range paths {
+		AssertTruef(count == 1,
+			"All data directories have to be unique. Found repetition with '%s'.", path)
 	}
 }
