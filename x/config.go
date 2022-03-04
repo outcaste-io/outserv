@@ -217,3 +217,7 @@ func (w *WorkerOptions) Parse(conf *viper.Viper) {
 			"All data directories have to be unique. Found repetition with '%s'.", path)
 	}
 }
+
+func WorkerPort() int {
+	return Config.PortOffset + PortInternal
+}

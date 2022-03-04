@@ -32,6 +32,7 @@ import (
 	"github.com/pkg/errors"
 	"go.etcd.io/etcd/raft/raftpb"
 	otrace "go.opencensus.io/trace"
+	"google.golang.org/grpc"
 )
 
 type sendmsg struct {
@@ -125,33 +126,38 @@ func (p *proposals) Done(key uint64, err error) {
 
 // RaftServer is a wrapper around node that implements the Raft service.
 type RaftServer struct {
-	m    sync.RWMutex
-	node *Node
+	m     sync.RWMutex
+	nodes map[string]*Node
+}
+
+var rs *RaftServer
+
+func Init() {
+	rs = &RaftServer{nodes: make(map[string]*Node)}
+}
+
+func Register(server *grpc.Server) {
+	pb.RegisterRaftServer(server, rs)
 }
 
 // UpdateNode safely updates the node.
-func (w *RaftServer) UpdateNode(n *Node) {
-	w.m.Lock()
-	defer w.m.Unlock()
-	w.node = n
+func UpdateNode(whoIs string, n *Node) {
+	rs.m.Lock()
+	defer rs.m.Unlock()
+	rs.nodes[whoIs] = n
 }
 
 // GetNode safely retrieves the node.
-func (w *RaftServer) GetNode() *Node {
-	w.m.RLock()
-	defer w.m.RUnlock()
-	return w.node
-}
-
-// NewRaftServer returns a pointer to a new RaftServer instance.
-func NewRaftServer(n *Node) *RaftServer {
-	return &RaftServer{node: n}
+func (rs *RaftServer) GetNode(whoIs string) *Node {
+	rs.m.RLock()
+	defer rs.m.RUnlock()
+	return rs.nodes[whoIs]
 }
 
 // IsPeer checks whether this node is a peer of the node sending the request.
-func (w *RaftServer) IsPeer(ctx context.Context, rc *pb.RaftContext) (
+func (rs *RaftServer) IsPeer(ctx context.Context, rc *pb.RaftContext) (
 	*pb.PeerResponse, error) {
-	node := w.GetNode()
+	node := rs.GetNode(rc.WhoIs)
 	if node == nil || node.Raft() == nil {
 		return &pb.PeerResponse{}, ErrNoNode
 	}
@@ -171,13 +177,13 @@ func (w *RaftServer) IsPeer(ctx context.Context, rc *pb.RaftContext) (
 }
 
 // JoinCluster handles requests to join the cluster.
-func (w *RaftServer) JoinCluster(ctx context.Context,
+func (rs *RaftServer) JoinCluster(ctx context.Context,
 	rc *pb.RaftContext) (*api.Payload, error) {
 	if ctx.Err() != nil {
 		return &api.Payload{}, ctx.Err()
 	}
 
-	node := w.GetNode()
+	node := rs.GetNode(rc.WhoIs)
 	if node == nil || node.Raft() == nil {
 		return nil, ErrNoNode
 	}
@@ -186,25 +192,31 @@ func (w *RaftServer) JoinCluster(ctx context.Context,
 }
 
 // RaftMessage handles RAFT messages.
-func (w *RaftServer) RaftMessage(server pb.Raft_RaftMessageServer) error {
+func (rs *RaftServer) RaftMessage(server pb.Raft_RaftMessageServer) error {
 	ctx := server.Context()
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	span := otrace.FromContext(ctx)
+	done := make(map[uint64]bool)
 
-	node := w.GetNode()
-	if node == nil || node.Raft() == nil {
-		return ErrNoNode
-	}
-	span.Annotatef(nil, "Stream server is node %#x", node.Id)
+	step := func(batch *pb.RaftBatch) error {
+		rc := batch.GetContext()
+		node := rs.GetNode(rc.WhoIs)
+		if node == nil || node.Raft() == nil {
+			return ErrNoNode
+		}
+		if !done[rc.Id] {
+			node.Connect(rc.Id, rc.Addr)
+			done[rc.Id] = true
+		}
 
-	var rc *pb.RaftContext
-	raft := node.Raft()
-	step := func(data []byte) error {
+		span.Annotatef(nil, "Stream server is node %#x", node.Id)
 		ctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
 
+		raft := node.Raft()
+		data := batch.Payload.GetData()
 		for idx := 0; idx < len(data); {
 			x.AssertTruef(len(data[idx:]) >= 4,
 				"Slice left of size: %v. Expected at least 4.", len(data[idx:]))
@@ -250,21 +262,7 @@ func (w *RaftServer) RaftMessage(server pb.Raft_RaftMessageServer) error {
 		if err != nil {
 			return err
 		}
-		if loop%1e6 == 0 {
-			glog.V(2).Infof("%d messages received by %#x from %#x", loop, node.Id, rc.GetId())
-		}
-		if loop == 1 {
-			rc = batch.GetContext()
-			span.Annotatef(nil, "Stream from %#x", rc.GetId())
-			if rc != nil {
-				node.Connect(rc.Id, rc.Addr)
-			}
-		}
-		if batch.Payload == nil {
-			continue
-		}
-		data := batch.Payload.Data
-		if err := step(data); err != nil {
+		if err := step(batch); err != nil {
 			return err
 		}
 	}
@@ -272,11 +270,13 @@ func (w *RaftServer) RaftMessage(server pb.Raft_RaftMessageServer) error {
 
 // Heartbeat rpc call is used to check connection with other workers after worker
 // tcp server for this instance starts.
-func (w *RaftServer) Heartbeat(_ *api.Payload, stream pb.Raft_HeartbeatServer) error {
+func (rs *RaftServer) Heartbeat(_ *api.Payload, stream pb.Raft_HeartbeatServer) error {
 	ticker := time.NewTicker(echoDuration)
 	defer ticker.Stop()
 
-	node := w.GetNode()
+	// Hardcoding alpha here. We shouldn't need to switch between zero and
+	// alpha.
+	node := rs.GetNode("alpha")
 	if node == nil {
 		return ErrNoNode
 	}

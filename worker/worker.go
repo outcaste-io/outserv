@@ -19,10 +19,7 @@
 package worker
 
 import (
-	"fmt"
-	"log"
 	"math"
-	"net"
 	"sync"
 	"sync/atomic"
 
@@ -50,10 +47,6 @@ var (
 	// fetching snapshot if network disconnectivity is greater than the interval at which snapshots
 	// are taken
 )
-
-func workerPort() int {
-	return x.Config.PortOffset + x.PortInternal
-}
 
 // Init initializes this package.
 func Init(ps *badger.DB) {
@@ -102,22 +95,8 @@ func (w *grpcWorker) Subscribe(
 
 // RunServer initializes a tcp server on port which listens to requests from
 // other workers for pb.communication.
-func RunServer(bindall bool) {
-	laddr := "localhost"
-	if bindall {
-		laddr = "0.0.0.0"
-	}
-	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", laddr, workerPort()))
-	if err != nil {
-		log.Fatalf("While running server: %v", err)
-	}
-	glog.Infof("Worker listening at address: %v", ln.Addr())
-
+func Register(server *grpc.Server) {
 	pb.RegisterWorkerServer(workerServer, &grpcWorker{})
-	pb.RegisterRaftServer(workerServer, &raftServer)
-	if err := workerServer.Serve(ln); err != nil {
-		glog.Errorf("Error while calling Serve: %+v", err)
-	}
 }
 
 // StoreStats returns stats for data store.

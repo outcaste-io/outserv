@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/ee"
 	"github.com/outcaste-io/outserv/ee/audit"
 	"github.com/outcaste-io/outserv/zero"
@@ -611,8 +612,6 @@ func serveGRPC(l net.Listener, tlsCfg *tls.Config, closer *z.Closer) {
 }
 
 func setupServer(closer *z.Closer) {
-	go worker.RunServer(bindall) // For pb.communication.
-
 	laddr := "localhost"
 	if bindall {
 		laddr = "0.0.0.0"
@@ -947,6 +946,34 @@ func run() {
 			}
 		}
 	}()
+
+	grpcOpts := []grpc.ServerOption{
+		grpc.MaxRecvMsgSize(x.GrpcMaxSize),
+		grpc.MaxSendMsgSize(x.GrpcMaxSize),
+		grpc.MaxConcurrentStreams(math.MaxInt32),
+		grpc.StatsHandler(&ocgrpc.ServerHandler{}),
+	}
+	if x.WorkerConfig.TLSServerConfig != nil {
+		grpcOpts = append(grpcOpts, grpc.Creds(credentials.NewTLS(x.WorkerConfig.TLSServerConfig)))
+	}
+	grpcServer := grpc.NewServer(grpcOpts...)
+	laddr := "localhost"
+	if bindall {
+		laddr = "0.0.0.0"
+	}
+	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", laddr, x.WorkerPort()))
+	if err != nil {
+		log.Fatalf("While running server: %v", err)
+	}
+	glog.Infof("Worker listening at address: %v", ln.Addr())
+
+	// Register the internal Grpc services.
+	conn.Register(grpcServer)
+	worker.Register(grpcServer)
+	if err := grpcServer.Serve(ln); err != nil {
+		glog.Errorf("Error while calling Serve: %+v", err)
+	}
+	// TODO: Find a way to close the server.
 
 	updaters := z.NewCloser(3)
 	go func() {

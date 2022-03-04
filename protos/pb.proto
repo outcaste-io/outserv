@@ -103,11 +103,12 @@ message SortResult {
 }
 
 message RaftContext {
-  fixed64 id = 1;
-  uint32 group = 2;
-  string addr = 3;
-  uint64 snapshot_ts = 4;
-  bool is_learner = 5;
+  string who_is = 1;
+  fixed64 id = 2;
+  uint32 group = 3;
+  string addr = 4;
+  uint64 snapshot_ts = 5;
+  bool is_learner = 6;
 }
 
 // Member stores information about RAFT group member for a single RAFT node.

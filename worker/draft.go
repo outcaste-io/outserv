@@ -231,41 +231,6 @@ func GetOngoingTasks() []string {
 	return tasks
 }
 
-// Now that we apply txn updates via Raft, waiting based on Txn timestamps is
-// sufficient. We don't need to wait for proposals to be applied.
-
-func newNode(store *raftwal.DiskStorage, gid uint32, id uint64, myAddr string) *node {
-	glog.Infof("Node ID: %#x with GroupID: %d\n", id, gid)
-
-	isLearner := x.WorkerConfig.Raft.GetBool("learner")
-	rc := &pb.RaftContext{
-		Addr:      myAddr,
-		Group:     gid,
-		Id:        id,
-		IsLearner: isLearner,
-	}
-	glog.Infof("RaftContext: %+v\n", rc)
-	m := conn.NewNode(rc, store, x.WorkerConfig.TLSClientConfig)
-
-	n := &node{
-		Node: m,
-		ctx:  context.Background(),
-		gid:  gid,
-		// We need a generous size for applyCh, because raft.Tick happens every
-		// 10ms. If we restrict the size here, then Raft goes into a loop trying
-		// to maintain quorum health.
-		applyCh:      make(chan []*pb.Proposal, 1000),
-		concApplyCh:  make(chan *pb.Proposal, 100),
-		drainApplyCh: make(chan struct{}),
-		elog:         trace.NewEventLog("Dgraph", "ApplyCh"),
-		closer:       z.NewCloser(4), // Matches CLOSER:1
-		ops:          make(map[op]operation),
-		cdcTracker:   newCDC(),
-		keysWritten:  newKeysWritten(),
-	}
-	return n
-}
-
 func (n *node) Ctx(key uint64) context.Context {
 	if pctx := n.Proposals.Get(key); pctx != nil {
 		return pctx.Ctx

@@ -18,9 +18,6 @@ import (
 	"github.com/outcaste-io/outserv/raftwal"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
-	"go.opencensus.io/plugin/ocgrpc"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 )
 
 type State struct {
@@ -194,40 +191,15 @@ func Run(closer *z.Closer, bindall bool) {
 
 	go x.MonitorDiskMetrics("wal_fs", wdir, closer)
 
-	// x.RegisterExporters(Zero.Conf, "dgraph.zero")
-	grpcOpts := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(x.GrpcMaxSize),
-		grpc.MaxSendMsgSize(x.GrpcMaxSize),
-		grpc.MaxConcurrentStreams(1000),
-		grpc.StatsHandler(&ocgrpc.ServerHandler{}),
-	}
-
-	if x.WorkerConfig.TLSServerConfig != nil {
-		grpcOpts = append(grpcOpts, grpc.Creds(credentials.NewTLS(x.WorkerConfig.TLSServerConfig)))
-	}
-	gServer := grpc.NewServer(grpcOpts...)
-	go func() {
-		addr := "localhost"
-		if bindall {
-			addr = "0.0.0.0"
-		}
-		x.AssertTrue(len(x.WorkerConfig.MyAddr) > 0)
-		grpcListener, err := setupListener(addr, x.PortZeroGrpc+x.Config.PortOffset, "grpc")
-		x.Check(err)
-
-		err = gServer.Serve(grpcListener)
-		glog.Infof("gRPC server stopped : %v", err)
-	}()
-
 	rc := pb.RaftContext{
+		WhoIs:     "zero",
 		Id:        nodeId,
 		Addr:      x.WorkerConfig.MyAddr,
 		Group:     0,
 		IsLearner: x.WorkerConfig.Raft.GetBool("learner"),
 	}
 	cn := conn.NewNode(&rc, store, x.WorkerConfig.TLSClientConfig)
-	raftServer := conn.NewRaftServer(cn)
-	pb.RegisterRaftServer(gServer, raftServer)
+	conn.UpdateNode(rc.WhoIs, cn)
 
 	nodeCloser := z.NewCloser(1)
 	go func() {
@@ -235,7 +207,6 @@ func Run(closer *z.Closer, bindall bool) {
 		<-closer.HasBeenClosed()
 
 		nodeCloser.SignalAndWait()
-		gServer.Stop()
 
 		err := store.Close()
 		glog.Infof("Zero Raft WAL closed with error: %v\n", err)

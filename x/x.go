@@ -91,10 +91,6 @@ const (
 	// message sizes allowable on the client size when dialing.
 	GrpcMaxSize = math.MaxInt32
 
-	// PortZeroGrpc is the default gRPC port for zero.
-	PortZeroGrpc = 5080
-	// PortZeroHTTP is the default HTTP port for zero.
-	PortZeroHTTP = 6080
 	// PortInternal is the default port for internal use.
 	PortInternal = 7080
 	// PortHTTP is the default HTTP port for alpha.

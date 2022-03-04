@@ -22,6 +22,7 @@ import (
 	"github.com/outcaste-io/outserv/zero"
 	"github.com/outcaste-io/ristretto/z"
 	"github.com/pkg/errors"
+	"golang.org/x/net/trace"
 )
 
 type groupi struct {
@@ -45,6 +46,38 @@ var gr = &groupi{
 
 func groups() *groupi {
 	return gr
+}
+
+func newNode(store *raftwal.DiskStorage, gid uint32, id uint64, myAddr string) *node {
+	glog.Infof("Node ID: %#x with GroupID: %d\n", id, gid)
+	isLearner := x.WorkerConfig.Raft.GetBool("learner")
+	rc := &pb.RaftContext{
+		WhoIs:     "alpha",
+		Addr:      myAddr,
+		Group:     gid,
+		Id:        id,
+		IsLearner: isLearner,
+	}
+	glog.Infof("RaftContext: %+v\n", rc)
+	m := conn.NewNode(rc, store, x.WorkerConfig.TLSClientConfig)
+
+	n := &node{
+		Node: m,
+		ctx:  context.Background(),
+		gid:  gid,
+		// We need a generous size for applyCh, because raft.Tick happens every
+		// 10ms. If we restrict the size here, then Raft goes into a loop trying
+		// to maintain quorum health.
+		applyCh:      make(chan []*pb.Proposal, 1000),
+		concApplyCh:  make(chan *pb.Proposal, 100),
+		drainApplyCh: make(chan struct{}),
+		elog:         trace.NewEventLog("Dgraph", "ApplyCh"),
+		closer:       z.NewCloser(4), // Matches CLOSER:1
+		ops:          make(map[op]operation),
+		cdcTracker:   newCDC(),
+		keysWritten:  newKeysWritten(),
+	}
+	return n
 }
 
 // StartRaftNodes will read the WAL dir, create the RAFT groups,
@@ -104,7 +137,9 @@ func StartRaftNodes(walStore *raftwal.DiskStorage, bindall bool) {
 
 	x.Checkf(schema.LoadFromDb(), "Error while initializing schema")
 	glog.Infof("Load schema from DB: OK")
-	raftServer.UpdateNode(gr.Node.Node)
+
+	conn.UpdateNode("alpha", gr.Node.Node)
+
 	gr.Node.InitAndStartNode()
 	glog.Infof("Init and start Raft node: OK")
 
