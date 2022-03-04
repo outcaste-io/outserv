@@ -121,10 +121,9 @@ type WorkerOptions struct {
 	Trace *z.SuperFlag
 	// MyAddr stores the address and port for this alpha.
 	MyAddr string
-	// ZeroAddr stores the list of address:port for the zero instances associated with this alpha.
-	// Alpha would communicate via only one zero address from the list. All
-	// the other addresses serve as fallback.
-	ZeroAddr []string
+	// PeerAddr stores the list of address:port for the other instances in the
+	// cluster. You just need one active address to work.
+	PeerAddr []string
 	// TLS client config which will be used to connect with zero and alpha internally
 	TLSClientConfig *tls.Config
 	// TLS server config which will be used to initiate server internal port
@@ -186,11 +185,11 @@ func (w *WorkerOptions) Parse(conf *viper.Viper) {
 		"Invalid survival mode: %s", survive)
 	w.HardSync = survive == "filesystem"
 
-	AssertTruef(len(w.ZeroAddr) > 0, "Provide at least one peer node address")
-	for _, zeroAddr := range w.ZeroAddr {
-		AssertTruef(zeroAddr != w.MyAddr,
+	AssertTruef(len(w.PeerAddr) > 0, "Provide at least one peer node address")
+	for _, addr := range w.PeerAddr {
+		AssertTruef(addr != w.MyAddr,
 			"Peer address %s and my address (IP:Port) %s can't be the same.",
-			zeroAddr, w.MyAddr)
+			addr, w.MyAddr)
 	}
 
 	data := z.NewSuperFlag(conf.GetString("data")).MergeAndCheckDefault(DataDefaults)

@@ -114,8 +114,8 @@ they form a Raft group and provide synchronous replication.
 		Flag("export", "Directory to store exports").
 		String())
 
-	flag.StringP("zero", "z", fmt.Sprintf("localhost:%d", x.PortZeroGrpc),
-		"Comma separated list of Dgraph Zero addresses of the form IP_ADDRESS:PORT.")
+	flag.String("peer", "",
+		"Comma separated list of Dgraph Peer addresses of the form IP_ADDRESS:PORT.")
 
 	// Useful for running multiple servers on the same machine.
 	flag.IntP("port_offset", "o", 0,
@@ -823,7 +823,7 @@ func run() {
 
 	raft := z.NewSuperFlag(Alpha.Conf.GetString("raft")).MergeAndCheckDefault(worker.RaftDefaults)
 	x.WorkerConfig = x.WorkerOptions{
-		ZeroAddr:            strings.Split(Alpha.Conf.GetString("zero"), ","),
+		PeerAddr:            strings.Split(Alpha.Conf.GetString("zero"), ","),
 		Raft:                raft,
 		WhiteListedIPRanges: ips,
 		StrictMutations:     opts.MutationsMode == worker.StrictMutations,

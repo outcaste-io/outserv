@@ -33,7 +33,7 @@ const (
 		`mutations-nquad=1000000; disallow-drop=false; query-timeout=0ms; txn-abort-after=5m;` +
 		`max-pending-queries=64;  max-retries=-1; shared-instance=false; max-splits=1000`
 	RaftDefaults = `learner=false; snapshot-after-entries=10000; ` +
-		`snapshot-after-duration=30m; pending-proposals=256; idx=; group=;`
+		`snapshot-after-duration=30m; pending-proposals=256; idx=1; group=1;`
 	SecurityDefaults   = `token=; whitelist=;`
 	ZeroLimitsDefaults = `uid-lease=0; refill-interval=30s; disable-admin-http=false;`
 )

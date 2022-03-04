@@ -353,7 +353,7 @@ func (n *node) initAndStartNode() error {
 
 	// TODO: Rename this to PeerAddr, and potentially support checking multiple
 	// PeerAddrs. For simplicity, just checking one now.
-	peer := x.WorkerConfig.ZeroAddr[0]
+	peer := x.WorkerConfig.PeerAddr[0]
 
 	switch {
 	case restart:
@@ -374,7 +374,7 @@ func (n *node) initAndStartNode() error {
 		n.SetRaft(raft.RestartNode(n.Cfg))
 
 	case len(peer) > 0:
-		glog.Infoln("Connecting to an existing peer: %+v\n", x.WorkerConfig.ZeroAddr)
+		glog.Infoln("Connecting to an existing peer: %+v\n", peer)
 		p := conn.GetPools().Connect(peer, x.WorkerConfig.TLSClientConfig)
 		if p == nil {
 			return errors.Errorf("Unhealthy connection to %v", peer)
