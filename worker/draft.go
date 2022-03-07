@@ -1228,7 +1228,7 @@ func (n *node) Run() {
 
 	done := make(chan struct{})
 	go n.checkpointAndClose(done)
-	go n.ReportRaftComms()
+	go n.ReportRaftComms(n.closer)
 	go n.proposeBaseTimestamp()
 
 	if !x.WorkerConfig.HardSync {

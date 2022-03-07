@@ -101,6 +101,12 @@ func (p *Pools) GetAll() []*Pool {
 	return pool
 }
 
+func (p *Pools) Close() {
+	for _, pool := range p.GetAll() {
+		pool.shutdown()
+	}
+}
+
 // RemoveInvalid removes invalid nodes from the list of pools.
 func (p *Pools) RemoveInvalid(state *pb.MembershipState) {
 	// Keeps track of valid IP addresses, assigned to active nodes. We do this

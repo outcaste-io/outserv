@@ -154,17 +154,22 @@ func NewNode(rc *pb.RaftContext, store *raftwal.DiskStorage, tlsConfig *tls.Conf
 }
 
 // ReportRaftComms periodically prints the state of the node (heartbeats in and out).
-func (n *Node) ReportRaftComms() {
+func (n *Node) ReportRaftComms(closer *z.Closer) {
 	if !glog.V(2) {
 		return
 	}
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		out := atomic.SwapInt64(&n.heartbeatsOut, 0)
-		in := atomic.SwapInt64(&n.heartbeatsIn, 0)
-		glog.Infof("RaftComm: [%#x] Heartbeats out: %d, in: %d", n.Id, out, in)
+	for {
+		select {
+		case <-ticker.C:
+			out := atomic.SwapInt64(&n.heartbeatsOut, 0)
+			in := atomic.SwapInt64(&n.heartbeatsIn, 0)
+			glog.Infof("RaftComm: [%#x] Heartbeats out: %d, in: %d", n.Id, out, in)
+		case <-closer.HasBeenClosed():
+			return
+		}
 	}
 }
 

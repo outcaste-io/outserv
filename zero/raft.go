@@ -416,7 +416,7 @@ func (n *node) initAndStartNode() error {
 
 	go n.Run()
 	go n.BatchAndSendMessages()
-	go n.ReportRaftComms()
+	go n.ReportRaftComms(n.closer)
 	go n.ensureClusterID()
 	return nil
 }

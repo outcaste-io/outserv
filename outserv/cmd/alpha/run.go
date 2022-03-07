@@ -1028,5 +1028,8 @@ func run() {
 	grpcServerCloser.SignalAndWait()
 	glog.Infof("Internal Grpc server closed.")
 
+	conn.GetPools().Close()
+	glog.Infof("Shutdown all connections.")
+
 	glog.Infoln("Server shutdown. Bye!")
 }
