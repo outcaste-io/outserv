@@ -519,7 +519,7 @@ func ValidateAndConvert(edge *pb.DirectedEdge, su *pb.SchemaUpdate) error {
 // AssignNsIdsOverNetwork sends a request to assign Namespace IDs to the current zero leader.
 func AssignNsIdsOverNetwork(ctx context.Context, num *pb.Num) (*pb.AssignedIds, error) {
 	num.Type = pb.Num_NS_ID
-	return nil, fmt.Errorf("TODO: Implement this")
+	return nil, fmt.Errorf("TODO: Implement AssignNsIdsOverNetwork")
 }
 
 // AssignUidsOverNetwork sends a request to assign UIDs to blank nodes to the current zero leader.
@@ -529,7 +529,7 @@ func AssignUidsOverNetwork(ctx context.Context, num *pb.Num) (*pb.AssignedIds, e
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 	num.Type = pb.Num_UID
-	return nil, fmt.Errorf("TODO: Implement this")
+	return nil, fmt.Errorf("TODO: Implement AssignUidsOverNetwork")
 }
 
 // TODO: Do we need fillTxnContext?

@@ -970,9 +970,20 @@ func run() {
 	// Register the internal Grpc services.
 	conn.Register(grpcServer)
 	worker.Register(grpcServer)
-	if err := grpcServer.Serve(ln); err != nil {
-		glog.Errorf("Error while calling Serve: %+v", err)
-	}
+
+	grpcServerCloser := z.NewCloser(1)
+	go func() {
+		defer grpcServerCloser.Done()
+
+		go func() {
+			<-grpcServerCloser.HasBeenClosed()
+			grpcServer.Stop()
+		}()
+
+		glog.Infof("Starting to serve Grpc connetions")
+		err := grpcServer.Serve(ln)
+		glog.Errorf("Grpc serve returned with error: %+v", err)
+	}()
 	// TODO: Find a way to close the server.
 
 	updaters := z.NewCloser(3)
@@ -999,9 +1010,9 @@ func run() {
 	// wait for it after group is closed.
 	updaters.Signal()
 
-	edgraph.Cleanup()
+	edgraph.StopServingQueries()
 	worker.BlockingStop()
-	glog.Infoln("worker stopped.")
+	glog.Infoln("Worker stopped.")
 
 	adminCloser.SignalAndWait()
 	glog.Infoln("adminCloser closed.")
@@ -1013,6 +1024,9 @@ func run() {
 
 	updaters.Wait()
 	glog.Infoln("updaters closed.")
+
+	grpcServerCloser.SignalAndWait()
+	glog.Infof("Internal Grpc server closed.")
 
 	glog.Infoln("Server shutdown. Bye!")
 }

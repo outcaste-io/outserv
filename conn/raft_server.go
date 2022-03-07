@@ -132,7 +132,7 @@ type RaftServer struct {
 
 var rs *RaftServer
 
-func Init() {
+func init() {
 	rs = &RaftServer{nodes: make(map[string]*Node)}
 }
 

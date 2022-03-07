@@ -19,28 +19,22 @@
 package worker
 
 import (
-	"math"
 	"sync"
 	"sync/atomic"
 
 	"github.com/outcaste-io/badger/v3"
 	badgerpb "github.com/outcaste-io/badger/v3/pb"
-	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
-	"go.opencensus.io/plugin/ocgrpc"
 
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 )
 
 var (
-	pstore       *badger.DB
-	workerServer *grpc.Server
-	raftServer   conn.RaftServer
+	pstore *badger.DB
 
 	// In case of flaky network connectivity we would try to keep upto maxPendingEntries in wal
 	// so that the nodes which have lagged behind leader can just replay entries instead of
@@ -54,18 +48,6 @@ func Init(ps *badger.DB) {
 	// needs to be initialized after group config
 	limiter = rateLimiter{c: sync.NewCond(&sync.Mutex{}), max: int(x.WorkerConfig.Raft.GetInt64("pending-proposals"))}
 	go limiter.bleed()
-
-	grpcOpts := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(x.GrpcMaxSize),
-		grpc.MaxSendMsgSize(x.GrpcMaxSize),
-		grpc.MaxConcurrentStreams(math.MaxInt32),
-		grpc.StatsHandler(&ocgrpc.ServerHandler{}),
-	}
-
-	if x.WorkerConfig.TLSServerConfig != nil {
-		grpcOpts = append(grpcOpts, grpc.Creds(credentials.NewTLS(x.WorkerConfig.TLSServerConfig)))
-	}
-	workerServer = grpc.NewServer(grpcOpts...)
 }
 
 // grpcWorker struct implements the gRPC server interface.
@@ -74,10 +56,11 @@ type grpcWorker struct {
 }
 
 // grpcWorker implements pb.WorkerServer.
-var _ pb.WorkerServer = (*grpcWorker)(nil)
+// var _ pb.WorkerServer = (*grpcWorker)(nil)
 
 func (w *grpcWorker) Subscribe(
 	req *pb.SubscriptionRequest, stream pb.Worker_SubscribeServer) error {
+	glog.Infof("Subscribe called")
 	// Subscribe on given prefixes.
 	var matches []badgerpb.Match
 	for _, p := range req.GetPrefixes() {
@@ -96,7 +79,7 @@ func (w *grpcWorker) Subscribe(
 // RunServer initializes a tcp server on port which listens to requests from
 // other workers for pb.communication.
 func Register(server *grpc.Server) {
-	pb.RegisterWorkerServer(workerServer, &grpcWorker{})
+	pb.RegisterWorkerServer(server, &grpcWorker{})
 }
 
 // StoreStats returns stats for data store.
@@ -117,9 +100,6 @@ func BlockingStop() {
 
 	glog.Infof("Stopping node...")
 	groups().Node.closer.SignalAndWait()
-
-	glog.Infof("Stopping worker server...")
-	workerServer.Stop()
 
 	groups().Node.cdcTracker.Close()
 }

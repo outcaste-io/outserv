@@ -1290,7 +1290,7 @@ func Init() {
 	maxPendingQueries = x.Config.Limit.GetInt64("max-pending-queries")
 }
 
-func Cleanup() {
+func StopServingQueries() {
 	// Mark the server unhealthy so that no new operations starts and wait for 5 seconds for
 	// the pending queries to finish.
 	x.UpdateHealthStatus(false)
