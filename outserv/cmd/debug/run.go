@@ -742,12 +742,10 @@ func printZeroProposal(buf *bytes.Buffer, zpr *pb.ZeroProposal) {
 		fmt.Fprintf(buf, " Member: %+v .", zpr.Member)
 	case zpr.Tablets != nil:
 		fmt.Fprintf(buf, " Tablets: %+v .", zpr.Tablets)
-	case zpr.MaxUID > 0:
-		fmt.Fprintf(buf, " MaxUID: %d .", zpr.MaxUID)
-	case zpr.MaxNsID > 0:
-		fmt.Fprintf(buf, " MaxNsID: %d .", zpr.MaxNsID)
-	case zpr.MaxRaftId > 0:
-		fmt.Fprintf(buf, " MaxRaftId: %d .", zpr.MaxRaftId)
+	case zpr.NumUids > 0:
+		fmt.Fprintf(buf, " NumUids: %d .", zpr.NumUids)
+	case zpr.NumNsids > 0:
+		fmt.Fprintf(buf, " NumNsids: %d .", zpr.NumNsids)
 	default:
 		fmt.Fprintf(buf, " Proposal: %+v .", zpr)
 	}

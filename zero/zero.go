@@ -18,6 +18,7 @@ import (
 	"github.com/outcaste-io/outserv/raftwal"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
+	"github.com/pkg/errors"
 )
 
 type State struct {
@@ -221,4 +222,28 @@ func Run(closer *z.Closer, bindall bool) {
 		state:  NewState(),
 	}
 	x.Check(inode.initAndStartNode())
+}
+
+func AssignUids(ctx context.Context, num uint32) (*pb.AssignedIds, error) {
+	prop := &pb.ZeroProposal{NumUids: num}
+	st, err := ProposeAndWait(ctx, prop)
+	if err != nil {
+		return nil, errors.Wrapf(err, "while AssignUids")
+	}
+
+	end := st.MaxUID
+	// Both the StartId and EndId are inclusive.
+	return &pb.AssignedIds{StartId: end - uint64(num), EndId: end - 1}, nil
+}
+
+func AssignNsids(ctx context.Context, num uint32) (*pb.AssignedIds, error) {
+	prop := &pb.ZeroProposal{NumNsids: num}
+	st, err := ProposeAndWait(ctx, prop)
+	if err != nil {
+		return nil, errors.Wrapf(err, "while AssignUids")
+	}
+
+	end := st.MaxNsID
+	// Both the StartId and EndId are inclusive.
+	return &pb.AssignedIds{StartId: end - uint64(num), EndId: end - 1}, nil
 }

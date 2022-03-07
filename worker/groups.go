@@ -448,7 +448,7 @@ func (g *groupi) Inform(preds []string) ([]*pb.Tablet, error) {
 		Tablets: unknownPreds,
 	}
 	glog.Infof("Sending proposal: %+v\n", prop)
-	if err := zero.ProposeAndWait(g.Ctx(), prop); err != nil {
+	if _, err := zero.ProposeAndWait(g.Ctx(), prop); err != nil {
 		return nil, errors.Wrapf(err, "Unable to propose: %+v\n", prop)
 	}
 
@@ -618,7 +618,7 @@ func (g *groupi) doSendMembership(tablets map[string]*pb.Tablet) error {
 		prop := &pb.ZeroProposal{
 			Member: member,
 		}
-		if err := zero.ProposeAndWait(g.Ctx(), prop); err != nil {
+		if _, err := zero.ProposeAndWait(g.Ctx(), prop); err != nil {
 			return errors.Wrapf(err, "Proposal %+v failed", prop)
 		}
 		glog.Infof("Proposal applied: %+v\n", prop)
@@ -648,7 +648,7 @@ func (g *groupi) doSendMembership(tablets map[string]*pb.Tablet) error {
 	prop := &pb.ZeroProposal{
 		Tablets: changes,
 	}
-	if err := zero.ProposeAndWait(g.Ctx(), prop); err != nil {
+	if _, err := zero.ProposeAndWait(g.Ctx(), prop); err != nil {
 		return errors.Wrapf(err, "Proposal %+v failed", prop)
 	}
 	glog.Infof("Proposal applied: %+v\n", prop)

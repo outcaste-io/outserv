@@ -137,17 +137,13 @@ message Group {
 }
 
 message ZeroProposal {
-  reserved 5; // Was used by maxTxnTs.
-  reserved 7; // Was used for Txn.
-  reserved 8; // Was used for string key.
-
   map<uint32, uint64> snapshot_ts = 1;  // Group ID -> Snapshot Ts.
   Member member = 2;
   repeated Tablet tablets = 3;
 
-  uint64 maxUID = 4;
-  uint64 maxNsID = 12;
-  uint64 maxRaftId = 6;
+  uint32 num_uids = 4;
+  uint32 num_nsids = 5;
+
   string cid = 9;  // Used as unique identifier for the cluster.
   ZeroSnapshot snapshot = 11;  // Used to make Zeros take a snapshot.
   // 12 has already been used.

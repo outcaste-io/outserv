@@ -6,14 +6,12 @@ package worker
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"math"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/outcaste-io/badger/v3/y"
-	"google.golang.org/grpc/metadata"
 
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
@@ -514,22 +512,6 @@ func ValidateAndConvert(edge *pb.DirectedEdge, su *pb.SchemaUpdate) error {
 	edge.ValueType = schemaType.Enum()
 	edge.Value = b.Value.([]byte)
 	return nil
-}
-
-// AssignNsIdsOverNetwork sends a request to assign Namespace IDs to the current zero leader.
-func AssignNsIdsOverNetwork(ctx context.Context, num *pb.Num) (*pb.AssignedIds, error) {
-	num.Type = pb.Num_NS_ID
-	return nil, fmt.Errorf("TODO: Implement AssignNsIdsOverNetwork")
-}
-
-// AssignUidsOverNetwork sends a request to assign UIDs to blank nodes to the current zero leader.
-func AssignUidsOverNetwork(ctx context.Context, num *pb.Num) (*pb.AssignedIds, error) {
-	// Pass on the incoming metadata to the zero. Namespace from the metadata is required by zero.
-	if md, ok := metadata.FromIncomingContext(ctx); ok {
-		ctx = metadata.NewOutgoingContext(ctx, md)
-	}
-	num.Type = pb.Num_UID
-	return nil, fmt.Errorf("TODO: Implement AssignUidsOverNetwork")
 }
 
 // TODO: Do we need fillTxnContext?

@@ -699,6 +699,10 @@ func getProposal(e raftpb.Entry) *pb.Proposal {
 	return p
 }
 
+func propResult(err error) conn.ProposalResult {
+	return conn.ProposalResult{Err: err}
+}
+
 func (n *node) processApplyCh() {
 	defer n.closer.Done() // CLOSER:1
 
@@ -752,7 +756,7 @@ func (n *node) processApplyCh() {
 			}
 		}
 
-		n.Proposals.Done(prop.Key, perr)
+		n.Proposals.Done(prop.Key, propResult(perr))
 		n.Applied.Done(prop.Index)
 		posting.DoneTimestamp(prop.CommitTs)
 		ostats.Record(context.Background(), x.RaftAppliedIndex.M(int64(n.Applied.DoneUntil())))
@@ -774,7 +778,7 @@ func (n *node) processApplyCh() {
 				case props := <-n.applyCh:
 					numDrained += len(props)
 					for _, p := range props {
-						n.Proposals.Done(p.Key, nil)
+						n.Proposals.Done(p.Key, propResult(nil))
 						n.Applied.Done(p.Index)
 					}
 				default:
@@ -1457,7 +1461,7 @@ func (n *node) Run() {
 								p.BaseTimestamp, e.Index)
 						}
 						baseTimestamp = p.BaseTimestamp
-						n.Proposals.Done(p.Key, nil)
+						n.Proposals.Done(p.Key, propResult(nil))
 						n.Applied.Done(p.Index)
 						continue
 					}

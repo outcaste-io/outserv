@@ -89,21 +89,21 @@ func (n *node) uniqueKey() uint64 {
 
 var errInternalRetry = errors.New("Retry Raft proposal internally")
 
-func ProposeAndWait(ctx context.Context, proposal *pb.ZeroProposal) error {
+func ProposeAndWait(ctx context.Context, proposal *pb.ZeroProposal) (*pb.MembershipState, error) {
 	return inode.proposeAndWait(ctx, proposal)
 }
 
 // proposeAndWait makes a proposal to the quorum for Group Zero and waits for it to be accepted by
 // the group before returning. It is safe to call concurrently.
-func (n *node) proposeAndWait(ctx context.Context, proposal *pb.ZeroProposal) error {
+func (n *node) proposeAndWait(ctx context.Context, proposal *pb.ZeroProposal) (*pb.MembershipState, error) {
 	switch {
 	case n.Raft() == nil:
-		return errors.Errorf("Raft isn't initialized yet.")
+		return nil, errors.Errorf("Raft isn't initialized yet.")
 	case ctx.Err() != nil:
-		return ctx.Err()
+		return nil, ctx.Err()
 	case !n.AmLeader():
 		// Do this check upfront. Don't do this inside propose for reasons explained below.
-		return errors.Errorf("Not Zero leader. Aborting proposal: %+v", proposal)
+		return nil, errors.Errorf("Not Zero leader. Aborting proposal: %+v", proposal)
 	}
 
 	// We could consider adding a wrapper around the user proposal, so we can access any key-values.
@@ -121,13 +121,13 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.ZeroProposal) er
 	// due to node no longer being the leader. In this scenario, the first proposal can still get
 	// accepted by Raft, causing a txn violation later for us, because we assumed that the proposal
 	// did not go through.
-	propose := func(timeout time.Duration) error {
+	propose := func(timeout time.Duration) (*pb.MembershipState, error) {
 		cctx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
 
-		errCh := make(chan error, 1)
+		resCh := make(chan conn.ProposalResult, 1)
 		pctx := &conn.ProposalCtx{
-			ErrCh: errCh,
+			ResCh: resCh,
 			// Don't use the original context, because that's not what we're passing to Raft.
 			Ctx: cctx,
 		}
@@ -145,23 +145,23 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.ZeroProposal) er
 		binary.BigEndian.PutUint64(data[:8], key)
 		sz, err := proposal.MarshalToSizedBuffer(data[8:])
 		if err != nil {
-			return err
+			return nil, err
 		}
 		data = data[:8+sz]
 		// Propose the change.
 		if err := n.Raft().Propose(cctx, data); err != nil {
 			span.Annotatef(nil, "Error while proposing via Raft: %v", err)
-			return errors.Wrapf(err, "While proposing")
+			return nil, errors.Wrapf(err, "While proposing")
 		}
 
 		// Wait for proposal to be applied or timeout.
 		select {
-		case err := <-errCh:
+		case res := <-resCh:
 			// We arrived here by a call to n.props.Done().
-			return err
+			return res.Data.(*pb.MembershipState), res.Err
 		case <-cctx.Done():
 			span.Annotatef(nil, "Internal context timeout %s. Will retry...", timeout)
-			return errInternalRetry
+			return nil, errInternalRetry
 		}
 	}
 
@@ -169,29 +169,30 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.ZeroProposal) er
 	// to leader can be dropped/end up appearing with empty Data in CommittedEntries.
 	// Having a timeout here prevents the mutation being stuck forever in case they don't have a
 	// timeout. We should always try with a timeout and optionally retry.
+	var st *pb.MembershipState
 	err := errInternalRetry
 	timeout := 4 * time.Second
 	for err == errInternalRetry {
-		err = propose(timeout)
+		st, err = propose(timeout)
 		timeout *= 2 // Exponential backoff
 		if timeout > time.Minute {
 			timeout = 32 * time.Second
 		}
 	}
-	return err
+	return st, err
 }
 
 var (
 	errInvalidProposal = errors.New("Invalid group proposal")
 )
 
-func (n *node) applyProposal(e raftpb.Entry) (uint64, error) {
+func (n *node) applyProposal(e raftpb.Entry) error {
 	x.AssertTrue(len(e.Data) > 0)
 
 	var p pb.ZeroProposal
 	key := binary.BigEndian.Uint64(e.Data[:8])
 	if err := p.Unmarshal(e.Data[8:]); err != nil {
-		return key, err
+		return err
 	}
 	span := otrace.FromContext(n.Proposals.Ctx(key))
 
@@ -201,7 +202,7 @@ func (n *node) applyProposal(e raftpb.Entry) (uint64, error) {
 	dst := proto.Clone(n.state._state).(*pb.MembershipState)
 	if len(p.Cid) > 0 {
 		if len(dst.Cid) > 0 {
-			return key, errInvalidProposal
+			return errInvalidProposal
 		}
 		dst.Cid = p.Cid
 	}
@@ -209,7 +210,7 @@ func (n *node) applyProposal(e raftpb.Entry) (uint64, error) {
 		if err := n.handleMemberProposal(dst, p.Member); err != nil {
 			span.Annotatef(nil, "While applying membership proposal: %+v", err)
 			glog.Errorf("While applying membership proposal: %+v", err)
-			return key, err
+			return err
 		}
 	}
 	if len(p.Tablets) > 0 {
@@ -217,29 +218,23 @@ func (n *node) applyProposal(e raftpb.Entry) (uint64, error) {
 		if err := n.handleTabletProposal(dst, p.Tablets); err != nil {
 			span.Annotatef(nil, "While applying tablet proposal: %+v", err)
 			glog.Errorf("While applying tablet proposal: %+v", err)
-			return key, err
+			return err
 		}
 		glog.Infof("Proposal applied: %+v\n", p.Tablets)
 	}
 
 	switch {
-	case p.MaxUID > dst.MaxUID:
-		dst.MaxUID = p.MaxUID
-	case p.MaxNsID > dst.MaxNsID:
-		dst.MaxNsID = p.MaxNsID
-	case p.MaxUID != 0 || p.MaxNsID != 0:
-		// Could happen after restart when some entries were there in WAL and did not get
-		// snapshotted.
-		glog.Infof("Could not apply proposal, ignoring: p.MaxUID=%v, "+
-			"p.MaxNsID=%v, maxUID=%d maxNsID=%d\n",
-			p.MaxUID, p.MaxNsID, dst.MaxUID, dst.MaxNsID)
+	case p.NumUids > 0:
+		dst.MaxUID += uint64(p.NumUids)
+	case p.NumNsids > 0:
+		dst.MaxNsID += uint64(p.NumNsids)
 	}
 
 	// Now assign the new state back.
 	glog.Infof("Updated state: %+v\n", dst)
 	n.state._state = dst
 	n.ch <- dst
-	return key, nil
+	return nil
 }
 
 func (n *node) handleMemberProposal(dst *pb.MembershipState, member *pb.Member) error {
@@ -321,7 +316,7 @@ func (n *node) ensureClusterID() {
 	propose := func() {
 		id := uuid.New().String()
 
-		err := n.proposeAndWait(context.Background(), &pb.ZeroProposal{Cid: id})
+		_, err := n.proposeAndWait(context.Background(), &pb.ZeroProposal{Cid: id})
 		if err == nil {
 			glog.Infof("CID set via proposal for cluster: %v", id)
 			return
@@ -531,11 +526,14 @@ func (n *node) Run() {
 
 				case entry.Type == raftpb.EntryNormal:
 					start := time.Now()
-					key, err := n.applyProposal(entry)
+					key := binary.BigEndian.Uint64(entry.Data[:8])
+					err := n.applyProposal(entry)
 					if err != nil {
 						glog.Errorf("While applying proposal: %v\n", err)
 					}
-					n.Proposals.Done(key, err)
+
+					st := n.state.membership()
+					n.Proposals.Done(key, conn.ProposalResult{err, st})
 
 					if took := time.Since(start); took > time.Second {
 						var p pb.ZeroProposal
@@ -634,7 +632,7 @@ func (n *node) calculateAndProposeSnapshot() error {
 	}
 	glog.V(2).Infof("Proposing snapshot at index: %d\n", zs.Index)
 	zp := &pb.ZeroProposal{Snapshot: zs}
-	if err = n.proposeAndWait(n.ctx, zp); err != nil {
+	if _, err = n.proposeAndWait(n.ctx, zp); err != nil {
 		glog.Errorf("Error while proposing snapshot: %v\n", err)
 		span.Annotatef(nil, "Error while proposing snapshot: %v", err)
 		return err

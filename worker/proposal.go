@@ -216,9 +216,9 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 		cctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		errCh := make(chan error, 1)
+		resCh := make(chan conn.ProposalResult, 1)
 		pctx := &conn.ProposalCtx{
-			ErrCh: errCh,
+			ResCh: resCh,
 			Ctx:   cctx,
 		}
 		x.AssertTruef(n.Proposals.Store(key, pctx), "Found existing proposal with key: [%x]", key)
@@ -235,9 +235,9 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 
 		for {
 			select {
-			case err = <-errCh:
+			case pres := <-resCh:
 				// We arrived here by a call to n.Proposals.Done().
-				return err
+				return pres.Err
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-timer.C:
