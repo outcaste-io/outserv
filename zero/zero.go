@@ -225,6 +225,7 @@ func Run(closer *z.Closer, bindall bool) {
 }
 
 func AssignUids(ctx context.Context, num uint32) (*pb.AssignedIds, error) {
+	// TODO: Make it so we don't have to propose to Zero for every request.
 	prop := &pb.ZeroProposal{NumUids: num}
 	st, err := ProposeAndWait(ctx, prop)
 	if err != nil {
