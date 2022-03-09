@@ -117,7 +117,7 @@ they form a Raft group and provide synchronous replication.
 
 	// Useful for running multiple servers on the same machine.
 	flag.IntP("port_offset", "o", 0,
-		"Value added to all listening port numbers. [Internal=7080, HTTP=8080, Grpc=9080]")
+		"Value added to all listening port numbers. [Internal=7080, HTTP=8080]")
 
 	// Custom plugins.
 	flag.String("custom_tokenizers", "",
@@ -674,7 +674,7 @@ func setupServer(closer *z.Closer) {
 	// Initialize the lambda server
 	setupLambdaServer(x.ServerCloser)
 	// Initialize the servers.
-	x.ServerCloser.AddRunning(3)
+	x.ServerCloser.AddRunning(2)
 	go x.StartListenHttpAndHttps(httpListener, tlsCfg, x.ServerCloser)
 	go func() {
 		defer x.ServerCloser.Done()
@@ -685,9 +685,8 @@ func setupServer(closer *z.Closer) {
 		atomic.StoreUint64(e, math.MaxUint64)
 
 		// Stops http servers; Already accepted connections are not closed.
-		if err := httpListener.Close(); err != nil {
-			glog.Warningf("Error while closing HTTP listener: %s", err)
-		}
+		err := httpListener.Close()
+		glog.Infof("HTTP listener closed with error: %v", err)
 	}()
 
 	glog.Infoln("HTTP server started.  Listening on port", httpPort())
@@ -961,7 +960,7 @@ func run() {
 	adminCloser := z.NewCloser(1)
 
 	setupServer(adminCloser)
-	glog.Infoln("GRPC and HTTP stopped.")
+	glog.Infoln("HTTP stopped.")
 
 	// This might not close until group is given the signal to close. So, only signal here,
 	// wait for it after group is closed.
