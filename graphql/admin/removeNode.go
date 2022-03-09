@@ -19,15 +19,12 @@ package admin
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strconv"
 
 	"github.com/pkg/errors"
 
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
-	"github.com/outcaste-io/outserv/protos/pb"
-	"github.com/outcaste-io/outserv/worker"
 )
 
 type removeNodeInput struct {
@@ -36,21 +33,22 @@ type removeNodeInput struct {
 }
 
 func resolveRemoveNode(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
-	input, err := getRemoveNodeInput(m)
-	if err != nil {
-		return resolve.EmptyResult(m, err), false
-	}
+	panic("TODO: Implement resolveRemoveNode")
+	// input, err := getRemoveNodeInput(m)
+	// if err != nil {
+	// 	return resolve.EmptyResult(m, err), false
+	// }
 
-	if _, err = worker.RemoveNodeOverNetwork(ctx, &pb.RemoveNodeRequest{NodeId: input.NodeId,
-		GroupId: input.GroupId}); err != nil {
-		return resolve.EmptyResult(m, err), false
-	}
+	// if _, err = worker.RemoveNodeOverNetwork(ctx, &pb.RemoveNodeRequest{NodeId: input.NodeId,
+	// 	GroupId: input.GroupId}); err != nil {
+	// 	return resolve.EmptyResult(m, err), false
+	// }
 
-	return resolve.DataResult(m,
-		map[string]interface{}{m.Name(): response("Success",
-			fmt.Sprintf("Removed node with group: %v, idx: %v", input.GroupId, input.NodeId))},
-		nil,
-	), true
+	// return resolve.DataResult(m,
+	// 	map[string]interface{}{m.Name(): response("Success",
+	// 		fmt.Sprintf("Removed node with group: %v, idx: %v", input.GroupId, input.NodeId))},
+	// 	nil,
+	// ), true
 }
 
 func getRemoveNodeInput(m schema.Mutation) (*removeNodeInput, error) {

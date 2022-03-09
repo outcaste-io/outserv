@@ -16,6 +16,7 @@ import (
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/outserv/zero"
 	"github.com/outcaste-io/sroar"
 	"github.com/pkg/errors"
 )
@@ -143,7 +144,6 @@ func verifyUid(ctx context.Context, uid uint64) error {
 // it shows up in the subjects or objects
 func AssignUids(ctx context.Context, gmuList []*gql.Mutation) (map[string]uint64, error) {
 	newUids := make(map[string]uint64)
-	num := &pb.Num{}
 	var err error
 	for _, gmu := range gmuList {
 		for _, nq := range gmu.Set {
@@ -179,13 +179,11 @@ func AssignUids(ctx context.Context, gmuList []*gql.Mutation) (map[string]uint64
 		}
 	}
 
-	num.Val = uint64(len(newUids))
-	num.Type = pb.Num_UID
-	if int(num.Val) > 0 {
+	if num := len(newUids); num > 0 {
 		var res *pb.AssignedIds
 		// TODO: Optimize later by prefetching. Also consolidate all the UID requests into a single
 		// pending request from this server to zero.
-		if res, err = worker.AssignUidsOverNetwork(ctx, num); err != nil {
+		if res, err = zero.AssignUids(ctx, uint32(num)); err != nil {
 			return newUids, err
 		}
 		curId := res.StartId

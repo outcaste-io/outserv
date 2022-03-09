@@ -31,6 +31,7 @@ import (
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/raftwal"
 	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/outserv/zero"
 	"github.com/outcaste-io/ristretto/z"
 	"github.com/pkg/errors"
 )
@@ -54,13 +55,10 @@ func TaskStatusOverNetwork(ctx context.Context, req *pb.TaskStatusRequest,
 	}
 
 	// Find the Alpha with the required Raft ID.
+	st := zero.MembershipState()
 	var addr string
-	for _, group := range groups().state.GetGroups() {
-		for _, member := range group.GetMembers() {
-			if member.GetId() == raftId {
-				addr = member.GetAddr()
-			}
-		}
+	if member, has := st.Members[raftId]; has {
+		addr = member.Addr
 	}
 	if addr == "" {
 		return nil, fmt.Errorf("the Alpha that served that task is not available")
@@ -96,7 +94,7 @@ var (
 
 // InitTasks initializes the global Tasks variable.
 func InitTasks() {
-	path := filepath.Join(x.WorkerConfig.TmpDir, "tasks.buf")
+	path := filepath.Join(x.WorkerConfig.Dir.Tmp, "tasks.buf")
 	log, err := z.NewTreePersistent(path)
 	x.Check(err)
 

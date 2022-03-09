@@ -31,8 +31,8 @@ var Version x.SubCommand
 func init() {
 	Version.Cmd = &cobra.Command{
 		Use:   "version",
-		Short: "Prints the dgraph version details",
-		Long:  "Version prints the dgraph version as reported by the build details.",
+		Short: "Prints the Outserv version details",
+		Long:  "Version prints the Outserv version as reported by the build details.",
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Print(x.BuildDetails())
 			os.Exit(0)

@@ -43,6 +43,7 @@ import (
 	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/outserv/zero"
 )
 
 const (
@@ -106,7 +107,7 @@ func PeriodicallyPostTelemetry() {
 		if time.Since(lastPostedAt) < time.Hour {
 			continue
 		}
-		ms := worker.GetMembershipState()
+		ms := zero.MembershipState()
 		t := telemetry.NewAlpha(ms)
 		t.NumGraphQLPM = atomic.SwapUint64(&numGraphQLPM, 0)
 		t.NumGraphQL = atomic.SwapUint64(&numGraphQL, 0)
@@ -1192,16 +1193,14 @@ func filterTablets(ctx context.Context, ms *pb.MembershipState) error {
 		// For galaxy namespace, we don't want to filter out the predicates.
 		return nil
 	}
-	for _, group := range ms.GetGroups() {
-		tablets := make(map[string]*pb.Tablet)
-		for pred, tablet := range group.GetTablets() {
-			if ns, attr := x.ParseNamespaceAttr(pred); namespace == ns {
-				tablets[attr] = tablet
-				tablets[attr].Predicate = attr
-			}
+	tablets := make(map[string]*pb.Tablet)
+	for pred, tablet := range ms.GetTablets() {
+		if ns, attr := x.ParseNamespaceAttr(pred); namespace == ns {
+			tablets[attr] = tablet
+			tablets[attr].Predicate = attr
 		}
-		group.Tablets = tablets
 	}
+	ms.Tablets = tablets
 	return nil
 }
 
@@ -1215,7 +1214,7 @@ func (s *Server) State(ctx context.Context) (*api.Response, error) {
 		return nil, err
 	}
 
-	ms := worker.GetMembershipState()
+	ms := zero.MembershipState()
 	if ms == nil {
 		return nil, errors.Errorf("No membership state found")
 	}
@@ -1291,7 +1290,7 @@ func Init() {
 	maxPendingQueries = x.Config.Limit.GetInt64("max-pending-queries")
 }
 
-func Cleanup() {
+func StopServingQueries() {
 	// Mark the server unhealthy so that no new operations starts and wait for 5 seconds for
 	// the pending queries to finish.
 	x.UpdateHealthStatus(false)

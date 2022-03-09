@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/outcaste-io/badger/v3/y"
-	"google.golang.org/grpc/metadata"
 
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
@@ -515,36 +514,6 @@ func ValidateAndConvert(edge *pb.DirectedEdge, su *pb.SchemaUpdate) error {
 	return nil
 }
 
-// AssignNsIdsOverNetwork sends a request to assign Namespace IDs to the current zero leader.
-func AssignNsIdsOverNetwork(ctx context.Context, num *pb.Num) (*pb.AssignedIds, error) {
-	pl := groups().Leader(0)
-	if pl == nil {
-		return nil, conn.ErrNoConnection
-	}
-
-	con := pl.Get()
-	c := pb.NewZeroClient(con)
-	num.Type = pb.Num_NS_ID
-	return c.AssignIds(ctx, num)
-}
-
-// AssignUidsOverNetwork sends a request to assign UIDs to blank nodes to the current zero leader.
-func AssignUidsOverNetwork(ctx context.Context, num *pb.Num) (*pb.AssignedIds, error) {
-	// Pass on the incoming metadata to the zero. Namespace from the metadata is required by zero.
-	if md, ok := metadata.FromIncomingContext(ctx); ok {
-		ctx = metadata.NewOutgoingContext(ctx, md)
-	}
-	pl := groups().Leader(0)
-	if pl == nil {
-		return nil, conn.ErrNoConnection
-	}
-
-	con := pl.Get()
-	c := pb.NewZeroClient(con)
-	num.Type = pb.Num_UID
-	return c.AssignIds(ctx, num)
-}
-
 // TODO: Do we need fillTxnContext?
 func fillTxnContext(tctx *api.TxnContext, startTs uint64) {
 	if txn := posting.GetTxn(startTs); txn != nil {
@@ -677,7 +646,6 @@ func MutateOverNetwork(ctx context.Context, m *pb.Mutations) (*api.TxnContext, e
 	resCh := make(chan res, len(mutationMap))
 	for gid, mu := range mutationMap {
 		if gid == 0 {
-			span.Annotatef(nil, "state: %+v", groups().state)
 			span.Annotatef(nil, "Group id zero for mutation: %+v", mu)
 			return tctx, errNonExistentTablet
 		}

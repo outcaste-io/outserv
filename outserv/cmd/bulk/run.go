@@ -211,7 +211,7 @@ func run() {
 		tlsConf, err := x.LoadClientTLSConfigForInternalPort(Bulk.Conf)
 		x.Check(err)
 		// Need to set zero addr in WorkerConfig before checking the license.
-		x.WorkerConfig.ZeroAddr = []string{opt.ZeroAddr}
+		x.WorkerConfig.PeerAddr = []string{opt.ZeroAddr}
 		x.WorkerConfig.TLSClientConfig = tlsConf
 	}
 	fmt.Printf("Encrypted input: %v; Encrypted output: %v\n", opt.Encrypted, opt.EncryptedOut)

@@ -101,23 +101,23 @@ func (p *Pools) GetAll() []*Pool {
 	return pool
 }
 
+func (p *Pools) Close() {
+	for _, pool := range p.GetAll() {
+		pool.shutdown()
+	}
+}
+
 // RemoveInvalid removes invalid nodes from the list of pools.
 func (p *Pools) RemoveInvalid(state *pb.MembershipState) {
 	// Keeps track of valid IP addresses, assigned to active nodes. We do this
 	// to avoid removing valid IP addresses from the Removed list.
 	validAddr := make(map[string]struct{})
-	for _, group := range state.Groups {
-		for _, member := range group.Members {
-			validAddr[member.Addr] = struct{}{}
-		}
-	}
-	for _, member := range state.Zeros {
+	for _, member := range state.Members {
 		validAddr[member.Addr] = struct{}{}
 	}
-	for _, member := range state.Removed {
-		// Some nodes could have the same IP address. So, check before disconnecting.
-		if _, valid := validAddr[member.Addr]; !valid {
-			p.remove(member.Addr)
+	for _, pool := range p.GetAll() {
+		if _, has := validAddr[pool.Addr]; !has {
+			p.remove(pool.Addr)
 		}
 	}
 }
@@ -298,7 +298,7 @@ func (p *Pool) MonitorHealth() {
 			if err == nil {
 				// Make a dummy request to test out the connection.
 				client := pb.NewRaftClient(conn)
-				_, err = client.IsPeer(ctx, &pb.RaftContext{})
+				_, err = client.IsPeer(ctx, &pb.RaftContext{WhoIs: "alpha"})
 			}
 			cancel()
 			if err == nil {

@@ -36,6 +36,7 @@ import (
 	"github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/outserv/zero"
 	"github.com/outcaste-io/ristretto/z"
 )
 
@@ -228,41 +229,6 @@ func GetOngoingTasks() []string {
 		tasks = append(tasks, id.String())
 	}
 	return tasks
-}
-
-// Now that we apply txn updates via Raft, waiting based on Txn timestamps is
-// sufficient. We don't need to wait for proposals to be applied.
-
-func newNode(store *raftwal.DiskStorage, gid uint32, id uint64, myAddr string) *node {
-	glog.Infof("Node ID: %#x with GroupID: %d\n", id, gid)
-
-	isLearner := x.WorkerConfig.Raft.GetBool("learner")
-	rc := &pb.RaftContext{
-		Addr:      myAddr,
-		Group:     gid,
-		Id:        id,
-		IsLearner: isLearner,
-	}
-	glog.Infof("RaftContext: %+v\n", rc)
-	m := conn.NewNode(rc, store, x.WorkerConfig.TLSClientConfig)
-
-	n := &node{
-		Node: m,
-		ctx:  context.Background(),
-		gid:  gid,
-		// We need a generous size for applyCh, because raft.Tick happens every
-		// 10ms. If we restrict the size here, then Raft goes into a loop trying
-		// to maintain quorum health.
-		applyCh:      make(chan []*pb.Proposal, 1000),
-		concApplyCh:  make(chan *pb.Proposal, 100),
-		drainApplyCh: make(chan struct{}),
-		elog:         trace.NewEventLog("Dgraph", "ApplyCh"),
-		closer:       z.NewCloser(4), // Matches CLOSER:1
-		ops:          make(map[op]operation),
-		cdcTracker:   newCDC(),
-		keysWritten:  newKeysWritten(),
-	}
-	return n
 }
 
 func (n *node) Ctx(key uint64) context.Context {
@@ -644,13 +610,6 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 	case len(proposal.Kv) > 0:
 		return populateKeyValues(ctx, proposal.Kv)
 
-	case proposal.State != nil:
-		n.elog.Printf("Applying state for key: %s", key)
-		// This state needn't be snapshotted in this group, on restart we would fetch
-		// a state which is latest or equal to this.
-		groups().applyState(groups().Node.Id, proposal.State)
-		return nil
-
 	case len(proposal.CleanPredicate) > 0:
 		n.elog.Printf("Cleaning predicate: %s", proposal.CleanPredicate)
 		end := time.Now().Add(10 * time.Second)
@@ -740,6 +699,10 @@ func getProposal(e raftpb.Entry) *pb.Proposal {
 	return p
 }
 
+func propResult(err error) conn.ProposalResult {
+	return conn.ProposalResult{Err: err}
+}
+
 func (n *node) processApplyCh() {
 	defer n.closer.Done() // CLOSER:1
 
@@ -793,7 +756,7 @@ func (n *node) processApplyCh() {
 			}
 		}
 
-		n.Proposals.Done(prop.Key, perr)
+		n.Proposals.Done(prop.Key, propResult(perr))
 		n.Applied.Done(prop.Index)
 		posting.DoneTimestamp(prop.CommitTs)
 		ostats.Record(context.Background(), x.RaftAppliedIndex.M(int64(n.Applied.DoneUntil())))
@@ -815,7 +778,7 @@ func (n *node) processApplyCh() {
 				case props := <-n.applyCh:
 					numDrained += len(props)
 					for _, p := range props {
-						n.Proposals.Done(p.Key, nil)
+						n.Proposals.Done(p.Key, propResult(nil))
 						n.Applied.Done(p.Index)
 					}
 				default:
@@ -917,14 +880,11 @@ func (n *node) commit(txn *posting.Txn) error {
 }
 
 func (n *node) leaderBlocking() (*conn.Pool, error) {
+	if _, err := zero.LatestMembershipState(n.ctx); err != nil {
+		return nil, errors.Wrapf(err, "while getting latest membership state")
+	}
 	pool := groups().Leader(groups().groupId())
 	if pool == nil {
-		// Functions like retrieveSnapshot and joinPeers are blocking at initial start and
-		// leader election for a group might not have happened when it is called. If we can't
-		// find a leader, get latest state from Zero.
-		if err := UpdateMembershipState(context.Background()); err != nil {
-			return nil, errors.Errorf("Error while trying to update membership state: %+v", err)
-		}
 		return nil, errors.Errorf("Unable to reach leader in group %d", n.gid)
 	}
 	return pool, nil
@@ -1262,7 +1222,8 @@ func (n *node) Run() {
 
 	done := make(chan struct{})
 	go n.checkpointAndClose(done)
-	go n.ReportRaftComms()
+	go n.ReportRaftComms("alpha", n.closer)
+	go n.EnsureRegularityOfTicks("alpha", tickDur, n.closer)
 	go n.proposeBaseTimestamp()
 
 	if !x.WorkerConfig.HardSync {
@@ -1305,7 +1266,7 @@ func (n *node) Run() {
 			// start an election process. And that election process would just continue to happen
 			// indefinitely because checkpoints and snapshots are being calculated indefinitely.
 		case <-ticker.C:
-			n.Raft().Tick()
+			n.Tick()
 
 		case rd := <-n.Raft().Ready():
 			timer.Start()
@@ -1491,7 +1452,7 @@ func (n *node) Run() {
 								p.BaseTimestamp, e.Index)
 						}
 						baseTimestamp = p.BaseTimestamp
-						n.Proposals.Done(p.Key, nil)
+						n.Proposals.Done(p.Key, propResult(nil))
 						n.Applied.Done(p.Index)
 						continue
 					}
