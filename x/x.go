@@ -96,6 +96,8 @@ const (
 	// PortHTTP is the default HTTP port for alpha.
 	PortHTTP = 8080
 	// PortGrpc is the default gRPC port for alpha.
+	// TODO: Remove PortGrpc. We shouldn't need to expose this. All
+	// interactions should be done via GraphQL HTTP.
 	PortGrpc = 9080
 	// ForceAbortDifference is the maximum allowed difference between
 	// AppliedUntil - TxnMarks.DoneUntil() before old transactions start getting aborted.

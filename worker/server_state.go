@@ -52,13 +52,6 @@ var State ServerState
 func InitServerState() {
 	Config.validate()
 	State.initStorage()
-
-	// groupId, err := x.ReadGroupIdFile(Config.PostingDir)
-	// if err != nil {
-	// 	glog.Warningf("Could not read %s file inside posting directory %s.", x.GroupIdFileName,
-	// 		Config.PostingDir)
-	// }
-	// x.WorkerConfig.ProposedGroupId = groupId
 }
 
 func setBadgerOptions(opt badger.Options) badger.Options {

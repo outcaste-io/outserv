@@ -41,8 +41,7 @@ type node struct {
 	ch     chan *pb.MembershipState
 
 	// The last timestamp when this Zero was able to reach quorum.
-	mu         sync.RWMutex
-	lastQuorum time.Time
+	mu sync.RWMutex
 }
 
 func (n *node) amLeader() bool {
@@ -54,22 +53,19 @@ func (n *node) amLeader() bool {
 }
 
 func (n *node) AmLeader() bool {
-	// Return false if the node is not the leader. Otherwise, check the lastQuorum as well.
-	if !n.amLeader() {
-		return false
-	}
+	return n.amLeader()
+
+	// Note (Mar 8, 2022):
+	// We used to check quorum here before. Because for transactions, Zero
+	// leader used to hold state all of which was not circulated via Raft. Now,
+	// all Zero operations achieve Raft quorum. So, we don't need to check
+	// separately for quorum again.
+	//
+	// Old message:
 	// This node must be the leader, but must also be an active member of
 	// the cluster, and not hidden behind a partition. Basically, if this
 	// node was the leader and goes behind a partition, it would still
 	// think that it is indeed the leader for the duration mentioned below.
-
-	// TODO: Not sure if we need to check for Quorum. We should just propose
-	// everything and await the application.
-	//
-	// n.mu.RLock()
-	// defer n.mu.RUnlock()
-	// return time.Since(n.lastQuorum) <= 5*time.Second
-	return true
 }
 
 // {2 bytes Node ID} {4 bytes for random} {2 bytes zero}
@@ -95,7 +91,9 @@ func ProposeAndWait(ctx context.Context, proposal *pb.ZeroProposal) (*pb.Members
 
 // proposeAndWait makes a proposal to the quorum for Group Zero and waits for it to be accepted by
 // the group before returning. It is safe to call concurrently.
-func (n *node) proposeAndWait(ctx context.Context, proposal *pb.ZeroProposal) (*pb.MembershipState, error) {
+func (n *node) proposeAndWait(ctx context.Context,
+	proposal *pb.ZeroProposal) (*pb.MembershipState, error) {
+
 	switch {
 	case n.Raft() == nil:
 		return nil, errors.Errorf("Raft isn't initialized yet.")
@@ -279,7 +277,8 @@ func (n *node) handleTabletProposal(dst *pb.MembershipState, tablets []*pb.Table
 			return errors.Errorf("Tablet group id is zero: %+v", tablet)
 		}
 		if tablet.Remove {
-			glog.Infof("Removing tablet for attr: [%v], gid: [%v]\n", tablet.Predicate, tablet.GroupId)
+			glog.Infof("Removing tablet for attr: [%v], gid: [%v]\n",
+				tablet.Predicate, tablet.GroupId)
 			delete(dst.Tablets, tablet.Predicate)
 			return nil
 		}
@@ -341,13 +340,11 @@ func (n *node) ensureClusterID() {
 }
 
 func (n *node) initAndStartNode() error {
-	glog.Infof("-----> initAndStartNode")
 	x.Check(n.initProposalKey(n.Id))
 	_, restart, err := n.PastLife()
 	x.Check(err)
 
-	// TODO: Rename this to PeerAddr, and potentially support checking multiple
-	// PeerAddrs. For simplicity, just checking one now.
+	// TODO: Check other peers too.
 	peer := x.WorkerConfig.PeerAddr[0]
 
 	switch {
@@ -477,8 +474,10 @@ func (n *node) Run() {
 				// empty.
 				readStateCh <- rs
 			}
-			glog.Infof("Read states: %d\n", len(rd.ReadStates))
-			span.Annotatef(nil, "Pushed %d readstates", len(rd.ReadStates))
+			if len(rd.ReadStates) > 0 {
+				glog.V(2).Infof("Read states: %d\n", len(rd.ReadStates))
+				span.Annotatef(nil, "Pushed %d readstates", len(rd.ReadStates))
+			}
 
 			if rd.SoftState != nil {
 				leader = rd.RaftState == raft.StateLeader

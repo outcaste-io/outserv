@@ -122,18 +122,6 @@ message Member {
   bool am_dead = 5 [(gogoproto.jsontag) = "amDead,omitempty"];
   uint64 last_update = 6 [(gogoproto.jsontag) = "lastUpdate,omitempty"];
   bool learner = 7;
-
-  bool cluster_info_only = 13
-      [(gogoproto.jsontag) = "clusterInfoOnly,omitempty"];
-  bool force_group_id = 14 [(gogoproto.jsontag) = "forceGroupId,omitempty"];
-}
-
-// Todo: Perhaps remove Group.
-message Group {
-  uint32 group_id = 1;
-  uint64 snapshot_ts = 3;           // Stores Snapshot transaction ts.
-  uint64 checksum = 4;              // Stores a checksum.
-  uint64 checkpoint_ts = 5;         // Stores checkpoint ts as seen by leader.
 }
 
 message ZeroProposal {
@@ -163,13 +151,6 @@ message MembershipState {
   uint64 maxNsID = 8;
   string cid = 9;  // Used to uniquely identify the Dgraph cluster.
 }
-
-/* message ConnectionState { */
-/*   Member member = 1; */
-/*   MembershipState state = 2; */
-/*   // Used to determine the timstamp for reading after bulk load. */
-/*   uint64 max_pending = 3; */
-/* } */
 
 message HealthInfo {
   string instance = 1;
@@ -520,10 +501,6 @@ message MoveTabletRequest {
   uint64 namespace = 1;
   string tablet = 2;
   uint32 dstGroup = 3;
-}
-
-message ApplyLicenseRequest {
-  bytes license = 1;
 }
 
 message SnapshotMeta {

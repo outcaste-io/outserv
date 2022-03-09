@@ -99,13 +99,7 @@ func StartRaftNodes(walStore *raftwal.DiskStorage, bindall bool) {
 		Addr:    x.WorkerConfig.MyAddr,
 		Learner: x.WorkerConfig.Raft.GetBool("learner"),
 	}
-	if m.GroupId > 0 {
-		// TODO: Remove the concept of forced group id.
-		m.ForceGroupId = true
-	}
 	glog.Infof("Sending member request to Zero: %+v\n", m)
-
-	// TODO: The following should directly interact with the zero package.
 
 	var connState *pb.MembershipState
 	var err error
@@ -175,7 +169,6 @@ func (g *groupi) informZeroAboutTablets() {
 
 	for range ticker.C {
 		preds := schema.State().Predicates()
-		glog.Infof("----> Going to inform about preds: %+v\n", preds)
 		if _, err := g.Inform(preds); err != nil {
 			glog.Errorf("Error while getting tablet for preds %v", err)
 		} else {
@@ -257,22 +250,11 @@ func (g *groupi) groupId() uint32 {
 	return atomic.LoadUint32(&g.gid)
 }
 
-// TODO: Remove this func.
 // MaxLeaseId returns the maximum UID that has been leased.
 func MaxLeaseId() uint64 {
 	st := zero.MembershipState()
 	return st.MaxUID
 }
-
-// // UpdateMembershipState contacts zero for an update on membership state.
-// func UpdateMembershipState(ctx context.Context) error {
-// 	st, err := zero.LatestMembershipState(gr.Ctx())
-// 	if err != nil {
-// 		return errors.Wrapf(err, "while retrieving membership")
-// 	}
-// 	gr.applyState(st)
-// 	return nil
-// }
 
 func (g *groupi) applyState(state *pb.MembershipState) {
 	myId := g.Node.Id
@@ -290,9 +272,6 @@ func (g *groupi) applyState(state *pb.MembershipState) {
 	// Sometimes this can cause us to lose latest tablet info, but that shouldn't cause any issues.
 	for _, member := range state.Members {
 		conn.GetPools().Connect(member.Addr, x.WorkerConfig.TLSClientConfig)
-		// if x.WorkerConfig.MyAddr != member.Addr {
-		// 	conn.GetPools().Connect(member.Addr, x.WorkerConfig.TLSClientConfig)
-		// }
 	}
 
 	// While restarting we fill Node information after retrieving initial state.
@@ -310,17 +289,10 @@ func (g *groupi) applyState(state *pb.MembershipState) {
 			// isPeer should only be true if the removed node is not the same as this node.
 			isPeer = isPeer && removedId != g.Node.RaftContext.Id
 			if !isPeer {
-				glog.Infof("%#x is not my peer. So, not removing.\n", removedId)
 				continue
 			}
 
 			go func(rid uint64) {
-				// Note: Not sure why we need to check here again.
-				// for _, oldMember := range oldState.GetRemoved() {
-				// 	if oldMember.GetId() == member.GetId() && !isPeer {
-				// 		return
-				// 	}
-				// }
 				glog.Infof("Proposing removal of peer %#x\n", rid)
 				if err := g.Node.ProposePeerRemoval(g.Ctx(), rid); err != nil {
 					glog.Errorf("Error while proposing node removal: %+v", err)
@@ -392,33 +364,6 @@ func (g *groupi) ServesTablet(key string) (bool, error) {
 	return false, nil
 }
 
-func (g *groupi) sendTablet(tablet *pb.Tablet) (*pb.Tablet, error) {
-	return nil, nil
-	// TODO: Fix up below.
-
-	// pl := g.connToZeroLeader()
-	// zc := pb.NewZeroClient(pl.Get())
-
-	// out, err := zc.ShouldServe(g.Ctx(), tablet)
-	// if err != nil {
-	// 	glog.Errorf("Error while ShouldServe grpc call %v", err)
-	// 	return nil, err
-	// }
-
-	// // Do not store tablets with group ID 0, as they are just dummy tablets for
-	// // predicates that do no exist.
-	// if out.GroupId > 0 {
-	// 	g.Lock()
-	// 	g.tablets[out.GetPredicate()] = out
-	// 	g.Unlock()
-	// }
-
-	// if out.GroupId == groups().groupId() {
-	// 	glog.Infof("Serving tablet for: %v\n", tablet.GetPredicate())
-	// }
-	// return out, nil
-}
-
 func (g *groupi) Inform(preds []string) ([]*pb.Tablet, error) {
 	// Don't need to use its result. Just ensure that Zero's information is up
 	// to date.
@@ -440,14 +385,25 @@ func (g *groupi) Inform(preds []string) ([]*pb.Tablet, error) {
 	}
 	g.RUnlock()
 
+	createResult := func(st *pb.MembershipState) []*pb.Tablet {
+		var res []*pb.Tablet
+		for _, pred := range preds {
+			tablet := st.Tablets[pred]
+			// Whether nil or not, we should send the tablet back, because it
+			// corresponds to the list of predicates asked for.
+			res = append(res, tablet)
+		}
+		return res
+	}
+
 	if len(unknownPreds) == 0 {
-		return nil, nil
+		return createResult(st), nil
 	}
 
 	prop := &pb.ZeroProposal{
 		Tablets: unknownPreds,
 	}
-	glog.Infof("Sending proposal: %+v\n", prop)
+	glog.V(2).Infof("Sending proposal: %+v\n", prop)
 	if _, err := zero.ProposeAndWait(g.Ctx(), prop); err != nil {
 		return nil, errors.Wrapf(err, "Unable to propose: %+v\n", prop)
 	}
@@ -456,19 +412,11 @@ func (g *groupi) Inform(preds []string) ([]*pb.Tablet, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "while getting latest membership state")
 	}
-	var res []*pb.Tablet
-	for _, t := range st.Tablets {
-		if t.GroupId == g.groupId() {
-			glog.Infof("Serving tablet for: %v\n", t.GetPredicate())
-			res = append(res, t)
-		}
-	}
-	return res, nil
+	return createResult(st), nil
 }
 
 // Do not modify the returned Tablet
 func (g *groupi) Tablet(key string) (*pb.Tablet, error) {
-	// TODO: Remove all this later, create a membership state and apply it
 	st := zero.MembershipState()
 	tablet, ok := st.Tablets[key]
 	if ok {
@@ -482,10 +430,6 @@ func (g *groupi) Tablet(key string) (*pb.Tablet, error) {
 		return nil, errors.Wrapf(err, "while informing Zero")
 	}
 	return tablets[0], nil
-}
-
-func (g *groupi) ForceTablet(key string) (*pb.Tablet, error) {
-	return g.sendTablet(&pb.Tablet{GroupId: g.groupId(), Predicate: key, Force: true})
 }
 
 func (g *groupi) HasMeInState() bool {
@@ -621,7 +565,7 @@ func (g *groupi) doSendMembership(tablets map[string]*pb.Tablet) error {
 		if _, err := zero.ProposeAndWait(g.Ctx(), prop); err != nil {
 			return errors.Wrapf(err, "Proposal %+v failed", prop)
 		}
-		glog.Infof("Proposal applied: %+v\n", prop)
+		glog.V(2).Infof("Proposal applied: %+v\n", prop)
 	}
 
 	// Only send tablet info, if I'm the leader.
@@ -651,34 +595,9 @@ func (g *groupi) doSendMembership(tablets map[string]*pb.Tablet) error {
 	if _, err := zero.ProposeAndWait(g.Ctx(), prop); err != nil {
 		return errors.Wrapf(err, "Proposal %+v failed", prop)
 	}
-	glog.Infof("Proposal applied: %+v\n", prop)
-
-	// TODO: Look into snapshot timestamps.
-	// if snap, err := g.Node.Snapshot(); err == nil {
-	// 	group.SnapshotTs = snap.BaseTs
-	// }
-	// group.CheckpointTs = atomic.LoadUint64(&g.Node.checkpointTs)
-
-	// zero.ProposeAndWait(g.Ctx(),
+	glog.V(2).Infof("Proposal applied: %+v\n", prop)
 
 	return nil
-	// TODO: Fix up below.
-
-	// pl := g.connToZeroLeader()
-	// if pl == nil {
-	// 	return errNoConnection
-	// }
-	// c := pb.NewZeroClient(pl.Get())
-	// ctx, cancel := context.WithTimeout(g.Ctx(), 10*time.Second)
-	// defer cancel()
-	// reply, err := c.UpdateMembership(ctx, group)
-	// if err != nil {
-	// 	return err
-	// }
-	// if string(reply.GetData()) == "OK" {
-	// 	return nil
-	// }
-	// return errors.Errorf(string(reply.GetData()))
 }
 
 // sendMembershipUpdates sends the membership update to Zero leader. If this Alpha is the leader, it

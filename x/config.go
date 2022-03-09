@@ -175,7 +175,8 @@ func (w *WorkerOptions) Parse(conf *viper.Viper) {
 		Check(ValidateAddress(w.MyAddr))
 		bindall := conf.GetBool("bindall")
 		if !bindall {
-			glog.Errorln("--my flag is provided without bindall, Did you forget to specify bindall?")
+			glog.Errorln("--my flag is provided without bindall." +
+				" Did you forget to specify bindall?")
 		}
 	}
 	w.Trace = z.NewSuperFlag(conf.GetString("trace")).MergeAndCheckDefault(TraceDefaults)

@@ -155,7 +155,7 @@ func NewNode(rc *pb.RaftContext, store *raftwal.DiskStorage, tlsConfig *tls.Conf
 
 // ReportRaftComms periodically prints the state of the node (heartbeats in and out).
 func (n *Node) ReportRaftComms(closer *z.Closer) {
-	if !glog.V(2) {
+	if !glog.V(3) {
 		return
 	}
 	ticker := time.NewTicker(time.Second)

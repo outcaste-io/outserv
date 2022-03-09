@@ -984,7 +984,6 @@ func run() {
 		err := grpcServer.Serve(ln)
 		glog.Errorf("Grpc serve returned with error: %+v", err)
 	}()
-	// TODO: Find a way to close the server.
 
 	updaters := z.NewCloser(3)
 	go func() {

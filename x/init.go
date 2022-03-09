@@ -72,7 +72,6 @@ func Init() {
 
 // BuildDetails returns a string containing details about the Dgraph binary.
 func BuildDetails() string {
-	licenseInfo := `Licensed under Smart License 1.0 and Apache Public License 2.0`
 	buf := z.CallocNoRef(1, "X.BuildDetails")
 	jem := len(buf) > 0
 	z.Free(buf)
@@ -81,18 +80,17 @@ func BuildDetails() string {
 Outserv version   : %v
 Outserv codename  : %v
 Outserv SHA-256   : %x
-Commit SHA-1     : %v
-Commit timestamp : %v
-Branch           : %v
-Go version       : %v
-jemalloc enabled : %v
+Commit SHA-1      : %v
+Commit timestamp  : %v
+Branch            : %v
+Go version        : %v
+jemalloc enabled  : %v
 
-%s.
-Copyright 2022 Outcaste, Inc.
+Licensed under Smart License 1.0. Copyright 2022 Outcaste, Inc.
 
 `,
 		dgraphVersion, dgraphCodename, ExecutableChecksum(), lastCommitSHA, lastCommitTime, gitBranch,
-		runtime.Version(), jem, licenseInfo)
+		runtime.Version(), jem)
 }
 
 // PrintVersion prints version and other helpful information if --version.

@@ -156,6 +156,7 @@ func New(opts XidMapOptions) *XidMap {
 			ctx = xm.attachNamespace(ctx)
 			cancel()
 
+			panic("TODO: Assign UIDs here locally. Then send to Zero.")
 			// TODO: Assign UIDs here &pb.Num{Val: 1e5, Type: pb.Num_UID}
 			// assigned, err := xm.zc.AssignIds(ctx, &pb.Num{Val: 1e5, Type: pb.Num_UID})
 			// glog.V(2).Infof("Assigned Uids: %+v. Err: %v", assigned, err)

@@ -33,7 +33,7 @@ type removeNodeInput struct {
 }
 
 func resolveRemoveNode(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
-	panic("implement this")
+	panic("TODO: Implement resolveRemoveNode")
 	// input, err := getRemoveNodeInput(m)
 	// if err != nil {
 	// 	return resolve.EmptyResult(m, err), false

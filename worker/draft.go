@@ -888,16 +888,6 @@ func (n *node) leaderBlocking() (*conn.Pool, error) {
 		return nil, errors.Errorf("Unable to reach leader in group %d", n.gid)
 	}
 	return pool, nil
-	// if pool == nil {
-	// 	// Functions like retrieveSnapshot and joinPeers are blocking at initial start and
-	// 	// leader election for a group might not have happened when it is called. If we can't
-	// 	// find a leader, get latest state from Zero.
-	// 	if err := UpdateMembershipState(context.Background()); err != nil {
-	// 		return nil, errors.Errorf("Error while trying to update membership state: %+v", err)
-	// 	}
-	// 	return nil, errors.Errorf("Unable to reach leader in group %d", n.gid)
-	// }
-	// return pool, nil
 }
 
 func (n *node) Snapshot() (*pb.Snapshot, error) {

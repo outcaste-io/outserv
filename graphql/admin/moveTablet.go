@@ -34,11 +34,11 @@ type moveTabletInput struct {
 }
 
 func resolveMoveTablet(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+	panic("TODO: Implement resolveMoveTablet")
 	// input, err := getMoveTabletInput(m)
 	// if err != nil {
 	// 	return resolve.EmptyResult(m, err), false
 	// }
-	panic("TODO: implement this")
 
 	// gRPC call returns a nil status if the error is non-nil
 	// status, err := worker.MoveTabletOverNetwork(ctx, &pb.MoveTabletRequest{
