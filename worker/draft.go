@@ -1655,7 +1655,7 @@ func (n *node) calculateSnapshot(startIdx, lastIdx, lastCommitTs uint64) (*pb.Sn
 	}
 	span.Annotatef(nil, "Last snapshot: %+v", snap)
 
-	if int(lastIdx-first) < discardN {
+	if lastIdx < first || int(lastIdx-first) < discardN {
 		span.Annotate(nil, "Skipping due to insufficient entries")
 		return nil, nil
 	}
