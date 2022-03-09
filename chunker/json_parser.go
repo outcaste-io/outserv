@@ -412,27 +412,6 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 					if err := handleBasicType(pred, iv, op, &nq); err != nil {
 						return mr, err
 					}
-					// Here populate facets from facetsMapSlice. Each map has mapping for single
-					// facet from item(one of predicate value) idx to *pb.Facet.
-					// {
-					// 	"friend": ["Joshua", "David", "Josh"],
-					// 	"friend|from": {
-					// 		"0": "school"
-					// 	},
-					// 	"friend|age": {
-					// 		"1": 20
-					// 	}
-					// }
-					// facetMapSlice looks like below. First map is for friend|from facet and second
-					// map is for friend|age facet.
-					// [
-					// 		map[int]*pb.Facet{
-					//			0: *pb.Facet
-					// 		},
-					// 		map[int]*pb.Facet{
-					//			1: *pb.Facet
-					// 		}
-					// ]
 					buf.Push(&nq)
 				case map[string]interface{}:
 					// map[string]interface{} can mean geojson or a connecting entity.
