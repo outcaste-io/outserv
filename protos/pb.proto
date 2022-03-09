@@ -736,5 +736,4 @@ message TaskStatusResponse {
   uint64 task_meta = 1;
 }
 
-
 // vim: expandtab sw=2 ts=2
