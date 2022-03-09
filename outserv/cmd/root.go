@@ -34,8 +34,6 @@ import (
 	"github.com/outcaste-io/outserv/outserv/cmd/debug"
 	"github.com/outcaste-io/outserv/outserv/cmd/debuginfo"
 	"github.com/outcaste-io/outserv/outserv/cmd/decrypt"
-	"github.com/outcaste-io/outserv/outserv/cmd/increment"
-	"github.com/outcaste-io/outserv/outserv/cmd/live"
 	"github.com/outcaste-io/outserv/outserv/cmd/migrate"
 	"github.com/outcaste-io/outserv/outserv/cmd/version"
 	"github.com/outcaste-io/outserv/x"
@@ -79,10 +77,11 @@ var rootConf = viper.New()
 
 // subcommands initially contains all default sub-commands.
 var subcommands = []*x.SubCommand{
-	// TODO: Support Bulk loader.
-	&cert.Cert, &live.Live,
+	// TODO: Consider if we need bulk loader.
+	// TODO: Consider if we need live loader.
+	&cert.Cert,
 	&alpha.Alpha, &version.Version, &debug.Debug, &migrate.Migrate,
-	&debuginfo.DebugInfo, &decrypt.Decrypt, &increment.Increment,
+	&debuginfo.DebugInfo, &decrypt.Decrypt,
 }
 
 func initCmds() {

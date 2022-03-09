@@ -11,11 +11,11 @@ import (
 	"sort"
 	"strconv"
 
-	dgoapi "github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/posting"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
@@ -115,7 +115,7 @@ type DgraphExecutor interface {
 	// Execute performs the actual query/mutation and returns a Dgraph response. If an error
 	// occurs, that indicates that the execution failed in some way significant enough
 	// way as to not continue processing this query/mutation or others in the same request.
-	Execute(ctx context.Context, req *dgoapi.Request, field schema.Field) (*dgoapi.Response, error)
+	Execute(ctx context.Context, req *pb.Request, field schema.Field) (*pb.Response, error)
 }
 
 // An UpsertMutation is the query and mutations needed for a Dgraph upsert.
@@ -123,18 +123,18 @@ type DgraphExecutor interface {
 // be created by the upsert.
 type UpsertMutation struct {
 	Query     []*gql.GraphQuery
-	Mutations []*dgoapi.Mutation
+	Mutations []*pb.Mutation
 	NewNodes  map[string]schema.Type
 }
 
 // DgraphExecutorFunc is an adapter that allows us to compose dgraph execution and
 // build a QueryExecuter from a function.  Based on the http.HandlerFunc pattern.
-type DgraphExecutorFunc func(ctx context.Context, req *dgoapi.Request) (*dgoapi.Response, error)
+type DgraphExecutorFunc func(ctx context.Context, req *pb.Request) (*pb.Response, error)
 
 // Execute calls qe(ctx, query)
 func (ex DgraphExecutorFunc) Execute(
 	ctx context.Context,
-	req *dgoapi.Request) (*dgoapi.Response, error) {
+	req *pb.Request) (*pb.Response, error) {
 
 	return ex(ctx, req)
 }
@@ -201,8 +201,8 @@ func getNumUids(m schema.Mutation, a map[string]string, r map[string]interface{}
 func (mr *dgraphResolver) rewriteAndExecute(
 	ctx context.Context,
 	mutation schema.Mutation) (*Resolved, bool) {
-	var mutResp, qryResp *dgoapi.Response
-	req := &dgoapi.Request{}
+	var mutResp, qryResp *pb.Response
+	req := &pb.Request{}
 
 	dgraphPreMutationQueryDuration := &schema.LabeledOffsetDuration{Label: "preMutationQuery"}
 	dgraphMutationDuration := &schema.LabeledOffsetDuration{Label: "mutation"}
@@ -352,7 +352,7 @@ func (mr *dgraphResolver) rewriteAndExecute(
 
 			queryTimer := newtimer(ctx, &dgraphPostMutationQueryDuration.OffsetDuration)
 			queryTimer.Start()
-			qryResp, err = mr.executor.Execute(ctx, &dgoapi.Request{Query: dgraph.AsString(dgQuery),
+			qryResp, err = mr.executor.Execute(ctx, &pb.Request{Query: dgraph.AsString(dgQuery),
 				ReadOnly: true}, qryField)
 			queryTimer.Stop()
 
@@ -466,7 +466,7 @@ func (mr *dgraphResolver) rewriteAndExecute(
 	if mutation.MutationType() != schema.DeleteMutation {
 		queryTimer := newtimer(ctx, &dgraphPostMutationQueryDuration.OffsetDuration)
 		queryTimer.Start()
-		qryResp, err = mr.executor.Execute(ctx, &dgoapi.Request{Query: dgraph.AsString(dgQuery),
+		qryResp, err = mr.executor.Execute(ctx, &pb.Request{Query: dgraph.AsString(dgQuery),
 			ReadOnly: true}, mutation.QueryField())
 		queryTimer.Stop()
 
@@ -559,7 +559,7 @@ func authorizeNewNodes(
 	uids map[string]string,
 	newNodeTypes map[string]schema.Type,
 	queryExecutor DgraphExecutor,
-	txn *dgoapi.TxnContext) error {
+	txn *pb.TxnContext) error {
 
 	customClaims, err := m.GetAuthMeta().ExtractCustomClaims(ctx)
 	if err != nil {
@@ -668,7 +668,7 @@ func authorizeNewNodes(
 	}
 
 	resp, errs := queryExecutor.Execute(ctx,
-		&dgoapi.Request{
+		&pb.Request{
 			Query:   dgraph.AsString(qs),
 			StartTs: txn.GetStartTs(),
 		}, nil)

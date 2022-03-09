@@ -598,7 +598,9 @@ func (n *node) calculateSnapshot() error {
 	num := last - first
 	span.Annotatef(nil, "First index: %d. Last index: %d. num: %d",
 		first, last, num)
-	if num < 64 {
+	if last < first || num < 64 {
+		// Last can be less than first if we took a snapshot at the latest
+		// entry.
 		// If we have less than 64 entries, don't bother taking a snapshot.
 		return nil
 	}
@@ -610,16 +612,21 @@ func (n *node) calculateSnapshot() error {
 	}
 	data, err := snap.Marshal()
 	x.Check(err)
-	for {
-		glog.V(2).Infof("Creating snapshot: %+v\n", snap)
+
+	for i := 0; ; i++ {
+		glog.V(2).Infof("Creating snapshot: %+v. First: %d Last: %d\n", snap, first, last)
 		// We should never let CreateSnapshot have an error.
-		err := n.Store.CreateSnapshot(snap.Index, n.ConfState(), data)
+		err = n.Store.CreateSnapshot(snap.Index, n.ConfState(), data)
 		if err == nil {
-			break
+			glog.Infof("Snapshot created: %+v\n", snap)
+			return nil
+		}
+		if i >= 120 {
+			glog.Fatalf("Unable to CreateSnapshot. Error: %v. Exiting...", err)
 		}
 		glog.Warningf("Error while calling CreateSnapshot: %v. Retrying...", err)
+		time.Sleep(time.Second)
 	}
-	return nil
 }
 
 func (n *node) applyConfChange(e raftpb.Entry) {

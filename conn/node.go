@@ -35,7 +35,6 @@ import (
 	otrace "go.opencensus.io/trace"
 
 	"github.com/outcaste-io/badger/v3/y"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/raftwal"
 	"github.com/outcaste-io/outserv/x"
@@ -514,7 +513,7 @@ func (n *Node) doSendMessage(to uint64, msgCh chan []byte) error {
 		case data := <-msgCh:
 			batch := &pb.RaftBatch{
 				Context: n.RaftContext,
-				Payload: &api.Payload{Data: data},
+				Payload: &pb.Payload{Data: data},
 			}
 			slurp(batch) // Pick up more entries from msgCh, if present.
 			span.Annotatef(nil, "[to: %x] [Packets: %d] Sending data of length: %d.",
@@ -796,7 +795,7 @@ func (n *Node) RunReadIndexLoop(closer *z.Closer, readStateCh <-chan raft.ReadSt
 	}
 }
 
-func (n *Node) joinCluster(ctx context.Context, rc *pb.RaftContext) (*api.Payload, error) {
+func (n *Node) joinCluster(ctx context.Context, rc *pb.RaftContext) (*pb.Payload, error) {
 	// Only process one JoinCluster request at a time.
 	n.joinLock.Lock()
 	defer n.joinLock.Unlock()
@@ -814,7 +813,7 @@ func (n *Node) joinCluster(ctx context.Context, rc *pb.RaftContext) (*api.Payloa
 	if addr, ok := n.Peer(rc.Id); ok && rc.Addr != addr {
 		// There exists a healthy connection to server with same id.
 		if _, err := GetPools().Get(addr); err == nil {
-			return &api.Payload{}, errors.Errorf(
+			return &pb.Payload{}, errors.Errorf(
 				"REUSE_ADDR: IP Address same as existing peer: %s", addr)
 		}
 	}
@@ -822,5 +821,5 @@ func (n *Node) joinCluster(ctx context.Context, rc *pb.RaftContext) (*api.Payloa
 
 	err := n.addToCluster(ctx, rc)
 	glog.Infof("[%#x] Done joining cluster with err: %v", rc.Id, err)
-	return &api.Payload{}, err
+	return &pb.Payload{}, err
 }

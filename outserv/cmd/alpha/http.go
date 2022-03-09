@@ -20,10 +20,10 @@ import (
 	"time"
 
 	"github.com/outcaste-io/outserv/graphql/admin"
+	"github.com/outcaste-io/outserv/protos/pb"
 
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/golang/glog"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/query"
@@ -201,7 +201,7 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 	}
 
-	req := api.Request{
+	req := pb.Request{
 		Vars:    params.Variables,
 		Query:   params.Query,
 		StartTs: startTs,
@@ -296,7 +296,7 @@ func mutationHandler(w http.ResponseWriter, r *http.Request) {
 	// start parsing the query
 	parseStart := time.Now()
 
-	var req *api.Request
+	var req *pb.Request
 	contentType := r.Header.Get("Content-Type")
 	mediaType, contentTypeParams, err := mime.ParseMediaType(contentType)
 	if err != nil {
@@ -317,7 +317,7 @@ func mutationHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		req = &api.Request{}
+		req = &pb.Request{}
 		if queryText, ok := ms["query"]; ok && queryText != nil {
 			req.Query, err = strconv.Unquote(string(queryText.bs))
 			if err != nil {
@@ -328,8 +328,8 @@ func mutationHandler(w http.ResponseWriter, r *http.Request) {
 
 		// JSON API support both keys 1. mutations  2. set,delete,cond
 		// We want to maintain the backward compatibility of the API here.
-		extractMutation := func(jsMap map[string]*skipJSONUnmarshal) (*api.Mutation, error) {
-			mu := &api.Mutation{}
+		extractMutation := func(jsMap map[string]*skipJSONUnmarshal) (*pb.Mutation, error) {
+			mu := &pb.Mutation{}
 			empty := true
 			if setJSON, ok := jsMap["set"]; ok && setJSON != nil {
 				empty = false
@@ -439,7 +439,7 @@ func alterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	op := &api.Operation{}
+	op := &pb.Operation{}
 	if err := jsonpb.UnmarshalString(string(b), op); err != nil {
 		op.Schema = string(b)
 	}

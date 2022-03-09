@@ -10,9 +10,9 @@ import (
 	"github.com/golang/glog"
 	"go.opencensus.io/trace"
 
-	dgoapi "github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 )
 
@@ -20,8 +20,8 @@ type DgraphEx struct{}
 
 // Execute is the underlying dgraph implementation of Dgraph execution.
 // If field is nil, returned response has JSON in DQL form, otherwise it will be in GraphQL form.
-func (dg *DgraphEx) Execute(ctx context.Context, req *dgoapi.Request,
-	field schema.Field) (*dgoapi.Response, error) {
+func (dg *DgraphEx) Execute(ctx context.Context, req *pb.Request,
+	field schema.Field) (*pb.Response, error) {
 
 	span := trace.FromContext(ctx)
 	stop := x.SpanTimer(span, "dgraph.Execute")

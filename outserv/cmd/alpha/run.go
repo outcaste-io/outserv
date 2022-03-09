@@ -6,7 +6,6 @@ package alpha
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"embed"
 	"fmt"
 	"log"
@@ -30,10 +29,10 @@ import (
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/ee"
 	"github.com/outcaste-io/outserv/ee/audit"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/zero"
 
 	"github.com/golang/glog"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/admin"
 	"github.com/outcaste-io/outserv/posting"
@@ -51,8 +50,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	_ "google.golang.org/grpc/encoding/gzip" // grpc compression
-	"google.golang.org/grpc/health"
-	hapi "google.golang.org/grpc/health/grpc_health_v1"
 
 	_ "github.com/dgraph-io/gqlparser/v2/validator/rules" // make gql validator init() all rules
 )
@@ -120,7 +117,7 @@ they form a Raft group and provide synchronous replication.
 
 	// Useful for running multiple servers on the same machine.
 	flag.IntP("port_offset", "o", 0,
-		"Value added to all listening port numbers. [Internal=7080, HTTP=8080, Grpc=9080]")
+		"Value added to all listening port numbers. [Internal=7080, HTTP=8080]")
 
 	// Custom plugins.
 	flag.String("custom_tokenizers", "",
@@ -365,10 +362,6 @@ func httpPort() int {
 	return x.Config.PortOffset + x.PortHTTP
 }
 
-func grpcPort() int {
-	return x.Config.PortOffset + x.PortGrpc
-}
-
 func healthCheck(w http.ResponseWriter, r *http.Request) {
 	x.AddCorsHeaders(w)
 	var err error
@@ -378,7 +371,7 @@ func healthCheck(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 
 		ctx := x.AttachAccessJwt(context.Background(), r)
-		var resp *api.Response
+		var resp *pb.Response
 		if resp, err = (&edgraph.Server{}).Health(ctx, true); err != nil {
 			x.SetStatus(w, x.Error, err.Error())
 			return
@@ -403,7 +396,7 @@ func healthCheck(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var resp *api.Response
+	var resp *pb.Response
 	if resp, err = (&edgraph.Server{}).Health(context.Background(), false); err != nil {
 		x.SetStatus(w, x.Error, err.Error())
 		return
@@ -425,7 +418,7 @@ func stateHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	ctx = x.AttachAccessJwt(ctx, r)
 
-	var aResp *api.Response
+	var aResp *pb.Response
 	if aResp, err = (&edgraph.Server{}).State(ctx); err != nil {
 		x.SetStatus(w, x.Error, err.Error())
 		return
@@ -586,31 +579,6 @@ func setupLambdaServer(closer *z.Closer) {
 	}()
 }
 
-func serveGRPC(l net.Listener, tlsCfg *tls.Config, closer *z.Closer) {
-	defer closer.Done()
-
-	x.RegisterExporters(Alpha.Conf, "dgraph.alpha")
-
-	opt := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(x.GrpcMaxSize),
-		grpc.MaxSendMsgSize(x.GrpcMaxSize),
-		grpc.MaxConcurrentStreams(1000),
-		grpc.StatsHandler(&ocgrpc.ServerHandler{}),
-		grpc.UnaryInterceptor(audit.AuditRequestGRPC),
-	}
-	if tlsCfg != nil {
-		opt = append(opt, grpc.Creds(credentials.NewTLS(tlsCfg)))
-	}
-
-	s := grpc.NewServer(opt...)
-	api.RegisterDgraphServer(s, &edgraph.Server{})
-	hapi.RegisterHealthServer(s, health.NewServer())
-
-	err := s.Serve(l)
-	glog.Errorf("GRPC listener canceled: %v\n", err)
-	s.Stop()
-}
-
 func setupServer(closer *z.Closer) {
 	laddr := "localhost"
 	if bindall {
@@ -623,11 +591,6 @@ func setupServer(closer *z.Closer) {
 	}
 
 	httpListener, err := setupListener(laddr, httpPort())
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	grpcListener, err := setupListener(laddr, grpcPort())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -711,8 +674,7 @@ func setupServer(closer *z.Closer) {
 	// Initialize the lambda server
 	setupLambdaServer(x.ServerCloser)
 	// Initialize the servers.
-	x.ServerCloser.AddRunning(3)
-	go serveGRPC(grpcListener, tlsCfg, x.ServerCloser)
+	x.ServerCloser.AddRunning(2)
 	go x.StartListenHttpAndHttps(httpListener, tlsCfg, x.ServerCloser)
 	go func() {
 		defer x.ServerCloser.Done()
@@ -722,16 +684,11 @@ func setupServer(closer *z.Closer) {
 		e = globalEpoch[x.GalaxyNamespace]
 		atomic.StoreUint64(e, math.MaxUint64)
 
-		// Stops grpc/http servers; Already accepted connections are not closed.
-		if err := grpcListener.Close(); err != nil {
-			glog.Warningf("Error while closing gRPC listener: %s", err)
-		}
-		if err := httpListener.Close(); err != nil {
-			glog.Warningf("Error while closing HTTP listener: %s", err)
-		}
+		// Stops http servers; Already accepted connections are not closed.
+		err := httpListener.Close()
+		glog.Infof("HTTP listener closed with error: %v", err)
 	}()
 
-	glog.Infoln("gRPC server started.  Listening on port", grpcPort())
 	glog.Infoln("HTTP server started.  Listening on port", httpPort())
 
 	atomic.AddUint32(&initDone, 1)
@@ -1003,7 +960,7 @@ func run() {
 	adminCloser := z.NewCloser(1)
 
 	setupServer(adminCloser)
-	glog.Infoln("GRPC and HTTP stopped.")
+	glog.Infoln("HTTP stopped.")
 
 	// This might not close until group is given the signal to close. So, only signal here,
 	// wait for it after group is closed.

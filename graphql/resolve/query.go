@@ -12,10 +12,10 @@ import (
 	"github.com/golang/glog"
 	otrace "go.opencensus.io/trace"
 
-	dgoapi "github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 )
 
@@ -107,7 +107,7 @@ func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query schema.Que
 
 	queryTimer := newtimer(ctx, &dgraphQueryDuration.OffsetDuration)
 	queryTimer.Start()
-	resp, err := qr.executor.Execute(ctx, &dgoapi.Request{Query: qry, ReadOnly: true}, query)
+	resp, err := qr.executor.Execute(ctx, &pb.Request{Query: qry, ReadOnly: true}, query)
 	queryTimer.Stop()
 
 	if err != nil && !x.IsGqlErrorList(err) {
@@ -180,7 +180,7 @@ func (qr *customDQLQueryResolver) rewriteAndExecute(ctx context.Context,
 	queryTimer := newtimer(ctx, &dgraphQueryDuration.OffsetDuration)
 	queryTimer.Start()
 
-	resp, err := qr.executor.Execute(ctx, &dgoapi.Request{Query: qry, Vars: vars,
+	resp, err := qr.executor.Execute(ctx, &pb.Request{Query: qry, Vars: vars,
 		ReadOnly: true}, nil)
 	queryTimer.Stop()
 
@@ -234,13 +234,13 @@ func convertScalarToString(val interface{}) (string, error) {
 func dqlVars(args map[string]interface{}) (map[string]string, error) {
 	vars := make(map[string]string)
 	for k, v := range args {
-		// dgoapi.Request{}.Vars accepts only string values for variables,
+		// pb.Request{}.Vars accepts only string values for variables,
 		// so need to convert all variable values to string
 		vStr, err := convertScalarToString(v)
 		if err != nil {
 			return vars, schema.GQLWrapf(err, "couldn't convert argument %s to string", k)
 		}
-		// the keys in dgoapi.Request{}.Vars are assumed to be prefixed with $
+		// the keys in pb.Request{}.Vars are assumed to be prefixed with $
 		vars["$"+k] = vStr
 	}
 	return vars, nil

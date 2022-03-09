@@ -20,8 +20,8 @@ import (
 	"context"
 
 	"github.com/golang/glog"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/gql"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/query"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
@@ -30,13 +30,13 @@ import (
 // Login handles login requests from clients. This version rejects all requests
 // since ACL is only supported in the enterprise version.
 func (s *Server) Login(ctx context.Context,
-	request *api.LoginRequest) (*api.Response, error) {
+	request *pb.LoginRequest) (*pb.Response, error) {
 	if err := x.HealthCheck(); err != nil {
 		return nil, err
 	}
 
 	glog.Warningf("Login failed: %s", x.ErrNotSupported)
-	return &api.Response{}, x.ErrNotSupported
+	return &pb.Response{}, x.ErrNotSupported
 }
 
 // ResetAcl is an empty method since ACL is only supported in the enterprise version.
@@ -55,7 +55,7 @@ func RefreshAcls(closer *z.Closer) {
 	closer.Done()
 }
 
-func authorizeAlter(ctx context.Context, op *api.Operation) error {
+func authorizeAlter(ctx context.Context, op *pb.Operation) error {
 	return nil
 }
 

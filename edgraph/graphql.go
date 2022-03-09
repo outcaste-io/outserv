@@ -24,8 +24,8 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
@@ -70,7 +70,7 @@ func ProcessPersistedQuery(ctx context.Context, gqlReq *schema.Request) error {
 		"$join": join,
 	}
 	req := &Request{
-		req: &api.Request{
+		req: &pb.Request{
 			Query:    queryForSHA,
 			Vars:     variables,
 			ReadOnly: true,
@@ -108,19 +108,19 @@ func ProcessPersistedQuery(ctx context.Context, gqlReq *schema.Request) error {
 		}
 
 		req = &Request{
-			req: &api.Request{
-				Mutations: []*api.Mutation{
+			req: &pb.Request{
+				Mutations: []*pb.Mutation{
 					{
-						Set: []*api.NQuad{
+						Set: []*pb.NQuad{
 							{
 								Subject:     "_:a",
 								Predicate:   "dgraph.graphql.p_query",
-								ObjectValue: &api.Value{Val: &api.Value_StrVal{StrVal: join}},
+								ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: join}},
 							},
 							{
 								Subject:   "_:a",
 								Predicate: "dgraph.type",
-								ObjectValue: &api.Value{Val: &api.Value_StrVal{
+								ObjectValue: &pb.Value{Val: &pb.Value_StrVal{
 									StrVal: "dgraph.graphql.persisted_query"}},
 							},
 						},

@@ -10,7 +10,6 @@ syntax = "proto3";
 
 package pb;
 
-import "api.proto";
 import "github.com/outcaste-io/badger/v3/pb/pb.proto";
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
@@ -425,26 +424,175 @@ message PeerResponse {
 
 message RaftBatch {
   RaftContext context = 1;
-  api.Payload payload = 2;
+  Payload payload = 2;
 }
 
+/* The following are from api.proto */
+
+message Payload {
+  bytes Data = 1;
+}
+
+message TxnContext {
+  uint64 start_ts = 1;
+  uint64 commit_ts = 2;
+  bool aborted = 3;
+  repeated string keys = 4;  // List of keys to be used for conflict detection.
+  repeated string preds = 5; // List of predicates involved in this transaction.
+  string hash = 6;
+}
+
+message Request {
+  uint64 start_ts = 1;
+
+  string query = 4;
+  map<string, string> vars = 5; // Support for GraphQL like variables.
+  bool read_only = 6;
+  bool best_effort = 7;
+
+  repeated Mutation mutations = 12;
+  bool commit_now = 13;
+  enum RespFormat {
+    JSON = 0;
+    RDF = 1;
+  }
+  RespFormat resp_format = 14;
+  string hash = 15;
+}
+
+message Uids {
+  repeated string uids = 1;
+}
+
+message ListOfString {
+    repeated string value = 1;
+}
+
+message Response {
+  bytes json = 1;
+  TxnContext txn = 2;
+  Latency latency = 3;
+  // Metrics contains all metrics related to the query.
+  Metrics metrics = 4;
+  // uids contains a mapping of blank_node => uid for the node. It only returns uids
+  // that were created as part of a mutation.
+  map<string, string> uids = 12;
+  bytes rdf = 13;
+  map<string, ListOfString> hdrs = 14;
+}
+
+message Mutation {
+  bytes set_json = 1;
+  bytes delete_json = 2;
+  bytes set_nquads = 3;
+  bytes del_nquads = 4;
+  repeated NQuad set = 5;
+  repeated NQuad del = 6;
+
+  // This is being used for upserts.
+  string cond = 9;
+
+  // This field is a duplicate of the one in Request and placed here for convenience.
+  bool commit_now = 14;
+}
+
+message Operation {
+  string schema = 1;
+  string drop_attr = 2;
+  bool drop_all = 3;
+
+  enum DropOp {
+    NONE = 0;
+    ALL = 1;
+    DATA = 2;
+    ATTR = 3;
+    TYPE = 4;
+  }
+  DropOp drop_op = 4;
+
+  // If drop_op is ATTR or TYPE, drop_value holds the name of the predicate or
+  // type to delete.
+  string drop_value = 5;
+
+  // run indexes in background.
+  bool run_in_background = 6;
+}
+
+message Check {}
+
+message Version {
+  string tag = 1;
+}
+
+message Latency {
+  uint64 parsing_ns = 1;
+  uint64 processing_ns = 2;
+  uint64 encoding_ns = 3;
+  uint64 assign_timestamp_ns = 4;
+  uint64 total_ns = 5;
+}
+
+message Metrics {
+  // num_uids is the map of number of uids processed by each attribute.
+  map<string, uint64> num_uids = 1;
+}
+
+message NQuad {
+  string subject = 1;
+  string predicate = 2;
+  string object_id = 3;
+  Value object_value = 4;
+  uint64 namespace = 5;
+  string lang = 6;
+}
+
+message Value {
+  oneof val {
+    string default_val = 1;
+    bytes bytes_val = 2;
+    int64 int_val = 3;
+    bool bool_val = 4;
+    string str_val = 5;
+    double double_val = 6;
+    bytes geo_val = 7;  // Geo data in WKB format
+    bytes date_val = 8;
+    bytes datetime_val = 9;
+    string password_val = 10;
+    uint64 uid_val=11;
+  }
+}
+
+message LoginRequest {
+  string userid = 1;
+  string password = 2;
+  string refresh_token = 3;
+  uint64 namespace = 4;
+}
+
+message Jwt {
+  string access_jwt = 1;
+  string refresh_jwt = 2;
+}
+
+/* End of api.proto */
+
 service Raft {
-  rpc Heartbeat(api.Payload) returns (stream HealthInfo) {}
-  rpc RaftMessage(stream RaftBatch) returns (api.Payload) {}
-  rpc JoinCluster(RaftContext) returns (api.Payload) {}
+  rpc Heartbeat(Payload) returns (stream HealthInfo) {}
+  rpc RaftMessage(stream RaftBatch) returns (Payload) {}
+  rpc JoinCluster(RaftContext) returns (Payload) {}
   rpc IsPeer(RaftContext) returns (PeerResponse) {}
 }
 
 service Worker {
   // Data serving RPCs.
-  rpc Mutate(Mutations) returns (api.TxnContext) {}
+  rpc Mutate(Mutations) returns (TxnContext) {}
   rpc ServeTask(Query) returns (Result) {}
   rpc StreamSnapshot(stream Snapshot) returns (stream KVS) {}
   rpc Sort(SortMessage) returns (SortResult) {}
   rpc Schema(SchemaRequest) returns (SchemaResult) {}
   rpc Export(ExportRequest) returns (ExportResponse) {}
-  rpc ReceivePredicate(stream KVS) returns (api.Payload) {}
-  rpc MovePredicate(MovePredicatePayload) returns (api.Payload) {}
+  rpc ReceivePredicate(stream KVS) returns (Payload) {}
+  rpc MovePredicate(MovePredicatePayload) returns (Payload) {}
   rpc Subscribe(SubscriptionRequest) returns (stream badgerpb3.KVList) {}
   rpc UpdateGraphQLSchema(UpdateGraphQLSchemaRequest) returns (UpdateGraphQLSchemaResponse) {}
   rpc DeleteNamespace(DeleteNsRequest) returns (Status) {}
