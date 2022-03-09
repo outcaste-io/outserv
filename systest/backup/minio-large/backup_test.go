@@ -47,7 +47,7 @@ var (
 
 	mc                *minio.Client
 	bucketName        = "dgraph-backup"
-	backupDestination = "minio://minio:9001/dgraph-backup?secure=false"
+	backupDestination = "minio://minio1:9001/dgraph-backup?secure=false"
 	uidCounter        = 0
 	batchSize         = 100
 	totalTriples      = 20000

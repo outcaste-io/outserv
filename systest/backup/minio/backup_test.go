@@ -54,7 +54,7 @@ var (
 )
 
 func TestBackupMinio(t *testing.T) {
-	backupDst = "minio://minio:9001/dgraph-backup?secure=false"
+	backupDst = "minio://minio1:9001/dgraph-backup?secure=false"
 
 	addr := testutil.ContainerAddr("minio", 9001)
 	localBackupDst = "minio://" + addr + "/dgraph-backup?secure=false"
