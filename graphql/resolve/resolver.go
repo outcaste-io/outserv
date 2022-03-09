@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
-	dgoapi "github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/api"
 	"github.com/outcaste-io/outserv/graphql/dgraph"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
@@ -159,14 +159,14 @@ func NewAdminExecutor() DgraphExecutor {
 	return &adminExecutor{dg: &dgraph.DgraphEx{}}
 }
 
-func (aex *adminExecutor) Execute(ctx context.Context, req *dgoapi.Request, field schema.Field) (
-	*dgoapi.Response, error) {
+func (aex *adminExecutor) Execute(ctx context.Context, req *pb.Request, field schema.Field) (
+	*pb.Response, error) {
 	ctx = context.WithValue(ctx, edgraph.Authorize, false)
 	return aex.dg.Execute(ctx, req, field)
 }
 
-func (de *dgraphExecutor) Execute(ctx context.Context, req *dgoapi.Request, field schema.Field) (
-	*dgoapi.Response, error) {
+func (de *dgraphExecutor) Execute(ctx context.Context, req *pb.Request, field schema.Field) (
+	*pb.Response, error) {
 	return de.dg.Execute(ctx, req, field)
 }
 

@@ -25,7 +25,6 @@ import (
 	geom "github.com/twpayne/go-geom"
 	"github.com/twpayne/go-geom/encoding/geojson"
 
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/algo"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/task"
@@ -1094,9 +1093,9 @@ func processNodeUids(fj fastJsonNode, enc *encoder, sg *SubGraph) error {
 
 // Extensions represents the extra information appended to query results.
 type Extensions struct {
-	Latency *api.Latency    `json:"server_latency,omitempty"`
-	Txn     *api.TxnContext `json:"txn,omitempty"`
-	Metrics *api.Metrics    `json:"metrics,omitempty"`
+	Latency *pb.Latency    `json:"server_latency,omitempty"`
+	Txn     *pb.TxnContext `json:"txn,omitempty"`
+	Metrics *pb.Metrics    `json:"metrics,omitempty"`
 }
 
 func (sg *SubGraph) toFastJSON(
@@ -1255,13 +1254,6 @@ func alreadySeen(parentIds []uint64, uid uint64) bool {
 		}
 	}
 	return false
-}
-
-func facetName(fieldName string, f *api.Facet) string {
-	if f.Alias != "" {
-		return f.Alias
-	}
-	return fieldName + x.FacetDelimeter + f.Key
 }
 
 // This method gets the values and children for a subprotos.

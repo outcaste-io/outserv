@@ -17,13 +17,13 @@
 package gql
 
 import (
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/lex"
+	"github.com/outcaste-io/outserv/protos/pb"
 )
 
 // ParseMutation parses a block into a mutation. Returns an object with a mutation or
 // an upsert block with mutation, otherwise returns nil with an error.
-func ParseMutation(mutation string) (req *api.Request, err error) {
+func ParseMutation(mutation string) (req *pb.Request, err error) {
 	var lexer lex.Lexer
 	lexer.Reset(mutation)
 	lexer.Run(lexIdentifyBlock)
@@ -47,7 +47,7 @@ func ParseMutation(mutation string) (req *api.Request, err error) {
 		if err != nil {
 			return nil, err
 		}
-		req = &api.Request{Mutations: []*api.Mutation{mu}}
+		req = &pb.Request{Mutations: []*pb.Mutation{mu}}
 	default:
 		return nil, it.Errorf("Unexpected token: [%s]", item.Val)
 	}
@@ -61,8 +61,8 @@ func ParseMutation(mutation string) (req *api.Request, err error) {
 }
 
 // parseUpsertBlock parses the upsert block
-func parseUpsertBlock(it *lex.ItemIterator) (*api.Request, error) {
-	var req *api.Request
+func parseUpsertBlock(it *lex.ItemIterator) (*pb.Request, error) {
+	var req *pb.Request
 	var queryText, condText string
 	var queryFound bool
 
@@ -129,7 +129,7 @@ func parseUpsertBlock(it *lex.ItemIterator) (*api.Request, error) {
 			}
 			mu.Cond = condText
 			if req == nil {
-				req = &api.Request{Mutations: []*api.Mutation{mu}}
+				req = &pb.Request{Mutations: []*pb.Mutation{mu}}
 			} else {
 				req.Mutations = append(req.Mutations, mu)
 			}
@@ -154,8 +154,8 @@ func parseUpsertBlock(it *lex.ItemIterator) (*api.Request, error) {
 }
 
 // parseMutationBlock parses the mutation block
-func parseMutationBlock(it *lex.ItemIterator) (*api.Mutation, error) {
-	var mu api.Mutation
+func parseMutationBlock(it *lex.ItemIterator) (*pb.Mutation, error) {
+	var mu pb.Mutation
 
 	item := it.Item()
 	if item.Typ != itemLeftCurl {
@@ -180,7 +180,7 @@ func parseMutationBlock(it *lex.ItemIterator) (*api.Mutation, error) {
 }
 
 // parseMutationOp parses and stores set or delete operation string in Mutation.
-func parseMutationOp(it *lex.ItemIterator, op string, mu *api.Mutation) error {
+func parseMutationOp(it *lex.ItemIterator, op string, mu *pb.Mutation) error {
 	parse := false
 	for it.Next() {
 		item := it.Item()

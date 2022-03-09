@@ -16,7 +16,6 @@ import (
 
 	"github.com/outcaste-io/badger/v3"
 	bpb "github.com/outcaste-io/badger/v3/pb"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/schema"
@@ -27,7 +26,7 @@ import (
 var (
 	errEmptyPredicate = errors.Errorf("Predicate not specified")
 	errNotLeader      = errors.Errorf("Server is not leader of this group")
-	emptyPayload      = api.Payload{}
+	emptyPayload      = pb.Payload{}
 )
 
 const (
@@ -139,7 +138,7 @@ func (w *grpcWorker) ReceivePredicate(stream pb.Worker_ReceivePredicateServer) e
 	// We can use count to check the number of posting lists returned in tests.
 	count := 0
 	ctx := stream.Context()
-	payload := &api.Payload{}
+	payload := &pb.Payload{}
 
 	glog.Infof("Got ReceivePredicate. Group: %d. Am leader: %v",
 		groups().groupId(), groups().Node.AmLeader())
@@ -189,7 +188,7 @@ func (w *grpcWorker) ReceivePredicate(stream pb.Worker_ReceivePredicateServer) e
 }
 
 func (w *grpcWorker) MovePredicate(ctx context.Context,
-	in *pb.MovePredicatePayload) (*api.Payload, error) {
+	in *pb.MovePredicatePayload) (*pb.Payload, error) {
 	return nil, fmt.Errorf("TODO: Support MovePredicate")
 
 	ctx, span := otrace.StartSpan(ctx, "worker.MovePredicate")

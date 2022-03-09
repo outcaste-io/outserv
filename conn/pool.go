@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
@@ -229,7 +228,7 @@ func (p *Pool) listenToHeartbeat() error {
 	ctx, cancel := context.WithCancel(p.closer.Ctx())
 	defer cancel()
 
-	s, err := c.Heartbeat(ctx, &api.Payload{})
+	s, err := c.Heartbeat(ctx, &pb.Payload{})
 	if err != nil {
 		return err
 	}

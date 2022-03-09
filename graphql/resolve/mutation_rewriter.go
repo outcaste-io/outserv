@@ -25,9 +25,9 @@ import (
 	"strconv"
 	"strings"
 
-	dgoapi "github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 
 	"github.com/pkg/errors"
@@ -498,7 +498,7 @@ func (arw *AddRewriter) Rewrite(
 	newNodes := make(map[string]schema.Type)
 	// mutationsAll stores mutations computed from fragment. These are returned as Mutation parameter
 	// of UpsertMutation
-	var mutationsAll []*dgoapi.Mutation
+	var mutationsAll []*pb.Mutation
 	// retErrors stores errors found out during rewriting mutations.
 	// These are returned by this function.
 	var retErrors error
@@ -647,7 +647,7 @@ func (urw *UpdateRewriter) Rewrite(
 	newNodes := make(map[string]schema.Type)
 	// mutations stores mutations computed from fragment. These are returned as Mutation parameter
 	// of UpsertMutation
-	var mutations []*dgoapi.Mutation
+	var mutations []*pb.Mutation
 	// retErrors stores errors found out during rewriting mutations.
 	// These are returned by this function.
 	var retErrors error
@@ -1107,7 +1107,7 @@ func (drw *deleteRewriter) Rewrite(
 
 	upserts := []*UpsertMutation{{
 		Query:     dgQry,
-		Mutations: []*dgoapi.Mutation{{DeleteJson: b}},
+		Mutations: []*pb.Mutation{{DeleteJson: b}},
 	}}
 
 	// If the mutation had the query field, then we also need to query the nodes which are going to
@@ -1229,7 +1229,7 @@ func deleteAuthSelector(t schema.Type) *schema.RuleNode {
 
 func mutationFromFragment(
 	frag *mutationFragment,
-	setBuilder, delBuilder mutationBuilder) (*dgoapi.Mutation, error) {
+	setBuilder, delBuilder mutationBuilder) (*pb.Mutation, error) {
 
 	if frag == nil {
 		return nil, nil
@@ -1250,7 +1250,7 @@ func mutationFromFragment(
 		return nil, schema.AsGQLErrors(err)
 	}
 
-	return &dgoapi.Mutation{
+	return &pb.Mutation{
 		SetJson:    set,
 		DeleteJson: del,
 		Cond:       conditions,

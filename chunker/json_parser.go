@@ -14,7 +14,6 @@ import (
 	"unicode"
 
 	simdjson "github.com/dgraph-io/simdjson-go"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/x"
@@ -35,13 +34,11 @@ func stripSpaces(str string) string {
 
 // This is the response for a map[string]interface{} i.e. a struct.
 type mapResponse struct {
-	uid       string       // uid retrieved or allocated for the node.
-	namespace uint64       // namespace to which the node belongs.
-	fcts      []*api.Facet // facets on the edge connecting this node to the source if any.
-	rawFacets map[string]interface{}
+	uid       string // uid retrieved or allocated for the node.
+	namespace uint64 // namespace to which the node belongs.
 }
 
-func handleBasicType(k string, v interface{}, op int, nq *api.NQuad) error {
+func handleBasicType(k string, v interface{}, op int, nq *pb.NQuad) error {
 	switch v := v.(type) {
 	case json.Number:
 		if strings.ContainsAny(v.String(), ".Ee") {
@@ -49,27 +46,27 @@ func handleBasicType(k string, v interface{}, op int, nq *api.NQuad) error {
 			if err != nil {
 				return err
 			}
-			nq.ObjectValue = &api.Value{Val: &api.Value_DoubleVal{DoubleVal: f}}
+			nq.ObjectValue = &pb.Value{Val: &pb.Value_DoubleVal{DoubleVal: f}}
 			return nil
 		}
 		i, err := v.Int64()
 		if err != nil {
 			return err
 		}
-		nq.ObjectValue = &api.Value{Val: &api.Value_IntVal{IntVal: i}}
+		nq.ObjectValue = &pb.Value{Val: &pb.Value_IntVal{IntVal: i}}
 
 	// this int64 case is needed for FastParseJSON, which doesn't use json.Number
 	case int64:
 		if v == 0 && op == DeleteNquads {
-			nq.ObjectValue = &api.Value{Val: &api.Value_IntVal{IntVal: v}}
+			nq.ObjectValue = &pb.Value{Val: &pb.Value_IntVal{IntVal: v}}
 			return nil
 		}
-		nq.ObjectValue = &api.Value{Val: &api.Value_IntVal{IntVal: v}}
+		nq.ObjectValue = &pb.Value{Val: &pb.Value_IntVal{IntVal: v}}
 
 	case string:
 		// Default value is considered as S P * deletion.
 		if v == "" && op == DeleteNquads {
-			nq.ObjectValue = &api.Value{Val: &api.Value_DefaultVal{DefaultVal: x.Star}}
+			nq.ObjectValue = &pb.Value{Val: &pb.Value_DefaultVal{DefaultVal: x.Star}}
 			return nil
 		}
 
@@ -86,21 +83,21 @@ func handleBasicType(k string, v interface{}, op int, nq *api.NQuad) error {
 		// In RDF, we assume everything is default (types.DefaultID), but in JSON we assume string
 		// (StringID). But this value will be checked against the schema so we don't overshadow a
 		// password value (types.PasswordID) - Issue#2623
-		nq.ObjectValue = &api.Value{Val: &api.Value_StrVal{StrVal: v}}
+		nq.ObjectValue = &pb.Value{Val: &pb.Value_StrVal{StrVal: v}}
 
 	case float64:
 		if v == 0 && op == DeleteNquads {
-			nq.ObjectValue = &api.Value{Val: &api.Value_DefaultVal{DefaultVal: x.Star}}
+			nq.ObjectValue = &pb.Value{Val: &pb.Value_DefaultVal{DefaultVal: x.Star}}
 			return nil
 		}
-		nq.ObjectValue = &api.Value{Val: &api.Value_DoubleVal{DoubleVal: v}}
+		nq.ObjectValue = &pb.Value{Val: &pb.Value_DoubleVal{DoubleVal: v}}
 
 	case bool:
 		if !v && op == DeleteNquads {
-			nq.ObjectValue = &api.Value{Val: &api.Value_DefaultVal{DefaultVal: x.Star}}
+			nq.ObjectValue = &pb.Value{Val: &pb.Value_DefaultVal{DefaultVal: x.Star}}
 			return nil
 		}
-		nq.ObjectValue = &api.Value{Val: &api.Value_BoolVal{BoolVal: v}}
+		nq.ObjectValue = &pb.Value{Val: &pb.Value_BoolVal{BoolVal: v}}
 
 	default:
 		return errors.Errorf("Unexpected type for val for attr: %s while converting to nquad", k)
@@ -111,17 +108,17 @@ func handleBasicType(k string, v interface{}, op int, nq *api.NQuad) error {
 
 func (buf *NQuadBuffer) checkForDeletion(mr mapResponse, m map[string]interface{}, op int) {
 	// Since uid is the only key, this must be S * * deletion.
-	if op == DeleteNquads && len(mr.uid) > 0 && len(m) == 1 && len(mr.rawFacets) == 0 {
-		buf.Push(&api.NQuad{
+	if op == DeleteNquads && len(mr.uid) > 0 && len(m) == 1 {
+		buf.Push(&pb.NQuad{
 			Subject:     mr.uid,
 			Predicate:   x.Star,
 			Namespace:   mr.namespace,
-			ObjectValue: &api.Value{Val: &api.Value_DefaultVal{DefaultVal: x.Star}},
+			ObjectValue: &pb.Value{Val: &pb.Value_DefaultVal{DefaultVal: x.Star}},
 		})
 	}
 }
 
-func handleGeoType(val map[string]interface{}, nq *api.NQuad) (bool, error) {
+func handleGeoType(val map[string]interface{}, nq *pb.NQuad) (bool, error) {
 	_, hasType := val["type"]
 	_, hasCoordinates := val["coordinates"]
 	if len(val) == 2 && hasType && hasCoordinates {
@@ -140,7 +137,7 @@ func handleGeoType(val map[string]interface{}, nq *api.NQuad) (bool, error) {
 	return false, nil
 }
 
-func tryParseAsGeo(b []byte, nq *api.NQuad) (bool, error) {
+func tryParseAsGeo(b []byte, nq *pb.NQuad) (bool, error) {
 	var g geom.T
 	err := geojson.Unmarshal(b, &g)
 	if err != nil {
@@ -160,8 +157,8 @@ func tryParseAsGeo(b []byte, nq *api.NQuad) (bool, error) {
 // negative, it only does one push to Ch() during Flush.
 type NQuadBuffer struct {
 	batchSize int
-	nquads    []*api.NQuad
-	nqCh      chan []*api.NQuad
+	nquads    []*pb.NQuad
+	nqCh      chan []*pb.NQuad
 	predHints map[string]pb.Metadata_HintType
 }
 
@@ -169,27 +166,27 @@ type NQuadBuffer struct {
 func NewNQuadBuffer(batchSize int) *NQuadBuffer {
 	buf := &NQuadBuffer{
 		batchSize: batchSize,
-		nqCh:      make(chan []*api.NQuad, 10),
+		nqCh:      make(chan []*pb.NQuad, 10),
 	}
 	if buf.batchSize > 0 {
-		buf.nquads = make([]*api.NQuad, 0, batchSize)
+		buf.nquads = make([]*pb.NQuad, 0, batchSize)
 	}
 	buf.predHints = make(map[string]pb.Metadata_HintType)
 	return buf
 }
 
 // Ch returns a channel containing slices of NQuads which can be consumed by the caller.
-func (buf *NQuadBuffer) Ch() <-chan []*api.NQuad {
+func (buf *NQuadBuffer) Ch() <-chan []*pb.NQuad {
 	return buf.nqCh
 }
 
 // Push can be passed one or more NQuad pointers, which get pushed to the buffer.
-func (buf *NQuadBuffer) Push(nqs ...*api.NQuad) {
+func (buf *NQuadBuffer) Push(nqs ...*pb.NQuad) {
 	for _, nq := range nqs {
 		buf.nquads = append(buf.nquads, nq)
 		if buf.batchSize > 0 && len(buf.nquads) >= buf.batchSize {
 			buf.nqCh <- buf.nquads
-			buf.nquads = make([]*api.NQuad, 0, buf.batchSize)
+			buf.nquads = make([]*pb.NQuad, 0, buf.batchSize)
 		}
 	}
 }
@@ -243,15 +240,6 @@ func getNextBlank() string {
 func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred string) (
 	mapResponse, error) {
 	var mr mapResponse
-
-	// move all facets from global map to smaller mr.rawFacets map
-	mr.rawFacets = make(map[string]interface{})
-	for k, v := range m {
-		if strings.Contains(k, x.FacetDelimeter) {
-			mr.rawFacets[k] = v
-			delete(m, k)
-		}
-	}
 
 	// Check field in map.
 	if uidVal, ok := m["uid"]; ok {
@@ -334,11 +322,11 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 		if v == nil {
 			if op == DeleteNquads {
 				// This corresponds to edge deletion.
-				nq := &api.NQuad{
+				nq := &pb.NQuad{
 					Subject:     mr.uid,
 					Predicate:   pred,
 					Namespace:   namespace,
-					ObjectValue: &api.Value{Val: &api.Value_DefaultVal{DefaultVal: x.Star}},
+					ObjectValue: &pb.Value{Val: &pb.Value_DefaultVal{DefaultVal: x.Star}},
 				}
 				// Here we split predicate and lang directive (ex: "name@en"), if needed. With JSON
 				// mutations that's the only way to send language for a value.
@@ -351,7 +339,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 			continue
 		}
 
-		nq := api.NQuad{
+		nq := pb.NQuad{
 			Subject:   mr.uid,
 			Predicate: pred,
 			Namespace: namespace,
@@ -397,7 +385,6 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 
 			// Add the connecting edge beteween the entities.
 			nq.ObjectId = cr.uid
-			nq.Facets = cr.fcts
 			buf.Push(&nq)
 			buf.PushPredHint(pred, pb.Metadata_SINGLE)
 		case []interface{}:
@@ -414,7 +401,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 					}
 				}
 
-				nq := api.NQuad{
+				nq := pb.NQuad{
 					Subject:   mr.uid,
 					Predicate: pred,
 					Namespace: namespace,
@@ -426,7 +413,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 						return mr, err
 					}
 					// Here populate facets from facetsMapSlice. Each map has mapping for single
-					// facet from item(one of predicate value) idx to *api.Facet.
+					// facet from item(one of predicate value) idx to *pb.Facet.
 					// {
 					// 	"friend": ["Joshua", "David", "Josh"],
 					// 	"friend|from": {
@@ -439,11 +426,11 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 					// facetMapSlice looks like below. First map is for friend|from facet and second
 					// map is for friend|age facet.
 					// [
-					// 		map[int]*api.Facet{
-					//			0: *api.Facet
+					// 		map[int]*pb.Facet{
+					//			0: *pb.Facet
 					// 		},
-					// 		map[int]*api.Facet{
-					//			1: *api.Facet
+					// 		map[int]*pb.Facet{
+					//			1: *pb.Facet
 					// 		}
 					// ]
 					buf.Push(&nq)
@@ -610,7 +597,7 @@ func (buf *NQuadBuffer) ParseJSON(b []byte, op int) error {
 
 // ParseJSON is a convenience wrapper function to get all NQuads in one call. This can however, lead
 // to high memory usage. So be careful using this.
-func ParseJSON(b []byte, op int) ([]*api.NQuad, *pb.Metadata, error) {
+func ParseJSON(b []byte, op int) ([]*pb.NQuad, *pb.Metadata, error) {
 	buf := NewNQuadBuffer(-1)
 	err := buf.FastParseJSON(b, op)
 	if err != nil {

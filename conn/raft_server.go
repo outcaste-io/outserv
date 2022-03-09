@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
@@ -183,9 +182,9 @@ func (rs *RaftServer) IsPeer(ctx context.Context, rc *pb.RaftContext) (
 
 // JoinCluster handles requests to join the cluster.
 func (rs *RaftServer) JoinCluster(ctx context.Context,
-	rc *pb.RaftContext) (*api.Payload, error) {
+	rc *pb.RaftContext) (*pb.Payload, error) {
 	if ctx.Err() != nil {
-		return &api.Payload{}, ctx.Err()
+		return &pb.Payload{}, ctx.Err()
 	}
 
 	node := rs.GetNode(rc.WhoIs)
@@ -277,7 +276,7 @@ func (rs *RaftServer) RaftMessage(server pb.Raft_RaftMessageServer) error {
 
 // Heartbeat rpc call is used to check connection with other workers after worker
 // tcp server for this instance starts.
-func (rs *RaftServer) Heartbeat(_ *api.Payload, stream pb.Raft_HeartbeatServer) error {
+func (rs *RaftServer) Heartbeat(_ *pb.Payload, stream pb.Raft_HeartbeatServer) error {
 	ticker := time.NewTicker(echoDuration)
 	defer ticker.Stop()
 

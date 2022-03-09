@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	dgoapi "github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 )
 
@@ -52,7 +52,7 @@ func (urw *updateGroupRewriter) Rewrite(
 	srcUID := resolve.MutationQueryVarUID
 
 	var errSet, errDel error
-	var mutSet, mutDel []*dgoapi.Mutation
+	var mutSet, mutDel []*pb.Mutation
 	ruleType := m.MutatedType().Field("rules").Type()
 
 	if setArg != nil {
@@ -88,11 +88,11 @@ func (urw *updateGroupRewriter) Rewrite(
 				"dgraph.rule.permission": %v
 			}`, variable, permission))
 
-			mutSet = append(mutSet, &dgoapi.Mutation{
+			mutSet = append(mutSet, &pb.Mutation{
 				SetJson: nonExistentJson,
 				Cond: fmt.Sprintf(`@if(gt(len(%s),0) AND eq(len(%s),0))`, resolve.MutationQueryVar,
 					variable),
-			}, &dgoapi.Mutation{
+			}, &pb.Mutation{
 				SetJson: existsJson,
 				Cond: fmt.Sprintf(`@if(gt(len(%s),0) AND gt(len(%s),0))`, resolve.MutationQueryVar,
 					variable),
@@ -122,7 +122,7 @@ func (urw *updateGroupRewriter) Rewrite(
 				}
 			]`, srcUID, variable, variable))
 
-			mutDel = append(mutDel, &dgoapi.Mutation{
+			mutDel = append(mutDel, &pb.Mutation{
 				DeleteJson: deleteJson,
 				Cond: fmt.Sprintf(`@if(gt(len(%s),0) AND gt(len(%s),0))`, resolve.MutationQueryVar,
 					variable),

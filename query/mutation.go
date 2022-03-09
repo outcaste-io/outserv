@@ -11,7 +11,6 @@ import (
 	otrace "go.opencensus.io/trace"
 
 	"github.com/golang/glog"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/worker"
@@ -23,7 +22,7 @@ import (
 
 // ApplyMutations performs the required edge expansions and forwards the results to the
 // worker to perform the mutations.
-func ApplyMutations(ctx context.Context, m *pb.Mutations) (*api.TxnContext, error) {
+func ApplyMutations(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, error) {
 	// In expandEdges, for non * type prredicates, we prepend the namespace directly and for
 	// * type predicates, we fetch the predicates and prepend the namespace.
 	edges, err := expandEdges(ctx, m)
@@ -204,7 +203,7 @@ func ToDirectedEdges(gmuList []*gql.Mutation, newUids map[string]uint64) (
 	// Wrapper for a pointer to protos.Nquad
 	var wnq *gql.NQuad
 
-	parse := func(nq *api.NQuad, op pb.DirectedEdge_Op) error {
+	parse := func(nq *pb.NQuad, op pb.DirectedEdge_Op) error {
 		wnq = &gql.NQuad{NQuad: nq}
 		if len(nq.Subject) == 0 {
 			return nil

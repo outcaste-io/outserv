@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/outcaste-io/badger/v3"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/ristretto"
 	"github.com/outcaste-io/ristretto/z"
 	ostats "go.opencensus.io/stats"
@@ -274,7 +273,7 @@ func (lc *LocalCache) UpdateDeltasAndDiscardLists() {
 	lc.plists = make(map[string]*List)
 }
 
-func (lc *LocalCache) fillPreds(ctx *api.TxnContext, gid uint32) {
+func (lc *LocalCache) fillPreds(ctx *pb.TxnContext, gid uint32) {
 	lc.RLock()
 	defer lc.RUnlock()
 	for key := range lc.deltas {
