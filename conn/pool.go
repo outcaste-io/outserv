@@ -298,7 +298,7 @@ func (p *Pool) MonitorHealth() {
 			if err == nil {
 				// Make a dummy request to test out the connection.
 				client := pb.NewRaftClient(conn)
-				_, err = client.IsPeer(ctx, &pb.RaftContext{})
+				_, err = client.IsPeer(ctx, &pb.RaftContext{WhoIs: "alpha"})
 			}
 			cancel()
 			if err == nil {

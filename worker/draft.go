@@ -1222,7 +1222,8 @@ func (n *node) Run() {
 
 	done := make(chan struct{})
 	go n.checkpointAndClose(done)
-	go n.ReportRaftComms(n.closer)
+	go n.ReportRaftComms("alpha", n.closer)
+	go n.EnsureRegularityOfTicks("alpha", tickDur, n.closer)
 	go n.proposeBaseTimestamp()
 
 	if !x.WorkerConfig.HardSync {
@@ -1265,7 +1266,7 @@ func (n *node) Run() {
 			// start an election process. And that election process would just continue to happen
 			// indefinitely because checkpoints and snapshots are being calculated indefinitely.
 		case <-ticker.C:
-			n.Raft().Tick()
+			n.Tick()
 
 		case rd := <-n.Raft().Ready():
 			timer.Start()

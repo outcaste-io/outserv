@@ -655,13 +655,20 @@ func (g *groupi) receiveMembershipUpdates() {
 		g.closer.Done() // CLOSER:1
 	}()
 
-	ch := zero.Subscribe()
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	var lastIndex uint64
 	for {
 		select {
+		case <-ticker.C:
+			st := zero.MembershipState()
+			if st.RaftIndex > lastIndex {
+				g.applyState(st)
+				lastIndex = st.RaftIndex
+			}
 		case <-g.closer.HasBeenClosed():
 			return
-		case st := <-ch:
-			g.applyState(st)
 		}
 	}
 }

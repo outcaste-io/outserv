@@ -209,6 +209,7 @@ func (rs *RaftServer) RaftMessage(server pb.Raft_RaftMessageServer) error {
 		rc := batch.GetContext()
 		node := rs.GetNode(rc.WhoIs)
 		if node == nil || node.Raft() == nil {
+			glog.Warningf("No node found for %s\n", rc.WhoIs)
 			return ErrNoNode
 		}
 		if !done[rc.Id] {
@@ -268,6 +269,7 @@ func (rs *RaftServer) RaftMessage(server pb.Raft_RaftMessageServer) error {
 			return err
 		}
 		if err := step(batch); err != nil {
+			glog.Errorf("Error while stepping: %s\n", err)
 			return err
 		}
 	}

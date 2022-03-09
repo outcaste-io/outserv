@@ -132,10 +132,8 @@ message ZeroProposal {
   uint32 num_uids = 4;
   uint32 num_nsids = 5;
 
-  string cid = 9;  // Used as unique identifier for the cluster.
-  ZeroSnapshot snapshot = 11;  // Used to make Zeros take a snapshot.
-  // 12 has already been used.
-  DeleteNsRequest delete_ns = 13;  // Used to delete namespace.
+  string cid = 6;  // Used as unique identifier for the cluster.
+  DeleteNsRequest delete_ns = 7;  // Used to delete namespace.
 }
 
 // MembershipState is used to pack together the current membership state of all
@@ -147,9 +145,10 @@ message MembershipState {
   map<string, Tablet> tablets = 3;
   repeated uint64 removed = 4; // Raft IDs of removed members.
 
-  uint64 maxUID = 7;
-  uint64 maxNsID = 8;
-  string cid = 9;  // Used to uniquely identify the Dgraph cluster.
+  uint64 raft_index = 5;
+  uint64 maxUID = 6;
+  uint64 maxNsID = 7;
+  string cid = 8;  // Used to uniquely identify the Dgraph cluster.
 }
 
 message HealthInfo {

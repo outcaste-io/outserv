@@ -163,7 +163,6 @@ func MembershipState() *pb.MembershipState {
 }
 
 func LatestMembershipState(ctx context.Context) (*pb.MembershipState, error) {
-	glog.Infof("Called LatestMembershipState")
 	if err := inode.WaitLinearizableRead(ctx); err != nil {
 		return nil, err
 	}
@@ -172,10 +171,6 @@ func LatestMembershipState(ctx context.Context) (*pb.MembershipState, error) {
 		return &pb.MembershipState{}, nil
 	}
 	return ms, nil
-}
-
-func Subscribe() <-chan *pb.MembershipState {
-	return inode.ch
 }
 
 func Run(closer *z.Closer, bindall bool) {

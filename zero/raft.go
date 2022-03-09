@@ -38,7 +38,6 @@ type node struct {
 	state  *State
 	ctx    context.Context
 	closer *z.Closer // to stop Run.
-	ch     chan *pb.MembershipState
 
 	// The last timestamp when this Zero was able to reach quorum.
 	mu sync.RWMutex
@@ -229,9 +228,9 @@ func (n *node) applyProposal(e raftpb.Entry) error {
 	}
 
 	// Now assign the new state back.
-	glog.Infof("Updated state: %+v\n", dst)
+	dst.RaftIndex = e.Index
+	glog.V(2).Infof("Updated state: %+v\n", dst)
 	n.state._state = dst
-	n.ch <- dst
 	return nil
 }
 
@@ -349,7 +348,7 @@ func (n *node) initAndStartNode() error {
 
 	switch {
 	case restart:
-		glog.Infoln("Restarting node for dgraphzero")
+		glog.Infoln("Restarting node for Zero")
 		sp, err := n.Store.Snapshot()
 		x.Checkf(err, "Unable to get existing snapshot")
 		if !raft.IsEmptySnap(sp) {
@@ -363,6 +362,7 @@ func (n *node) initAndStartNode() error {
 				n.Connect(id, zs.State.Members[id].Addr)
 			}
 		}
+		glog.Infof("Restarting node using raft.Config: %+v\n", n.Cfg)
 		n.SetRaft(raft.RestartNode(n.Cfg))
 
 	case len(peer) > 0:
@@ -408,7 +408,7 @@ func (n *node) initAndStartNode() error {
 
 	go n.Run()
 	go n.BatchAndSendMessages()
-	go n.ReportRaftComms(n.closer)
+	go n.ReportRaftComms("zero", n.closer)
 	go n.ensureClusterID()
 	return nil
 }
@@ -422,10 +422,9 @@ func (n *node) Run() {
 	slowTicker := time.NewTicker(time.Minute)
 	defer slowTicker.Stop()
 
-	n.ch = make(chan *pb.MembershipState, 16)
 	// snapshot can cause select loop to block while deleting entries, so run
 	// it in goroutine
-	closer := z.NewCloser(2)
+	closer := z.NewCloser(0)
 
 	defer func() {
 		closer.SignalAndWait()
@@ -433,7 +432,6 @@ func (n *node) Run() {
 		n.closer.Done()
 	}()
 
-	go n.snapshotPeriodically(closer)
 	if !x.WorkerConfig.HardSync {
 		closer.AddRunning(1)
 		go x.StoreSync(n.Store, closer)
@@ -442,7 +440,11 @@ func (n *node) Run() {
 	// We only stop runReadIndexLoop after the for loop below has finished interacting with it.
 	// That way we know sending to readStateCh will not deadlock.
 	readStateCh := make(chan raft.ReadState, 100)
+	closer.AddRunning(1)
 	go n.RunReadIndexLoop(closer, readStateCh)
+
+	// No need for closer to wait on this function.
+	go n.EnsureRegularityOfTicks("zero", tickDur, closer)
 
 	glog.Infof("Zero.Run")
 	var leader bool
@@ -455,13 +457,13 @@ func (n *node) Run() {
 			return
 
 		case <-ticker.C:
-			n.Raft().Tick()
+			n.Tick()
 
 		case <-slowTicker.C:
 			// We should calculate the snapshot in the same loop, to ensure that
 			// we have applied all the Raft committed entries to the state, and
 			// that we're picking up the correct state.
-			if err := n.calculateAndProposeSnapshot(); err != nil {
+			if err := n.calculateSnapshot(); err != nil {
 				glog.Errorf("While calculating snapshot: %v\n", err)
 			}
 
@@ -475,7 +477,7 @@ func (n *node) Run() {
 				readStateCh <- rs
 			}
 			if len(rd.ReadStates) > 0 {
-				glog.V(2).Infof("Read states: %d\n", len(rd.ReadStates))
+				glog.V(3).Infof("Read states: %d\n", len(rd.ReadStates))
 				span.Annotatef(nil, "Pushed %d readstates", len(rd.ReadStates))
 			}
 
@@ -574,33 +576,9 @@ func (n *node) Run() {
 	}
 }
 
-func (n *node) snapshotPeriodically(closer *z.Closer) {
-	defer closer.Done()
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			if err := n.calculateAndProposeSnapshot(); err != nil {
-				glog.Errorf("While calculateAndProposeSnapshot: %v", err)
-			}
-
-		case <-closer.HasBeenClosed():
-			return
-		}
-	}
-}
-
-// It uses that information to calculate a snapshot, which it proposes to other
-// Zeros. When the proposal arrives via Raft, all Zeros apply it to themselves
-// via applySnapshot in raft.Ready.
-func (n *node) calculateAndProposeSnapshot() error {
-	// Only run this on the leader.
-	if !n.AmLeader() {
-		return nil
-	}
-
+// Each Zero member calculates and stores a snapshot locally. There's no need to
+// propose it to everyone else.
+func (n *node) calculateSnapshot() error {
 	_, span := otrace.StartSpan(n.ctx, "Calculate.Snapshot",
 		otrace.WithSampler(otrace.AlwaysSample()))
 	defer span.End()
@@ -621,22 +599,26 @@ func (n *node) calculateAndProposeSnapshot() error {
 	span.Annotatef(nil, "First index: %d. Last index: %d. num: %d",
 		first, last, num)
 	if num < 64 {
+		// If we have less than 64 entries, don't bother taking a snapshot.
 		return nil
 	}
 
-	state := n.state.membershipCopy()
-	zs := &pb.ZeroSnapshot{
+	state := n.state.membership()
+	snap := &pb.ZeroSnapshot{
 		Index: last,
 		State: state,
 	}
-	glog.V(2).Infof("Proposing snapshot at index: %d\n", zs.Index)
-	zp := &pb.ZeroProposal{Snapshot: zs}
-	if _, err = n.proposeAndWait(n.ctx, zp); err != nil {
-		glog.Errorf("Error while proposing snapshot: %v\n", err)
-		span.Annotatef(nil, "Error while proposing snapshot: %v", err)
-		return err
+	data, err := snap.Marshal()
+	x.Check(err)
+	for {
+		glog.V(2).Infof("Creating snapshot: %+v\n", snap)
+		// We should never let CreateSnapshot have an error.
+		err := n.Store.CreateSnapshot(snap.Index, n.ConfState(), data)
+		if err == nil {
+			break
+		}
+		glog.Warningf("Error while calling CreateSnapshot: %v. Retrying...", err)
 	}
-	span.Annotatef(nil, "Snapshot proposed: Done")
 	return nil
 }
 
