@@ -46,7 +46,9 @@ to fund the development of open source.
 
 a. Use your personal savings to fund the development. Or, have your company fund
     the development of the project.
+
 b. Build open source part time while working for another company, if they allow that.
+
 c. Take money from VCs. This generally results in building proprietary features and a cloud managed service to monetize the software.
 
 Option a: If possible, this is the best way to go. But, might not be available as an
@@ -62,7 +64,7 @@ Option c: Once you take money from VCs, it becomes your fiduciary duty to
     proprietary features typically come with opaque pricing models for
     on-premises deployments.
 
-    Second and the most widely used revenue stream is to provide a cloud hosted
+Second and the most widely used revenue stream is to provide a cloud hosted
     solution. To maximize the revenue there and eliminate competing cloud
     services, the license is usually changed to a non open-source license which
     disallows others from building similar services.
