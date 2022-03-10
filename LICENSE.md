@@ -13,7 +13,7 @@ the limitations and conditions below.
 
 ## Limitations
 
-The software contains a routine that allows the licensor to monetize your use of
+The software contains a module that allows the licensor to monetize your use of
 the software. You may not move, change, disable, or circumvent this functionality
 in the software.
 
