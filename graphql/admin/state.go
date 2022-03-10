@@ -1,3 +1,5 @@
+// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
+
 package admin
 
 import (
