@@ -64,7 +64,7 @@ var (
 	Alpha x.SubCommand
 
 	// need this here to refer it in admin_backup.go
-	adminServer admin.IServeGraphQL
+	adminServer *admin.GqlHandler
 	initDone    uint32
 )
 
@@ -631,7 +631,8 @@ func setupServer(closer *z.Closer) {
 	e := new(uint64)
 	atomic.StoreUint64(e, 0)
 	globalEpoch[x.GalaxyNamespace] = e
-	var mainServer admin.IServeGraphQL
+
+	var mainServer *admin.GqlHandler
 	var gqlHealthStore *admin.GraphQLHealthStore
 	// Do not use := notation here because adminServer is a global variable.
 	mainServer, adminServer, gqlHealthStore = admin.NewServers(introspection,

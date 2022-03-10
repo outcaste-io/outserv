@@ -14,10 +14,10 @@ import (
 
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/api"
-	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
+	"go.opencensus.io/trace"
 	otrace "go.opencensus.io/trace"
 
 	"github.com/golang/glog"
@@ -74,18 +74,44 @@ type ResolverFns struct {
 	Ex  DgraphExecutor
 }
 
+type DgraphEx struct{}
+
+// Execute is the underlying dgraph implementation of Dgraph execution.
+// If field is nil, returned response has JSON in DQL form, otherwise it will be in GraphQL form.
+func (dg *DgraphEx) Execute(ctx context.Context, req *pb.Request,
+	field schema.Field) (*pb.Response, error) {
+
+	span := trace.FromContext(ctx)
+	stop := x.SpanTimer(span, "dgraph.Execute")
+	defer stop()
+
+	if req == nil || (req.Query == "" && len(req.Mutations) == 0) {
+		return nil, nil
+	}
+
+	if glog.V(3) {
+		muts := make([]string, len(req.Mutations))
+		for i, m := range req.Mutations {
+			muts[i] = m.String()
+		}
+
+		glog.Infof("Executing Dgraph request; with\nQuery: \n%s\nMutations:%s",
+			req.Query, strings.Join(muts, "\n"))
+	}
+
+	ctx = context.WithValue(ctx, edgraph.IsGraphql, true)
+	resp, err := (&edgraph.Server{}).QueryGraphQL(ctx, req, field)
+	if !x.IsGqlErrorList(err) {
+		err = schema.GQLWrapf(err, "Dgraph execution failed")
+	}
+
+	return resp, err
+}
+
 // dgraphExecutor is an implementation of both QueryExecutor and MutationExecutor
 // that proxies query/mutation resolution through Query method in dgraph server.
 type dgraphExecutor struct {
-	dg *dgraph.DgraphEx
-}
-
-// adminExecutor is an implementation of both QueryExecutor and MutationExecutor
-// that proxies query resolution through Query method in dgraph server, and
-// it doesn't require authorization. Currently it's only used for querying
-// gqlschema during init.
-type adminExecutor struct {
-	dg *dgraph.DgraphEx
+	dg *DgraphEx
 }
 
 // A Resolved is the result of resolving a single field - generally a query or mutation.
@@ -107,22 +133,7 @@ func (cf CompletionFunc) Complete(ctx context.Context, resolved *Resolved) {
 
 // NewDgraphExecutor builds a DgraphExecutor for proxying requests through dgraph.
 func NewDgraphExecutor() DgraphExecutor {
-	return newDgraphExecutor(&dgraph.DgraphEx{})
-}
-
-func newDgraphExecutor(dg *dgraph.DgraphEx) DgraphExecutor {
-	return &dgraphExecutor{dg: dg}
-}
-
-// NewAdminExecutor builds a DgraphExecutor for proxying requests through dgraph.
-func NewAdminExecutor() DgraphExecutor {
-	return &adminExecutor{dg: &dgraph.DgraphEx{}}
-}
-
-func (aex *adminExecutor) Execute(ctx context.Context, req *pb.Request, field schema.Field) (
-	*pb.Response, error) {
-	ctx = context.WithValue(ctx, edgraph.Authorize, false)
-	return aex.dg.Execute(ctx, req, field)
+	return &dgraphExecutor{dg: &DgraphEx{}}
 }
 
 func (de *dgraphExecutor) Execute(ctx context.Context, req *pb.Request, field schema.Field) (
