@@ -38,60 +38,20 @@ const (
 	ErrInternal = "Internal error"
 )
 
-// A ResolverFactory finds the right resolver for a query/mutation.
-type ResolverFactory interface {
-	queryResolverFor(query schema.Query) QueryResolver
-	mutationResolverFor(mutation schema.Mutation) MutationResolver
-
-	// WithQueryResolver adds a new query resolver.  Each time query name is resolved
-	// resolver is called to create a new instance of a QueryResolver to resolve the
-	// query.
-	WithQueryResolver(name string, resolver func(schema.Query) QueryResolver) ResolverFactory
-
-	// WithMutationResolver adds a new query resolver.  Each time mutation name is resolved
-	// resolver is called to create a new instance of a MutationResolver to resolve the
-	// mutation.
-	WithMutationResolver(
-		name string, resolver func(schema.Mutation) MutationResolver) ResolverFactory
-
-	// WithConventionResolvers adds a set of our convention based resolvers to the
-	// factory.  The registration happens only once.
-	WithConventionResolvers(s schema.Schema, fns *ResolverFns) ResolverFactory
-
-	// WithQueryMiddlewareConfig adds the configuration to use to apply middlewares before resolving
-	// queries. The config should be a mapping of the name of query to its middlewares.
-	WithQueryMiddlewareConfig(config map[string]QueryMiddlewares) ResolverFactory
-
-	// WithMutationMiddlewareConfig adds the configuration to use to apply middlewares before
-	// resolving mutations. The config should be a mapping of the name of mutation to its
-	// middlewares.
-	WithMutationMiddlewareConfig(config map[string]MutationMiddlewares) ResolverFactory
-
-	// WithSchemaIntrospection adds schema introspection capabilities to the factory.
-	// So __schema and __type queries can be resolved.
-	WithSchemaIntrospection() ResolverFactory
-}
-
-// A ResultCompleter can take a []byte slice representing an intermediate result
-// in resolving field and applies a completion step.
-type ResultCompleter interface {
-	Complete(ctx context.Context, resolved *Resolved)
-}
-
 // RequestResolver can process GraphQL requests and write GraphQL JSON responses.
 // A schema.Request may contain any number of queries or mutations (never both).
 // RequestResolver.Resolve() resolves all of them by finding the resolved answers
 // of the component queries/mutations and joining into a single schema.Response.
 type RequestResolver struct {
 	schema    schema.Schema
-	resolvers ResolverFactory
+	resolvers *ResolverFactory
 }
 
-// A resolverFactory is the main implementation of ResolverFactory.  It stores a
+// A ResolverFactory is the main implementation of ResolverFactory.  It stores a
 // map of all the resolvers that have been registered and returns a resolver that
 // just returns errors if it's asked for a resolver for a field that it doesn't
 // know about.
-type resolverFactory struct {
+type ResolverFactory struct {
 	sync.RWMutex
 	queryResolvers    map[string]func(schema.Query) QueryResolver
 	mutationResolvers map[string]func(schema.Mutation) MutationResolver
@@ -170,23 +130,23 @@ func (de *dgraphExecutor) Execute(ctx context.Context, req *pb.Request, field sc
 	return de.dg.Execute(ctx, req, field)
 }
 
-func (rf *resolverFactory) WithQueryResolver(
-	name string, resolver func(schema.Query) QueryResolver) ResolverFactory {
+func (rf *ResolverFactory) WithQueryResolver(
+	name string, resolver func(schema.Query) QueryResolver) *ResolverFactory {
 	rf.Lock()
 	defer rf.Unlock()
 	rf.queryResolvers[name] = resolver
 	return rf
 }
 
-func (rf *resolverFactory) WithMutationResolver(
-	name string, resolver func(schema.Mutation) MutationResolver) ResolverFactory {
+func (rf *ResolverFactory) WithMutationResolver(
+	name string, resolver func(schema.Mutation) MutationResolver) *ResolverFactory {
 	rf.Lock()
 	defer rf.Unlock()
 	rf.mutationResolvers[name] = resolver
 	return rf
 }
 
-func (rf *resolverFactory) WithSchemaIntrospection() ResolverFactory {
+func (rf *ResolverFactory) WithSchemaIntrospection() *ResolverFactory {
 	return rf.
 		WithQueryResolver("__schema",
 			func(q schema.Query) QueryResolver {
@@ -209,8 +169,8 @@ func (rf *resolverFactory) WithSchemaIntrospection() ResolverFactory {
 			})
 }
 
-func (rf *resolverFactory) WithConventionResolvers(
-	s schema.Schema, fns *ResolverFns) ResolverFactory {
+func (rf *ResolverFactory) WithConventionResolvers(
+	s schema.Schema, fns *ResolverFns) *ResolverFactory {
 
 	queries := append(s.Queries(schema.GetQuery), s.Queries(schema.FilterQuery)...)
 	queries = append(queries, s.Queries(schema.PasswordQuery)...)
@@ -267,16 +227,16 @@ func (rf *resolverFactory) WithConventionResolvers(
 	return rf
 }
 
-func (rf *resolverFactory) WithQueryMiddlewareConfig(
-	config map[string]QueryMiddlewares) ResolverFactory {
+func (rf *ResolverFactory) WithQueryMiddlewareConfig(
+	config map[string]QueryMiddlewares) *ResolverFactory {
 	if len(config) != 0 {
 		rf.queryMiddlewareConfig = config
 	}
 	return rf
 }
 
-func (rf *resolverFactory) WithMutationMiddlewareConfig(
-	config map[string]MutationMiddlewares) ResolverFactory {
+func (rf *ResolverFactory) WithMutationMiddlewareConfig(
+	config map[string]MutationMiddlewares) *ResolverFactory {
 	if len(config) != 0 {
 		rf.mutationMiddlewareConfig = config
 	}
@@ -288,9 +248,9 @@ func (rf *resolverFactory) WithMutationMiddlewareConfig(
 // to resolve a query/mutation it doesn't know how to rewrite, it uses
 // the queryError/mutationError to build an error result.
 func NewResolverFactory(
-	queryError QueryResolverFunc, mutationError MutationResolverFunc) ResolverFactory {
+	queryError QueryResolverFunc, mutationError MutationResolverFunc) *ResolverFactory {
 
-	return &resolverFactory{
+	return &ResolverFactory{
 		queryResolvers:    make(map[string]func(schema.Query) QueryResolver),
 		mutationResolvers: make(map[string]func(schema.Mutation) MutationResolver),
 
@@ -401,7 +361,7 @@ func entitiesQueryCompletion(ctx context.Context, resolved *Resolved) {
 // noopCompletion just passes back it's result and err arguments
 func noopCompletion(ctx context.Context, resolved *Resolved) {}
 
-func (rf *resolverFactory) queryResolverFor(query schema.Query) QueryResolver {
+func (rf *ResolverFactory) queryResolverFor(query schema.Query) QueryResolver {
 	rf.RLock()
 	defer rf.RUnlock()
 	mws := rf.queryMiddlewareConfig[query.Name()]
@@ -411,7 +371,7 @@ func (rf *resolverFactory) queryResolverFor(query schema.Query) QueryResolver {
 	return rf.queryError
 }
 
-func (rf *resolverFactory) mutationResolverFor(mutation schema.Mutation) MutationResolver {
+func (rf *ResolverFactory) mutationResolverFor(mutation schema.Mutation) MutationResolver {
 	rf.RLock()
 	defer rf.RUnlock()
 	mws := rf.mutationMiddlewareConfig[mutation.Name()]
@@ -422,7 +382,7 @@ func (rf *resolverFactory) mutationResolverFor(mutation schema.Mutation) Mutatio
 }
 
 // New creates a new RequestResolver.
-func New(s schema.Schema, resolverFactory ResolverFactory) *RequestResolver {
+func New(s schema.Schema, resolverFactory *ResolverFactory) *RequestResolver {
 	return &RequestResolver{
 		schema:    s,
 		resolvers: resolverFactory,

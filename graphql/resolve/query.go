@@ -58,7 +58,7 @@ func NewEntitiesQueryResolver(qr QueryRewriter, ex DgraphExecutor) QueryResolver
 type queryResolver struct {
 	queryRewriter   QueryRewriter
 	executor        DgraphExecutor
-	resultCompleter ResultCompleter
+	resultCompleter CompletionFunc
 }
 
 func (qr *queryResolver) Resolve(ctx context.Context, query schema.Query) *Resolved {

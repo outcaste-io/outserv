@@ -612,7 +612,7 @@ func (g *GraphQLHealthStore) updatingSchema() {
 }
 
 type adminServer struct {
-	rf       resolve.ResolverFactory
+	rf       *resolve.ResolverFactory
 	resolver *resolve.RequestResolver
 
 	// The mutex that locks schema update operations
@@ -789,7 +789,7 @@ func newAdminResolver(
 	return server.resolver
 }
 
-func newAdminResolverFactory() resolve.ResolverFactory {
+func newAdminResolverFactory() *resolve.ResolverFactory {
 	adminMutationResolvers := map[string]resolve.MutationResolverFunc{
 		"addNamespace":       resolveAddNamespace,
 		"config":             resolveUpdateConfig,
@@ -988,7 +988,7 @@ func (as *adminServer) addConnectedAdminResolvers() {
 			})
 }
 
-func resolverFactoryWithErrorMsg(msg string) resolve.ResolverFactory {
+func resolverFactoryWithErrorMsg(msg string) *resolve.ResolverFactory {
 	errFunc := func(name string) error { return errors.Errorf(msg, name) }
 	qErr :=
 		resolve.QueryResolverFunc(func(ctx context.Context, query schema.Query) *resolve.Resolved {
@@ -1022,7 +1022,7 @@ func (as *adminServer) resetSchema(ns uint64, gqlSchema schema.Schema) {
 	// set status as updating schema
 	mainHealthStore.updatingSchema()
 
-	var resolverFactory resolve.ResolverFactory
+	var resolverFactory *resolve.ResolverFactory
 	// gqlSchema can be nil in following cases:
 	// * after DROP_ALL
 	// * if the schema hasn't yet been set even once for a non-Galaxy namespace
