@@ -6,10 +6,10 @@ import (
 	"errors"
 	"strconv"
 
-	"github.com/outcaste-io/outserv/x"
 	"github.com/dgraph-io/gqlgen/graphql"
 	"github.com/dgraph-io/gqlgen/graphql/introspection"
 	"github.com/dgraph-io/gqlparser/v2/ast"
+	"github.com/outcaste-io/outserv/x"
 )
 
 // Introspection works by walking through the selection set which are part of ast.Operation
@@ -24,7 +24,7 @@ import (
 
 // Introspect performs an introspection query given a query that's expected to be either
 // __schema or __type.
-func Introspect(q Query) (json.RawMessage, error) {
+func Introspect(q *Query) (json.RawMessage, error) {
 	if q.Name() != "__schema" && q.Name() != "__type" && q.Name() != Typename {
 		return nil, errors.New("call to introspect for field that isn't an introspection query " +
 			"this indicates bug. Please let us know by filing an issue.")
@@ -42,12 +42,7 @@ func Introspect(q Query) (json.RawMessage, error) {
 			"this indicates bug. Please let us know by filing an issue.")
 	}
 
-	qu, ok := q.(*query)
-	if !ok {
-		return nil, errors.New("couldn't convert query to internal type " +
-			"this indicates bug. Please let us know by filing an issue.")
-	}
-
+	qu := q
 	reqCtx := &requestContext{
 		RawQuery:  op.query,
 		Variables: op.vars,

@@ -74,13 +74,8 @@ var jsLambda embed.FS
 
 func init() {
 	Alpha.Cmd = &cobra.Command{
-		Use:   "alpha",
-		Short: "Run Dgraph Alpha database server",
-		Long: `
-A Dgraph Alpha instance stores the data. Each Dgraph Alpha is responsible for
-storing and serving one data group. If multiple Alphas serve the same group,
-they form a Raft group and provide synchronous replication.
-`,
+		Use:   "graphql",
+		Short: "Run Outserv GraphQL server",
 		Run: func(cmd *cobra.Command, args []string) {
 			defer x.StartProfile(Alpha.Conf).Stop()
 			run()

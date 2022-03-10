@@ -28,11 +28,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/outcaste-io/outserv/graphql/authorization"
 	"github.com/dgraph-io/gqlparser/v2/parser"
+	"github.com/outcaste-io/outserv/graphql/authorization"
 
-	"github.com/outcaste-io/outserv/x"
 	"github.com/dgraph-io/gqlparser/v2/ast"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
 
@@ -121,8 +121,8 @@ type Schema interface {
 // An Operation is a single valid GraphQL operation.  It contains either
 // Queries or Mutations, but not both.  Subscriptions are not yet supported.
 type Operation interface {
-	Queries() []Query
-	Mutations() []Mutation
+	Queries() []*Query
+	Mutations() []*Mutation
 	Schema() Schema
 	IsQuery() bool
 	IsMutation() bool
@@ -205,29 +205,6 @@ type Field interface {
 	CompleteAlias(buf *bytes.Buffer)
 	// GetAuthMeta returns the Dgraph.Authorization meta information stored in schema
 	GetAuthMeta() *authorization.AuthMeta
-}
-
-// A Mutation is a field (from the schema's Mutation type) from an Operation
-type Mutation interface {
-	Field
-	MutationType() MutationType
-	MutatedType() Type
-	QueryField() Field
-	NumUidsField() Field
-	HasLambdaOnMutate() bool
-}
-
-// A Query is a field (from the schema's Query type) from an Operation
-type Query interface {
-	Field
-	QueryType() QueryType
-	DQLQuery() string
-	Rename(newName string)
-	// RepresentationsArg returns a parsed version of the `representations` argument for `_entities`
-	// query
-	RepresentationsArg() (*EntityRepresentations, error)
-	AuthFor(jwtVars map[string]interface{}) Query
-	Schema() Schema
 }
 
 // A Type is a GraphQL type like: Float, T, T! and [T!]!.  If it's not a list, then
@@ -364,8 +341,8 @@ type fieldDefinition struct {
 	dgraphPredicate map[string]map[string]string
 }
 
-type mutation field
-type query field
+type Mutation field
+type Query field
 
 func (s *schema) Queries(t QueryType) []string {
 	if s.schema.Query == nil {
@@ -432,28 +409,28 @@ func (o *operation) Schema() Schema {
 	return o.inSchema
 }
 
-func (o *operation) Queries() (qs []Query) {
+func (o *operation) Queries() (qs []*Query) {
 	if o.IsMutation() {
 		return
 	}
 
 	for _, s := range o.op.SelectionSet {
 		if f, ok := s.(*ast.Field); ok {
-			qs = append(qs, &query{field: f, op: o, sel: s})
+			qs = append(qs, &Query{field: f, op: o, sel: s})
 		}
 	}
 
 	return
 }
 
-func (o *operation) Mutations() (ms []Mutation) {
+func (o *operation) Mutations() (ms []*Mutation) {
 	if !o.IsMutation() {
 		return
 	}
 
 	for _, s := range o.op.SelectionSet {
 		if f, ok := s.(*ast.Field); ok {
-			ms = append(ms, &mutation{field: f, op: o})
+			ms = append(ms, &Mutation{field: f, op: o})
 		}
 	}
 
@@ -841,11 +818,11 @@ func (f *field) IsExternal() bool {
 	return hasExternal(f.field.Definition)
 }
 
-func (q *query) IsExternal() bool {
+func (q *Query) IsExternal() bool {
 	return (*field)(q).IsExternal()
 }
 
-func (m *mutation) IsExternal() bool {
+func (m *Mutation) IsExternal() bool {
 	return (*field)(m).IsExternal()
 }
 
@@ -1690,43 +1667,43 @@ func (f *field) IncludeAbstractField(dgraphTypes []string) bool {
 	return false
 }
 
-func (q *query) IsAuthQuery() bool {
+func (q *Query) IsAuthQuery() bool {
 	return (*field)(q).field.Arguments.ForName("dgraph.uid") != nil
 }
 
-func (q *query) IsAggregateField() bool {
+func (q *Query) IsAggregateField() bool {
 	return (*field)(q).IsAggregateField()
 }
 
-func (q *query) GqlErrorf(path []interface{}, message string, args ...interface{}) *x.GqlError {
+func (q *Query) GqlErrorf(path []interface{}, message string, args ...interface{}) *x.GqlError {
 	return (*field)(q).GqlErrorf(path, message, args...)
 }
 
-func (q *query) MaxPathLength() int {
+func (q *Query) MaxPathLength() int {
 	return (*field)(q).MaxPathLength()
 }
 
-func (q *query) PreAllocatePathSlice() []interface{} {
+func (q *Query) PreAllocatePathSlice() []interface{} {
 	return (*field)(q).PreAllocatePathSlice()
 }
 
-func (q *query) NullValue() []byte {
+func (q *Query) NullValue() []byte {
 	return (*field)(q).NullValue()
 }
 
-func (q *query) NullResponse() []byte {
+func (q *Query) NullResponse() []byte {
 	return (*field)(q).NullResponse()
 }
 
-func (q *query) CompleteAlias(buf *bytes.Buffer) {
+func (q *Query) CompleteAlias(buf *bytes.Buffer) {
 	(*field)(q).CompleteAlias(buf)
 }
 
-func (q *query) GetAuthMeta() *authorization.AuthMeta {
+func (q *Query) GetAuthMeta() *authorization.AuthMeta {
 	return (*field)(q).GetAuthMeta()
 }
 
-func (q *query) RepresentationsArg() (*EntityRepresentations, error) {
+func (q *Query) RepresentationsArg() (*EntityRepresentations, error) {
 	representations, ok := q.ArgValue("representations").([]interface{})
 	if !ok {
 		return nil, fmt.Errorf("error parsing `representations` argument")
@@ -1794,9 +1771,9 @@ func (q *query) RepresentationsArg() (*EntityRepresentations, error) {
 	return entityReprs, nil
 }
 
-func (q *query) AuthFor(jwtVars map[string]interface{}) Query {
+func (q *Query) AuthFor(jwtVars map[string]interface{}) *Query {
 	// copy the template, so that multiple queries can run rewriting for the rule.
-	return &query{
+	return &Query{
 		field: (*field)(q).field,
 		op: &operation{op: q.op.op,
 			query:    q.op.query,
@@ -1807,119 +1784,119 @@ func (q *query) AuthFor(jwtVars map[string]interface{}) Query {
 		sel: q.sel}
 }
 
-func (q *query) Rename(newName string) {
+func (q *Query) Rename(newName string) {
 	q.field.Name = newName
 }
 
-func (q *query) Schema() Schema {
+func (q *Query) Schema() Schema {
 	return q.op.inSchema
 }
 
-func (q *query) Name() string {
+func (q *Query) Name() string {
 	return (*field)(q).Name()
 }
 
-func (q *query) RemoteResponseName() string {
+func (q *Query) RemoteResponseName() string {
 	return (*field)(q).RemoteResponseName()
 }
 
-func (q *query) Alias() string {
+func (q *Query) Alias() string {
 	return (*field)(q).Alias()
 }
 
-func (q *query) DgraphAlias() string {
+func (q *Query) DgraphAlias() string {
 	return q.Name()
 }
 
-func (q *query) SetArgTo(arg string, val interface{}) {
+func (q *Query) SetArgTo(arg string, val interface{}) {
 	(*field)(q).SetArgTo(arg, val)
 }
 
-func (q *query) Arguments() map[string]interface{} {
+func (q *Query) Arguments() map[string]interface{} {
 	return (*field)(q).Arguments()
 }
 
-func (q *query) ArgValue(name string) interface{} {
+func (q *Query) ArgValue(name string) interface{} {
 	return (*field)(q).ArgValue(name)
 }
 
-func (q *query) IsArgListType(name string) bool {
+func (q *Query) IsArgListType(name string) bool {
 	return (*field)(q).IsArgListType(name)
 }
 
-func (q *query) Skip() bool {
+func (q *Query) Skip() bool {
 	return false
 }
 
-func (q *query) Include() bool {
+func (q *Query) Include() bool {
 	return true
 }
 
-func (q *query) SkipField(dgraphTypes []string, seenField map[string]bool) bool {
+func (q *Query) SkipField(dgraphTypes []string, seenField map[string]bool) bool {
 	return (*field)(q).SkipField(dgraphTypes, seenField)
 }
 
-func (q *query) Cascade() []string {
+func (q *Query) Cascade() []string {
 	return (*field)(q).Cascade()
 }
 
-func (q *query) ApolloRequiredFields() []string {
+func (q *Query) ApolloRequiredFields() []string {
 	return (*field)(q).ApolloRequiredFields()
 }
 
-func (q *query) CustomRequiredFields() map[string]FieldDefinition {
+func (q *Query) CustomRequiredFields() map[string]FieldDefinition {
 	return (*field)(q).CustomRequiredFields()
 }
 
-func (q *query) IsCustomHTTP() bool {
+func (q *Query) IsCustomHTTP() bool {
 	return (*field)(q).IsCustomHTTP()
 }
 
-func (q *query) HasCustomHTTPChild() bool {
+func (q *Query) HasCustomHTTPChild() bool {
 	return (*field)(q).HasCustomHTTPChild()
 }
 
-func (q *query) HasLambdaDirective() bool {
+func (q *Query) HasLambdaDirective() bool {
 	return (*field)(q).HasLambdaDirective()
 }
 
-func (q *query) IDArgValue() (map[string]string, uint64, error) {
+func (q *Query) IDArgValue() (map[string]string, uint64, error) {
 	return (*field)(q).IDArgValue()
 }
 
-func (q *query) XIDArgs() map[string]string {
+func (q *Query) XIDArgs() map[string]string {
 	return (*field)(q).XIDArgs()
 }
 
-func (q *query) Type() Type {
+func (q *Query) Type() Type {
 	return (*field)(q).Type()
 }
 
-func (q *query) SelectionSet() []Field {
+func (q *Query) SelectionSet() []Field {
 	return (*field)(q).SelectionSet()
 }
 
-func (q *query) Location() x.Location {
+func (q *Query) Location() x.Location {
 	return (*field)(q).Location()
 }
 
-func (q *query) ResponseName() string {
+func (q *Query) ResponseName() string {
 	return (*field)(q).ResponseName()
 }
 
-func (q *query) GetObjectName() string {
+func (q *Query) GetObjectName() string {
 	return q.field.ObjectDefinition.Name
 }
 
-func (q *query) CustomHTTPConfig(ns uint64) (*FieldHTTPConfig, error) {
+func (q *Query) CustomHTTPConfig(ns uint64) (*FieldHTTPConfig, error) {
 	return getCustomHTTPConfig((*field)(q), true, ns)
 }
 
-func (q *query) EnumValues() []string {
+func (q *Query) EnumValues() []string {
 	return nil
 }
 
-func (m *mutation) ConstructedFor() Type {
+func (m *Mutation) ConstructedFor() Type {
 	return (*field)(m).ConstructedFor()
 }
 
@@ -1942,7 +1919,7 @@ func (f *field) ConstructedFor() Type {
 	}
 }
 
-func (q *query) ConstructedFor() Type {
+func (q *Query) ConstructedFor() Type {
 	if q.QueryType() != AggregateQuery {
 		return q.Type()
 	}
@@ -1958,11 +1935,11 @@ func (q *query) ConstructedFor() Type {
 	}
 }
 
-func (m *mutation) ConstructedForDgraphPredicate() string {
+func (m *Mutation) ConstructedForDgraphPredicate() string {
 	return (*field)(m).ConstructedForDgraphPredicate()
 }
 
-func (q *query) ConstructedForDgraphPredicate() string {
+func (q *Query) ConstructedForDgraphPredicate() string {
 	return (*field)(q).ConstructedForDgraphPredicate()
 }
 
@@ -1978,11 +1955,11 @@ func (f *field) ConstructedForDgraphPredicate() string {
 	return f.op.inSchema.dgraphPredicate[f.field.ObjectDefinition.Name][fldName[:len(fldName)-9]]
 }
 
-func (m *mutation) DgraphPredicateForAggregateField() string {
+func (m *Mutation) DgraphPredicateForAggregateField() string {
 	return (*field)(m).DgraphPredicateForAggregateField()
 }
 
-func (q *query) DgraphPredicateForAggregateField() string {
+func (q *Query) DgraphPredicateForAggregateField() string {
 	return (*field)(q).DgraphPredicateForAggregateField()
 }
 
@@ -2019,11 +1996,11 @@ func (f *field) DgraphPredicateForAggregateField() string {
 	return f.op.inSchema.dgraphPredicate[mainTypeName][fldName[:len(fldName)-3]]
 }
 
-func (q *query) QueryType() QueryType {
+func (q *Query) QueryType() QueryType {
 	return queryType(q.Name(), q.op.inSchema.customDirectives["Query"][q.Name()])
 }
 
-func (q *query) DQLQuery() string {
+func (q *Query) DQLQuery() string {
 	if customDir := q.op.inSchema.customDirectives["Query"][q.Name()]; customDir != nil {
 		if dqlArgument := customDir.Arguments.ForName(dqlArg); dqlArgument != nil {
 			return dqlArgument.Value.Raw
@@ -2056,115 +2033,115 @@ func queryType(name string, custom *ast.Directive) QueryType {
 	}
 }
 
-func (q *query) Operation() Operation {
+func (q *Query) Operation() Operation {
 	return (*field)(q).Operation()
 }
 
-func (q *query) DgraphPredicate() string {
+func (q *Query) DgraphPredicate() string {
 	return (*field)(q).DgraphPredicate()
 }
 
-func (q *query) AbstractType() bool {
+func (q *Query) AbstractType() bool {
 	return (*field)(q).AbstractType()
 }
 
-func (q *query) TypeName(dgraphTypes []string) string {
+func (q *Query) TypeName(dgraphTypes []string) string {
 	return (*field)(q).TypeName(dgraphTypes)
 }
 
-func (q *query) IncludeAbstractField(dgraphTypes []string) bool {
+func (q *Query) IncludeAbstractField(dgraphTypes []string) bool {
 	return (*field)(q).IncludeAbstractField(dgraphTypes)
 }
 
-func (m *mutation) Name() string {
+func (m *Mutation) Name() string {
 	return (*field)(m).Name()
 }
 
-func (m *mutation) RemoteResponseName() string {
+func (m *Mutation) RemoteResponseName() string {
 	return (*field)(m).RemoteResponseName()
 }
 
-func (m *mutation) Alias() string {
+func (m *Mutation) Alias() string {
 	return (*field)(m).Alias()
 }
 
-func (m *mutation) DgraphAlias() string {
+func (m *Mutation) DgraphAlias() string {
 	return m.Name()
 }
 
-func (m *mutation) SetArgTo(arg string, val interface{}) {
+func (m *Mutation) SetArgTo(arg string, val interface{}) {
 	(*field)(m).SetArgTo(arg, val)
 }
 
-func (m *mutation) IsArgListType(name string) bool {
+func (m *Mutation) IsArgListType(name string) bool {
 	return (*field)(m).IsArgListType(name)
 }
 
-func (m *mutation) Arguments() map[string]interface{} {
+func (m *Mutation) Arguments() map[string]interface{} {
 	return (*field)(m).Arguments()
 }
 
-func (m *mutation) ArgValue(name string) interface{} {
+func (m *Mutation) ArgValue(name string) interface{} {
 	return (*field)(m).ArgValue(name)
 }
 
-func (m *mutation) Skip() bool {
+func (m *Mutation) Skip() bool {
 	return false
 }
 
-func (m *mutation) Include() bool {
+func (m *Mutation) Include() bool {
 	return true
 }
 
-func (m *mutation) SkipField(dgraphTypes []string, seenField map[string]bool) bool {
+func (m *Mutation) SkipField(dgraphTypes []string, seenField map[string]bool) bool {
 	return (*field)(m).SkipField(dgraphTypes, seenField)
 }
 
-func (m *mutation) Cascade() []string {
+func (m *Mutation) Cascade() []string {
 	return (*field)(m).Cascade()
 }
 
-func (m *mutation) ApolloRequiredFields() []string {
+func (m *Mutation) ApolloRequiredFields() []string {
 	return (*field)(m).ApolloRequiredFields()
 }
 
-func (m *mutation) CustomRequiredFields() map[string]FieldDefinition {
+func (m *Mutation) CustomRequiredFields() map[string]FieldDefinition {
 	return (*field)(m).CustomRequiredFields()
 }
 
-func (m *mutation) IsCustomHTTP() bool {
+func (m *Mutation) IsCustomHTTP() bool {
 	return (*field)(m).IsCustomHTTP()
 }
 
-func (m *mutation) HasCustomHTTPChild() bool {
+func (m *Mutation) HasCustomHTTPChild() bool {
 	return (*field)(m).HasCustomHTTPChild()
 }
 
-func (m *mutation) HasLambdaDirective() bool {
+func (m *Mutation) HasLambdaDirective() bool {
 	return (*field)(m).HasLambdaDirective()
 }
 
-func (m *mutation) Type() Type {
+func (m *Mutation) Type() Type {
 	return (*field)(m).Type()
 }
 
-func (m *mutation) AbstractType() bool {
+func (m *Mutation) AbstractType() bool {
 	return (*field)(m).AbstractType()
 }
 
-func (m *mutation) XIDArgs() map[string]string {
+func (m *Mutation) XIDArgs() map[string]string {
 	return (*field)(m).XIDArgs()
 }
 
-func (m *mutation) IDArgValue() (map[string]string, uint64, error) {
+func (m *Mutation) IDArgValue() (map[string]string, uint64, error) {
 	return (*field)(m).IDArgValue()
 }
 
-func (m *mutation) SelectionSet() []Field {
+func (m *Mutation) SelectionSet() []Field {
 	return (*field)(m).SelectionSet()
 }
 
-func (m *mutation) QueryField() Field {
+func (m *Mutation) QueryField() Field {
 	for _, f := range m.SelectionSet() {
 		if f.Name() == NumUid || f.Name() == Typename || f.Name() == Msg {
 			continue
@@ -2180,7 +2157,7 @@ func (m *mutation) QueryField() Field {
 	return nil
 }
 
-func (m *mutation) NumUidsField() Field {
+func (m *Mutation) NumUidsField() Field {
 	for _, f := range m.SelectionSet() {
 		if f.Name() == NumUid {
 			return f
@@ -2189,15 +2166,15 @@ func (m *mutation) NumUidsField() Field {
 	return nil
 }
 
-func (m *mutation) HasLambdaOnMutate() bool {
+func (m *Mutation) HasLambdaOnMutate() bool {
 	return m.op.inSchema.lambdaOnMutate[m.Name()]
 }
 
-func (m *mutation) Location() x.Location {
+func (m *Mutation) Location() x.Location {
 	return (*field)(m).Location()
 }
 
-func (m *mutation) ResponseName() string {
+func (m *Mutation) ResponseName() string {
 	return (*field)(m).ResponseName()
 }
 
@@ -2206,24 +2183,24 @@ func (m *mutation) ResponseName() string {
 // It's not the same as the response type of m because mutations don't directly
 // return what they mutate.  Mutations return a payload package that includes
 // the actual node mutated as a field.
-func (m *mutation) MutatedType() Type {
+func (m *Mutation) MutatedType() Type {
 	// ATM there's a single field in the mutation payload.
 	return m.op.inSchema.mutatedType[m.Name()]
 }
 
-func (m *mutation) CustomHTTPConfig(ns uint64) (*FieldHTTPConfig, error) {
+func (m *Mutation) CustomHTTPConfig(ns uint64) (*FieldHTTPConfig, error) {
 	return getCustomHTTPConfig((*field)(m), true, ns)
 }
 
-func (m *mutation) EnumValues() []string {
+func (m *Mutation) EnumValues() []string {
 	return nil
 }
 
-func (m *mutation) GetObjectName() string {
+func (m *Mutation) GetObjectName() string {
 	return m.field.ObjectDefinition.Name
 }
 
-func (m *mutation) MutationType() MutationType {
+func (m *Mutation) MutationType() MutationType {
 	return mutationType(m.Name(), m.op.inSchema.customDirectives["Mutation"][m.Name()])
 }
 
@@ -2242,55 +2219,55 @@ func mutationType(name string, custom *ast.Directive) MutationType {
 	}
 }
 
-func (m *mutation) Operation() Operation {
+func (m *Mutation) Operation() Operation {
 	return (*field)(m).Operation()
 }
 
-func (m *mutation) DgraphPredicate() string {
+func (m *Mutation) DgraphPredicate() string {
 	return (*field)(m).DgraphPredicate()
 }
 
-func (m *mutation) TypeName(dgraphTypes []string) string {
+func (m *Mutation) TypeName(dgraphTypes []string) string {
 	return (*field)(m).TypeName(dgraphTypes)
 }
 
-func (m *mutation) IncludeAbstractField(dgraphTypes []string) bool {
+func (m *Mutation) IncludeAbstractField(dgraphTypes []string) bool {
 	return (*field)(m).IncludeAbstractField(dgraphTypes)
 }
 
-func (m *mutation) IsAuthQuery() bool {
+func (m *Mutation) IsAuthQuery() bool {
 	return (*field)(m).field.Arguments.ForName("dgraph.uid") != nil
 }
 
-func (m *mutation) IsAggregateField() bool {
+func (m *Mutation) IsAggregateField() bool {
 	return (*field)(m).IsAggregateField()
 }
 
-func (m *mutation) GqlErrorf(path []interface{}, message string, args ...interface{}) *x.GqlError {
+func (m *Mutation) GqlErrorf(path []interface{}, message string, args ...interface{}) *x.GqlError {
 	return (*field)(m).GqlErrorf(path, message, args...)
 }
 
-func (m *mutation) MaxPathLength() int {
+func (m *Mutation) MaxPathLength() int {
 	return (*field)(m).MaxPathLength()
 }
 
-func (m *mutation) PreAllocatePathSlice() []interface{} {
+func (m *Mutation) PreAllocatePathSlice() []interface{} {
 	return (*field)(m).PreAllocatePathSlice()
 }
 
-func (m *mutation) NullValue() []byte {
+func (m *Mutation) NullValue() []byte {
 	return (*field)(m).NullValue()
 }
 
-func (m *mutation) NullResponse() []byte {
+func (m *Mutation) NullResponse() []byte {
 	return (*field)(m).NullResponse()
 }
 
-func (m *mutation) CompleteAlias(buf *bytes.Buffer) {
+func (m *Mutation) CompleteAlias(buf *bytes.Buffer) {
 	(*field)(m).CompleteAlias(buf)
 }
 
-func (m *mutation) GetAuthMeta() *authorization.AuthMeta {
+func (m *Mutation) GetAuthMeta() *authorization.AuthMeta {
 	return (*field)(m).GetAuthMeta()
 }
 
