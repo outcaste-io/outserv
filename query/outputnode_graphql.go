@@ -69,11 +69,11 @@ type customFieldResult struct {
 
 // encodeInput represents the input required for the encode call.
 type encodeInput struct {
-	parentField gqlSchema.Field   // parentField is the parent of all the fields in childSelSet
-	parentPath  []interface{}     // parentPath is the path for parent field in JSON response
-	fj          fastJsonNode      // fj is the fastJson node corresponding to parentField
-	fjIsRoot    bool              // fjIsRoot tells whether fj is the root fastJson node or not
-	childSelSet []gqlSchema.Field // childSelSet contains all the fields in the selection set of
+	parentField *gqlSchema.Field   // parentField is the parent of all the fields in childSelSet
+	parentPath  []interface{}      // parentPath is the path for parent field in JSON response
+	fj          fastJsonNode       // fj is the fastJson node corresponding to parentField
+	fjIsRoot    bool               // fjIsRoot tells whether fj is the root fastJson node or not
+	childSelSet []*gqlSchema.Field // childSelSet contains all the fields in the selection set of
 	// parentField. Data corresponding to childSelSet will be present in fj's children.
 }
 
@@ -178,9 +178,9 @@ func (genc *graphQLEncoder) encode(encInp encodeInput) bool {
 	seenField := make(map[string]bool) // seenField map keeps track of fields which have been seen
 	// as part of interface to avoid double entry in the resulting response
 
-	var curSelection gqlSchema.Field // used to store the current selection in the childSelSet
-	var curSelectionIsDgList bool    // indicates whether the curSelection is list stored in Dgraph
-	var cur, next fastJsonNode       // used to iterate over data in fastJson nodes
+	var curSelection *gqlSchema.Field // used to store the current selection in the childSelSet
+	var curSelectionIsDgList bool     // indicates whether the curSelection is list stored in Dgraph
+	var cur, next fastJsonNode        // used to iterate over data in fastJson nodes
 
 	// We need to keep iterating only if:
 	// 1. There is data to be processed for the current level. AND,
@@ -588,7 +588,7 @@ func (genc *graphQLEncoder) extractRequiredFieldsData(parentNode fastJsonNode,
 // If the current field had @custom(http: {...}), then we need to find the fastJson node which
 // stores data for this field from the customNodes mapping, and use that to write the value
 // for this field.
-func (genc *graphQLEncoder) writeCustomField(curSelection gqlSchema.Field,
+func (genc *graphQLEncoder) writeCustomField(curSelection *gqlSchema.Field,
 	customNodes map[uint16]fastJsonNode, parentPath []interface{}) bool {
 	if cNode := customNodes[genc.idForAttr(curSelection.DgraphAlias())]; cNode != nil {
 		// if we found the custom fastJson node, then directly write the value stored
@@ -609,14 +609,14 @@ func (genc *graphQLEncoder) writeCustomField(curSelection gqlSchema.Field,
 	return false
 }
 
-func (genc *graphQLEncoder) initChildAttrId(field gqlSchema.Field) {
+func (genc *graphQLEncoder) initChildAttrId(field *gqlSchema.Field) {
 	for _, f := range field.SelectionSet() {
 		_ = genc.idForAttr(f.DgraphAlias())
 		genc.initChildAttrId(f)
 	}
 }
 
-func (genc *graphQLEncoder) processCustomFields(field gqlSchema.Field, n fastJsonNode) {
+func (genc *graphQLEncoder) processCustomFields(field *gqlSchema.Query, n fastJsonNode) {
 	if field.HasCustomHTTPChild() {
 		// initially, create attr ids for all the descendents of this field,
 		// so that they don't result in race-conditions later
@@ -672,7 +672,7 @@ func (genc *graphQLEncoder) processCustomFields(field gqlSchema.Field, n fastJso
 			wg.Done()
 		}()
 		// extract the representations for Apollo _entities query and store them in GraphQL encoder
-		if q, ok := field.(gqlSchema.Query); ok && q.QueryType() == gqlSchema.EntitiesQuery {
+		if q, ok := field.(*gqlSchema.Query); ok && q.QueryType() == gqlSchema.EntitiesQuery {
 			// ignore the error here, as that should have been taken care of during query rewriting
 			genc.entityRepresentations, _ = q.RepresentationsArg()
 		}
@@ -1089,7 +1089,7 @@ func (genc *graphQLEncoder) resolveNestedFields(childField gqlSchema.Field,
 // 		}
 // which doesn't request any aggregate properties. In this case the fastJson node won't have any
 // children and we just need to write null as the value of the query.
-func (genc *graphQLEncoder) completeRootAggregateQuery(fj fastJsonNode, query gqlSchema.Field,
+func (genc *graphQLEncoder) completeRootAggregateQuery(fj fastJsonNode, query *gqlSchema.Field,
 	qryPath []interface{}) fastJsonNode {
 	if genc.children(fj) == nil {
 		x.Check2(genc.buf.Write(gqlSchema.JsonNull))
@@ -1154,7 +1154,7 @@ func (genc *graphQLEncoder) completeRootAggregateQuery(fj fastJsonNode, query gq
 // 		  }
 // 		}
 func (genc *graphQLEncoder) completeAggregateChildren(fj fastJsonNode,
-	field gqlSchema.Field, fieldPath []interface{}, respIsNull bool) fastJsonNode {
+	field *gqlSchema.Field, fieldPath []interface{}, respIsNull bool) fastJsonNode {
 	if !respIsNull {
 		// first we need to skip all the nodes returned with the attr of field as they are not
 		// needed in GraphQL.
@@ -1208,7 +1208,7 @@ func (genc *graphQLEncoder) completeAggregateChildren(fj fastJsonNode,
 
 // completeGeoObject builds a json GraphQL result object for the underlying geo type.
 // Currently, it supports Point, Polygon and MultiPolygon.
-func completeGeoObject(path []interface{}, field gqlSchema.Field, val map[string]interface{},
+func completeGeoObject(path []interface{}, field *gqlSchema.Field, val map[string]interface{},
 	buf *bytes.Buffer) *x.GqlError {
 	coordinate, _ := val[gqlSchema.Coordinates].([]interface{})
 	if coordinate == nil {
@@ -1358,7 +1358,7 @@ func completeMultiPolygon(field gqlSchema.Field, multiPolygon []interface{}, buf
 }
 
 // cantCoerceScalar tells whether a scalar value can be coerced to its corresponding GraphQL scalar.
-func cantCoerceScalar(val []byte, field gqlSchema.Field) bool {
+func cantCoerceScalar(val []byte, field *gqlSchema.Field) bool {
 	switch field.Type().Name() {
 	case "Int":
 		// Although GraphQL layer would have input coercion for Int,
@@ -1408,13 +1408,13 @@ func checkAndStripComma(buf *bytes.Buffer) {
 
 // getTypename returns the JSON bytes for the __typename field, given the dgraph.type values
 // extracted from dgraph response.
-func getTypename(f gqlSchema.Field, dgraphTypes []string) []byte {
+func getTypename(f *gqlSchema.Field, dgraphTypes []string) []byte {
 	return []byte(`"` + f.TypeName(dgraphTypes) + `"`)
 }
 
 // writeGraphQLNull writes null value for the given field to the buffer.
 // If the field is non-nullable, it returns false, otherwise it returns true.
-func writeGraphQLNull(f gqlSchema.Field, buf *bytes.Buffer, keyEndPos int) bool {
+func writeGraphQLNull(f *gqlSchema.Field, buf *bytes.Buffer, keyEndPos int) bool {
 	if b := f.NullValue(); b != nil {
 		buf.Truncate(keyEndPos) // truncate to make sure we write null correctly
 		x.Check2(buf.Write(b))

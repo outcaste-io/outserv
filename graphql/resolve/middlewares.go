@@ -19,10 +19,10 @@ package resolve
 import (
 	"context"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 )
 
@@ -66,7 +66,7 @@ func (mws QueryMiddlewares) Then(resolver QueryResolver) QueryResolver {
 	}
 	if resolver == nil {
 		resolver = QueryResolverFunc(func(ctx context.Context, query schema.Query) *Resolved {
-			return &Resolved{Field: query}
+			return &Resolved{Field: query.field}
 		})
 	}
 	for i := len(mws) - 1; i >= 0; i-- {

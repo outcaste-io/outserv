@@ -34,7 +34,7 @@ import (
 )
 
 // ToJson converts the list of subgraph into a JSON response by calling toFastJSON.
-func ToJson(ctx context.Context, l *Latency, sgl []*SubGraph, field gqlSchema.Field) ([]byte, error) {
+func ToJson(ctx context.Context, l *Latency, sgl []*SubGraph, field *gqlSchema.Field) ([]byte, error) {
 	sgr := &SubGraph{}
 	for _, sg := range sgl {
 		if sg.Params.Alias == "var" || sg.Params.Alias == "shortest" {
@@ -1099,7 +1099,7 @@ type Extensions struct {
 }
 
 func (sg *SubGraph) toFastJSON(
-	ctx context.Context, l *Latency, field gqlSchema.Field) ([]byte, error) {
+	ctx context.Context, l *Latency, field *gqlSchema.Field) ([]byte, error) {
 	encodingStart := time.Now()
 	defer func() {
 		l.Json = time.Since(encodingStart)
@@ -1153,7 +1153,7 @@ func (sg *SubGraph) toDqlJSON(enc *encoder, n fastJsonNode) error {
 	return enc.encode(n)
 }
 
-func (sg *SubGraph) toGraphqlJSON(genc *graphQLEncoder, n fastJsonNode, f gqlSchema.Field) error {
+func (sg *SubGraph) toGraphqlJSON(genc *graphQLEncoder, n fastJsonNode, f *gqlSchema.Query) error {
 	// GraphQL queries will always have at least one query whose results are visible to users,
 	// implying that the root fastJson node will always have at least one child. So, no need
 	// to check for the case where there are no children for the root fastJson node.
@@ -1167,7 +1167,7 @@ func (sg *SubGraph) toGraphqlJSON(genc *graphQLEncoder, n fastJsonNode, f gqlSch
 		parentPath:  f.PreAllocatePathSlice(),
 		fj:          n,
 		fjIsRoot:    true,
-		childSelSet: []gqlSchema.Field{f},
+		childSelSet: []*gqlSchema.Field{f},
 	}) {
 		// if genc.encode() didn't finish successfully here, that means we need to send
 		// data as null in the GraphQL response like this:

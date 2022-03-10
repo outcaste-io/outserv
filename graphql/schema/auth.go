@@ -48,7 +48,7 @@ type RuleNode struct {
 	Or        []*RuleNode
 	And       []*RuleNode
 	Not       *RuleNode
-	Rule      *Query
+	Rule      *Field
 	DQLRule   *gql.GraphQuery
 	RBACRule  *RBACQuery
 	Variables ast.VariableDefinitionList
@@ -587,7 +587,8 @@ func gqlValidateRule(sch *schema, typ *ast.Definition, rule string, node *RuleNo
 	// recursively expand fragments in operation as selection set fields
 	recursivelyExpandFragmentSelections(f, opWrapper)
 
-	node.Rule = &Query{
+	node.Rule = &Field{
+		Kind:  QueryKind,
 		field: f,
 		op:    opWrapper,
 		sel:   op.SelectionSet[0]}
