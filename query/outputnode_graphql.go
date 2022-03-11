@@ -541,7 +541,7 @@ func (genc *graphQLEncoder) extractDgraphTypes(child fastJsonNode) (fastJsonNode
 // The keys in the returned map correspond to the name of a required field.
 // Values in the map correspond to the extracted data for a required field.
 func (genc *graphQLEncoder) extractRequiredFieldsData(parentNode fastJsonNode,
-	rfDefs map[string]gqlSchema.FieldDefinition) (map[string]interface{}, []string) {
+	rfDefs map[string]*gqlSchema.FieldDefinition) (map[string]interface{}, []string) {
 	child := genc.children(parentNode)
 	// first, just skip all the custom nodes
 	for ; child != nil && genc.getCustom(child); child = child.next {

@@ -214,7 +214,7 @@ func createEmptyDQLRule(typeName string) *RuleNode {
 	}
 }
 
-func authRules(sch *schema) (map[string]*TypeAuth, error) {
+func authRules(sch *Schema) (map[string]*TypeAuth, error) {
 	s := sch.schema
 	//TODO: Add position in error.
 	var errResult, err error
@@ -322,7 +322,7 @@ func mergeAuthRules(
 }
 
 func parseAuthDirective(
-	sch *schema,
+	sch *Schema,
 	typ *ast.Definition,
 	dir *ast.Directive) (*AuthContainer, error) {
 
@@ -361,7 +361,7 @@ func parseAuthDirective(
 	return result, errResult
 }
 
-func parseAuthNode(sch *schema, typ *ast.Definition, val *ast.Value) (*RuleNode, error) {
+func parseAuthNode(sch *Schema, typ *ast.Definition, val *ast.Value) (*RuleNode, error) {
 
 	if len(val.Children) == 0 {
 		return nil, gqlerror.Errorf("Type %s: @auth: no arguments - "+
@@ -526,7 +526,7 @@ func validateRBACOperators(typ *ast.Definition, query *RBACQuery) (bool, string)
 	return true, ""
 }
 
-func gqlValidateRule(sch *schema, typ *ast.Definition, rule string, node *RuleNode) error {
+func gqlValidateRule(sch *Schema, typ *ast.Definition, rule string, node *RuleNode) error {
 	doc, gqlErr := parser.ParseQuery(&ast.Source{Input: rule})
 	if gqlErr != nil {
 		return gqlerror.Errorf("Type %s: @auth: failed to parse GraphQL rule "+

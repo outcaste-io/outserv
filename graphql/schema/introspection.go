@@ -30,11 +30,7 @@ func Introspect(q *Field) (json.RawMessage, error) {
 			"this indicates bug. Please let us know by filing an issue.")
 	}
 
-	sch, ok := q.Operation().Schema().(*schema)
-	if !ok {
-		return nil, errors.New("couldn't convert schema to internal type " +
-			"this indicates bug. Please let us know by filing an issue.")
-	}
+	sch := q.Operation().Schema()
 
 	op, ok := q.Operation().(*operation)
 	if !ok {

@@ -124,7 +124,7 @@ type DgraphExecutor interface {
 type UpsertMutation struct {
 	Query     []*gql.GraphQuery
 	Mutations []*pb.Mutation
-	NewNodes  map[string]schema.Type
+	NewNodes  map[string]*schema.Type
 }
 
 // DgraphExecutorFunc is an adapter that allows us to compose dgraph execution and
@@ -367,7 +367,7 @@ func (mr *dgraphResolver) rewriteAndExecute(
 	}
 
 	result := make(map[string]interface{})
-	newNodes := make(map[string]schema.Type)
+	newNodes := make(map[string]*schema.Type)
 
 	mutationTimer := newtimer(ctx, &dgraphMutationDuration.OffsetDuration)
 	mutationTimer.Start()
@@ -557,7 +557,7 @@ func authorizeNewNodes(
 	ctx context.Context,
 	m *schema.Field,
 	uids map[string]string,
-	newNodeTypes map[string]schema.Type,
+	newNodeTypes map[string]*schema.Type,
 	queryExecutor DgraphExecutor,
 	txn *pb.TxnContext) error {
 
@@ -576,7 +576,7 @@ func authorizeNewNodes(
 	// Collect all the newly created nodes in type groups
 
 	newByType := make(map[string][]uint64)
-	namesToType := make(map[string]schema.Type)
+	namesToType := make(map[string]*schema.Type)
 	for nodeName, nodeTyp := range newNodeTypes {
 		if uidStr, created := uids[nodeName]; created {
 			uid, err := strconv.ParseUint(uidStr, 0, 64)

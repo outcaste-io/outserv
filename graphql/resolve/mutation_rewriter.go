@@ -95,7 +95,7 @@ type mutationFragment struct {
 	fragment   interface{}
 	deletes    []interface{}
 	check      resultChecker
-	newNodes   map[string]schema.Type
+	newNodes   map[string]*schema.Type
 }
 
 // xidMetadata is used to handle cases where we get multiple objects which have same xid value in a
@@ -135,7 +135,7 @@ func NewVariableGenerator() *VariableGenerator {
 // Next gets the Next variable name for the given type and xid.
 // So, if two objects of the same type have same value for xid field,
 // then they will get same variable name.
-func (v *VariableGenerator) Next(typ schema.Type, xidName, xidVal string, auth bool) string {
+func (v *VariableGenerator) Next(typ *schema.Type, xidName, xidVal string, auth bool) string {
 	// return previously allocated variable name for repeating xidVal
 	var key string
 	flagAndXidName := xidName
@@ -231,7 +231,7 @@ func NewXidMetadata() *xidMetadata {
 //		b. newXidObj has some values other than xids and isn't equal to existingXidObject
 // It is used in places where we don't want to allow duplicates.
 func (xidMetadata *xidMetadata) isDuplicateXid(atTopLevel bool, xidVar string,
-	newXidObj map[string]interface{}, srcField schema.FieldDefinition, isXID map[string]bool) bool {
+	newXidObj map[string]interface{}, srcField *schema.FieldDefinition, isXID map[string]bool) bool {
 	if atTopLevel && xidMetadata.seenAtTopLevel[xidVar] {
 		return true
 	}
@@ -495,7 +495,7 @@ func (arw *AddRewriter) Rewrite(
 	// This is collated from newNodes of each fragment.
 	// Example
 	// newNodes["Project3"] = schema.Type(Project)
-	newNodes := make(map[string]schema.Type)
+	newNodes := make(map[string]*schema.Type)
 	// mutationsAll stores mutations computed from fragment. These are returned as Mutation parameter
 	// of UpsertMutation
 	var mutationsAll []*pb.Mutation
@@ -644,7 +644,7 @@ func (urw *UpdateRewriter) Rewrite(
 	// This is collated from newNodes of each fragment.
 	// Example
 	// newNodes["Project3"] = schema.Type(Project)
-	newNodes := make(map[string]schema.Type)
+	newNodes := make(map[string]*schema.Type)
 	// mutations stores mutations computed from fragment. These are returned as Mutation parameter
 	// of UpsertMutation
 	var mutations []*pb.Mutation
@@ -1200,7 +1200,7 @@ func asUID(val interface{}) (uint64, error) {
 	return uid, nil
 }
 
-func addAuthSelector(t schema.Type) *schema.RuleNode {
+func addAuthSelector(t *schema.Type) *schema.RuleNode {
 	auth := t.AuthRules()
 	if auth == nil || auth.Rules == nil {
 		return nil
@@ -1209,7 +1209,7 @@ func addAuthSelector(t schema.Type) *schema.RuleNode {
 	return auth.Rules.Add
 }
 
-func updateAuthSelector(t schema.Type) *schema.RuleNode {
+func updateAuthSelector(t *schema.Type) *schema.RuleNode {
 	auth := t.AuthRules()
 	if auth == nil || auth.Rules == nil {
 		return nil
@@ -1218,7 +1218,7 @@ func updateAuthSelector(t schema.Type) *schema.RuleNode {
 	return auth.Rules.Update
 }
 
-func deleteAuthSelector(t schema.Type) *schema.RuleNode {
+func deleteAuthSelector(t *schema.Type) *schema.RuleNode {
 	auth := t.AuthRules()
 	if auth == nil || auth.Rules == nil {
 		return nil
@@ -1259,7 +1259,7 @@ func mutationFromFragment(
 }
 
 func checkXIDExistsQuery(
-	xidVariable, xidString, xidPredicate string, typ schema.Type) *gql.GraphQuery {
+	xidVariable, xidString, xidPredicate string, typ *schema.Type) *gql.GraphQuery {
 	qry := &gql.GraphQuery{
 		Attr: xidVariable,
 		Func: &gql.Function{
@@ -1307,7 +1307,7 @@ func checkUIDExistsQuery(val interface{}, variable string) (*gql.GraphQuery, err
 func asIDReference(
 	ctx context.Context,
 	val interface{},
-	srcField schema.FieldDefinition,
+	srcField *schema.FieldDefinition,
 	srcUID string,
 	varGen *VariableGenerator,
 	isRemove bool) *mutationFragment {
@@ -1356,8 +1356,8 @@ func asIDReference(
 // In all other cases, upsertVar is "".
 func rewriteObject(
 	ctx context.Context,
-	typ schema.Type,
-	srcField schema.FieldDefinition,
+	typ *schema.Type,
+	srcField *schema.FieldDefinition,
 	srcUID string,
 	varGen *VariableGenerator,
 	obj map[string]interface{},
@@ -1769,7 +1769,7 @@ func rewriteObject(
 	return frag, upsertVar, retErrors
 }
 
-func xidErrorForInterfaceType(typ schema.Type, xidString string, xid schema.FieldDefinition,
+func xidErrorForInterfaceType(typ *schema.Type, xidString string, xid *schema.FieldDefinition,
 	interfaceName string) error {
 	// TODO(Jatin): currently we are checking typ of the mutated field for auth rules,
 	//  But we need to check auth rule on implementing type for which we found existing node
@@ -1791,8 +1791,8 @@ func xidErrorForInterfaceType(typ schema.Type, xidString string, xid schema.Fiel
 // Look at description of RewriteQueries for an example of generated existence queries.
 func existenceQueries(
 	ctx context.Context,
-	typ schema.Type,
-	srcField schema.FieldDefinition,
+	typ *schema.Type,
+	srcField *schema.FieldDefinition,
 	varGen *VariableGenerator,
 	obj map[string]interface{},
 	xidMetadata *xidMetadata) ([]*gql.GraphQuery, []string, []error) {
@@ -2007,8 +2007,8 @@ func existenceQueries(
 
 func existenceQueriesUnion(
 	ctx context.Context,
-	parentTyp schema.Type,
-	srcField schema.FieldDefinition,
+	parentTyp *schema.Type,
+	srcField *schema.FieldDefinition,
 	varGen *VariableGenerator,
 	obj map[string]interface{},
 	xidMetadata *xidMetadata,
@@ -2032,7 +2032,7 @@ func existenceQueriesUnion(
 		return nil, nil, retError
 	}
 
-	var newtyp schema.Type
+	var newtyp *schema.Type
 	for memberRef, memberRefVal := range obj {
 		memberTypeName := strings.ToUpper(memberRef[:1]) + memberRef[1:len(
 			memberRef)-3]
@@ -2049,7 +2049,7 @@ func existenceQueriesUnion(
 // So, just rewrite it as an object with correct underlying type.
 func rewriteUnionField(
 	ctx context.Context,
-	srcField schema.FieldDefinition,
+	srcField *schema.FieldDefinition,
 	srcUID string,
 	varGen *VariableGenerator,
 	obj map[string]interface{},
@@ -2057,7 +2057,7 @@ func rewriteUnionField(
 	existenceQueriesResult map[string]string,
 	mutationType MutationType) (*mutationFragment, string, []error) {
 
-	var newtyp schema.Type
+	var newtyp *schema.Type
 	for memberRef, memberRefVal := range obj {
 		memberTypeName := strings.ToUpper(memberRef[:1]) + memberRef[1:len(
 			memberRef)-3]
@@ -2070,7 +2070,7 @@ func rewriteUnionField(
 
 // rewriteGeoObject rewrites the given value correctly based on the underlying Geo type.
 // Currently, it supports Point, Polygon and MultiPolygon.
-func rewriteGeoObject(val map[string]interface{}, typ schema.Type) []interface{} {
+func rewriteGeoObject(val map[string]interface{}, typ *schema.Type) []interface{} {
 	switch typ.Name() {
 	case schema.Point:
 		return rewritePoint(val)
@@ -2158,7 +2158,7 @@ func addAdditionalDeletes(
 	ctx context.Context,
 	frag *mutationFragment,
 	varGen *VariableGenerator,
-	srcField schema.FieldDefinition,
+	srcField *schema.FieldDefinition,
 	srcUID, variable string) {
 
 	if srcField == nil {
@@ -2219,7 +2219,7 @@ func addDelete(
 	frag *mutationFragment,
 	varGen *VariableGenerator,
 	qryVar, excludeVar string,
-	qryFld, delFld schema.FieldDefinition) {
+	qryFld, delFld *schema.FieldDefinition) {
 
 	// only add the delete for singular edges
 	if qryFld.Type().ListType() != nil {
@@ -2384,7 +2384,7 @@ func authCheck(chk resultChecker, qry string) resultChecker {
 	}
 }
 
-func attachChild(res map[string]interface{}, parent schema.Type, child schema.FieldDefinition, childUID string) {
+func attachChild(res map[string]interface{}, parent *schema.Type, child *schema.FieldDefinition, childUID string) {
 	if parent == nil {
 		return
 	}
@@ -2396,7 +2396,7 @@ func attachChild(res map[string]interface{}, parent schema.Type, child schema.Fi
 	}
 }
 
-func deleteInverseObject(obj map[string]interface{}, srcField schema.FieldDefinition) {
+func deleteInverseObject(obj map[string]interface{}, srcField *schema.FieldDefinition) {
 	if srcField != nil {
 		invField := srcField.Inverse()
 		if invField != nil && invField.Type().ListType() == nil {
@@ -2405,7 +2405,7 @@ func deleteInverseObject(obj map[string]interface{}, srcField schema.FieldDefini
 	}
 }
 
-func addInverseLink(obj map[string]interface{}, srcField schema.FieldDefinition, srcUID string) {
+func addInverseLink(obj map[string]interface{}, srcField *schema.FieldDefinition, srcUID string) {
 	if srcField != nil {
 		invField := srcField.Inverse()
 		if invField != nil {
@@ -2418,11 +2418,11 @@ func newFragment(f interface{}) *mutationFragment {
 	return &mutationFragment{
 		fragment: f,
 		check:    func(m map[string]interface{}) error { return nil },
-		newNodes: make(map[string]schema.Type),
+		newNodes: make(map[string]*schema.Type),
 	}
 }
 
-func copyTypeMap(from, to map[string]schema.Type) {
+func copyTypeMap(from, to map[string]*schema.Type) {
 	for name, typ := range from {
 		to[name] = typ
 	}
@@ -2477,8 +2477,8 @@ func extractVal(xidVal interface{}, xidName, typeName string) (string, error) {
 
 // This function will return interface type and variable for existence query on interface,
 // if given xid is inherited from interface, otherwise it will return nil and empty string
-func interfaceVariable(typ schema.Type, varGen *VariableGenerator, xidName string,
-	xidString string) (schema.Type, string) {
+func interfaceVariable(typ *schema.Type, varGen *VariableGenerator, xidName string,
+	xidString string) (*schema.Type, string) {
 	interfaceType, isInherited := typ.FieldOriginatedFrom(xidName)
 	fieldDef := typ.Field(xidName)
 	if isInherited && fieldDef.HasInterfaceArg() {
@@ -2489,8 +2489,8 @@ func interfaceVariable(typ schema.Type, varGen *VariableGenerator, xidName strin
 
 // This function returns true if there are multiple nodes present
 // in a result of existence queries
-func gotMultipleExistingNodes(xids []schema.FieldDefinition, obj map[string]interface{},
-	typ schema.Type, varGen *VariableGenerator, idExistence map[string]string) bool {
+func gotMultipleExistingNodes(xids []*schema.FieldDefinition, obj map[string]interface{},
+	typ *schema.Type, varGen *VariableGenerator, idExistence map[string]string) bool {
 
 	var existenceNodeUid string
 	for _, xid := range xids {

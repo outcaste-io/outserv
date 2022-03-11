@@ -314,7 +314,7 @@ func newAdminResolver(
 		}
 		server.mux.RUnlock()
 
-		var gqlSchema schema.Schema
+		var gqlSchema *schema.Schema
 		// on drop_all, we will receive an empty string as the schema update
 		if newSchema.Schema != "" {
 			gqlSchema, err = generateGQLSchema(newSchema, ns)
@@ -425,7 +425,7 @@ func getCurrentGraphQLSchema(namespace uint64) (*worker.GqlSchema, error) {
 	return &worker.GqlSchema{ID: uid, Schema: graphQLSchema}, nil
 }
 
-func generateGQLSchema(sch *worker.GqlSchema, ns uint64) (schema.Schema, error) {
+func generateGQLSchema(sch *worker.GqlSchema, ns uint64) (*schema.Schema, error) {
 	schHandler, err := schema.NewHandler(sch.Schema, false)
 	if err != nil {
 		return nil, err
@@ -584,7 +584,7 @@ func (as *adminServer) incrementSchemaUpdateCounter(ns uint64) {
 	atomic.AddUint64(as.getGlobalEpoch(ns), 1)
 }
 
-func (as *adminServer) resetSchema(ns uint64, gqlSchema schema.Schema) {
+func (as *adminServer) resetSchema(ns uint64, gqlSchema *schema.Schema) {
 	// set status as updating schema
 	mainHealthStore.updatingSchema()
 
@@ -648,7 +648,7 @@ func (as *adminServer) lazyLoadSchema(namespace uint64) error {
 		return errors.Wrap(err, "failed to lazy-load GraphQL schema")
 	}
 
-	var generatedSchema schema.Schema
+	var generatedSchema *schema.Schema
 	if sch.Schema == "" {
 		// if there was no schema stored in Dgraph, we still need to attach resolvers to the main
 		// graphql server which should just return errors for any incoming request.

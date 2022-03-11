@@ -77,9 +77,9 @@ type FieldHTTPConfig struct {
 
 // EntityRepresentations is the parsed form of the `representations` argument in `_entities` query
 type EntityRepresentations struct {
-	TypeDefn Type            // the type corresponding to __typename in the representations argument
-	KeyField FieldDefinition // the definition of the @key field
-	KeyVals  []interface{}   // the list of values corresponding to the key field
+	TypeDefn *Type            // the type corresponding to __typename in the representations argument
+	KeyField *FieldDefinition // the definition of the @key field
+	KeyVals  []interface{}    // the list of values corresponding to the key field
 	// a map of key field value to the input representation for that value. The keys in this map
 	// are the string formatted version of the key field value.
 	KeyValToRepresentation map[string]map[string]interface{}
@@ -107,23 +107,12 @@ const (
 	FilterArgName                     = "filter"
 )
 
-// Schema represents a valid GraphQL schema
-type Schema interface {
-	Operation(r *Request) (Operation, error)
-	Queries(t QueryType) []string
-	Mutations(t MutationType) []string
-	IsFederated() bool
-	SetMeta(meta *metaInfo)
-	Meta() *metaInfo
-	Type(typeName string) Type
-}
-
 // An Operation is a single valid GraphQL operation.  It contains either
 // Queries or Mutations, but not both.  Subscriptions are not yet supported.
 type Operation interface {
 	Queries() []*Field
 	Mutations() []*Field
-	Schema() Schema
+	Schema() *Schema
 	IsQuery() bool
 	IsMutation() bool
 	IsSubscription() bool
@@ -133,63 +122,13 @@ type Operation interface {
 // A Type is a GraphQL type like: Float, T, T! and [T!]!.  If it's not a list, then
 // ListType is nil.  If it's an object type then Field gets field definitions by
 // name from the definition of the type; IDField gets the ID field of the type.
-type Type interface {
-	Field(name string) FieldDefinition
-	Fields() []FieldDefinition
-	IDField() FieldDefinition
-	XIDFields() []FieldDefinition
-	InterfaceImplHasAuthRules() bool
-	PasswordField() FieldDefinition
-	Name() string
-	DgraphName() string
-	DgraphPredicate(fld string) string
-	Nullable() bool
-	// true if this is a union type
-	IsUnion() bool
-	IsInterface() bool
-	// returns a list of member types for this union
-	UnionMembers([]interface{}) []Type
-	ListType() Type
-	Interfaces() []string
-	ImplementingTypes() []Type
-	EnsureNonNulls(map[string]interface{}, string) error
-	FieldOriginatedFrom(fieldName string) (Type, bool)
-	AuthRules() *TypeAuth
-	IsGeo() bool
-	IsAggregateResult() bool
-	IsInbuiltOrEnumType() bool
-	fmt.Stringer
-}
-
-// A FieldDefinition is a field as defined in some Type in the schema.  As opposed
-// to a Field, which is an instance of a query or mutation asking for a field
-// (which in turn must have a FieldDefinition of the right type in the schema.)
-type FieldDefinition interface {
-	Name() string
-	DgraphAlias() string
-	DgraphPredicate() string
-	Type() Type
-	ParentType() Type
-	IsID() bool
-	IsExternal() bool
-	HasIDDirective() bool
-	GetDefaultValue(action string) interface{}
-	HasInterfaceArg() bool
-	Inverse() FieldDefinition
-	WithMemberType(string) FieldDefinition
-	// TODO - It might be possible to get rid of ForwardEdge and just use Inverse() always.
-	ForwardEdge() FieldDefinition
-	// GetAuthMeta returns the Dgraph.Authorization meta information stored in schema
-	GetAuthMeta() *authorization.AuthMeta
-}
-
-type astType struct {
+type Type struct {
 	typ             *ast.Type
-	inSchema        *schema
+	inSchema        *Schema
 	dgraphPredicate map[string]map[string]string
 }
 
-type schema struct {
+type Schema struct {
 	schema *ast.Schema
 	// dgraphPredicate gives us the dgraph predicate corresponding to a typeName + fieldName.
 	// It is pre-computed so that runtime queries and mutations can look it
@@ -198,7 +137,7 @@ type schema struct {
 	// fieldName => dgraphPredicate.
 	dgraphPredicate map[string]map[string]string
 	// Map of mutation field name to mutated type.
-	mutatedType map[string]*astType
+	mutatedType map[string]*Type
 	// Map from typename to ast.Definition
 	typeNameAst map[string][]*ast.Definition
 	// customDirectives stores the mapping of typeName -> fieldName -> @custom definition.
@@ -240,7 +179,7 @@ type operation struct {
 	// The fields below are used by schema introspection queries.
 	query    string
 	doc      *ast.QueryDocument
-	inSchema *schema
+	inSchema *Schema
 }
 
 type FieldKind int
@@ -266,10 +205,13 @@ type Field struct {
 	hasCustomHTTPChild *bool
 }
 
-type fieldDefinition struct {
+// A FieldDefinition is a field as defined in some Type in the schema.  As opposed
+// to a Field, which is an instance of a query or mutation asking for a field
+// (which in turn must have a FieldDefinition of the right type in the schema.)
+type FieldDefinition struct {
 	fieldDef        *ast.FieldDefinition
-	parentType      Type
-	inSchema        *schema
+	parentType      *Type
+	inSchema        *Schema
 	dgraphPredicate map[string]map[string]string
 }
 
@@ -281,7 +223,7 @@ type fieldDefinition struct {
 // 	*Field
 // }
 
-func (s *schema) Queries(t QueryType) []string {
+func (s *Schema) Queries(t QueryType) []string {
 	if s.schema.Query == nil {
 		return nil
 	}
@@ -294,7 +236,7 @@ func (s *schema) Queries(t QueryType) []string {
 	return result
 }
 
-func (s *schema) Mutations(t MutationType) []string {
+func (s *Schema) Mutations(t MutationType) []string {
 	if s.schema.Mutation == nil {
 		return nil
 	}
@@ -307,21 +249,21 @@ func (s *schema) Mutations(t MutationType) []string {
 	return result
 }
 
-func (s *schema) IsFederated() bool {
+func (s *Schema) IsFederated() bool {
 	return s.schema.Types["_Entity"] != nil
 }
 
-func (s *schema) SetMeta(meta *metaInfo) {
+func (s *Schema) SetMeta(meta *metaInfo) {
 	s.meta = meta
 }
 
-func (s *schema) Meta() *metaInfo {
+func (s *Schema) Meta() *metaInfo {
 	return s.meta
 }
 
-func (s *schema) Type(typeName string) Type {
+func (s *Schema) Type(typeName string) *Type {
 	if s.typeNameAst[typeName] != nil {
-		return &astType{
+		return &Type{
 			typ:             &ast.Type{NamedType: typeName},
 			inSchema:        s,
 			dgraphPredicate: s.dgraphPredicate,
@@ -342,7 +284,7 @@ func (o *operation) IsSubscription() bool {
 	return o.op.Operation == ast.Subscription
 }
 
-func (o *operation) Schema() Schema {
+func (o *operation) Schema() *Schema {
 	return o.inSchema
 }
 
@@ -552,13 +494,13 @@ func dgraphMapping(sch *ast.Schema) map[string]map[string]string {
 	return dgraphPredicate
 }
 
-func mutatedTypeMapping(s *schema,
-	dgraphPredicate map[string]map[string]string) map[string]*astType {
+func mutatedTypeMapping(s *Schema,
+	dgraphPredicate map[string]map[string]string) map[string]*Type {
 	if s.schema.Mutation == nil {
 		return nil
 	}
 
-	m := make(map[string]*astType, len(s.schema.Mutation.Fields))
+	m := make(map[string]*Type, len(s.schema.Mutation.Fields))
 	for _, field := range s.schema.Mutation.Fields {
 		mutatedTypeName := ""
 		switch {
@@ -588,7 +530,7 @@ func mutatedTypeMapping(s *schema,
 		typ := def.Fields[0].Type
 		// This would contain mapping of mutation field name to the Type()
 		// for e.g. addPost => astType for Post
-		m[field.Name] = &astType{typ, s, dgraphPredicate}
+		m[field.Name] = &Type{typ, s, dgraphPredicate}
 	}
 	return m
 }
@@ -755,7 +697,7 @@ func (f *Field) IsExternal() bool {
 	return hasExternal(f.field.Definition)
 }
 
-func (fd *fieldDefinition) IsExternal() bool {
+func (fd *FieldDefinition) IsExternal() bool {
 	return hasExternal(fd.fieldDef)
 }
 
@@ -893,10 +835,10 @@ func lambdaOnMutateMappings(s *ast.Schema) map[string]bool {
 }
 
 // AsSchema wraps a github.com/dgraph-io/gqlparser/ast.Schema.
-func AsSchema(s *ast.Schema, ns uint64) (Schema, error) {
+func AsSchema(s *ast.Schema, ns uint64) (*Schema, error) {
 	customDirs, lambdaDirs := customAndLambdaMappings(s, ns)
 	dgraphPredicate := dgraphMapping(s)
-	sch := &schema{
+	sch := &Schema{
 		schema:             s,
 		dgraphPredicate:    dgraphPredicate,
 		typeNameAst:        typeMappings(s),
@@ -1157,9 +1099,9 @@ func (f *Field) Cascade() []string {
 	return fields
 }
 
-func toRequiredFieldDefs(requiredFieldNames map[string]bool, sibling *Field) map[string]FieldDefinition {
-	res := make(map[string]FieldDefinition, len(requiredFieldNames))
-	parentType := &astType{
+func toRequiredFieldDefs(requiredFieldNames map[string]bool, sibling *Field) map[string]*FieldDefinition {
+	res := make(map[string]*FieldDefinition, len(requiredFieldNames))
+	parentType := &Type{
 		typ:             &ast.Type{NamedType: sibling.field.ObjectDefinition.Name},
 		inSchema:        sibling.op.inSchema,
 		dgraphPredicate: sibling.op.inSchema.dgraphPredicate,
@@ -1175,7 +1117,7 @@ func (f *Field) ApolloRequiredFields() []string {
 	return f.op.inSchema.requiresDirectives[f.GetObjectName()][f.Name()]
 }
 
-func (f *Field) CustomRequiredFields() map[string]FieldDefinition {
+func (f *Field) CustomRequiredFields() map[string]*FieldDefinition {
 	custom := f.op.inSchema.customDirectives[f.GetObjectName()][f.Name()]
 	if custom == nil {
 		return nil
@@ -1356,7 +1298,7 @@ func (f *Field) IDArgValue() (xids map[string]string, uid uint64, err error) {
 	return
 }
 
-func (f *Field) Type() Type {
+func (f *Field) Type() *Type {
 	var t *ast.Type
 	if f.field != nil && f.field.Definition != nil {
 		t = f.field.Definition.Type
@@ -1375,7 +1317,7 @@ func (f *Field) Type() Type {
 		t = &ast.Type{NamedType: "__Undefined__", NonNull: false}
 	}
 
-	return &astType{
+	return &Type{
 		typ:             t,
 		inSchema:        f.op.inSchema,
 		dgraphPredicate: f.op.inSchema.dgraphPredicate,
@@ -1394,7 +1336,7 @@ func (f *Field) GetObjectName() string {
 	return f.field.ObjectDefinition.Name
 }
 
-func (t *astType) IsInbuiltOrEnumType() bool {
+func (t *Type) IsInbuiltOrEnumType() bool {
 	_, ok := inbuiltTypeToDgraph[t.Name()]
 	return ok || (t.inSchema.schema.Types[t.Name()].Kind == ast.Enum)
 }
@@ -1638,7 +1580,7 @@ func (q *Field) RepresentationsArg() (*EntityRepresentations, error) {
 
 	// initialize the struct to return
 	entityReprs := &EntityRepresentations{
-		TypeDefn: &astType{
+		TypeDefn: &Type{
 			typ:             &ast.Type{NamedType: typename},
 			inSchema:        q.op.inSchema,
 			dgraphPredicate: q.op.inSchema.dgraphPredicate,
@@ -1695,13 +1637,13 @@ func (q *Field) Rename(newName string) {
 	q.field.Name = newName
 }
 
-func (q *Field) Schema() Schema {
+func (q *Field) Schema() *Schema {
 	return q.op.inSchema
 }
 
 // In case the field f is of type <Type>Aggregate, the Type is retunred.
 // In all other case the function returns the type of field f.
-func (f *Field) ConstructedFor() Type {
+func (f *Field) ConstructedFor() *Type {
 	if !f.IsAggregateField() {
 		return f.Type()
 	}
@@ -1709,7 +1651,7 @@ func (f *Field) ConstructedFor() Type {
 	// f has type of the form <SomeTypeName>AggregateResult
 	fieldName := f.Type().Name()
 	typeName := fieldName[:len(fieldName)-15]
-	return &astType{
+	return &Type{
 		typ: &ast.Type{
 			NamedType: typeName,
 		},
@@ -1840,7 +1782,7 @@ func (m *Field) HasLambdaOnMutate() bool {
 // It's not the same as the response type of m because mutations don't directly
 // return what they mutate.  Mutations return a payload package that includes
 // the actual node mutated as a field.
-func (m *Field) MutatedType() Type {
+func (m *Field) MutatedType() *Type {
 	// ATM there's a single field in the mutation payload.
 	return m.op.inSchema.mutatedType[m.Name()]
 }
@@ -1867,20 +1809,20 @@ func mutationType(name string, custom *ast.Directive) MutationType {
 	}
 }
 
-func (t *astType) AuthRules() *TypeAuth {
+func (t *Type) AuthRules() *TypeAuth {
 	return t.inSchema.authRules[t.DgraphName()]
 }
 
-func (t *astType) IsGeo() bool {
+func (t *Type) IsGeo() bool {
 	return t.Name() == "Point" || t.Name() == "Polygon" || t.Name() == "MultiPolygon"
 }
 
-func (t *astType) IsAggregateResult() bool {
+func (t *Type) IsAggregateResult() bool {
 	return strings.HasSuffix(t.Name(), "AggregateResult")
 }
 
-func (t *astType) Field(name string) FieldDefinition {
-	return &fieldDefinition{
+func (t *Type) Field(name string) *FieldDefinition {
+	return &FieldDefinition{
 		// this ForName lookup is a loop in the underlying schema :-(
 		fieldDef:        t.inSchema.schema.Types[t.Name()].Fields.ForName(name),
 		inSchema:        t.inSchema,
@@ -1889,12 +1831,12 @@ func (t *astType) Field(name string) FieldDefinition {
 	}
 }
 
-func (t *astType) Fields() []FieldDefinition {
-	var result []FieldDefinition
+func (t *Type) Fields() []*FieldDefinition {
+	var result []*FieldDefinition
 
 	for _, fld := range t.inSchema.schema.Types[t.Name()].Fields {
 		result = append(result,
-			&fieldDefinition{
+			&FieldDefinition{
 				fieldDef:        fld,
 				inSchema:        t.inSchema,
 				dgraphPredicate: t.dgraphPredicate,
@@ -1905,23 +1847,23 @@ func (t *astType) Fields() []FieldDefinition {
 	return result
 }
 
-func (fd *fieldDefinition) Name() string {
+func (fd *FieldDefinition) Name() string {
 	return fd.fieldDef.Name
 }
 
-func (fd *fieldDefinition) DgraphAlias() string {
+func (fd *FieldDefinition) DgraphAlias() string {
 	return fd.parentType.Name() + "." + fd.fieldDef.Name
 }
 
-func (fd *fieldDefinition) DgraphPredicate() string {
+func (fd *FieldDefinition) DgraphPredicate() string {
 	return fd.dgraphPredicate[fd.parentType.Name()][fd.Name()]
 }
 
-func (fd *fieldDefinition) IsID() bool {
+func (fd *FieldDefinition) IsID() bool {
 	return isID(fd.fieldDef)
 }
 
-func (fd *fieldDefinition) GetDefaultValue(action string) interface{} {
+func (fd *FieldDefinition) GetDefaultValue(action string) interface{} {
 	if fd.fieldDef == nil {
 		return nil
 	}
@@ -1951,7 +1893,7 @@ func getDefaultValue(fd *ast.FieldDefinition, action string) interface{} {
 	return value.Raw
 }
 
-func (fd *fieldDefinition) HasIDDirective() bool {
+func (fd *FieldDefinition) HasIDDirective() bool {
 	if fd.fieldDef == nil {
 		return false
 	}
@@ -1963,7 +1905,7 @@ func hasIDDirective(fd *ast.FieldDefinition) bool {
 	return id != nil
 }
 
-func (fd *fieldDefinition) HasInterfaceArg() bool {
+func (fd *FieldDefinition) HasInterfaceArg() bool {
 	if fd.fieldDef == nil {
 		return false
 	}
@@ -1995,22 +1937,22 @@ func hasDefault(fd *ast.FieldDefinition) bool {
 	return fd.Directives.ForName(defaultDirective) != nil
 }
 
-func (fd *fieldDefinition) Type() Type {
+func (fd *FieldDefinition) Type() *Type {
 	if fd.fieldDef == nil {
 		return nil
 	}
-	return &astType{
+	return &Type{
 		typ:             fd.fieldDef.Type,
 		inSchema:        fd.inSchema,
 		dgraphPredicate: fd.dgraphPredicate,
 	}
 }
 
-func (fd *fieldDefinition) ParentType() Type {
+func (fd *FieldDefinition) ParentType() *Type {
 	return fd.parentType
 }
 
-func (fd *fieldDefinition) Inverse() FieldDefinition {
+func (fd *FieldDefinition) Inverse() *FieldDefinition {
 
 	invDirective := fd.fieldDef.Directives.ForName(inverseDirective)
 	if invDirective == nil {
@@ -2029,7 +1971,7 @@ func (fd *fieldDefinition) Inverse() FieldDefinition {
 	// fld must exist if the schema passed our validation
 	fld := typ.Fields.ForName(invFieldArg.Value.Raw)
 
-	return &fieldDefinition{
+	return &FieldDefinition{
 		fieldDef:        fld,
 		inSchema:        fd.inSchema,
 		dgraphPredicate: fd.dgraphPredicate,
@@ -2037,9 +1979,9 @@ func (fd *fieldDefinition) Inverse() FieldDefinition {
 	}
 }
 
-func (fd *fieldDefinition) WithMemberType(memberType string) FieldDefinition {
+func (fd *FieldDefinition) WithMemberType(memberType string) *FieldDefinition {
 	// just need to return a copy of this fieldDefinition with type set to memberType
-	return &fieldDefinition{
+	return &FieldDefinition{
 		fieldDef: &ast.FieldDefinition{
 			Name:         fd.fieldDef.Name,
 			Arguments:    fd.fieldDef.Arguments,
@@ -2057,7 +1999,7 @@ func (fd *fieldDefinition) WithMemberType(memberType string) FieldDefinition {
 // ForwardEdge gets the field definition for a forward edge if this field is a reverse edge
 // i.e. if it has a dgraph directive like
 // @dgraph(name: "~movies")
-func (fd *fieldDefinition) ForwardEdge() FieldDefinition {
+func (fd *FieldDefinition) ForwardEdge() *FieldDefinition {
 	dd := fd.fieldDef.Directives.ForName(dgraphDirective)
 	if dd == nil {
 		return nil
@@ -2096,7 +2038,7 @@ func (fd *fieldDefinition) ForwardEdge() FieldDefinition {
 		}
 	}
 
-	return &fieldDefinition{
+	return &FieldDefinition{
 		fieldDef:        fld,
 		inSchema:        fd.inSchema,
 		dgraphPredicate: fd.dgraphPredicate,
@@ -2104,18 +2046,18 @@ func (fd *fieldDefinition) ForwardEdge() FieldDefinition {
 	}
 }
 
-func (fd *fieldDefinition) GetAuthMeta() *authorization.AuthMeta {
+func (fd *FieldDefinition) GetAuthMeta() *authorization.AuthMeta {
 	return fd.inSchema.meta.authMeta
 }
 
-func (t *astType) Name() string {
+func (t *Type) Name() string {
 	if t.typ.NamedType == "" {
 		return t.typ.Elem.NamedType
 	}
 	return t.typ.NamedType
 }
 
-func (t *astType) DgraphName() string {
+func (t *Type) DgraphName() string {
 	typeDef := t.inSchema.schema.Types[t.typ.Name()]
 	name := typeName(typeDef)
 	if name != "" {
@@ -2124,24 +2066,24 @@ func (t *astType) DgraphName() string {
 	return t.Name()
 }
 
-func (t *astType) Nullable() bool {
+func (t *Type) Nullable() bool {
 	return !t.typ.NonNull
 }
 
-func (t *astType) IsInterface() bool {
+func (t *Type) IsInterface() bool {
 	return t.inSchema.schema.Types[t.typ.Name()].Kind == ast.Interface
 }
 
-func (t *astType) IsUnion() bool {
+func (t *Type) IsUnion() bool {
 	return t.inSchema.schema.Types[t.typ.Name()].Kind == ast.Union
 }
 
-func (t *astType) UnionMembers(memberTypesList []interface{}) []Type {
-	var memberTypes []Type
+func (t *Type) UnionMembers(memberTypesList []interface{}) []*Type {
+	var memberTypes []*Type
 	if (memberTypesList) == nil {
 		// if no specific members were requested, find out all the members of this union
 		for _, typName := range t.inSchema.schema.Types[t.typ.Name()].Types {
-			memberTypes = append(memberTypes, &astType{
+			memberTypes = append(memberTypes, &Type{
 				typ:             &ast.Type{NamedType: typName},
 				inSchema:        t.inSchema,
 				dgraphPredicate: t.dgraphPredicate,
@@ -2150,7 +2092,7 @@ func (t *astType) UnionMembers(memberTypesList []interface{}) []Type {
 	} else {
 		// else return wrapper for only the members which were requested
 		for _, typName := range memberTypesList {
-			memberTypes = append(memberTypes, &astType{
+			memberTypes = append(memberTypes, &Type{
 				typ:             &ast.Type{NamedType: typName.(string)},
 				inSchema:        t.inSchema,
 				dgraphPredicate: t.dgraphPredicate,
@@ -2160,11 +2102,11 @@ func (t *astType) UnionMembers(memberTypesList []interface{}) []Type {
 	return memberTypes
 }
 
-func (t *astType) ListType() Type {
+func (t *Type) ListType() *Type {
 	if t.typ == nil || t.typ.Elem == nil {
 		return nil
 	}
-	return &astType{
+	return &Type{
 		typ:             t.typ.Elem,
 		inSchema:        t.inSchema,
 		dgraphPredicate: t.dgraphPredicate}
@@ -2172,11 +2114,11 @@ func (t *astType) ListType() Type {
 
 // DgraphPredicate returns the name of the predicate in Dgraph that represents this
 // type's field fld.  Mostly this will be type_name.field_name,.
-func (t *astType) DgraphPredicate(fld string) string {
+func (t *Type) DgraphPredicate(fld string) string {
 	return t.dgraphPredicate[t.Name()][fld]
 }
 
-func (t *astType) String() string {
+func (t *Type) String() string {
 	if t == nil {
 		return ""
 	}
@@ -2204,7 +2146,7 @@ func (t *astType) String() string {
 	return sb.String()
 }
 
-func (t *astType) IDField() FieldDefinition {
+func (t *Type) IDField() *FieldDefinition {
 	def := t.inSchema.schema.Types[t.Name()]
 	// If the field is of ID type but it is an external field,
 	// then it is stored in Dgraph as string type with Hash index.
@@ -2215,7 +2157,7 @@ func (t *astType) IDField() FieldDefinition {
 
 	for _, fd := range def.Fields {
 		if isID(fd) {
-			return &fieldDefinition{
+			return &FieldDefinition{
 				fieldDef:   fd,
 				inSchema:   t.inSchema,
 				parentType: t,
@@ -2226,7 +2168,7 @@ func (t *astType) IDField() FieldDefinition {
 	return nil
 }
 
-func (t *astType) PasswordField() FieldDefinition {
+func (t *Type) PasswordField() *FieldDefinition {
 	def := t.inSchema.schema.Types[t.Name()]
 	if def.Kind != ast.Object && def.Kind != ast.Interface {
 		return nil
@@ -2237,14 +2179,14 @@ func (t *astType) PasswordField() FieldDefinition {
 		return nil
 	}
 
-	return &fieldDefinition{
+	return &FieldDefinition{
 		fieldDef:   fd,
 		inSchema:   t.inSchema,
 		parentType: t,
 	}
 }
 
-func (t *astType) XIDFields() []FieldDefinition {
+func (t *Type) XIDFields() []*FieldDefinition {
 	def := t.inSchema.schema.Types[t.Name()]
 	if def.Kind != ast.Object && def.Kind != ast.Interface {
 		return nil
@@ -2253,10 +2195,10 @@ func (t *astType) XIDFields() []FieldDefinition {
 	// If field is of ID type but it is an external field,
 	// then it is stored in Dgraph as string type with Hash index.
 	// So it should be returned as an XID Field.
-	var xids []FieldDefinition
+	var xids []*FieldDefinition
 	for _, fd := range def.Fields {
 		if hasIDDirective(fd) || (hasExternal(fd) && isID(fd)) {
-			xids = append(xids, &fieldDefinition{
+			xids = append(xids, &FieldDefinition{
 				fieldDef:   fd,
 				inSchema:   t.inSchema,
 				parentType: t,
@@ -2269,7 +2211,7 @@ func (t *astType) XIDFields() []FieldDefinition {
 }
 
 // InterfaceImplHasAuthRules checks if an interface's implementation has auth rules.
-func (t *astType) InterfaceImplHasAuthRules() bool {
+func (t *Type) InterfaceImplHasAuthRules() bool {
 	schema := t.inSchema.schema
 	types := schema.Types
 	if typ, ok := types[t.Name()]; !ok || typ.Kind != ast.Interface {
@@ -2289,7 +2231,7 @@ func (t *astType) InterfaceImplHasAuthRules() bool {
 	return false
 }
 
-func (t *astType) Interfaces() []string {
+func (t *Type) Interfaces() []string {
 	interfaces := t.inSchema.schema.Types[t.typ.Name()].Interfaces
 	if len(interfaces) == 0 {
 		return nil
@@ -2309,14 +2251,14 @@ func (t *astType) Interfaces() []string {
 	return names
 }
 
-func (t *astType) ImplementingTypes() []Type {
+func (t *Type) ImplementingTypes() []*Type {
 	objects := t.inSchema.schema.PossibleTypes[t.typ.Name()]
 	if len(objects) == 0 {
 		return nil
 	}
-	types := make([]Type, 0, len(objects))
+	types := make([]*Type, 0, len(objects))
 	for _, typ := range objects {
-		types = append(types, &astType{
+		types = append(types, &Type{
 			typ:             &ast.Type{NamedType: typ.Name},
 			inSchema:        t.inSchema,
 			dgraphPredicate: t.dgraphPredicate,
@@ -2360,7 +2302,7 @@ func (t *astType) ImplementingTypes() []Type {
 //
 // and then check ourselves that either there's an ID, or there's all the bits to
 // satisfy a valid post.
-func (t *astType) EnsureNonNulls(obj map[string]interface{}, exclusion string) error {
+func (t *Type) EnsureNonNulls(obj map[string]interface{}, exclusion string) error {
 	for _, fld := range t.inSchema.schema.Types[t.Name()].Fields {
 		if fld.Type.NonNull && !isID(fld) && !hasDefault(fld) && fld.Name != exclusion &&
 			t.inSchema.customDirectives[t.Name()][fld.Name] == nil {
@@ -2685,9 +2627,9 @@ func SubstituteVarsInBody(jsonTemplate interface{}, variables map[string]interfa
 // If the field wasn't inherited, but belonged to this type,then type is returned.
 // Otherwise, nil is returned. Along with type definition we return boolean flag true if field
 // is inherited from interface.
-func (t *astType) FieldOriginatedFrom(fieldName string) (Type, bool) {
+func (t *Type) FieldOriginatedFrom(fieldName string) (*Type, bool) {
 
-	astTyp := &astType{
+	astTyp := &Type{
 		inSchema:        t.inSchema,
 		dgraphPredicate: t.dgraphPredicate,
 	}

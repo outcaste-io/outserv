@@ -41,7 +41,7 @@ type authRewriter struct {
 	// queryType(uid(varName)) {
 	// Once such case is when we perform query in delete mutation.
 	filterByUid bool
-	selector    func(t schema.Type) *schema.RuleNode
+	selector    func(t *schema.Type) *schema.RuleNode
 	varGen      *VariableGenerator
 	varName     string
 	// `parentVarName` is used to link a query with it's previous level.
@@ -113,7 +113,7 @@ func dqlHasCascadeDirective(q *gql.GraphQuery) bool {
 }
 
 // Returns the auth selector to be used depending on the query type.
-func getAuthSelector(queryType schema.QueryType) func(t schema.Type) *schema.RuleNode {
+func getAuthSelector(queryType schema.QueryType) func(t *schema.Type) *schema.RuleNode {
 	if queryType == schema.PasswordQuery {
 		return passwordAuthSelector
 	}
@@ -735,7 +735,7 @@ func extractTypeFromFunc(f *gql.Function) string {
 // DQL which tells us about the queried type at the root.
 func rewriteDQLQueryWithAuth(
 	dgQuery []*gql.GraphQuery,
-	sch schema.Schema,
+	sch *schema.Schema,
 	authRw *authRewriter) ([]*gql.GraphQuery, error) {
 	var dgQueries []*gql.GraphQuery
 	// DQL query may contain multiple query blocks.
@@ -804,7 +804,7 @@ func rewriteDQLQueryWithAuth(
 // This function is used by rewriteAsQuery and aggregateQuery functions
 func addCommonRules(
 	field *schema.Field,
-	fieldType schema.Type,
+	fieldType *schema.Type,
 	authRw *authRewriter) ([]*gql.GraphQuery, schema.RuleResult) {
 	rbac := authRw.evaluateStaticRules(fieldType)
 	dgQuery := &gql.GraphQuery{
@@ -890,7 +890,7 @@ func (authRw *authRewriter) writingAuth() bool {
 // the nodes authorized to be queried, returning a new graphQuery that does the
 // original query and the auth.
 func (authRw *authRewriter) addAuthQueries(
-	typ schema.Type,
+	typ *schema.Type,
 	dgQuery []*gql.GraphQuery,
 	rbacEval schema.RuleResult) []*gql.GraphQuery {
 
@@ -910,7 +910,7 @@ func (authRw *authRewriter) addAuthQueries(
 
 	if typ.IsInterface() {
 		// First we fetch the list of Implementing types here
-		implementingTypes := make([]schema.Type, 0)
+		implementingTypes := make([]*schema.Type, 0)
 		implementingTypes = append(implementingTypes, typ.ImplementingTypes()...)
 
 		var qrys []*gql.GraphQuery
@@ -1103,7 +1103,7 @@ func (authRw *authRewriter) addVariableUIDFunc(q *gql.GraphQuery) {
 	}
 }
 
-func queryAuthSelector(t schema.Type) *schema.RuleNode {
+func queryAuthSelector(t *schema.Type) *schema.RuleNode {
 	auth := t.AuthRules()
 	if auth == nil || auth.Rules == nil {
 		return nil
@@ -1113,7 +1113,7 @@ func queryAuthSelector(t schema.Type) *schema.RuleNode {
 }
 
 // passwordAuthSelector is used as auth selector for checkPassword queries
-func passwordAuthSelector(t schema.Type) *schema.RuleNode {
+func passwordAuthSelector(t *schema.Type) *schema.RuleNode {
 	auth := t.AuthRules()
 	if auth == nil || auth.Rules == nil {
 		return nil
@@ -1122,7 +1122,7 @@ func passwordAuthSelector(t schema.Type) *schema.RuleNode {
 	return auth.Rules.Password
 }
 
-func (authRw *authRewriter) rewriteAuthQueries(typ schema.Type) ([]*gql.GraphQuery, *gql.FilterTree) {
+func (authRw *authRewriter) rewriteAuthQueries(typ *schema.Type) ([]*gql.GraphQuery, *gql.FilterTree) {
 	if authRw == nil || authRw.isWritingAuth {
 		return nil, nil
 	}
@@ -1138,7 +1138,7 @@ func (authRw *authRewriter) rewriteAuthQueries(typ schema.Type) ([]*gql.GraphQue
 	}).rewriteRuleNode(typ, authRw.selector(typ))
 }
 
-func (authRw *authRewriter) evaluateStaticRules(typ schema.Type) schema.RuleResult {
+func (authRw *authRewriter) evaluateStaticRules(typ *schema.Type) schema.RuleResult {
 	if authRw == nil || authRw.isWritingAuth {
 		return schema.Uncertain
 	}
@@ -1148,7 +1148,7 @@ func (authRw *authRewriter) evaluateStaticRules(typ schema.Type) schema.RuleResu
 }
 
 func (authRw *authRewriter) rewriteRuleNode(
-	typ schema.Type,
+	typ *schema.Type,
 	rn *schema.RuleNode) ([]*gql.GraphQuery, *gql.FilterTree) {
 
 	if typ == nil || rn == nil {
@@ -1156,7 +1156,7 @@ func (authRw *authRewriter) rewriteRuleNode(
 	}
 
 	nodeList := func(
-		typ schema.Type,
+		typ *schema.Type,
 		rns []*schema.RuleNode) ([]*gql.GraphQuery, []*gql.FilterTree) {
 
 		var qrys []*gql.GraphQuery
@@ -1245,7 +1245,7 @@ func (authRw *authRewriter) rewriteRuleNode(
 	return nil, nil
 }
 
-func addTypeFilter(q *gql.GraphQuery, typ schema.Type) {
+func addTypeFilter(q *gql.GraphQuery, typ *schema.Type) {
 	thisFilter := &gql.FilterTree{
 		Func: buildTypeFunc(typ.DgraphName()),
 	}
@@ -1546,7 +1546,7 @@ func addSelectionSetFrom(
 	// These fields might not have been requested by the user directly as part of the query but
 	// are required in the body template for other @custom fields requested within the query.
 	// We must fetch them from Dgraph.
-	requiredFields := make(map[string]schema.FieldDefinition)
+	requiredFields := make(map[string]*schema.FieldDefinition)
 	// fieldAdded is a map from field's dgraph alias to bool.
 	// It tells whether a field with that dgraph alias has been added to DQL query or not.
 	fieldAdded := make(map[string]bool)
@@ -1721,7 +1721,7 @@ func addSelectionSetFrom(
 // If the predicate Attribute of children is not of the type `Type.Field` then
 // the corresponding child is ignored during calculation. for eg: predicates like
 // `uid`,`name@en` will be ignored.
-func dqlHasAuthRules(q *gql.GraphQuery, typ schema.Type, authRw *authRewriter) bool {
+func dqlHasAuthRules(q *gql.GraphQuery, typ *schema.Type, authRw *authRewriter) bool {
 	if q == nil || typ == nil {
 		return false
 	}
@@ -1757,7 +1757,7 @@ func getFieldName(attr string) string {
 // satisfy the @auth rules then it is removed from the query.
 func addAuthQueriesOnSelectionSet(
 	q *gql.GraphQuery,
-	typ schema.Type,
+	typ *schema.Type,
 	auth *authRewriter) []*gql.GraphQuery {
 
 	var authQueries, children []*gql.GraphQuery
@@ -1765,7 +1765,7 @@ func addAuthQueriesOnSelectionSet(
 	for _, f := range q.Children {
 		fldName := getFieldName(f.Attr)
 		fld := typ.Field(fldName)
-		var fldType schema.Type
+		var fldType *schema.Type
 		if fld != nil {
 			fldType = fld.Type()
 		}
@@ -1941,7 +1941,7 @@ func extractQueryFilter(f *schema.Field) map[string]interface{} {
 	return filter
 }
 
-func idFilter(filter map[string]interface{}, idField schema.FieldDefinition) []uint64 {
+func idFilter(filter map[string]interface{}, idField *schema.FieldDefinition) []uint64 {
 	if filter == nil || idField == nil {
 		return nil
 	}
@@ -1957,7 +1957,7 @@ func idFilter(filter map[string]interface{}, idField schema.FieldDefinition) []u
 // addFilter adds a filter to the input DQL query. It returns false if the field for which the
 // filter was specified should not be included in the DQL query.
 // Currently, it would only be false for a union field when no memberTypes are queried.
-func addFilter(q *gql.GraphQuery, typ schema.Type, filter map[string]interface{}) bool {
+func addFilter(q *gql.GraphQuery, typ *schema.Type, filter map[string]interface{}) bool {
 	if len(filter) == 0 {
 		return true
 	}
@@ -2021,7 +2021,7 @@ func addFilter(q *gql.GraphQuery, typ schema.Type, filter map[string]interface{}
 // ATM those will probably generate junk that might cause a Dgraph error.  And
 // bubble back to the user as a GraphQL error when the query fails. Really,
 // they should fail query validation and never get here.
-func buildFilter(typ schema.Type, filter map[string]interface{}) *gql.FilterTree {
+func buildFilter(typ *schema.Type, filter map[string]interface{}) *gql.FilterTree {
 
 	var ands []*gql.FilterTree
 	var or *gql.FilterTree
@@ -2270,7 +2270,7 @@ func buildFilter(typ schema.Type, filter map[string]interface{}) *gql.FilterTree
 	}
 }
 
-func buildHasFilterList(typ schema.Type, fieldsSlice []interface{}) []*gql.FilterTree {
+func buildHasFilterList(typ *schema.Type, fieldsSlice []interface{}) []*gql.FilterTree {
 	var ands []*gql.FilterTree
 	fn := "has"
 	for _, fieldName := range fieldsSlice {
@@ -2329,7 +2329,7 @@ func buildMultiPolygon(multipolygon map[string]interface{}, buf *bytes.Buffer) {
 	x.Check2(buf.WriteString("]"))
 }
 
-func buildUnionFilter(typ schema.Type, filter map[string]interface{}) (*gql.FilterTree, bool) {
+func buildUnionFilter(typ *schema.Type, filter map[string]interface{}) (*gql.FilterTree, bool) {
 	memberTypesList, ok := filter["memberTypes"].([]interface{})
 	// if memberTypes was specified to be an empty list like: { memberTypes: [], ...},
 	// then we don't need to include the field, on which the filter was specified, in the query.

@@ -43,7 +43,7 @@ const (
 // RequestResolver.Resolve() resolves all of them by finding the resolved answers
 // of the component queries/mutations and joining into a single schema.Response.
 type RequestResolver struct {
-	schema    schema.Schema
+	schema    *schema.Schema
 	resolvers *ResolverFactory
 }
 
@@ -181,7 +181,7 @@ func (rf *ResolverFactory) WithSchemaIntrospection() *ResolverFactory {
 }
 
 func (rf *ResolverFactory) WithConventionResolvers(
-	s schema.Schema, fns *ResolverFns) *ResolverFactory {
+	s *schema.Schema, fns *ResolverFns) *ResolverFactory {
 
 	queries := append(s.Queries(schema.GetQuery), s.Queries(schema.FilterQuery)...)
 	queries = append(queries, s.Queries(schema.PasswordQuery)...)
@@ -393,7 +393,7 @@ func (rf *ResolverFactory) mutationResolverFor(mutation *schema.Field) MutationR
 }
 
 // New creates a new RequestResolver.
-func New(s schema.Schema, resolverFactory *ResolverFactory) *RequestResolver {
+func New(s *schema.Schema, resolverFactory *ResolverFactory) *RequestResolver {
 	return &RequestResolver{
 		schema:    s,
 		resolvers: resolverFactory,
@@ -567,7 +567,7 @@ func (r *RequestResolver) ValidateSubscription(req *schema.Request) error {
 	return nil
 }
 
-func (r *RequestResolver) Schema() schema.Schema {
+func (r *RequestResolver) Schema() *schema.Schema {
 	return r.schema
 }
 

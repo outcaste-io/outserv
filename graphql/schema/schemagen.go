@@ -23,12 +23,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/outcaste-io/outserv/graphql/authorization"
-	"github.com/outcaste-io/outserv/x"
 	"github.com/dgraph-io/gqlparser/v2/ast"
 	"github.com/dgraph-io/gqlparser/v2/gqlerror"
 	"github.com/dgraph-io/gqlparser/v2/parser"
 	"github.com/dgraph-io/gqlparser/v2/validator"
+	"github.com/outcaste-io/outserv/graphql/authorization"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
 
@@ -51,7 +51,7 @@ type handler struct {
 
 // FromString builds a GraphQL Schema from input string, or returns any parsing
 // or validation errors.
-func FromString(schema string, ns uint64) (Schema, error) {
+func FromString(schema string, ns uint64) (*Schema, error) {
 	// validator.Prelude includes a bunch of predefined types which help with schema introspection
 	// queries, hence we include it as part of the schema.
 	doc, gqlErr := parser.ParseSchemas(validator.Prelude, &ast.Source{Input: schema})

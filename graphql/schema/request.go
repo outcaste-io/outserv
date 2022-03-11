@@ -50,7 +50,7 @@ type PersistedQuery struct {
 // schema s. If the request is GraphQL valid, it must contain a single valid
 // Operation.  If either the request is malformed or doesn't contain a valid
 // operation, all GraphQL errors encountered are returned.
-func (s *schema) Operation(req *Request) (Operation, error) {
+func (s *Schema) Operation(req *Request) (Operation, error) {
 	if req == nil || req.Query == "" {
 		return nil, errors.New("no query string supplied in request")
 	}
