@@ -19,7 +19,6 @@ package gql
 import (
 	"testing"
 
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/stretchr/testify/require"
 )
 
@@ -1161,37 +1160,6 @@ func TestParseMutationAndQueryWithComments(t *testing.T) {
 	`
 	_, err := Parse(Request{Str: query})
 	require.Error(t, err)
-}
-
-func TestParseMutation(t *testing.T) {
-	m := `
-		{
-			set {
-				<name> <is> <something> .
-				<hometown> <is> <san/francisco> .
-			}
-			delete {
-				<name> <is> <something-else> .
-			}
-		}
-	`
-	req, err := ParseMutation(m)
-	require.NoError(t, err)
-	mu := req.Mutations[0]
-	require.NotNil(t, mu)
-	sets, err := parseNquads(mu.SetNquads)
-	require.NoError(t, err)
-	require.EqualValues(t, &api.NQuad{
-		Subject: "name", Predicate: "is", ObjectId: "something"},
-		sets[0])
-	require.EqualValues(t, &api.NQuad{
-		Subject: "hometown", Predicate: "is", ObjectId: "san/francisco"},
-		sets[1])
-	dels, err := parseNquads(mu.DelNquads)
-	require.NoError(t, err)
-	require.EqualValues(t, &api.NQuad{
-		Subject: "name", Predicate: "is", ObjectId: "something-else"},
-		dels[0])
 }
 
 func TestParseMutationTooManyBlocks(t *testing.T) {
