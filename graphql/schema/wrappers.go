@@ -79,7 +79,7 @@ type FieldHTTPConfig struct {
 
 // EntityRepresentations is the parsed form of the `representations` argument in `_entities` query
 type EntityRepresentations struct {
-	TypeDefn *Type            // the type corresponding to __typename in the representations argument
+	TypeDefn *Type            // the type corresponding to __typename in the representations arg
 	KeyField *FieldDefinition // the definition of the @key field
 	KeyVals  []interface{}    // the list of values corresponding to the key field
 	// a map of key field value to the input representation for that value. The keys in this map
