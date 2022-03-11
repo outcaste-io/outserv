@@ -53,7 +53,6 @@ following questions:
 
 ## License
 
-This project, as a whole, is licensed under the terms of the Smart License 1.0.
+This project, as a whole, is licensed under the terms of the Smart License v1.0.
 Certain portions of this project are licensed by contributors or others
-under the terms of open source licenses such as the Apache 2.0 license.
-
+under the terms of open source licenses such as the Apache License v2.0.
