@@ -1194,6 +1194,7 @@ func ToHex(i uint64) []byte {
 	return out
 }
 
+// TODO: Fix this all up.
 // RootTemplate defines the help template for dgraph command.
 var RootTemplate string = `Dgraph is a horizontally scalable and distributed graph database,
 providing ACID transactions, consistent replication and linearizable reads.

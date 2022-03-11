@@ -534,7 +534,7 @@ func graphqlProbeHandler(gqlHealthStore *admin.GraphQLHealthStore, globalEpoch m
 }
 
 func resolveWithAdminServer(gqlReq *schema.Request, r *http.Request,
-	adminServer admin.IServeGraphQL) *schema.Response {
+	adminServer *admin.GqlHandler) *schema.Response {
 	md := metadata.New(nil)
 	ctx := metadata.NewIncomingContext(context.Background(), md)
 	ctx = x.AttachAccessJwt(ctx, r)

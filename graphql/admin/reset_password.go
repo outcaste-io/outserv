@@ -1,18 +1,5 @@
-/*
- * Copyright 2020 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package admin
 
@@ -21,13 +8,13 @@ import (
 	"encoding/json"
 	"strconv"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
-	"github.com/golang/glog"
 )
 
-func resolveResetPassword(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+func resolveResetPassword(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	inp, err := getPasswordInput(m)
 	if err != nil {
 		glog.Error("Failed to parse the reset password input")
@@ -50,7 +37,7 @@ func resolveResetPassword(ctx context.Context, m schema.Mutation) (*resolve.Reso
 
 }
 
-func getPasswordInput(m schema.Mutation) (*edgraph.ResetPasswordInput, error) {
+func getPasswordInput(m *schema.Field) (*edgraph.ResetPasswordInput, error) {
 	var input edgraph.ResetPasswordInput
 
 	inputArg := m.ArgValue(schema.InputArgName)

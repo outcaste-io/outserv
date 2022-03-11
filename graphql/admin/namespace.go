@@ -1,18 +1,5 @@
-/*
- * Copyright 2021 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2021 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package admin
 
@@ -37,7 +24,7 @@ type deleteNamespaceInput struct {
 	NamespaceId int
 }
 
-func resolveAddNamespace(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+func resolveAddNamespace(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	req, err := getAddNamespaceInput(m)
 	if err != nil {
 		return resolve.EmptyResult(m, err), false
@@ -60,7 +47,7 @@ func resolveAddNamespace(ctx context.Context, m schema.Mutation) (*resolve.Resol
 	), true
 }
 
-func resolveDeleteNamespace(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+func resolveDeleteNamespace(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	req, err := getDeleteNamespaceInput(m)
 	if err != nil {
 		return resolve.EmptyResult(m, err), false
@@ -86,7 +73,7 @@ func resolveDeleteNamespace(ctx context.Context, m schema.Mutation) (*resolve.Re
 	), true
 }
 
-func getAddNamespaceInput(m schema.Mutation) (*addNamespaceInput, error) {
+func getAddNamespaceInput(m *schema.Field) (*addNamespaceInput, error) {
 	inputArg := m.ArgValue(schema.InputArgName)
 	inputByts, err := json.Marshal(inputArg)
 	if err != nil {
@@ -98,7 +85,7 @@ func getAddNamespaceInput(m schema.Mutation) (*addNamespaceInput, error) {
 	return &input, schema.GQLWrapf(err, "couldn't get input argument")
 }
 
-func getDeleteNamespaceInput(m schema.Mutation) (*deleteNamespaceInput, error) {
+func getDeleteNamespaceInput(m *schema.Field) (*deleteNamespaceInput, error) {
 	inputArg := m.ArgValue(schema.InputArgName)
 	inputByts, err := json.Marshal(inputArg)
 	if err != nil {

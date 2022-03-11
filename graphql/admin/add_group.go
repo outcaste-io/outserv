@@ -1,3 +1,5 @@
+// Copyright 2022 Outcaste LLC. Licensed under the Smart License v1.0.
+
 package admin
 
 import (
@@ -23,7 +25,7 @@ func NewAddGroupRewriter() resolve.MutationRewriter {
 // AddRewriter.
 func (mrw *addGroupRewriter) RewriteQueries(
 	ctx context.Context,
-	m schema.Mutation) ([]*gql.GraphQuery, []string, error) {
+	m *schema.Field) ([]*gql.GraphQuery, []string, error) {
 
 	return ((*resolve.AddRewriter)(mrw)).RewriteQueries(ctx, m)
 }
@@ -33,7 +35,7 @@ func (mrw *addGroupRewriter) RewriteQueries(
 // A rule is duplicate if it has same predicate name as another rule.
 func (mrw *addGroupRewriter) Rewrite(
 	ctx context.Context,
-	m schema.Mutation,
+	m *schema.Field,
 	idExistence map[string]string) ([]*resolve.UpsertMutation, error) {
 
 	addGroupInput, _ := m.ArgValue(schema.InputArgName).([]interface{})
@@ -53,7 +55,7 @@ func (mrw *addGroupRewriter) Rewrite(
 // FromMutationResult rewrites the query part of a GraphQL add mutation into a Dgraph query.
 func (mrw *addGroupRewriter) FromMutationResult(
 	ctx context.Context,
-	mutation schema.Mutation,
+	mutation *schema.Field,
 	assigned map[string]string,
 	result map[string]interface{}) ([]*gql.GraphQuery, error) {
 
@@ -61,7 +63,7 @@ func (mrw *addGroupRewriter) FromMutationResult(
 }
 
 func (mrw *addGroupRewriter) MutatedRootUIDs(
-	mutation schema.Mutation,
+	mutation *schema.Field,
 	assigned map[string]string,
 	result map[string]interface{}) []string {
 	return ((*resolve.AddRewriter)(mrw)).MutatedRootUIDs(mutation, assigned, result)

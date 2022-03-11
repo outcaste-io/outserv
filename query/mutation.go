@@ -188,7 +188,8 @@ func AssignUids(ctx context.Context, gmuList []*gql.Mutation) (map[string]uint64
 		curId := res.StartId
 		// assign generated ones now
 		for k := range newUids {
-			x.AssertTruef(curId != 0 && curId <= res.EndId, "not enough uids generated")
+			x.AssertTruef(curId != 0 && curId <= res.EndId,
+				"not enough uids generated: res: %+v . curId: %d", res, curId)
 			newUids[k] = curId
 			curId++
 		}

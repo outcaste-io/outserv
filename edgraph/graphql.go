@@ -121,7 +121,6 @@ func ProcessPersistedQuery(ctx context.Context, gqlReq *schema.Request) error {
 		ctx := context.WithValue(ctx, IsGraphql, true)
 		_, err := (&Server{}).doQuery(ctx, req)
 		return err
-
 	}
 
 	if len(shaQueryRes.Me) != 1 {

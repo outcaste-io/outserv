@@ -1,18 +1,5 @@
-/*
- * Copyright 2021 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2021 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package schema
 
@@ -106,7 +93,7 @@ func Unmarshal(data []byte, v interface{}) error {
 // nil and the error propagates to the enclosing level.
 func CompleteObject(
 	path []interface{},
-	fields []Field,
+	fields []*Field,
 	res map[string]interface{}) ([]byte, x.GqlErrorList) {
 
 	var errs x.GqlErrorList
@@ -184,7 +171,7 @@ func CompleteObject(
 // could turn out to be a list or object or scalar value.
 func CompleteValue(
 	path []interface{},
-	field Field,
+	field *Field,
 	val interface{}) ([]byte, x.GqlErrorList) {
 
 	switch val := val.(type) {
@@ -263,7 +250,7 @@ func CompleteValue(
 // elements resolve to null, then the whole list is crushed to null.
 func completeList(
 	path []interface{},
-	field Field,
+	field *Field,
 	values []interface{}) ([]byte, x.GqlErrorList) {
 
 	if field.Type().ListType() == nil {
@@ -317,7 +304,7 @@ func completeList(
 	return buf.Bytes(), errs
 }
 
-func mismatched(path []interface{}, field Field) ([]byte, x.GqlErrorList) {
+func mismatched(path []interface{}, field *Field) ([]byte, x.GqlErrorList) {
 	glog.Errorf("completeList() called in resolving %s (Line: %v, Column: %v), "+
 		"but its type is %s.\n"+
 		"That could indicate the Dgraph schema doesn't match the GraphQL schema.",
@@ -339,7 +326,7 @@ func mismatched(path []interface{}, field Field) ([]byte, x.GqlErrorList) {
 //  * string
 //  * json.Number (because it uses custom JSON decoder which preserves number precision)
 // So, we need to consider only these cases at present.
-func coerceScalar(val interface{}, field Field, path []interface{}) (interface{},
+func coerceScalar(val interface{}, field *Field, path []interface{}) (interface{},
 	x.GqlErrorList) {
 
 	valueCoercionError := func(val interface{}) x.GqlErrorList {

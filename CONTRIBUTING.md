@@ -247,7 +247,7 @@ Over years of writing big scalable systems, we are convinced that striving for s
 
 Every new source file must begin with a license header.
 
-Copyright yyyy-yyyy Outcaste LLC are available under the Smart License v1.0.
+Copyright yyyy-yyyy Outcaste LLC. Licensed under the Smart License v1.0.
 
 If you're modifying existing Apache licensed files files, please modify the header to this:
 
