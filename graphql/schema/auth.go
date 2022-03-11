@@ -575,7 +575,7 @@ func gqlValidateRule(sch *Schema, typ *ast.Definition, rule string, node *RuleNo
 			"rules,but found %s", typ.Name, typ.Name, f.Name)
 	}
 
-	opWrapper := &operation{
+	opWrapper := &Operation{
 		op:                      op,
 		query:                   rule,
 		doc:                     doc,

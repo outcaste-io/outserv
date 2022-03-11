@@ -107,18 +107,6 @@ const (
 	FilterArgName                     = "filter"
 )
 
-// An Operation is a single valid GraphQL operation.  It contains either
-// Queries or Mutations, but not both.  Subscriptions are not yet supported.
-type Operation interface {
-	Queries() []*Field
-	Mutations() []*Field
-	Schema() *Schema
-	IsQuery() bool
-	IsMutation() bool
-	IsSubscription() bool
-	CacheControl() string
-}
-
 // A Type is a GraphQL type like: Float, T, T! and [T!]!.  If it's not a list, then
 // ListType is nil.  If it's an object type then Field gets field definitions by
 // name from the definition of the type; IDField gets the ID field of the type.
@@ -167,7 +155,9 @@ type Schema struct {
 	meta *metaInfo
 }
 
-type operation struct {
+// An Operation is a single valid GraphQL operation.  It contains either
+// Queries or Mutations, but not both.  Subscriptions are not yet supported.
+type Operation struct {
 	op     *ast.OperationDefinition
 	vars   map[string]interface{}
 	header http.Header
@@ -193,7 +183,7 @@ const (
 type Field struct {
 	Kind  FieldKind
 	field *ast.Field
-	op    *operation
+	op    *Operation
 	sel   ast.Selection
 	// arguments contains the computed values for arguments taking into account the values
 	// for the GraphQL variables supplied in the query.
@@ -272,23 +262,23 @@ func (s *Schema) Type(typeName string) *Type {
 	return nil
 }
 
-func (o *operation) IsQuery() bool {
+func (o *Operation) IsQuery() bool {
 	return o.op.Operation == ast.Query
 }
 
-func (o *operation) IsMutation() bool {
+func (o *Operation) IsMutation() bool {
 	return o.op.Operation == ast.Mutation
 }
 
-func (o *operation) IsSubscription() bool {
+func (o *Operation) IsSubscription() bool {
 	return o.op.Operation == ast.Subscription
 }
 
-func (o *operation) Schema() *Schema {
+func (o *Operation) Schema() *Schema {
 	return o.inSchema
 }
 
-func (o *operation) Queries() (qs []*Field) {
+func (o *Operation) Queries() (qs []*Field) {
 	if o.IsMutation() {
 		return
 	}
@@ -302,7 +292,7 @@ func (o *operation) Queries() (qs []*Field) {
 	return
 }
 
-func (o *operation) Mutations() (ms []*Field) {
+func (o *Operation) Mutations() (ms []*Field) {
 	if !o.IsMutation() {
 		return
 	}
@@ -316,7 +306,7 @@ func (o *operation) Mutations() (ms []*Field) {
 	return
 }
 
-func (o *operation) CacheControl() string {
+func (o *Operation) CacheControl() string {
 	if o.op.Directives.ForName(cacheControlDirective) == nil {
 		return ""
 	}
@@ -1492,7 +1482,7 @@ func (f *Field) Location() x.Location {
 		Column: f.field.Position.Column}
 }
 
-func (f *Field) Operation() Operation {
+func (f *Field) Operation() *Operation {
 	return f.op
 }
 
@@ -1624,7 +1614,7 @@ func (q *Field) AuthFor(jwtVars map[string]interface{}) *Field {
 	return &Field{
 		Kind:  QueryKind,
 		field: q.field,
-		op: &operation{op: q.op.op,
+		op: &Operation{op: q.op.op,
 			query:    q.op.query,
 			doc:      q.op.doc,
 			inSchema: q.op.inSchema,

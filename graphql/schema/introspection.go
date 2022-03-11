@@ -31,12 +31,7 @@ func Introspect(q *Field) (json.RawMessage, error) {
 	}
 
 	sch := q.Operation().Schema()
-
-	op, ok := q.Operation().(*operation)
-	if !ok {
-		return nil, errors.New("couldn't convert operation to internal type " +
-			"this indicates bug. Please let us know by filing an issue.")
-	}
+	op := q.Operation()
 
 	qu := q
 	reqCtx := &requestContext{

@@ -50,7 +50,7 @@ type PersistedQuery struct {
 // schema s. If the request is GraphQL valid, it must contain a single valid
 // Operation.  If either the request is malformed or doesn't contain a valid
 // operation, all GraphQL errors encountered are returned.
-func (s *Schema) Operation(req *Request) (Operation, error) {
+func (s *Schema) Operation(req *Request) (*Operation, error) {
 	if req == nil || req.Query == "" {
 		return nil, errors.New("no query string supplied in request")
 	}
@@ -87,7 +87,7 @@ func (s *Schema) Operation(req *Request) (Operation, error) {
 		return nil, gqlErr
 	}
 
-	operation := &operation{op: op,
+	operation := &Operation{op: op,
 		vars:                    vars,
 		query:                   req.Query,
 		header:                  req.Header,
@@ -143,7 +143,7 @@ func (s *Schema) Operation(req *Request) (Operation, error) {
 //    which are implemented by Human type should also be expanded. That means, any fragments on
 //    Human, Character and Employee will be expanded in the result of queryHuman.
 // 3. field returns a Union: process is similar to the case when field returns an interface.
-func recursivelyExpandFragmentSelections(field *ast.Field, op *operation) {
+func recursivelyExpandFragmentSelections(field *ast.Field, op *Operation) {
 	// This happens in case of introspection queries, as they don't have any types in graphql schema
 	// but explicit resolvers defined. So, when the parser parses the raw request, it is not able to
 	// find a definition for such fields in the schema. Introspection queries are already handling
@@ -256,7 +256,7 @@ func getTypeNamesAsMap(typesDefs []*ast.Definition) map[string]bool {
 }
 
 func addSelectionToInterfaceImplFragFields(interfaceTypeName string, field ast.Selection,
-	interfaceImplMap map[string]bool, op *operation) {
+	interfaceImplMap map[string]bool, op *Operation) {
 	switch frag := field.(type) {
 	case *ast.InlineFragment:
 		addFragFieldsToInterfaceImplFields(interfaceTypeName, frag.TypeCondition,
@@ -268,7 +268,7 @@ func addSelectionToInterfaceImplFragFields(interfaceTypeName string, field ast.S
 }
 
 func addFragFieldsToInterfaceImplFields(interfaceTypeName, typeCond string, selSet ast.SelectionSet,
-	interfaceImplMap map[string]bool, op *operation) {
+	interfaceImplMap map[string]bool, op *Operation) {
 	if interfaceImplMap[typeCond] {
 		// if the type condition on fragment matches one of the types implementing the interface
 		// then we need to store mapping of the fields inside the fragment to the type condition.
