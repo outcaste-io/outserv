@@ -1628,10 +1628,11 @@ func (q *Field) Schema() *Schema {
 // In case the field f is of type <Type>Aggregate, the Type is retunred.
 // In all other case the function returns the type of field f.
 func (f *Field) ConstructedFor() *Type {
-	glog.Infof("ConstructedFor called for: %+v\n", f)
-	if !f.IsAggregateField() {
-		return f.Type()
-	}
+	// The following code doesn't do the same thing as QueryType(). Perhaps
+	// remove.
+	// if !f.IsAggregateField() {
+	// 	return f.Type()
+	// }
 	if f.QueryType() != AggregateQuery {
 		return f.Type()
 	}
