@@ -34,14 +34,7 @@ import (
 
 // A Handler can produce valid GraphQL and Dgraph schemas given an input of
 // types and relationships
-type Handler interface {
-	MetaInfo() *metaInfo
-	DGSchema() string
-	GQLSchema() string
-	GQLSchemaWithoutApolloExtras() string
-}
-
-type handler struct {
+type Handler struct {
 	input          string
 	originalDefs   []string
 	completeSchema *ast.Schema
@@ -67,15 +60,15 @@ func FromString(schema string, ns uint64) (*Schema, error) {
 	return AsSchema(gqlSchema, ns)
 }
 
-func (s *handler) MetaInfo() *metaInfo {
+func (s *Handler) MetaInfo() *metaInfo {
 	return s.schemaMeta
 }
 
-func (s *handler) GQLSchema() string {
+func (s *Handler) GQLSchema() string {
 	return Stringify(s.completeSchema, s.originalDefs, false)
 }
 
-func (s *handler) DGSchema() string {
+func (s *Handler) DGSchema() string {
 	return s.dgraphSchema
 }
 
@@ -85,7 +78,7 @@ func (s *handler) DGSchema() string {
 // as they are failing in the schema validation which is a bug
 // in their library. See here:
 // https://github.com/apollographql/apollo-server/issues/3655
-func (s *handler) GQLSchemaWithoutApolloExtras() string {
+func (s *Handler) GQLSchemaWithoutApolloExtras() string {
 	typeMapCopy := make(map[string]*ast.Definition)
 	for typ, defn := range s.completeSchema.Types {
 		// Exclude "union _Entity = ..." definition from types
@@ -282,7 +275,7 @@ func parseMetaInfo(sch string) (*metaInfo, error) {
 
 // NewHandler processes the input schema. If there are no errors, it returns
 // a valid Handler, otherwise it returns nil and an error.
-func NewHandler(input string, apolloServiceQuery bool) (Handler, error) {
+func NewHandler(input string, apolloServiceQuery bool) (*Handler, error) {
 	if input == "" {
 		return nil, gqlerror.Errorf("No schema specified")
 	}
@@ -416,7 +409,7 @@ func NewHandler(input string, apolloServiceQuery bool) (Handler, error) {
 		}
 	}
 
-	return &handler{
+	return &Handler{
 		input:          input,
 		dgraphSchema:   dgSchema,
 		completeSchema: sch,

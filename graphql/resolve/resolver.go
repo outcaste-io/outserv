@@ -691,7 +691,7 @@ func DataResult(f *schema.Field, data map[string]interface{}, err error) *Resolv
 	}
 }
 
-func newtimer(ctx context.Context, Duration *schema.OffsetDuration) schema.OffsetTimer {
+func newtimer(ctx context.Context, Duration *schema.OffsetDuration) *schema.OffsetTimer {
 	resolveStartTime, _ := ctx.Value(resolveStartTime).(time.Time)
 	tf := schema.NewOffsetTimerFactory(resolveStartTime)
 	return tf.NewOffsetTimer(Duration)

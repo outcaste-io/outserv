@@ -252,22 +252,13 @@ type LabeledOffsetDuration struct {
 }
 
 // A TimerFactory makes offset timers that can be used to fill out an OffsetDuration.
-type TimerFactory interface {
-	NewOffsetTimer(storeTo *OffsetDuration) OffsetTimer
+type TimerFactory struct {
+	offsetFrom time.Time
 }
 
 // An OffsetTimer is used to fill out an OffsetDuration.  Start starts the timer
 // and calculates the offset.  Stop calculates the duration.
-type OffsetTimer interface {
-	Start()
-	Stop()
-}
-
-type timerFactory struct {
-	offsetFrom time.Time
-}
-
-type offsetTimer struct {
+type OffsetTimer struct {
 	offsetFrom time.Time
 	start      time.Time
 	backing    *OffsetDuration
@@ -275,22 +266,22 @@ type offsetTimer struct {
 
 // NewOffsetTimerFactory creates a new TimerFactory given offsetFrom as the
 // reference time to calculate the OffsetDuration.StartOffset from.
-func NewOffsetTimerFactory(offsetFrom time.Time) TimerFactory {
-	return &timerFactory{offsetFrom: offsetFrom}
+func NewOffsetTimerFactory(offsetFrom time.Time) *TimerFactory {
+	return &TimerFactory{offsetFrom: offsetFrom}
 }
 
-func (tf *timerFactory) NewOffsetTimer(storeTo *OffsetDuration) OffsetTimer {
-	return &offsetTimer{
+func (tf *TimerFactory) NewOffsetTimer(storeTo *OffsetDuration) *OffsetTimer {
+	return &OffsetTimer{
 		offsetFrom: tf.offsetFrom,
 		backing:    storeTo,
 	}
 }
 
-func (ot *offsetTimer) Start() {
+func (ot *OffsetTimer) Start() {
 	ot.start = time.Now()
 	ot.backing.StartOffset = ot.start.Sub(ot.offsetFrom).Nanoseconds()
 }
 
-func (ot *offsetTimer) Stop() {
+func (ot *OffsetTimer) Stop() {
 	ot.backing.Duration = time.Since(ot.start).Nanoseconds()
 }
