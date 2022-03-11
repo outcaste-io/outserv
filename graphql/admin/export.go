@@ -22,12 +22,12 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 )
 
@@ -39,7 +39,7 @@ type exportInput struct {
 	DestinationFields
 }
 
-func resolveExport(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+func resolveExport(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	glog.Info("Got export request through GraphQL admin API")
 
 	input, err := getExportInput(m)
@@ -107,7 +107,7 @@ func resolveExport(ctx context.Context, m schema.Mutation) (*resolve.Resolved, b
 	), true
 }
 
-func getExportInput(m schema.Mutation) (*exportInput, error) {
+func getExportInput(m *schema.Field) (*exportInput, error) {
 	inputArg := m.ArgValue(schema.InputArgName)
 	inputByts, err := json.Marshal(inputArg)
 	if err != nil {

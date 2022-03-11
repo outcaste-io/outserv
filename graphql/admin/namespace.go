@@ -37,7 +37,7 @@ type deleteNamespaceInput struct {
 	NamespaceId int
 }
 
-func resolveAddNamespace(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+func resolveAddNamespace(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	req, err := getAddNamespaceInput(m)
 	if err != nil {
 		return resolve.EmptyResult(m, err), false
@@ -60,7 +60,7 @@ func resolveAddNamespace(ctx context.Context, m schema.Mutation) (*resolve.Resol
 	), true
 }
 
-func resolveDeleteNamespace(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+func resolveDeleteNamespace(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	req, err := getDeleteNamespaceInput(m)
 	if err != nil {
 		return resolve.EmptyResult(m, err), false
@@ -86,7 +86,7 @@ func resolveDeleteNamespace(ctx context.Context, m schema.Mutation) (*resolve.Re
 	), true
 }
 
-func getAddNamespaceInput(m schema.Mutation) (*addNamespaceInput, error) {
+func getAddNamespaceInput(m *schema.Field) (*addNamespaceInput, error) {
 	inputArg := m.ArgValue(schema.InputArgName)
 	inputByts, err := json.Marshal(inputArg)
 	if err != nil {
@@ -98,7 +98,7 @@ func getAddNamespaceInput(m schema.Mutation) (*addNamespaceInput, error) {
 	return &input, schema.GQLWrapf(err, "couldn't get input argument")
 }
 
-func getDeleteNamespaceInput(m schema.Mutation) (*deleteNamespaceInput, error) {
+func getDeleteNamespaceInput(m *schema.Field) (*deleteNamespaceInput, error) {
 	inputArg := m.ArgValue(schema.InputArgName)
 	inputByts, err := json.Marshal(inputArg)
 	if err != nil {

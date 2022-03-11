@@ -21,13 +21,13 @@ import (
 	"encoding/json"
 	"strconv"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
-	"github.com/golang/glog"
 )
 
-func resolveResetPassword(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+func resolveResetPassword(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	inp, err := getPasswordInput(m)
 	if err != nil {
 		glog.Error("Failed to parse the reset password input")
@@ -50,7 +50,7 @@ func resolveResetPassword(ctx context.Context, m schema.Mutation) (*resolve.Reso
 
 }
 
-func getPasswordInput(m schema.Mutation) (*edgraph.ResetPasswordInput, error) {
+func getPasswordInput(m *schema.Field) (*edgraph.ResetPasswordInput, error) {
 	var input edgraph.ResetPasswordInput
 
 	inputArg := m.ArgValue(schema.InputArgName)

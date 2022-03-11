@@ -375,30 +375,30 @@ func newAdminResolverFactory() *resolve.ResolverFactory {
 	rf := resolverFactoryWithErrorMsg(errResolverNotFound).
 		WithQueryMiddlewareConfig(adminQueryMWConfig).
 		WithMutationMiddlewareConfig(adminMutationMWConfig).
-		WithQueryResolver("health", func(q schema.Query) resolve.QueryResolver {
+		WithQueryResolver("health", func(q *schema.Field) resolve.QueryResolver {
 			return resolve.QueryResolverFunc(resolveHealth)
 		}).
-		WithQueryResolver("state", func(q schema.Query) resolve.QueryResolver {
+		WithQueryResolver("state", func(q *schema.Field) resolve.QueryResolver {
 			return resolve.QueryResolverFunc(resolveState)
 		}).
-		WithQueryResolver("config", func(q schema.Query) resolve.QueryResolver {
+		WithQueryResolver("config", func(q *schema.Field) resolve.QueryResolver {
 			return resolve.QueryResolverFunc(resolveGetConfig)
 		}).
-		WithQueryResolver("task", func(q schema.Query) resolve.QueryResolver {
+		WithQueryResolver("task", func(q *schema.Field) resolve.QueryResolver {
 			return resolve.QueryResolverFunc(resolveTask)
 		}).
-		WithQueryResolver("getLambdaScript", func(q schema.Query) resolve.QueryResolver {
+		WithQueryResolver("getLambdaScript", func(q *schema.Field) resolve.QueryResolver {
 			return resolve.QueryResolverFunc(resolveGetLambda)
 		}).
-		WithQueryResolver("getGQLSchema", func(q schema.Query) resolve.QueryResolver {
+		WithQueryResolver("getGQLSchema", func(q *schema.Field) resolve.QueryResolver {
 			return resolve.QueryResolverFunc(
-				func(ctx context.Context, query schema.Query) *resolve.Resolved {
+				func(ctx context.Context, query *schema.Field) *resolve.Resolved {
 					return &resolve.Resolved{Err: errors.Errorf(errMsgServerNotReady), Field: q}
 				})
 		}).
-		WithMutationResolver("updateGQLSchema", func(m schema.Mutation) resolve.MutationResolver {
+		WithMutationResolver("updateGQLSchema", func(m *schema.Field) resolve.MutationResolver {
 			return resolve.MutationResolverFunc(
-				func(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+				func(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 					return &resolve.Resolved{Err: errors.Errorf(errMsgServerNotReady), Field: m},
 						false
 				})
@@ -407,7 +407,7 @@ func newAdminResolverFactory() *resolve.ResolverFactory {
 		// gotta force go to evaluate the right function at each loop iteration
 		// otherwise you get variable capture issues
 		func(f resolve.MutationResolver) {
-			rf.WithMutationResolver(gqlMut, func(m schema.Mutation) resolve.MutationResolver {
+			rf.WithMutationResolver(gqlMut, func(m *schema.Field) resolve.MutationResolver {
 				return f
 			})
 		}(resolver)
@@ -501,55 +501,55 @@ func (as *adminServer) addConnectedAdminResolvers() {
 	dgEx := resolve.NewDgraphExecutor()
 
 	as.rf.WithMutationResolver("updateGQLSchema",
-		func(m schema.Mutation) resolve.MutationResolver {
+		func(m *schema.Field) resolve.MutationResolver {
 			return &updateSchemaResolver{admin: as}
 		}).
 		WithQueryResolver("getGQLSchema",
-			func(q schema.Query) resolve.QueryResolver {
+			func(q *schema.Field) resolve.QueryResolver {
 				return &getSchemaResolver{admin: as}
 			}).
 		WithQueryResolver("queryGroup",
-			func(q schema.Query) resolve.QueryResolver {
+			func(q *schema.Field) resolve.QueryResolver {
 				return resolve.NewQueryResolver(qryRw, dgEx)
 			}).
 		WithQueryResolver("queryUser",
-			func(q schema.Query) resolve.QueryResolver {
+			func(q *schema.Field) resolve.QueryResolver {
 				return resolve.NewQueryResolver(qryRw, dgEx)
 			}).
 		WithQueryResolver("getGroup",
-			func(q schema.Query) resolve.QueryResolver {
+			func(q *schema.Field) resolve.QueryResolver {
 				return resolve.NewQueryResolver(qryRw, dgEx)
 			}).
 		WithQueryResolver("getCurrentUser",
-			func(q schema.Query) resolve.QueryResolver {
+			func(q *schema.Field) resolve.QueryResolver {
 				return resolve.NewQueryResolver(&currentUserResolver{baseRewriter: qryRw}, dgEx)
 			}).
 		WithQueryResolver("getUser",
-			func(q schema.Query) resolve.QueryResolver {
+			func(q *schema.Field) resolve.QueryResolver {
 				return resolve.NewQueryResolver(qryRw, dgEx)
 			}).
 		WithMutationResolver("addUser",
-			func(m schema.Mutation) resolve.MutationResolver {
+			func(m *schema.Field) resolve.MutationResolver {
 				return resolve.NewDgraphResolver(resolve.NewAddRewriter(), dgEx)
 			}).
 		WithMutationResolver("addGroup",
-			func(m schema.Mutation) resolve.MutationResolver {
+			func(m *schema.Field) resolve.MutationResolver {
 				return resolve.NewDgraphResolver(NewAddGroupRewriter(), dgEx)
 			}).
 		WithMutationResolver("updateUser",
-			func(m schema.Mutation) resolve.MutationResolver {
+			func(m *schema.Field) resolve.MutationResolver {
 				return resolve.NewDgraphResolver(resolve.NewUpdateRewriter(), dgEx)
 			}).
 		WithMutationResolver("updateGroup",
-			func(m schema.Mutation) resolve.MutationResolver {
+			func(m *schema.Field) resolve.MutationResolver {
 				return resolve.NewDgraphResolver(NewUpdateGroupRewriter(), dgEx)
 			}).
 		WithMutationResolver("deleteUser",
-			func(m schema.Mutation) resolve.MutationResolver {
+			func(m *schema.Field) resolve.MutationResolver {
 				return resolve.NewDgraphResolver(resolve.NewDeleteRewriter(), dgEx)
 			}).
 		WithMutationResolver("deleteGroup",
-			func(m schema.Mutation) resolve.MutationResolver {
+			func(m *schema.Field) resolve.MutationResolver {
 				return resolve.NewDgraphResolver(resolve.NewDeleteRewriter(), dgEx)
 			})
 }
@@ -557,12 +557,12 @@ func (as *adminServer) addConnectedAdminResolvers() {
 func resolverFactoryWithErrorMsg(msg string) *resolve.ResolverFactory {
 	errFunc := func(name string) error { return errors.Errorf(msg, name) }
 	qErr :=
-		resolve.QueryResolverFunc(func(ctx context.Context, query schema.Query) *resolve.Resolved {
+		resolve.QueryResolverFunc(func(ctx context.Context, query *schema.Field) *resolve.Resolved {
 			return &resolve.Resolved{Err: errFunc(query.ResponseName()), Field: query}
 		})
 
 	mErr := resolve.MutationResolverFunc(
-		func(ctx context.Context, mutation schema.Mutation) (*resolve.Resolved, bool) {
+		func(ctx context.Context, mutation *schema.Field) (*resolve.Resolved, bool) {
 			return &resolve.Resolved{Err: errFunc(mutation.ResponseName()), Field: mutation}, false
 		})
 
@@ -602,8 +602,8 @@ func (as *adminServer) resetSchema(ns uint64, gqlSchema schema.Schema) {
 			WithConventionResolvers(gqlSchema, as.fns)
 		// If the schema is a Federated Schema then attach "_service" resolver
 		if gqlSchema.IsFederated() {
-			resolverFactory.WithQueryResolver("_service", func(s schema.Query) resolve.QueryResolver {
-				return resolve.QueryResolverFunc(func(ctx context.Context, query schema.Query) *resolve.Resolved {
+			resolverFactory.WithQueryResolver("_service", func(s *schema.Field) resolve.QueryResolver {
+				return resolve.QueryResolverFunc(func(ctx context.Context, query *schema.Field) *resolve.Resolved {
 					as.mux.RLock()
 					defer as.mux.RUnlock()
 					sch, ok := as.gqlSchemas.GetCurrent(ns)

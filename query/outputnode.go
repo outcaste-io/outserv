@@ -1153,7 +1153,7 @@ func (sg *SubGraph) toDqlJSON(enc *encoder, n fastJsonNode) error {
 	return enc.encode(n)
 }
 
-func (sg *SubGraph) toGraphqlJSON(genc *graphQLEncoder, n fastJsonNode, f *gqlSchema.Query) error {
+func (sg *SubGraph) toGraphqlJSON(genc *graphQLEncoder, n fastJsonNode, f *gqlSchema.Field) error {
 	// GraphQL queries will always have at least one query whose results are visible to users,
 	// implying that the root fastJson node will always have at least one child. So, no need
 	// to check for the case where there are no children for the root fastJson node.

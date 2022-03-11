@@ -19,14 +19,15 @@ package admin
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/outcaste-io/outserv/worker"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/query"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/golang/glog"
 )
 
 type getSchemaResolver struct {
@@ -41,7 +42,7 @@ type updateSchemaResolver struct {
 	admin *adminServer
 }
 
-func (usr *updateSchemaResolver) Resolve(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+func (usr *updateSchemaResolver) Resolve(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	glog.Info("Got updateGQLSchema request")
 
 	input, err := getSchemaInput(m)
@@ -78,7 +79,7 @@ func (usr *updateSchemaResolver) Resolve(ctx context.Context, m schema.Mutation)
 		nil), true
 }
 
-func (gsr *getSchemaResolver) Resolve(ctx context.Context, q schema.Query) *resolve.Resolved {
+func (gsr *getSchemaResolver) Resolve(ctx context.Context, q *schema.Field) *resolve.Resolved {
 	var data map[string]interface{}
 
 	gsr.admin.mux.RLock()
@@ -104,7 +105,7 @@ func (gsr *getSchemaResolver) Resolve(ctx context.Context, q schema.Query) *reso
 	return resolve.DataResult(q, data, nil)
 }
 
-func getSchemaInput(m schema.Mutation) (*updateGQLSchemaInput, error) {
+func getSchemaInput(m *schema.Field) (*updateGQLSchemaInput, error) {
 	inputArg := m.ArgValue(schema.InputArgName)
 	inputByts, err := json.Marshal(inputArg)
 	if err != nil {

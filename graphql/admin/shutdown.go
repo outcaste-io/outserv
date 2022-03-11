@@ -19,13 +19,13 @@ package admin
 import (
 	"context"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/golang/glog"
 )
 
-func resolveShutdown(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+func resolveShutdown(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	glog.Info("Got shutdown request through GraphQL admin API")
 
 	x.ServerCloser.Signal()

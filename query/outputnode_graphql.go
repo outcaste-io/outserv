@@ -61,7 +61,7 @@ type customFieldResult struct {
 	// parents are all the parents which have the same resolved value for the custom childField
 	parents []fastJsonNode
 	// childField is the custom field which has been resolved
-	childField gqlSchema.Field
+	childField *gqlSchema.Field
 	// childVal is the result of resolving the custom childField from remote HTTP endpoint.
 	// A child node is attached to all the parents with this value.
 	childVal []byte
@@ -616,7 +616,7 @@ func (genc *graphQLEncoder) initChildAttrId(field *gqlSchema.Field) {
 	}
 }
 
-func (genc *graphQLEncoder) processCustomFields(field *gqlSchema.Query, n fastJsonNode) {
+func (genc *graphQLEncoder) processCustomFields(field *gqlSchema.Field, n fastJsonNode) {
 	if field.HasCustomHTTPChild() {
 		// initially, create attr ids for all the descendents of this field,
 		// so that they don't result in race-conditions later
@@ -672,9 +672,9 @@ func (genc *graphQLEncoder) processCustomFields(field *gqlSchema.Query, n fastJs
 			wg.Done()
 		}()
 		// extract the representations for Apollo _entities query and store them in GraphQL encoder
-		if q, ok := field.(*gqlSchema.Query); ok && q.QueryType() == gqlSchema.EntitiesQuery {
+		if field.QueryType() == gqlSchema.EntitiesQuery {
 			// ignore the error here, as that should have been taken care of during query rewriting
-			genc.entityRepresentations, _ = q.RepresentationsArg()
+			genc.entityRepresentations, _ = field.RepresentationsArg()
 		}
 		// start resolving the custom fields
 		genc.resolveCustomFields(field.SelectionSet(), []fastJsonNode{genc.children(n)})
@@ -710,7 +710,7 @@ func (genc *graphQLEncoder) processCustomFields(field *gqlSchema.Query, n fastJs
 //
 // For fields without custom directive we recursively call resolveCustomFields and let it do the
 // work.
-func (genc *graphQLEncoder) resolveCustomFields(childFields []gqlSchema.Field,
+func (genc *graphQLEncoder) resolveCustomFields(childFields []*gqlSchema.Field,
 	parentNodeHeads []fastJsonNode) {
 	wg := &sync.WaitGroup{}
 	for _, childField := range childFields {
@@ -741,7 +741,7 @@ func (genc *graphQLEncoder) resolveCustomFields(childFields []gqlSchema.Field,
 //  - benchmark concurrency for the worker goroutines: channels vs mutexes?
 //    https://medium.com/@_orcaman/when-too-much-concurrency-slows-you-down-golang-9c144ca305a
 //  - worry about path in errors and how to deal with them, specially during completion step
-func (genc *graphQLEncoder) resolveCustomField(childField gqlSchema.Field,
+func (genc *graphQLEncoder) resolveCustomField(childField *gqlSchema.Field,
 	parentNodeHeads []fastJsonNode, wg *sync.WaitGroup) {
 	defer wg.Done() // signal when this goroutine finishes execution
 
@@ -1021,7 +1021,7 @@ func (genc *graphQLEncoder) resolveCustomField(childField gqlSchema.Field,
 // }
 // In the example above, resolveNestedFields would be called on classes field and parentNodeHeads
 // would be the list of head pointers for all the user fastJson nodes.
-func (genc *graphQLEncoder) resolveNestedFields(childField gqlSchema.Field,
+func (genc *graphQLEncoder) resolveNestedFields(childField *gqlSchema.Field,
 	parentNodeHeads []fastJsonNode, wg *sync.WaitGroup) {
 	defer wg.Done() // signal when this goroutine finishes execution
 
@@ -1232,7 +1232,7 @@ func completeGeoObject(path []interface{}, field *gqlSchema.Field, val map[strin
 
 // completePoint takes in coordinates from dgraph response like [12.32, 123.32], and builds
 // a JSON GraphQL result object for Point like { "longitude" : 12.32 , "latitude" : 123.32 }.
-func completePoint(field gqlSchema.Field, coordinate []interface{}, buf *bytes.Buffer) {
+func completePoint(field *gqlSchema.Field, coordinate []interface{}, buf *bytes.Buffer) {
 	comma := ""
 
 	x.Check2(buf.WriteRune('{'))
@@ -1260,7 +1260,7 @@ func completePoint(field gqlSchema.Field, coordinate []interface{}, buf *bytes.B
 // completePolygon converts the Dgraph result to GraphQL Polygon type.
 // Dgraph output: coordinate: [[[22.22,11.11],[16.16,15.15],[21.21,20.2]],[[22.28,11.18],[16.18,15.18],[21.28,20.28]]]
 // Graphql output: { coordinates: [ { points: [{ latitude: 11.11, longitude: 22.22}, { latitude: 15.15, longitude: 16.16} , { latitude: 20.20, longitude: 21.21} ]}, { points: [{ latitude: 11.18, longitude: 22.28}, { latitude: 15.18, longitude: 16.18} , { latitude: 20.28, longitude: 21.28}]} ] }
-func completePolygon(field gqlSchema.Field, polygon []interface{}, buf *bytes.Buffer) {
+func completePolygon(field *gqlSchema.Field, polygon []interface{}, buf *bytes.Buffer) {
 	comma1 := ""
 
 	x.Check2(buf.WriteRune('{'))
@@ -1323,7 +1323,7 @@ func completePolygon(field gqlSchema.Field, polygon []interface{}, buf *bytes.Bu
 }
 
 // completeMultiPolygon converts the Dgraph result to GraphQL MultiPolygon type.
-func completeMultiPolygon(field gqlSchema.Field, multiPolygon []interface{}, buf *bytes.Buffer) {
+func completeMultiPolygon(field *gqlSchema.Field, multiPolygon []interface{}, buf *bytes.Buffer) {
 	comma1 := ""
 
 	x.Check2(buf.WriteRune('{'))

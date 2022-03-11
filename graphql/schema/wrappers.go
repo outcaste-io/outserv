@@ -1765,7 +1765,7 @@ func (f *Field) DgraphPredicateForAggregateField() string {
 
 func (q *Field) QueryType() QueryType {
 	if q.Kind != QueryKind {
-		panic("QueryType probably shouldn't have been called")
+		return ""
 	}
 	return queryType(q.Name(), q.op.inSchema.customDirectives["Query"][q.Name()])
 }

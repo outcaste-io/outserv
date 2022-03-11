@@ -23,20 +23,20 @@ var errNotScalar = errors.New("provided value is not a scalar, can't convert it 
 
 // A QueryResolver can resolve a single query.
 type QueryResolver interface {
-	Resolve(ctx context.Context, query schema.Query) *Resolved
+	Resolve(ctx context.Context, query *schema.Field) *Resolved
 }
 
 // A QueryRewriter can build a Dgraph gql.GraphQuery from a GraphQL query,
 type QueryRewriter interface {
-	Rewrite(ctx context.Context, q schema.Query) ([]*gql.GraphQuery, error)
+	Rewrite(ctx context.Context, q *schema.Field) ([]*gql.GraphQuery, error)
 }
 
 // QueryResolverFunc is an adapter that allows to build a QueryResolver from
 // a function.  Based on the http.HandlerFunc pattern.
-type QueryResolverFunc func(ctx context.Context, query schema.Query) *Resolved
+type QueryResolverFunc func(ctx context.Context, query *schema.Field) *Resolved
 
 // Resolve calls qr(ctx, query)
-func (qr QueryResolverFunc) Resolve(ctx context.Context, query schema.Query) *Resolved {
+func (qr QueryResolverFunc) Resolve(ctx context.Context, query *schema.Field) *Resolved {
 	return qr(ctx, query)
 }
 
@@ -61,7 +61,7 @@ type queryResolver struct {
 	resultCompleter CompletionFunc
 }
 
-func (qr *queryResolver) Resolve(ctx context.Context, query schema.Query) *Resolved {
+func (qr *queryResolver) Resolve(ctx context.Context, query *schema.Field) *Resolved {
 	span := otrace.FromContext(ctx)
 	stop := x.SpanTimer(span, "resolveQuery")
 	defer stop()
@@ -81,7 +81,7 @@ func (qr *queryResolver) Resolve(ctx context.Context, query schema.Query) *Resol
 	return resolved
 }
 
-func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query schema.Query) *Resolved {
+func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query *schema.Field) *Resolved {
 	dgraphQueryDuration := &schema.LabeledOffsetDuration{Label: "query"}
 	ext := &schema.Extensions{}
 
@@ -135,7 +135,7 @@ type customDQLQueryResolver struct {
 	executor      DgraphExecutor
 }
 
-func (qr *customDQLQueryResolver) Resolve(ctx context.Context, query schema.Query) *Resolved {
+func (qr *customDQLQueryResolver) Resolve(ctx context.Context, query *schema.Field) *Resolved {
 	span := otrace.FromContext(ctx)
 	stop := x.SpanTimer(span, "resolveCustomDQLQuery")
 	defer stop()
@@ -155,7 +155,7 @@ func (qr *customDQLQueryResolver) Resolve(ctx context.Context, query schema.Quer
 }
 
 func (qr *customDQLQueryResolver) rewriteAndExecute(ctx context.Context,
-	query schema.Query) *Resolved {
+	query *schema.Field) *Resolved {
 	dgraphQueryDuration := &schema.LabeledOffsetDuration{Label: "query"}
 	ext := &schema.Extensions{}
 
@@ -199,7 +199,7 @@ func (qr *customDQLQueryResolver) rewriteAndExecute(ctx context.Context,
 	return resolved
 }
 
-func resolveIntrospection(ctx context.Context, q schema.Query) *Resolved {
+func resolveIntrospection(ctx context.Context, q *schema.Field) *Resolved {
 	data, err := schema.Introspect(q)
 	return &Resolved{
 		Data:  data,

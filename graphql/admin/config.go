@@ -21,10 +21,10 @@ import (
 	"encoding/json"
 	"strconv"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/worker"
-	"github.com/golang/glog"
 )
 
 type configInput struct {
@@ -35,7 +35,7 @@ type configInput struct {
 	LogRequest *bool
 }
 
-func resolveUpdateConfig(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+func resolveUpdateConfig(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	glog.Info("Got config update through GraphQL admin API")
 
 	input, err := getConfigInput(m)
@@ -62,7 +62,7 @@ func resolveUpdateConfig(ctx context.Context, m schema.Mutation) (*resolve.Resol
 	), true
 }
 
-func resolveGetConfig(ctx context.Context, q schema.Query) *resolve.Resolved {
+func resolveGetConfig(ctx context.Context, q *schema.Field) *resolve.Resolved {
 	glog.Info("Got config query through GraphQL admin API")
 
 	return resolve.DataResult(
@@ -75,7 +75,7 @@ func resolveGetConfig(ctx context.Context, q schema.Query) *resolve.Resolved {
 
 }
 
-func getConfigInput(m schema.Mutation) (*configInput, error) {
+func getConfigInput(m *schema.Field) (*configInput, error) {
 	inputArg := m.ArgValue(schema.InputArgName)
 	inputByts, err := json.Marshal(inputArg)
 	if err != nil {

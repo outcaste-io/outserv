@@ -34,7 +34,7 @@ type taskInput struct {
 	Id string
 }
 
-func resolveTask(ctx context.Context, q schema.Query) *resolve.Resolved {
+func resolveTask(ctx context.Context, q *schema.Field) *resolve.Resolved {
 	// Get Task ID.
 	input, err := getTaskInput(q)
 	if err != nil {
@@ -67,7 +67,7 @@ func resolveTask(ctx context.Context, q schema.Query) *resolve.Resolved {
 	)
 }
 
-func getTaskInput(q schema.Query) (*taskInput, error) {
+func getTaskInput(q *schema.Field) (*taskInput, error) {
 	inputArg := q.ArgValue(schema.InputArgName)
 	inputBytes, err := json.Marshal(inputArg)
 	if err != nil {

@@ -20,13 +20,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/golang/glog"
 )
 
-func resolveDraining(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+func resolveDraining(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	glog.Info("Got draining request through GraphQL admin API")
 
 	enable := getDrainingInput(m)
@@ -41,7 +41,7 @@ func resolveDraining(ctx context.Context, m schema.Mutation) (*resolve.Resolved,
 	), true
 }
 
-func getDrainingInput(m schema.Mutation) bool {
+func getDrainingInput(m *schema.Field) bool {
 	enable, _ := m.ArgValue("enable").(bool)
 	return enable
 }

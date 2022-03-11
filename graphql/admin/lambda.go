@@ -20,20 +20,20 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/query"
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/golang/glog"
 )
 
 type updateLambdaInput struct {
 	Set worker.LambdaScript `json:"set,omitempty"`
 }
 
-func resolveUpdateLambda(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+func resolveUpdateLambda(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	glog.Info("Got updateLambdaScript request")
 
 	input, err := getLambdaInput(m)
@@ -57,7 +57,7 @@ func resolveUpdateLambda(ctx context.Context, m schema.Mutation) (*resolve.Resol
 		nil), true
 }
 
-func resolveGetLambda(ctx context.Context, q schema.Query) *resolve.Resolved {
+func resolveGetLambda(ctx context.Context, q *schema.Field) *resolve.Resolved {
 	var data map[string]interface{}
 
 	ns, err := x.ExtractNamespace(ctx)
@@ -79,7 +79,7 @@ func resolveGetLambda(ctx context.Context, q schema.Query) *resolve.Resolved {
 	return resolve.DataResult(q, data, nil)
 }
 
-func getLambdaInput(m schema.Mutation) (*updateLambdaInput, error) {
+func getLambdaInput(m *schema.Field) (*updateLambdaInput, error) {
 	inputArg := m.ArgValue(schema.InputArgName)
 	inputByts, err := json.Marshal(inputArg)
 	if err != nil {

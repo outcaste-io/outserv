@@ -19,15 +19,15 @@ package admin
 import (
 	"context"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 )
 
-func resolveHealth(ctx context.Context, q schema.Query) *resolve.Resolved {
+func resolveHealth(ctx context.Context, q *schema.Field) *resolve.Resolved {
 	glog.Info("Got health request")
 
 	resp, err := (&edgraph.Server{}).Health(ctx, true)

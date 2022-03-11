@@ -316,7 +316,7 @@ func (xidMetadata *xidMetadata) isDuplicateXid(atTopLevel bool, xidVar string,
 // mutation will fail.
 func (arw *AddRewriter) RewriteQueries(
 	ctx context.Context,
-	m schema.Mutation) ([]*gql.GraphQuery, []string, error) {
+	m *schema.Field) ([]*gql.GraphQuery, []string, error) {
 
 	arw.VarGen = NewVariableGenerator()
 	arw.XidMetadata = NewXidMetadata()
@@ -366,7 +366,7 @@ func (arw *AddRewriter) RewriteQueries(
 // See AddRewriter for how the rewritten queries look like.
 func (urw *UpdateRewriter) RewriteQueries(
 	ctx context.Context,
-	m schema.Mutation) ([]*gql.GraphQuery, []string, error) {
+	m *schema.Field) ([]*gql.GraphQuery, []string, error) {
 	mutatedType := m.MutatedType()
 
 	urw.VarGen = NewVariableGenerator()
@@ -470,7 +470,7 @@ func (urw *UpdateRewriter) RewriteQueries(
 // }
 func (arw *AddRewriter) Rewrite(
 	ctx context.Context,
-	m schema.Mutation,
+	m *schema.Field,
 	idExistence map[string]string) ([]*UpsertMutation, error) {
 
 	mutationType := Add
@@ -617,7 +617,7 @@ func (arw *AddRewriter) Rewrite(
 // See AddRewriter for how the set and remove fragments get created.
 func (urw *UpdateRewriter) Rewrite(
 	ctx context.Context,
-	m schema.Mutation,
+	m *schema.Field,
 	idExistence map[string]string) ([]*UpsertMutation, error) {
 	mutatedType := m.MutatedType()
 
@@ -770,7 +770,7 @@ func (urw *UpdateRewriter) Rewrite(
 // FromMutationResult rewrites the query part of a GraphQL add mutation into a Dgraph query.
 func (arw *AddRewriter) FromMutationResult(
 	ctx context.Context,
-	mutation schema.Mutation,
+	mutation *schema.Field,
 	assigned map[string]string,
 	result map[string]interface{}) ([]*gql.GraphQuery, error) {
 
@@ -824,7 +824,7 @@ func (arw *AddRewriter) FromMutationResult(
 // FromMutationResult rewrites the query part of a GraphQL update mutation into a Dgraph query.
 func (urw *UpdateRewriter) FromMutationResult(
 	ctx context.Context,
-	mutation schema.Mutation,
+	mutation *schema.Field,
 	assigned map[string]string,
 	result map[string]interface{}) ([]*gql.GraphQuery, error) {
 
@@ -858,7 +858,7 @@ func (urw *UpdateRewriter) FromMutationResult(
 }
 
 func (arw *AddRewriter) MutatedRootUIDs(
-	mutation schema.Mutation,
+	mutation *schema.Field,
 	assigned map[string]string,
 	result map[string]interface{}) []string {
 
@@ -884,7 +884,7 @@ func (arw *AddRewriter) MutatedRootUIDs(
 }
 
 func (urw *UpdateRewriter) MutatedRootUIDs(
-	mutation schema.Mutation,
+	mutation *schema.Field,
 	assigned map[string]string,
 	result map[string]interface{}) []string {
 
@@ -939,7 +939,7 @@ func checkResult(frag *mutationFragment, result map[string]interface{}) error {
 	return err
 }
 
-func extractMutationFilter(m schema.Mutation) map[string]interface{} {
+func extractMutationFilter(m *schema.Field) map[string]interface{} {
 	var filter map[string]interface{}
 	mutationType := m.MutationType()
 	if mutationType == schema.UpdateMutation {
@@ -954,7 +954,7 @@ func extractMutationFilter(m schema.Mutation) map[string]interface{} {
 }
 
 func RewriteUpsertQueryFromMutation(
-	m schema.Mutation,
+	m *schema.Field,
 	authRw *authRewriter,
 	mutationQueryVar string,
 	queryAttribute string,
@@ -1029,7 +1029,7 @@ func RewriteUpsertQueryFromMutation(
 }
 
 // removeNodeReference removes any reference we know about (via @hasInverse) into a node.
-func removeNodeReference(m schema.Mutation, authRw *authRewriter,
+func removeNodeReference(m *schema.Field, authRw *authRewriter,
 	qry *gql.GraphQuery) []interface{} {
 	var deletes []interface{}
 	for _, fld := range m.MutatedType().Fields() {
@@ -1067,7 +1067,7 @@ func removeNodeReference(m schema.Mutation, authRw *authRewriter,
 
 func (drw *deleteRewriter) Rewrite(
 	ctx context.Context,
-	m schema.Mutation,
+	m *schema.Field,
 	idExistence map[string]string) ([]*UpsertMutation, error) {
 
 	if m.MutationType() != schema.DeleteMutation {
@@ -1157,7 +1157,7 @@ func (drw *deleteRewriter) Rewrite(
 
 func (drw *deleteRewriter) FromMutationResult(
 	ctx context.Context,
-	mutation schema.Mutation,
+	mutation *schema.Field,
 	assigned map[string]string,
 	result map[string]interface{}) ([]*gql.GraphQuery, error) {
 
@@ -1166,7 +1166,7 @@ func (drw *deleteRewriter) FromMutationResult(
 }
 
 func (drw *deleteRewriter) MutatedRootUIDs(
-	mutation schema.Mutation,
+	mutation *schema.Field,
 	assigned map[string]string,
 	result map[string]interface{}) []string {
 
@@ -1178,7 +1178,7 @@ func (drw *deleteRewriter) MutatedRootUIDs(
 // The function generates VarGen and XidMetadata which are used in Rewrite function.
 func (drw *deleteRewriter) RewriteQueries(
 	ctx context.Context,
-	m schema.Mutation) ([]*gql.GraphQuery, []string, error) {
+	m *schema.Field) ([]*gql.GraphQuery, []string, error) {
 
 	drw.VarGen = NewVariableGenerator()
 

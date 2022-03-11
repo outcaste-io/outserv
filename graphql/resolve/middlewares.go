@@ -65,8 +65,8 @@ func (mws QueryMiddlewares) Then(resolver QueryResolver) QueryResolver {
 		return resolver
 	}
 	if resolver == nil {
-		resolver = QueryResolverFunc(func(ctx context.Context, query schema.Query) *Resolved {
-			return &Resolved{Field: query.field}
+		resolver = QueryResolverFunc(func(ctx context.Context, query *schema.Field) *Resolved {
+			return &Resolved{Field: query}
 		})
 	}
 	for i := len(mws) - 1; i >= 0; i-- {
@@ -99,7 +99,7 @@ func (mws MutationMiddlewares) Then(resolver MutationResolver) MutationResolver 
 	}
 	if resolver == nil {
 		resolver = MutationResolverFunc(func(ctx context.Context,
-			mutation schema.Mutation) (*Resolved, bool) {
+			mutation *schema.Field) (*Resolved, bool) {
 			return &Resolved{Field: mutation}, true
 		})
 	}
@@ -111,7 +111,7 @@ func (mws MutationMiddlewares) Then(resolver MutationResolver) MutationResolver 
 
 // resolveGuardianOfTheGalaxyAuth returns a Resolved with error if the context doesn't contain any
 // Guardian of Galaxy auth, otherwise it returns nil
-func resolveGuardianOfTheGalaxyAuth(ctx context.Context, f schema.Field) *Resolved {
+func resolveGuardianOfTheGalaxyAuth(ctx context.Context, f *schema.Field) *Resolved {
 	if err := edgraph.AuthGuardianOfTheGalaxy(ctx); err != nil {
 		return EmptyResult(f, err)
 	}
@@ -120,14 +120,14 @@ func resolveGuardianOfTheGalaxyAuth(ctx context.Context, f schema.Field) *Resolv
 
 // resolveGuardianAuth returns a Resolved with error if the context doesn't contain any Guardian auth,
 // otherwise it returns nil
-func resolveGuardianAuth(ctx context.Context, f schema.Field) *Resolved {
+func resolveGuardianAuth(ctx context.Context, f *schema.Field) *Resolved {
 	if err := edgraph.AuthorizeGuardians(ctx); err != nil {
 		return EmptyResult(f, err)
 	}
 	return nil
 }
 
-func resolveIpWhitelisting(ctx context.Context, f schema.Field) *Resolved {
+func resolveIpWhitelisting(ctx context.Context, f *schema.Field) *Resolved {
 	if _, err := x.HasWhitelistedIP(ctx); err != nil {
 		return EmptyResult(f, err)
 	}
@@ -137,7 +137,7 @@ func resolveIpWhitelisting(ctx context.Context, f schema.Field) *Resolved {
 // GuardianOfTheGalaxyAuthMW4Query blocks the resolution of resolverFunc if there is no Guardian
 // of Galaxy auth present in context, otherwise it lets the resolverFunc resolve the query.
 func GuardianOfTheGalaxyAuthMW4Query(resolver QueryResolver) QueryResolver {
-	return QueryResolverFunc(func(ctx context.Context, query schema.Query) *Resolved {
+	return QueryResolverFunc(func(ctx context.Context, query *schema.Field) *Resolved {
 		if resolved := resolveGuardianOfTheGalaxyAuth(ctx, query); resolved != nil {
 			return resolved
 		}
@@ -148,7 +148,7 @@ func GuardianOfTheGalaxyAuthMW4Query(resolver QueryResolver) QueryResolver {
 // GuardianAuthMW4Query blocks the resolution of resolverFunc if there is no Guardian auth present
 // in context, otherwise it lets the resolverFunc resolve the query.
 func GuardianAuthMW4Query(resolver QueryResolver) QueryResolver {
-	return QueryResolverFunc(func(ctx context.Context, query schema.Query) *Resolved {
+	return QueryResolverFunc(func(ctx context.Context, query *schema.Field) *Resolved {
 		if resolved := resolveGuardianAuth(ctx, query); resolved != nil {
 			return resolved
 		}
@@ -157,7 +157,7 @@ func GuardianAuthMW4Query(resolver QueryResolver) QueryResolver {
 }
 
 func IpWhitelistingMW4Query(resolver QueryResolver) QueryResolver {
-	return QueryResolverFunc(func(ctx context.Context, query schema.Query) *Resolved {
+	return QueryResolverFunc(func(ctx context.Context, query *schema.Field) *Resolved {
 		if resolved := resolveIpWhitelisting(ctx, query); resolved != nil {
 			return resolved
 		}
@@ -166,7 +166,7 @@ func IpWhitelistingMW4Query(resolver QueryResolver) QueryResolver {
 }
 
 func LoggingMWQuery(resolver QueryResolver) QueryResolver {
-	return QueryResolverFunc(func(ctx context.Context, query schema.Query) *Resolved {
+	return QueryResolverFunc(func(ctx context.Context, query *schema.Field) *Resolved {
 		glog.Infof("GraphQL admin query. Name =  %v", query.Name())
 		return resolver.Resolve(ctx, query)
 	})
@@ -175,7 +175,7 @@ func LoggingMWQuery(resolver QueryResolver) QueryResolver {
 // GuardianOfTheGalaxyAuthMW4Mutation blocks the resolution of resolverFunc if there is no Guardian
 // of Galaxy auth present in context, otherwise it lets the resolverFunc resolve the mutation.
 func GuardianOfTheGalaxyAuthMW4Mutation(resolver MutationResolver) MutationResolver {
-	return MutationResolverFunc(func(ctx context.Context, mutation schema.Mutation) (*Resolved, bool) {
+	return MutationResolverFunc(func(ctx context.Context, mutation *schema.Field) (*Resolved, bool) {
 		if resolved := resolveGuardianOfTheGalaxyAuth(ctx, mutation); resolved != nil {
 			return resolved, false
 		}
@@ -186,7 +186,7 @@ func GuardianOfTheGalaxyAuthMW4Mutation(resolver MutationResolver) MutationResol
 // GuardianAuthMW4Mutation blocks the resolution of resolverFunc if there is no Guardian auth
 // present in context, otherwise it lets the resolverFunc resolve the mutation.
 func GuardianAuthMW4Mutation(resolver MutationResolver) MutationResolver {
-	return MutationResolverFunc(func(ctx context.Context, mutation schema.Mutation) (*Resolved, bool) {
+	return MutationResolverFunc(func(ctx context.Context, mutation *schema.Field) (*Resolved, bool) {
 		if resolved := resolveGuardianAuth(ctx, mutation); resolved != nil {
 			return resolved, false
 		}
@@ -195,7 +195,7 @@ func GuardianAuthMW4Mutation(resolver MutationResolver) MutationResolver {
 }
 
 func IpWhitelistingMW4Mutation(resolver MutationResolver) MutationResolver {
-	return MutationResolverFunc(func(ctx context.Context, mutation schema.Mutation) (*Resolved,
+	return MutationResolverFunc(func(ctx context.Context, mutation *schema.Field) (*Resolved,
 		bool) {
 		if resolved := resolveIpWhitelisting(ctx, mutation); resolved != nil {
 			return resolved, false
@@ -205,7 +205,7 @@ func IpWhitelistingMW4Mutation(resolver MutationResolver) MutationResolver {
 }
 
 func LoggingMWMutation(resolver MutationResolver) MutationResolver {
-	return MutationResolverFunc(func(ctx context.Context, mutation schema.Mutation) (*Resolved,
+	return MutationResolverFunc(func(ctx context.Context, mutation *schema.Field) (*Resolved,
 		bool) {
 		glog.Infof("GraphQL admin mutation. Name =  %v", mutation.Name())
 		return resolver.Resolve(ctx, mutation)
@@ -213,7 +213,7 @@ func LoggingMWMutation(resolver MutationResolver) MutationResolver {
 }
 
 func AclOnlyMW4Mutation(resolver MutationResolver) MutationResolver {
-	return MutationResolverFunc(func(ctx context.Context, mutation schema.Mutation) (*Resolved,
+	return MutationResolverFunc(func(ctx context.Context, mutation *schema.Field) (*Resolved,
 		bool) {
 		if !x.WorkerConfig.AclEnabled {
 			return EmptyResult(mutation, errors.New("Enable ACL to use this mutation")), false

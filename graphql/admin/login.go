@@ -34,7 +34,7 @@ type loginInput struct {
 	RefreshToken string
 }
 
-func resolveLogin(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+func resolveLogin(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	glog.Info("Got login request")
 
 	input := getLoginInput(m)
@@ -65,7 +65,7 @@ func resolveLogin(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bo
 
 }
 
-func getLoginInput(m schema.Mutation) *loginInput {
+func getLoginInput(m *schema.Field) *loginInput {
 	// We should be able to convert these to string as GraphQL schema validation should ensure this.
 	// If the input wasn't specified, then the arg value would be nil and the string value empty.
 

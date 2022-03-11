@@ -71,7 +71,7 @@ type deleteEvent struct {
 // sendWebhookEvent forms an HTTP payload required for the webhooks configured with @lambdaOnMutate
 // directive, and then sends that payload to the lambda URL configured with Alpha. There is no
 // guarantee that the payload will be delivered successfully to the lambda server.
-func sendWebhookEvent(ctx context.Context, m schema.Mutation, commitTs uint64, rootUIDs []string) {
+func sendWebhookEvent(ctx context.Context, m *schema.Field, commitTs uint64, rootUIDs []string) {
 	accessJWT, _ := x.ExtractJwt(ctx)
 	ns, _ := x.ExtractNamespace(ctx)
 	var authHeader *authHeaderPayload

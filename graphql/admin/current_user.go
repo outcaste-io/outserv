@@ -39,7 +39,7 @@ func extractName(ctx context.Context) (string, error) {
 }
 
 func (gsr *currentUserResolver) Rewrite(ctx context.Context,
-	gqlQuery schema.Query) ([]*gql.GraphQuery, error) {
+	gqlQuery *schema.Field) ([]*gql.GraphQuery, error) {
 
 	name, err := extractName(ctx)
 	if err != nil {

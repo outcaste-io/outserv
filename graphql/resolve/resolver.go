@@ -53,8 +53,8 @@ type RequestResolver struct {
 // know about.
 type ResolverFactory struct {
 	sync.RWMutex
-	queryResolvers    map[string]func(schema.Query) QueryResolver
-	mutationResolvers map[string]func(schema.Mutation) MutationResolver
+	queryResolvers    map[string]func(*schema.Field) QueryResolver
+	mutationResolvers map[string]func(*schema.Field) MutationResolver
 
 	queryMiddlewareConfig    map[string]QueryMiddlewares
 	mutationMiddlewareConfig map[string]MutationMiddlewares
@@ -79,7 +79,7 @@ type DgraphEx struct{}
 // Execute is the underlying dgraph implementation of Dgraph execution.
 // If field is nil, returned response has JSON in DQL form, otherwise it will be in GraphQL form.
 func (dg *DgraphEx) Execute(ctx context.Context, req *pb.Request,
-	field schema.Field) (*pb.Response, error) {
+	field *schema.Field) (*pb.Response, error) {
 
 	span := trace.FromContext(ctx)
 	stop := x.SpanTimer(span, "dgraph.Execute")
@@ -117,7 +117,7 @@ type dgraphExecutor struct {
 // A Resolved is the result of resolving a single field - generally a query or mutation.
 type Resolved struct {
 	Data       []byte
-	Field      schema.Field
+	Field      *schema.Field
 	Err        error
 	Extensions *schema.Extensions
 }
@@ -136,13 +136,13 @@ func NewDgraphExecutor() DgraphExecutor {
 	return &dgraphExecutor{dg: &DgraphEx{}}
 }
 
-func (de *dgraphExecutor) Execute(ctx context.Context, req *pb.Request, field schema.Field) (
+func (de *dgraphExecutor) Execute(ctx context.Context, req *pb.Request, field *schema.Field) (
 	*pb.Response, error) {
 	return de.dg.Execute(ctx, req, field)
 }
 
 func (rf *ResolverFactory) WithQueryResolver(
-	name string, resolver func(schema.Query) QueryResolver) *ResolverFactory {
+	name string, resolver func(*schema.Field) QueryResolver) *ResolverFactory {
 	rf.Lock()
 	defer rf.Unlock()
 	rf.queryResolvers[name] = resolver
@@ -150,7 +150,7 @@ func (rf *ResolverFactory) WithQueryResolver(
 }
 
 func (rf *ResolverFactory) WithMutationResolver(
-	name string, resolver func(schema.Mutation) MutationResolver) *ResolverFactory {
+	name string, resolver func(*schema.Field) MutationResolver) *ResolverFactory {
 	rf.Lock()
 	defer rf.Unlock()
 	rf.mutationResolvers[name] = resolver
@@ -160,20 +160,20 @@ func (rf *ResolverFactory) WithMutationResolver(
 func (rf *ResolverFactory) WithSchemaIntrospection() *ResolverFactory {
 	return rf.
 		WithQueryResolver("__schema",
-			func(q schema.Query) QueryResolver {
+			func(q *schema.Field) QueryResolver {
 				return QueryResolverFunc(resolveIntrospection)
 			}).
 		WithQueryResolver("__type",
-			func(q schema.Query) QueryResolver {
+			func(q *schema.Field) QueryResolver {
 				return QueryResolverFunc(resolveIntrospection)
 			}).
 		WithQueryResolver("__typename",
-			func(q schema.Query) QueryResolver {
+			func(q *schema.Field) QueryResolver {
 				return QueryResolverFunc(resolveIntrospection)
 			}).
 		WithMutationResolver("__typename",
-			func(m schema.Mutation) MutationResolver {
-				return MutationResolverFunc(func(ctx context.Context, m schema.Mutation) (*Resolved, bool) {
+			func(m *schema.Field) MutationResolver {
+				return MutationResolverFunc(func(ctx context.Context, m *schema.Field) (*Resolved, bool) {
 					return DataResult(m, map[string]interface{}{"__typename": "Mutation"}, nil),
 						resolverSucceeded
 				})
@@ -187,50 +187,50 @@ func (rf *ResolverFactory) WithConventionResolvers(
 	queries = append(queries, s.Queries(schema.PasswordQuery)...)
 	queries = append(queries, s.Queries(schema.AggregateQuery)...)
 	for _, q := range queries {
-		rf.WithQueryResolver(q, func(q schema.Query) QueryResolver {
+		rf.WithQueryResolver(q, func(q *schema.Field) QueryResolver {
 			return NewQueryResolver(fns.Qrw, fns.Ex)
 		})
 	}
 
 	for _, q := range s.Queries(schema.EntitiesQuery) {
-		rf.WithQueryResolver(q, func(q schema.Query) QueryResolver {
+		rf.WithQueryResolver(q, func(q *schema.Field) QueryResolver {
 			return NewEntitiesQueryResolver(fns.Qrw, fns.Ex)
 		})
 	}
 
 	for _, q := range s.Queries(schema.HTTPQuery) {
-		rf.WithQueryResolver(q, func(q schema.Query) QueryResolver {
+		rf.WithQueryResolver(q, func(q *schema.Field) QueryResolver {
 			return NewHTTPQueryResolver(nil)
 		})
 	}
 
 	for _, q := range s.Queries(schema.DQLQuery) {
-		rf.WithQueryResolver(q, func(q schema.Query) QueryResolver {
+		rf.WithQueryResolver(q, func(q *schema.Field) QueryResolver {
 			// DQL queries don't need any QueryRewriter
 			return NewCustomDQLQueryResolver(fns.Qrw, fns.Ex)
 		})
 	}
 
 	for _, m := range s.Mutations(schema.AddMutation) {
-		rf.WithMutationResolver(m, func(m schema.Mutation) MutationResolver {
+		rf.WithMutationResolver(m, func(m *schema.Field) MutationResolver {
 			return NewDgraphResolver(fns.Arw(), fns.Ex)
 		})
 	}
 
 	for _, m := range s.Mutations(schema.UpdateMutation) {
-		rf.WithMutationResolver(m, func(m schema.Mutation) MutationResolver {
+		rf.WithMutationResolver(m, func(m *schema.Field) MutationResolver {
 			return NewDgraphResolver(fns.Urw(), fns.Ex)
 		})
 	}
 
 	for _, m := range s.Mutations(schema.DeleteMutation) {
-		rf.WithMutationResolver(m, func(m schema.Mutation) MutationResolver {
+		rf.WithMutationResolver(m, func(m *schema.Field) MutationResolver {
 			return NewDgraphResolver(fns.Drw, fns.Ex)
 		})
 	}
 
 	for _, m := range s.Mutations(schema.HTTPMutation) {
-		rf.WithMutationResolver(m, func(m schema.Mutation) MutationResolver {
+		rf.WithMutationResolver(m, func(m *schema.Field) MutationResolver {
 			return NewHTTPMutationResolver(nil)
 		})
 	}
@@ -262,8 +262,8 @@ func NewResolverFactory(
 	queryError QueryResolverFunc, mutationError MutationResolverFunc) *ResolverFactory {
 
 	return &ResolverFactory{
-		queryResolvers:    make(map[string]func(schema.Query) QueryResolver),
-		mutationResolvers: make(map[string]func(schema.Mutation) MutationResolver),
+		queryResolvers:    make(map[string]func(*schema.Field) QueryResolver),
+		mutationResolvers: make(map[string]func(*schema.Field) MutationResolver),
 
 		queryMiddlewareConfig:    make(map[string]QueryMiddlewares),
 		mutationMiddlewareConfig: make(map[string]MutationMiddlewares),
@@ -281,11 +281,11 @@ func entitiesQueryCompletion(ctx context.Context, resolved *Resolved) {
 	if len(resolved.Data) == 0 {
 		return
 	}
-	query, ok := resolved.Field.(schema.Query)
-	if !ok {
-		// this function shouldn't be called for anything other than a query
+	if resolved.Field.Kind != schema.QueryKind {
+		// This function shouldn't be called for anything other than a query.
 		return
 	}
+	query := resolved.Field
 
 	var data map[string][]interface{}
 	err := schema.Unmarshal(resolved.Data, &data)
@@ -372,7 +372,7 @@ func entitiesQueryCompletion(ctx context.Context, resolved *Resolved) {
 // noopCompletion just passes back it's result and err arguments
 func noopCompletion(ctx context.Context, resolved *Resolved) {}
 
-func (rf *ResolverFactory) queryResolverFor(query schema.Query) QueryResolver {
+func (rf *ResolverFactory) queryResolverFor(query *schema.Field) QueryResolver {
 	rf.RLock()
 	defer rf.RUnlock()
 	mws := rf.queryMiddlewareConfig[query.Name()]
@@ -382,7 +382,7 @@ func (rf *ResolverFactory) queryResolverFor(query schema.Query) QueryResolver {
 	return rf.queryError
 }
 
-func (rf *ResolverFactory) mutationResolverFor(mutation schema.Mutation) MutationResolver {
+func (rf *ResolverFactory) mutationResolverFor(mutation *schema.Field) MutationResolver {
 	rf.RLock()
 	defer rf.RUnlock()
 	mws := rf.mutationMiddlewareConfig[mutation.Name()]
@@ -472,7 +472,7 @@ func (r *RequestResolver) Resolve(ctx context.Context, gqlReq *schema.Request) (
 		for i, q := range op.Queries() {
 			wg.Add(1)
 
-			go func(q schema.Query, storeAt int) {
+			go func(q *schema.Field, storeAt int) {
 				defer wg.Done()
 				defer api.PanicHandler(
 					func(err error) {
@@ -573,7 +573,7 @@ func (r *RequestResolver) Schema() schema.Schema {
 
 // validateCustomFieldsRecursively will return err if the given field is custom or any of its
 // children is type of a custom field.
-func validateCustomFieldsRecursively(field schema.Field) error {
+func validateCustomFieldsRecursively(field *schema.Field) error {
 	if field.IsCustomHTTP() {
 		return x.GqlErrorf("Custom field `%s` is not supported in graphql subscription",
 			field.Name()).WithLocations(field.Location())
@@ -626,7 +626,7 @@ func NewHTTPMutationResolver(hc *http.Client) MutationResolver {
 	return &httpMutationResolver{hc}
 }
 
-func (hr *httpResolver) Resolve(ctx context.Context, field schema.Field) *Resolved {
+func (hr *httpResolver) Resolve(ctx context.Context, field *schema.Field) *Resolved {
 	span := otrace.FromContext(ctx)
 	stop := x.SpanTimer(span, "resolveHTTP")
 	defer stop()
@@ -635,7 +635,7 @@ func (hr *httpResolver) Resolve(ctx context.Context, field schema.Field) *Resolv
 	return resolved
 }
 
-func (hr *httpResolver) rewriteAndExecute(ctx context.Context, field schema.Field) *Resolved {
+func (hr *httpResolver) rewriteAndExecute(ctx context.Context, field *schema.Field) *Resolved {
 	ns, _ := x.ExtractNamespace(ctx)
 	hrc, err := field.CustomHTTPConfig(ns)
 	if err != nil {
@@ -663,17 +663,17 @@ func (hr *httpResolver) rewriteAndExecute(ctx context.Context, field schema.Fiel
 	return DataResult(field, map[string]interface{}{field.Name(): fieldData}, errs)
 }
 
-func (h *httpQueryResolver) Resolve(ctx context.Context, query schema.Query) *Resolved {
+func (h *httpQueryResolver) Resolve(ctx context.Context, query *schema.Field) *Resolved {
 	return (*httpResolver)(h).Resolve(ctx, query)
 }
 
-func (h *httpMutationResolver) Resolve(ctx context.Context, mutation schema.Mutation) (*Resolved,
+func (h *httpMutationResolver) Resolve(ctx context.Context, mutation *schema.Field) (*Resolved,
 	bool) {
 	resolved := (*httpResolver)(h).Resolve(ctx, mutation)
 	return resolved, resolved.Err == nil || resolved.Err.Error() == ""
 }
 
-func EmptyResult(f schema.Field, err error) *Resolved {
+func EmptyResult(f *schema.Field, err error) *Resolved {
 	return &Resolved{
 		Data:  f.NullResponse(),
 		Field: f,
@@ -681,8 +681,8 @@ func EmptyResult(f schema.Field, err error) *Resolved {
 	}
 }
 
-func DataResult(f schema.Field, data map[string]interface{}, err error) *Resolved {
-	b, errs := schema.CompleteObject(f.PreAllocatePathSlice(), []schema.Field{f}, data)
+func DataResult(f *schema.Field, data map[string]interface{}, err error) *Resolved {
+	b, errs := schema.CompleteObject(f.PreAllocatePathSlice(), []*schema.Field{f}, data)
 
 	return &Resolved{
 		Data:  b,

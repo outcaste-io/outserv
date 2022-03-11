@@ -22,7 +22,7 @@ func NewUpdateGroupRewriter() resolve.MutationRewriter {
 // nodes. It does not rewrite any queries.
 func (urw *updateGroupRewriter) RewriteQueries(
 	ctx context.Context,
-	m schema.Mutation) ([]*gql.GraphQuery, []string, error) {
+	m *schema.Field) ([]*gql.GraphQuery, []string, error) {
 
 	urw.VarGen = resolve.NewVariableGenerator()
 	urw.XidMetadata = resolve.NewXidMetadata()
@@ -37,7 +37,7 @@ func (urw *updateGroupRewriter) RewriteQueries(
 // name as another rule.
 func (urw *updateGroupRewriter) Rewrite(
 	ctx context.Context,
-	m schema.Mutation,
+	m *schema.Field,
 	idExistence map[string]string) ([]*resolve.UpsertMutation, error) {
 
 	inp := m.ArgValue(schema.InputArgName).(map[string]interface{})
@@ -148,7 +148,7 @@ func (urw *updateGroupRewriter) Rewrite(
 // FromMutationResult rewrites the query part of a GraphQL update mutation into a Dgraph query.
 func (urw *updateGroupRewriter) FromMutationResult(
 	ctx context.Context,
-	mutation schema.Mutation,
+	mutation *schema.Field,
 	assigned map[string]string,
 	result map[string]interface{}) ([]*gql.GraphQuery, error) {
 
@@ -156,7 +156,7 @@ func (urw *updateGroupRewriter) FromMutationResult(
 }
 
 func (urw *updateGroupRewriter) MutatedRootUIDs(
-	mutation schema.Mutation,
+	mutation *schema.Field,
 	assigned map[string]string,
 	result map[string]interface{}) []string {
 	return ((*resolve.UpdateRewriter)(urw)).MutatedRootUIDs(mutation, assigned, result)
