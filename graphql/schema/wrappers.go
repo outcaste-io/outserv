@@ -23,12 +23,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/dgraph-io/gqlparser/v2/parser"
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/graphql/authorization"
 
 	"github.com/dgraph-io/gqlparser/v2/ast"
@@ -1626,7 +1628,11 @@ func (q *Field) Schema() *Schema {
 // In case the field f is of type <Type>Aggregate, the Type is retunred.
 // In all other case the function returns the type of field f.
 func (f *Field) ConstructedFor() *Type {
+	glog.Infof("ConstructedFor called for: %+v\n", f)
 	if !f.IsAggregateField() {
+		return f.Type()
+	}
+	if f.QueryType() != AggregateQuery {
 		return f.Type()
 	}
 
@@ -1658,6 +1664,7 @@ func (f *Field) ConstructedForDgraphPredicate() string {
 // it returns corresponding dgraph predicate name.
 // In all other cases it returns dgraph predicate of the field.
 func (f *Field) DgraphPredicateForAggregateField() string {
+	debug.PrintStack()
 	aggregateFunctions := []string{"Max", "Min", "Sum", "Avg"}
 
 	fldName := f.Name()
@@ -1668,6 +1675,7 @@ func (f *Field) DgraphPredicateForAggregateField() string {
 		}
 	}
 	if !isAggregateFunction {
+		glog.Infof("This is not an aggregate function: %+v. Returning: %s\n", f, f.DgraphPredicate())
 		return f.DgraphPredicate()
 	}
 	// aggregateResultTypeName contains name of the type in which the aggregate field is defined,
@@ -1678,19 +1686,19 @@ func (f *Field) DgraphPredicateForAggregateField() string {
 	// If aggregateResultTypeName is found to not end with AggregateResult, just return DgraphPredicate()
 	if !strings.HasSuffix(aggregateResultTypeName, "AggregateResult") {
 		// This is an extra precaution and ideally, the code should not reach over here.
+		glog.Infof("does not have aggregateresult suffix: %s . returning: %s\n", aggregateResultTypeName, f.DgraphPredicate())
 		return f.DgraphPredicate()
 	}
 	mainTypeName := aggregateResultTypeName[:len(aggregateResultTypeName)-15]
 	// Remove last 3 characters of the field name.
 	// Eg. to get "FieldName" from "FieldNameMax"
 	// As all Aggregate functions are of length 3, removing last 3 characters from fldName
-	return f.op.inSchema.dgraphPredicate[mainTypeName][fldName[:len(fldName)-3]]
+	out := f.op.inSchema.dgraphPredicate[mainTypeName][fldName[:len(fldName)-3]]
+	glog.Infof("Dgraph predicate result: %s\n", out)
+	return out
 }
 
 func (q *Field) QueryType() QueryType {
-	if q.Kind != QueryKind {
-		return ""
-	}
 	return queryType(q.Name(), q.op.inSchema.customDirectives["Query"][q.Name()])
 }
 

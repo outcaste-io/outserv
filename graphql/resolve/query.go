@@ -104,6 +104,7 @@ func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query *schema.Fi
 			query.ResponseName()))
 	}
 	qry := dgraph.AsString(dgQuery)
+	glog.V(2).Infof("DQL Query: %s\n", qry)
 
 	queryTimer := newtimer(ctx, &dgraphQueryDuration.OffsetDuration)
 	queryTimer.Start()

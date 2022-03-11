@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -259,6 +260,7 @@ func aggregateQuery(query *schema.Field, authRw *authRewriter) []*gql.GraphQuery
 
 	// Get the type which the count query is written for
 	mainType := query.ConstructedFor()
+	glog.Infof("mainType: %s\n", mainType)
 
 	dgQuery, rbac := addCommonRules(query, mainType, authRw)
 	if rbac == schema.Negative {
@@ -342,6 +344,7 @@ func aggregateQuery(query *schema.Field, authRw *authRewriter) []*gql.GraphQuery
 				//        TweetsAggregateResult.scoreMin : min(val(scoreVar))
 				// }
 				finalMainQuery.Children = append(finalMainQuery.Children, finalQueryChild)
+				glog.Infof("final query child: %+v\n", finalQueryChild)
 				break
 			}
 		}
