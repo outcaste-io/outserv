@@ -74,7 +74,7 @@ var jsLambda embed.FS
 
 func init() {
 	Alpha.Cmd = &cobra.Command{
-		Use:   "graphql",
+		Use:   "alpha",
 		Short: "Run Outserv GraphQL server",
 		Run: func(cmd *cobra.Command, args []string) {
 			defer x.StartProfile(Alpha.Conf).Stop()

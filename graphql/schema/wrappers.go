@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -1665,7 +1664,6 @@ func (f *Field) ConstructedForDgraphPredicate() string {
 // it returns corresponding dgraph predicate name.
 // In all other cases it returns dgraph predicate of the field.
 func (f *Field) DgraphPredicateForAggregateField() string {
-	debug.PrintStack()
 	aggregateFunctions := []string{"Max", "Min", "Sum", "Avg"}
 
 	fldName := f.Name()
@@ -1695,7 +1693,6 @@ func (f *Field) DgraphPredicateForAggregateField() string {
 	// Eg. to get "FieldName" from "FieldNameMax"
 	// As all Aggregate functions are of length 3, removing last 3 characters from fldName
 	out := f.op.inSchema.dgraphPredicate[mainTypeName][fldName[:len(fldName)-3]]
-	glog.Infof("Dgraph predicate result: %s\n", out)
 	return out
 }
 
