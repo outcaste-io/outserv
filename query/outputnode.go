@@ -34,7 +34,9 @@ import (
 )
 
 // ToJson converts the list of subgraph into a JSON response by calling toFastJSON.
-func ToJson(ctx context.Context, l *Latency, sgl []*SubGraph, field *gqlSchema.Field) ([]byte, error) {
+func ToJson(ctx context.Context, l *Latency, sgl []*SubGraph,
+	field *gqlSchema.Field) ([]byte, error) {
+
 	sgr := &SubGraph{}
 	for _, sg := range sgl {
 		if sg.Params.Alias == "var" || sg.Params.Alias == "shortest" {

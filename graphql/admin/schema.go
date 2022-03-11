@@ -42,9 +42,10 @@ type updateSchemaResolver struct {
 	admin *adminServer
 }
 
-func (usr *updateSchemaResolver) Resolve(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
-	glog.Info("Got updateGQLSchema request")
+func (usr *updateSchemaResolver) Resolve(ctx context.Context,
+	m *schema.Field) (*resolve.Resolved, bool) {
 
+	glog.Info("Got updateGQLSchema request")
 	input, err := getSchemaInput(m)
 	if err != nil {
 		return resolve.EmptyResult(m, err), false

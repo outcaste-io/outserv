@@ -173,10 +173,11 @@ func (rf *ResolverFactory) WithSchemaIntrospection() *ResolverFactory {
 			}).
 		WithMutationResolver("__typename",
 			func(m *schema.Field) MutationResolver {
-				return MutationResolverFunc(func(ctx context.Context, m *schema.Field) (*Resolved, bool) {
-					return DataResult(m, map[string]interface{}{"__typename": "Mutation"}, nil),
-						resolverSucceeded
-				})
+				return MutationResolverFunc(
+					func(ctx context.Context, m *schema.Field) (*Resolved, bool) {
+						return DataResult(m, map[string]interface{}{"__typename": "Mutation"}, nil),
+							resolverSucceeded
+					})
 			})
 }
 

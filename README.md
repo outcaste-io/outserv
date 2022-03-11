@@ -1,6 +1,7 @@
-# Outserv: GraphQL Indexing and Serving System
+Outserv: GraphQL Indexing and Serving System
 
-Outserv is a GraphQL Indexing and Serving System. While other GraphQL systems tend to be layers above other databases, Outserv is a native GraphQL system. This fork is being maintained by Manish Jain,
+Outserv is a fork of [Dgraph](https://github.com/dgraph-io/dgraph), focusing on
+serving data via GraphQL. This fork is being maintained by Manish Jain,
 ex-founder of Dgraph Labs and the Outcaste team consisting of ex-Dgraph
 employees.
 

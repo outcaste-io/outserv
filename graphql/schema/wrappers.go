@@ -205,14 +205,6 @@ type FieldDefinition struct {
 	dgraphPredicate map[string]map[string]string
 }
 
-// type Mutation field
-// type Mutation struct {
-// 	*Field
-// }
-// type Query struct {
-// 	*Field
-// }
-
 func (s *Schema) Queries(t QueryType) []string {
 	if s.schema.Query == nil {
 		return nil

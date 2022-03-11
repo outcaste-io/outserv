@@ -589,25 +589,27 @@ func (as *adminServer) resetSchema(ns uint64, gqlSchema *schema.Schema) {
 			WithConventionResolvers(gqlSchema, as.fns)
 		// If the schema is a Federated Schema then attach "_service" resolver
 		if gqlSchema.IsFederated() {
-			resolverFactory.WithQueryResolver("_service", func(s *schema.Field) resolve.QueryResolver {
-				return resolve.QueryResolverFunc(func(ctx context.Context, query *schema.Field) *resolve.Resolved {
-					as.mux.RLock()
-					defer as.mux.RUnlock()
-					sch, ok := as.gqlSchemas.GetCurrent(ns)
-					if !ok {
-						return resolve.EmptyResult(query,
-							fmt.Errorf("error while getting the schema for ns %d", ns))
-					}
-					handler, err := schema.NewHandler(sch.Schema, true)
-					if err != nil {
-						return resolve.EmptyResult(query, err)
-					}
-					data := handler.GQLSchemaWithoutApolloExtras()
-					return resolve.DataResult(query,
-						map[string]interface{}{"_service": map[string]interface{}{"sdl": data}},
-						nil)
+			resolverFactory.WithQueryResolver("_service",
+				func(s *schema.Field) resolve.QueryResolver {
+					return resolve.QueryResolverFunc(
+						func(ctx context.Context, query *schema.Field) *resolve.Resolved {
+							as.mux.RLock()
+							defer as.mux.RUnlock()
+							sch, ok := as.gqlSchemas.GetCurrent(ns)
+							if !ok {
+								return resolve.EmptyResult(query,
+									fmt.Errorf("error while getting the schema for ns %d", ns))
+							}
+							handler, err := schema.NewHandler(sch.Schema, true)
+							if err != nil {
+								return resolve.EmptyResult(query, err)
+							}
+							data := handler.GQLSchemaWithoutApolloExtras()
+							return resolve.DataResult(query,
+								map[string]interface{}{"_service": map[string]interface{}{"sdl": data}},
+								nil)
+						})
 				})
-			})
 		}
 
 		if as.withIntrospection {
