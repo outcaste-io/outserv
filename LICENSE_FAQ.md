@@ -28,7 +28,7 @@ developers of the software can make a living.
 
 ### 4. Can I provide a managed service using a project under Smart License?
 
-Absolutely. As opposed to other such licenses (like Elastic or
+Absolutely. As opposed to other such licenses (like Elastic License or
 SSPL), Smart License allows building commercial products, including building
 managed services. In fact, we encourage others to do so, to make
 this software as broadly available as possible for end users.
@@ -39,6 +39,9 @@ Yes. If you copy any part of the code base under the Smart License,
 your program should pay and do the equivalent of what the monetization module
 would have done.
 
+If you use any of this software, you must keep and not circumvent monetization
+module. You can't use only other portions of the software.
+
 ### 6. Why build this license? Why charge for this software?
 
 We have build a lot of open source software in the past, with none of them
@@ -48,14 +51,15 @@ to fund the development of open source.
 a. Use your personal savings to fund the development. Or, have your company fund
     the development of the project.
 b. Build open source part time while working for another company, if they allow that.
-c. Take money from VCs. This generally results in building proprietary features and a cloud managed service to monetize the software.
+c. Take money from VCs. This generally results in building proprietary features
+    and a cloud managed service to monetize the software.
 
 Option a: If possible, this is the best way to go. But, might not be available as an
 option for most developers.
 
 Option b: For work-life balance, this option is highly unwieldy.
 
-Option c: Once you take money from VCs, it becomes your fiduciary duty to
+Option c: Once you take VC money, it becomes your fiduciary duty to
     optimize stock holder interests. To generate revenue, developers often mix
     open source (free) features with proprietary (paid) features (also known as
     open core model), which causes a rift for the developing team between how much do
@@ -75,7 +79,8 @@ model is open and fair to all.
 *With Smart License, we aim to hit the nail on its head.* Make the software charge
 for its usage with an open pricing model baked into the code itself, available
 and visible to everyone. And provide as much freedom as possible for others to
-use, modify or build commercial services around the software.
+use, modify or build commercial services around the software, under our motto of
+open ethos.
 
 > Not open source. Open ethos.
 
@@ -92,7 +97,9 @@ it imposes.
 
 Elastic License 2.0 has this limitation, that Smart License does NOT have:
 
-*You may not provide the software to third parties as a hosted or managed service, where the service provides users with access to any substantial set of the features or functionality of the software.*
+*You may not provide the software to third parties as a hosted or managed
+service, where the service provides users with access to any substantial set of
+the features or functionality of the software.*
 
 As mentioned above, we encourage managed service
 providers to make this software as widely available as possible.

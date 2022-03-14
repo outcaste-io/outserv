@@ -14,8 +14,8 @@ the limitations and conditions below.
 ## Limitations
 
 The software contains a module that allows the licensor to monetize your use of
-the software. You may not move, change, disable, or circumvent this functionality
-in the software.
+the software. You may not move, remove, change, disable, or circumvent this
+functionality in the software.
 
 You may not alter, remove, or obscure any licensing, copyright, or other notices
 of the licensor in the software. Any use of the licensor’s trademarks is subject
