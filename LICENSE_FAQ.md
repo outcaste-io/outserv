@@ -33,6 +33,17 @@ SSPL), Smart License allows building commercial products, including building
 managed services. In fact, we encourage others to do so, to make
 this software as broadly available as possible for end-users.
 
+### 5. If I fork the codebase, do I need to make my derivative work publicly available?
+
+No. If you fork the codebase and make modifications, those changes can stay
+private. You have no obligation to make those public. You can even commercialize
+this fork by charging for the software, linking it to proprietary code or by
+creating proprietary services around the fork.
+
+However, the fork must continue to abide by the limitations of the Smart
+License, which includes keeping the monetization module, licensing, copyright
+and other notices.
+
 ### 5. If I copy only certain parts of the code into another program, do I still need to pay?
 
 Yes. If you copy any part of the codebase under the Smart License,
