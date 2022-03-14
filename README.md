@@ -74,7 +74,8 @@ following questions:
 
 This project, as a whole, is licensed under the terms of the Smart License v1.0.
 A copy of the Smart license is available in [LICENSE.md](LICENSE.md) file.
-Frequently asked questions about the license are addressed in [LICENSE_FAQ.md][].
+Frequently asked questions about the license are addressed in
+[LICENSE_FAQ.md](LICENSE_FAQ.md).
 
 Certain portions of this project are licensed by contributors or others
 under the terms of open source licenses such as the Apache 2.0 license.
