@@ -59,18 +59,18 @@ We have built a lot of open-source software in the past, with none of them
 providing any source of income for the developers. Currently, there are three ways
 to fund the development of open source.
 
-a. Use your personal savings to fund the development. Or, have your company fund
+- a. Use your personal savings to fund the development. Or, have your company fund
     the development of the project.
-b. Build open-source part-time while working for another company, if they allow that.
-c. Take money from VCs. This generally results in building proprietary features
+- b. Build open-source part-time while working for another company, if they allow that.
+- c. Take money from VCs. This generally results in building proprietary features
     and a cloud-managed service to monetize the software.
 
-Option a: If possible, this is the best way to go. But, might not be available as an
+- Option a: If possible, this is the best way to go. But, might not be available as an
 option for most developers.
 
-Option b: For work-life balance, this option is highly unwieldy.
+- Option b: For work-life balance, this option is highly unwieldy.
 
-Option c: Once you take VC money, it becomes your fiduciary duty to
+- Option c: Once you take VC money, it becomes your fiduciary duty to
     optimize stockholder interests. To generate revenue, developers often mix
     open-source (free) features with proprietary (paid) features (also known as
     the open core model), which causes a rift for the developing team between
