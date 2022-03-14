@@ -1,17 +1,28 @@
-Outserv: GraphQL Indexing and Serving System
+# Outserv: GraphQL Indexing and Serving System
 
-Outserv is a fork of [Dgraph](https://github.com/dgraph-io/dgraph), focusing on
-serving data via GraphQL. This fork is being maintained by Manish Jain,
-ex-founder of Dgraph Labs and the Outcaste team consisting of ex-Dgraph
-employees.
+Outserv is a GraphQL Indexing and Serving System, built to make it easier to
+deploy a fast, scalable, production grade system to serve data via GraphQL.
 
-Outserv's goal is to provide [Google](https://www.google.com) production level scale and throughput,
-while serving real-time user queries over terabytes of structured data.
-Dgraph supports GraphQL, and responds in JSON.
+## What is the motivation behind Outserv?
 
-**Outserv's main focus is on serving structured data via GraphQL.** While we
-would still maintain DQL query language, we might remove certain features of DQL
-to simplify the system and improve storage and performance.
+A typical GraphQL production tech stack today contains:
+
+1. A source of truth database (like Blockchain or Postgres)
+1. A search system (like Elastic Search)
+1. A cache system (like Redis)
+1. A GraphQL layer (like Hasura / Apollo)
+1. Business Logic
+
+Outserv cuts down this stack significantly. A tech stack with Outserv looks like
+this:
+
+1. A source of truth database (like Blockchain or Postgres)
+1. Outserv providing search, caching and GraphQL APIs
+1. Business Logic
+
+Outserv aims to make it trivial for anyone to bring up a production grade
+GraphQL tech stack -- which we consider to be an important step to web3
+decentralization.
 
 ## Install from Source
 
@@ -32,6 +43,13 @@ Then clone the Outserv repository and use `make install` to install the Dgraph b
 git clone https://github.com/outcaste-io/outserv.git
 cd ./outserv
 make install
+```
+
+### Run
+
+```bash
+$ outserv graphql # To run the server
+$ outserv graphql --help # To see the various customization options.
 ```
 
 ## Get Started
