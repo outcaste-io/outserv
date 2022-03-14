@@ -1,4 +1,4 @@
-# Auto-generated with: [compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --num_zeros 1 --image=outcaste/outserv --tag=test -O ../systest/bulk_live/bulk/docker-compose.yml --num_alphas 0 --minio --minio_data_dir=.]
+# Auto-generated with: [compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test -O ../systest/bulk_live/bulk/docker-compose.yml --num_alphas 0 --minio --minio_data_dir=.]
 #
 version: "3.5"
 services:
@@ -12,13 +12,4 @@ services:
       target: /data/minio
       read_only: false
     command: minio server /data/minio --address :9001
-  zero1:
-    image: outcaste/outserv:test
-    working_dir: /data/zero1
-    labels:
-      cluster: test
-    ports:
-    - "5080"
-    - "6080"
-    command: outserv zero --raft='idx=1' --my=zero1:5080 --logtostderr -v=2 --bindall
 volumes: {}

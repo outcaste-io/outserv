@@ -1,4 +1,4 @@
-# Auto-generated with: [compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --num_zeros 1 --image=outcaste/outserv --tag=test -O ../systest/plugin/docker-compose.yml --extra_alpha_flags '--custom_tokenizers=/plugins/0.so,/plugins/1.so,/plugins/2.so,/plugins/3.so' --alpha_volume ../../testutil/custom_plugins:/plugins:ro]
+# Auto-generated with: [compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test -O ../systest/plugin/docker-compose.yml --extra_alpha_flags '--custom_tokenizers=/plugins/0.so,/plugins/1.so,/plugins/2.so,/plugins/3.so' --alpha_volume ../../testutil/custom_plugins:/plugins:ro]
 #
 version: "3.5"
 services:
@@ -15,16 +15,7 @@ services:
       source: ../../testutil/custom_plugins
       target: /plugins
       read_only: true
-    command: outserv alpha --my=alpha1:7080 --zero=zero1:5080 --logtostderr -v=2 --expose_trace=true
+    command: outserv alpha --my=alpha1:7080 --logtostderr -v=2 --expose_trace=true
       --raft "idx=1; group=1" --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.0.0.0/8;"
       '--custom_tokenizers=/plugins/0.so,/plugins/1.so,/plugins/2.so,/plugins/3.so'
-  zero1:
-    image: outcaste/outserv:test
-    working_dir: /data/zero1
-    labels:
-      cluster: test
-    ports:
-    - "5080"
-    - "6080"
-    command: outserv zero --raft='idx=1' --my=zero1:5080 --logtostderr -v=2 --bindall
 volumes: {}

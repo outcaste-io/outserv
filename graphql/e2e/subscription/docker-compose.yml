@@ -1,4 +1,4 @@
-# Auto-generated with: [compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --num_zeros 1 --image=outcaste/outserv --tag=test -O ../graphql/e2e/subscription/docker-compose.yml --num_alphas 3]
+# Auto-generated with: [compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test -O ../graphql/e2e/subscription/docker-compose.yml --num_alphas 3]
 #
 version: "3.5"
 services:
@@ -10,7 +10,7 @@ services:
     ports:
     - "8080"
     - "9080"
-    command: outserv alpha --my=alpha1:7080 --zero=zero1:5080 --logtostderr -v=2 --expose_trace=true
+    command: outserv alpha --my=alpha1:7080 --logtostderr -v=2 --expose_trace=true
       --raft "idx=1; group=1" --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.0.0.0/8;"
   alpha2:
     image: outcaste/outserv:test
@@ -20,8 +20,8 @@ services:
     ports:
     - "8080"
     - "9080"
-    command: outserv alpha --my=alpha2:7080 --zero=zero1:5080 --logtostderr -v=2 --expose_trace=true
-      --raft "idx=2; group=1" --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.0.0.0/8;"
+    command: outserv alpha --my=alpha2:7080 --logtostderr -v=2 --expose_trace=true
+      --peer=alpha1:7080 --raft "idx=2; group=1" --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.0.0.0/8;"
   alpha3:
     image: outcaste/outserv:test
     working_dir: /data/alpha3
@@ -30,16 +30,6 @@ services:
     ports:
     - "8080"
     - "9080"
-    command: outserv alpha --my=alpha3:7080 --zero=zero1:5080 --logtostderr -v=2 --expose_trace=true
-      --raft "idx=3; group=1" --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.0.0.0/8;"
-  zero1:
-    image: outcaste/outserv:test
-    working_dir: /data/zero1
-    labels:
-      cluster: test
-    ports:
-    - "5080"
-    - "6080"
-    command: outserv zero --raft='idx=1' --my=zero1:5080 --replicas=3 --logtostderr
-      -v=2 --bindall
+    command: outserv alpha --my=alpha3:7080 --logtostderr -v=2 --expose_trace=true
+      --peer=alpha1:7080 --raft "idx=3; group=1" --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.0.0.0/8;"
 volumes: {}
