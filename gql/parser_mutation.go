@@ -1,29 +1,16 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package gql
 
 import (
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/lex"
+	"github.com/outcaste-io/outserv/protos/pb"
 )
 
 // ParseMutation parses a block into a mutation. Returns an object with a mutation or
 // an upsert block with mutation, otherwise returns nil with an error.
-func ParseMutation(mutation string) (req *api.Request, err error) {
+func ParseMutation(mutation string) (req *pb.Request, err error) {
 	var lexer lex.Lexer
 	lexer.Reset(mutation)
 	lexer.Run(lexIdentifyBlock)
@@ -47,7 +34,7 @@ func ParseMutation(mutation string) (req *api.Request, err error) {
 		if err != nil {
 			return nil, err
 		}
-		req = &api.Request{Mutations: []*api.Mutation{mu}}
+		req = &pb.Request{Mutations: []*pb.Mutation{mu}}
 	default:
 		return nil, it.Errorf("Unexpected token: [%s]", item.Val)
 	}
@@ -61,8 +48,8 @@ func ParseMutation(mutation string) (req *api.Request, err error) {
 }
 
 // parseUpsertBlock parses the upsert block
-func parseUpsertBlock(it *lex.ItemIterator) (*api.Request, error) {
-	var req *api.Request
+func parseUpsertBlock(it *lex.ItemIterator) (*pb.Request, error) {
+	var req *pb.Request
 	var queryText, condText string
 	var queryFound bool
 
@@ -129,7 +116,7 @@ func parseUpsertBlock(it *lex.ItemIterator) (*api.Request, error) {
 			}
 			mu.Cond = condText
 			if req == nil {
-				req = &api.Request{Mutations: []*api.Mutation{mu}}
+				req = &pb.Request{Mutations: []*pb.Mutation{mu}}
 			} else {
 				req.Mutations = append(req.Mutations, mu)
 			}
@@ -154,8 +141,8 @@ func parseUpsertBlock(it *lex.ItemIterator) (*api.Request, error) {
 }
 
 // parseMutationBlock parses the mutation block
-func parseMutationBlock(it *lex.ItemIterator) (*api.Mutation, error) {
-	var mu api.Mutation
+func parseMutationBlock(it *lex.ItemIterator) (*pb.Mutation, error) {
+	var mu pb.Mutation
 
 	item := it.Item()
 	if item.Typ != itemLeftCurl {
@@ -180,7 +167,7 @@ func parseMutationBlock(it *lex.ItemIterator) (*api.Mutation, error) {
 }
 
 // parseMutationOp parses and stores set or delete operation string in Mutation.
-func parseMutationOp(it *lex.ItemIterator, op string, mu *api.Mutation) error {
+func parseMutationOp(it *lex.ItemIterator, op string, mu *pb.Mutation) error {
 	parse := false
 	for it.Next() {
 		item := it.Item()
@@ -200,9 +187,9 @@ func parseMutationOp(it *lex.ItemIterator, op string, mu *api.Mutation) error {
 
 			switch op {
 			case "set":
-				mu.SetNquads = []byte(item.Val)
+				mu.SetJson = []byte(item.Val)
 			case "delete":
-				mu.DelNquads = []byte(item.Val)
+				mu.DeleteJson = []byte(item.Val)
 			case "schema":
 				return it.Errorf("Altering schema not supported through http client.")
 			case "dropall":

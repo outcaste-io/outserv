@@ -1,18 +1,5 @@
-/*
- * Copyright 2015-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2015-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package posting
 
@@ -23,7 +10,6 @@ import (
 	"time"
 
 	"github.com/outcaste-io/badger/v3"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/ristretto"
 	"github.com/outcaste-io/ristretto/z"
 	ostats "go.opencensus.io/stats"
@@ -274,7 +260,7 @@ func (lc *LocalCache) UpdateDeltasAndDiscardLists() {
 	lc.plists = make(map[string]*List)
 }
 
-func (lc *LocalCache) fillPreds(ctx *api.TxnContext, gid uint32) {
+func (lc *LocalCache) fillPreds(ctx *pb.TxnContext, gid uint32) {
 	lc.RLock()
 	defer lc.RUnlock()
 	for key := range lc.deltas {

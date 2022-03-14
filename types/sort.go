@@ -1,18 +1,5 @@
-/*
- * Copyright 2016-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2016-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package types
 
@@ -20,7 +7,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	"golang.org/x/text/collate"
@@ -31,7 +17,6 @@ type sortBase struct {
 	values [][]Val // Each uid could have multiple values which we need to sort it by.
 	desc   []bool  // Sort orders for different values.
 	ul     *[]uint64
-	o      []*pb.Facets
 	cl     *collate.Collator // Compares Unicode strings according to the given collation order.
 }
 
@@ -44,9 +29,6 @@ func (s sortBase) Len() int { return len(s.values) }
 func (s sortBase) Swap(i, j int) {
 	s.values[i], s.values[j] = s.values[j], s.values[i]
 	(*s.ul)[i], (*s.ul)[j] = (*s.ul)[j], (*s.ul)[i]
-	if s.o != nil {
-		s.o[i], s.o[j] = s.o[j], s.o[i]
-	}
 }
 
 type byValue struct{ sortBase }
@@ -100,7 +82,7 @@ func IsSortable(tid TypeID) bool {
 
 // SortWithFacet sorts the given array in-place and considers the given facets to calculate
 // the proper ordering.
-func SortWithFacet(v [][]Val, ul *[]uint64, l []*pb.Facets, desc []bool, lang string) error {
+func SortWithFacet(v [][]Val, ul *[]uint64, desc []bool, lang string) error {
 	if len(v) == 0 || len(v[0]) == 0 {
 		return nil
 	}
@@ -120,7 +102,7 @@ func SortWithFacet(v [][]Val, ul *[]uint64, l []*pb.Facets, desc []bool, lang st
 		}
 	}
 
-	b := sortBase{v, desc, ul, l, cl}
+	b := sortBase{v, desc, ul, cl}
 	toBeSorted := byValue{b}
 	sort.Sort(toBeSorted)
 	return nil
@@ -128,7 +110,7 @@ func SortWithFacet(v [][]Val, ul *[]uint64, l []*pb.Facets, desc []bool, lang st
 
 // Sort sorts the given array in-place.
 func Sort(v [][]Val, ul *[]uint64, desc []bool, lang string) error {
-	return SortWithFacet(v, ul, nil, desc, lang)
+	return SortWithFacet(v, ul, desc, lang)
 }
 
 // Less returns true if a is strictly less than b.

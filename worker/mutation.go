@@ -1,18 +1,5 @@
-/*
- * Copyright 2016-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2016-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package worker
 
@@ -25,17 +12,12 @@ import (
 	"time"
 
 	"github.com/outcaste-io/badger/v3/y"
-	"google.golang.org/grpc/metadata"
-
-	ostats "go.opencensus.io/stats"
 
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
 
 	"github.com/outcaste-io/badger/v3"
-	"github.com/outcaste-io/dgo/v210"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -531,50 +513,9 @@ func ValidateAndConvert(edge *pb.DirectedEdge, su *pb.SchemaUpdate) error {
 	return nil
 }
 
-// AssignNsIdsOverNetwork sends a request to assign Namespace IDs to the current zero leader.
-func AssignNsIdsOverNetwork(ctx context.Context, num *pb.Num) (*pb.AssignedIds, error) {
-	pl := groups().Leader(0)
-	if pl == nil {
-		return nil, conn.ErrNoConnection
-	}
-
-	con := pl.Get()
-	c := pb.NewZeroClient(con)
-	num.Type = pb.Num_NS_ID
-	return c.AssignIds(ctx, num)
-}
-
-// AssignUidsOverNetwork sends a request to assign UIDs to blank nodes to the current zero leader.
-func AssignUidsOverNetwork(ctx context.Context, num *pb.Num) (*pb.AssignedIds, error) {
-	// Pass on the incoming metadata to the zero. Namespace from the metadata is required by zero.
-	if md, ok := metadata.FromIncomingContext(ctx); ok {
-		ctx = metadata.NewOutgoingContext(ctx, md)
-	}
-	pl := groups().Leader(0)
-	if pl == nil {
-		return nil, conn.ErrNoConnection
-	}
-
-	con := pl.Get()
-	c := pb.NewZeroClient(con)
-	num.Type = pb.Num_UID
-	return c.AssignIds(ctx, num)
-}
-
-// Timestamps sends a request to assign startTs for a new transaction to the current zero leader.
-func Timestamps(ctx context.Context, num *pb.Num) (*pb.AssignedIds, error) {
-	pl := groups().connToZeroLeader()
-	if pl == nil {
-		return nil, conn.ErrNoConnection
-	}
-
-	con := pl.Get()
-	c := pb.NewZeroClient(con)
-	return c.Timestamps(ctx, num)
-}
-
-func fillTxnContext(tctx *api.TxnContext, startTs uint64) {
-	if txn := posting.Oracle().GetTxn(startTs); txn != nil {
+// TODO: Do we need fillTxnContext?
+func fillTxnContext(tctx *pb.TxnContext, startTs uint64) {
+	if txn := posting.GetTxn(startTs); txn != nil {
 		txn.FillContext(tctx, groups().groupId())
 	}
 	// We do not need to fill linread mechanism anymore, because transaction
@@ -586,7 +527,7 @@ func fillTxnContext(tctx *api.TxnContext, startTs uint64) {
 func proposeOrSend(ctx context.Context, gid uint32, m *pb.Mutations, chr chan res) {
 	res := res{}
 	if groups().ServesGroup(gid) {
-		res.ctx = &api.TxnContext{}
+		res.ctx = &pb.TxnContext{}
 		res.err = (&grpcWorker{}).proposeAndWait(ctx, res.ctx, m)
 		chr <- res
 		return
@@ -599,7 +540,7 @@ func proposeOrSend(ctx context.Context, gid uint32, m *pb.Mutations, chr chan re
 		return
 	}
 
-	var tc *api.TxnContext
+	var tc *pb.TxnContext
 	c := pb.NewWorkerClient(pl.Get())
 
 	ch := make(chan error, 1)
@@ -682,16 +623,16 @@ func populateMutationMap(src *pb.Mutations) (map[uint32]*pb.Mutations, error) {
 
 type res struct {
 	err error
-	ctx *api.TxnContext
+	ctx *pb.TxnContext
 }
 
 // MutateOverNetwork checks which group should be running the mutations
 // according to the group config and sends it to that instance.
-func MutateOverNetwork(ctx context.Context, m *pb.Mutations) (*api.TxnContext, error) {
+func MutateOverNetwork(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, error) {
 	ctx, span := otrace.StartSpan(ctx, "worker.MutateOverNetwork")
 	defer span.End()
 
-	tctx := &api.TxnContext{StartTs: m.StartTs}
+	tctx := &pb.TxnContext{}
 	if err := verifyTypes(ctx, m); err != nil {
 		return tctx, err
 	}
@@ -704,11 +645,9 @@ func MutateOverNetwork(ctx context.Context, m *pb.Mutations) (*api.TxnContext, e
 	resCh := make(chan res, len(mutationMap))
 	for gid, mu := range mutationMap {
 		if gid == 0 {
-			span.Annotatef(nil, "state: %+v", groups().state)
 			span.Annotatef(nil, "Group id zero for mutation: %+v", mu)
 			return tctx, errNonExistentTablet
 		}
-		mu.StartTs = m.StartTs
 		go proposeOrSend(ctx, gid, mu, resCh)
 	}
 
@@ -817,51 +756,7 @@ func typeSanityCheck(t *pb.TypeUpdate) error {
 	return nil
 }
 
-// CommitOverNetwork makes a proxy call to Zero to commit or abort a transaction.
-func CommitOverNetwork(ctx context.Context, tc *api.TxnContext) (uint64, error) {
-	ctx, span := otrace.StartSpan(ctx, "worker.CommitOverNetwork")
-	defer span.End()
-
-	clientDiscard := false
-	if tc.Aborted {
-		// The client called Discard
-		ostats.Record(ctx, x.TxnDiscards.M(1))
-		clientDiscard = true
-	}
-
-	pl := groups().Leader(0)
-	if pl == nil {
-		return 0, conn.ErrNoConnection
-	}
-
-	// Do de-duplication before sending the request to zero.
-	tc.Keys = x.Unique(tc.Keys)
-	tc.Preds = x.Unique(tc.Preds)
-
-	zc := pb.NewZeroClient(pl.Get())
-	tctx, err := zc.CommitOrAbort(ctx, tc)
-
-	if err != nil {
-		span.Annotatef(nil, "Error=%v", err)
-		return 0, err
-	}
-	var attributes []otrace.Attribute
-	attributes = append(attributes, otrace.Int64Attribute("commitTs", int64(tctx.CommitTs)),
-		otrace.BoolAttribute("committed", tctx.CommitTs > 0))
-	span.Annotate(attributes, "")
-
-	if tctx.Aborted || tctx.CommitTs == 0 {
-		if !clientDiscard {
-			// The server aborted the txn (not the client)
-			ostats.Record(ctx, x.TxnAborts.M(1))
-		}
-		return 0, dgo.ErrAborted
-	}
-	ostats.Record(ctx, x.TxnCommits.M(1))
-	return tctx.CommitTs, nil
-}
-
-func (w *grpcWorker) proposeAndWait(ctx context.Context, txnCtx *api.TxnContext,
+func (w *grpcWorker) proposeAndWait(ctx context.Context, txnCtx *pb.TxnContext,
 	m *pb.Mutations) error {
 	if x.WorkerConfig.StrictMutations {
 		for _, edge := range m.Edges {
@@ -876,16 +771,16 @@ func (w *grpcWorker) proposeAndWait(ctx context.Context, txnCtx *api.TxnContext,
 	// MaxAssignedTs >= m.StartTs.
 	node := groups().Node
 	err := node.proposeAndWait(ctx, &pb.Proposal{Mutations: m})
-	fillTxnContext(txnCtx, m.StartTs)
+	fillTxnContext(txnCtx, 0)
 	return err
 }
 
 // Mutate is used to apply mutations over the network on other instances.
-func (w *grpcWorker) Mutate(ctx context.Context, m *pb.Mutations) (*api.TxnContext, error) {
+func (w *grpcWorker) Mutate(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, error) {
 	ctx, span := otrace.StartSpan(ctx, "worker.Mutate")
 	defer span.End()
 
-	txnCtx := &api.TxnContext{}
+	txnCtx := &pb.TxnContext{}
 	if ctx.Err() != nil {
 		return txnCtx, ctx.Err()
 	}
@@ -894,12 +789,4 @@ func (w *grpcWorker) Mutate(ctx context.Context, m *pb.Mutations) (*api.TxnConte
 	}
 
 	return txnCtx, w.proposeAndWait(ctx, txnCtx, m)
-}
-
-func tryAbortTransactions(startTimestamps []uint64) {
-	// Aborts if not already committed.
-	req := &pb.TxnTimestamps{Ts: startTimestamps}
-
-	err := groups().Node.blockingAbort(req)
-	glog.Infof("tryAbortTransactions for %d txns. Error: %+v\n", len(req.Ts), err)
 }

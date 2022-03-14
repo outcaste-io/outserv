@@ -1,18 +1,5 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package bulk
 
@@ -105,7 +92,6 @@ type state struct {
 type loader struct {
 	*state
 	mappers []*mapper
-	zero    *grpc.ClientConn
 }
 
 func newLoader(opt *options) *loader {
@@ -135,7 +121,7 @@ func newLoader(opt *options) *loader {
 		shards: newShardMap(opt.MapShards),
 		// Lots of gz readers, so not much channel buffer needed.
 		readerChunkCh: make(chan *bytes.Buffer, opt.NumGoroutines),
-		writeTs:       getWriteTimestamp(zero),
+		writeTs:       getWriteTimestamp(),
 		namespaces:    &sync.Map{},
 	}
 	st.schema = newSchemaStore(readSchema(opt), opt, st)
@@ -151,18 +137,8 @@ func newLoader(opt *options) *loader {
 	return ld
 }
 
-func getWriteTimestamp(zero *grpc.ClientConn) uint64 {
-	client := pb.NewZeroClient(zero)
-	for {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		ts, err := client.Timestamps(ctx, &pb.Num{Val: 1})
-		cancel()
-		if err == nil {
-			return ts.GetStartId()
-		}
-		fmt.Printf("Error communicating with dgraph zero, retrying: %v", err)
-		time.Sleep(time.Second)
-	}
+func getWriteTimestamp() uint64 {
+	return x.Timestamp(uint64(time.Now().Unix())<<32, 0)
 }
 
 // leaseNamespace is called at the end of map phase. It leases the namespace ids till the maximum
@@ -237,19 +213,19 @@ func (ld *loader) mapStage() {
 
 	fs := filestore.NewFileStore(ld.opt.DataFiles)
 
-	files := fs.FindDataFiles(ld.opt.DataFiles, []string{".rdf", ".rdf.gz", ".json", ".json.gz"})
+	files := fs.FindDataFiles(ld.opt.DataFiles, []string{".json", ".json.gz"})
 	if len(files) == 0 {
 		fmt.Printf("No data files found in %s.\n", ld.opt.DataFiles)
 		os.Exit(1)
 	}
 
 	// Because mappers must handle chunks that may be from different input files, they must all
-	// assume the same data format, either RDF or JSON. Use the one specified by the user or by
+	// assume the same data format, JSON. Use the one specified by the user or by
 	// the first load file.
 	loadType := chunker.DataFormat(files[0], ld.opt.DataFormat)
 	if loadType == chunker.UnknownFormat {
 		// Dont't try to detect JSON input in bulk loader.
-		fmt.Printf("Need --format=rdf or --format=json to load %s", files[0])
+		fmt.Printf("Need --format=json to load %s", files[0])
 		os.Exit(1)
 	}
 
@@ -357,11 +333,6 @@ func (ld *loader) processGqlSchema(loadType chunker.InputFormat) {
 	buf, err := ioutil.ReadAll(r)
 	x.Check(err)
 
-	rdfSchema := `_:gqlschema <dgraph.type> "dgraph.graphql" <%#x> .
-	_:gqlschema <dgraph.graphql.xid> "dgraph.graphql.schema" <%#x> .
-	_:gqlschema <dgraph.graphql.schema> %s <%#x> .
-	`
-
 	jsonSchema := `{
 		"namespace": "%#x",
 		"dgraph.type": "dgraph.graphql",
@@ -387,8 +358,6 @@ func (ld *loader) processGqlSchema(loadType chunker.InputFormat) {
 		}
 		quotedSch := strconv.Quote(string(b))
 		switch loadType {
-		case chunker.RdfFormat:
-			x.Check2(gqlBuf.Write([]byte(fmt.Sprintf(rdfSchema, ns, ns, quotedSch, ns))))
 		case chunker.JsonFormat:
 			x.Check2(gqlBuf.Write([]byte(fmt.Sprintf(jsonSchema, ns, quotedSch))))
 		}

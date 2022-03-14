@@ -1,18 +1,5 @@
-/*
- * Copyright 2020 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package admin
 
@@ -21,10 +8,10 @@ import (
 	"encoding/json"
 
 	"github.com/golang/glog"
-	dgoapi "github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/protos/pb"
 )
 
 type loginInput struct {
@@ -34,11 +21,11 @@ type loginInput struct {
 	RefreshToken string
 }
 
-func resolveLogin(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+func resolveLogin(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	glog.Info("Got login request")
 
 	input := getLoginInput(m)
-	resp, err := (&edgraph.Server{}).Login(ctx, &dgoapi.LoginRequest{
+	resp, err := (&edgraph.Server{}).Login(ctx, &pb.LoginRequest{
 		Userid:       input.UserId,
 		Password:     input.Password,
 		Namespace:    input.Namespace,
@@ -48,7 +35,7 @@ func resolveLogin(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bo
 		return resolve.EmptyResult(m, err), false
 	}
 
-	jwt := &dgoapi.Jwt{}
+	jwt := &pb.Jwt{}
 	if err := jwt.Unmarshal(resp.GetJson()); err != nil {
 		return resolve.EmptyResult(m, err), false
 	}
@@ -65,7 +52,7 @@ func resolveLogin(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bo
 
 }
 
-func getLoginInput(m schema.Mutation) *loginInput {
+func getLoginInput(m *schema.Field) *loginInput {
 	// We should be able to convert these to string as GraphQL schema validation should ensure this.
 	// If the input wasn't specified, then the arg value would be nil and the string value empty.
 

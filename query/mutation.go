@@ -1,18 +1,5 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package query
 
@@ -24,19 +11,18 @@ import (
 	otrace "go.opencensus.io/trace"
 
 	"github.com/golang/glog"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/protos/pb"
-	"github.com/outcaste-io/outserv/types/facets"
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/outserv/zero"
 	"github.com/outcaste-io/sroar"
 	"github.com/pkg/errors"
 )
 
 // ApplyMutations performs the required edge expansions and forwards the results to the
 // worker to perform the mutations.
-func ApplyMutations(ctx context.Context, m *pb.Mutations) (*api.TxnContext, error) {
+func ApplyMutations(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, error) {
 	// In expandEdges, for non * type prredicates, we prepend the namespace directly and for
 	// * type predicates, we fetch the predicates and prepend the namespace.
 	edges, err := expandEdges(ctx, m)
@@ -88,7 +74,6 @@ func expandEdges(ctx context.Context, m *pb.Mutations) ([]*pb.DirectedEdge, erro
 			sg := &SubGraph{}
 			sg.DestMap = sroar.NewBitmap()
 			sg.DestMap.Set(edge.GetEntity())
-			sg.ReadTs = m.StartTs
 			types, err := getNodeTypes(ctx, sg)
 			if err != nil {
 				return nil, err
@@ -158,7 +143,6 @@ func verifyUid(ctx context.Context, uid uint64) error {
 // it shows up in the subjects or objects
 func AssignUids(ctx context.Context, gmuList []*gql.Mutation) (map[string]uint64, error) {
 	newUids := make(map[string]uint64)
-	num := &pb.Num{}
 	var err error
 	for _, gmu := range gmuList {
 		for _, nq := range gmu.Set {
@@ -194,19 +178,18 @@ func AssignUids(ctx context.Context, gmuList []*gql.Mutation) (map[string]uint64
 		}
 	}
 
-	num.Val = uint64(len(newUids))
-	num.Type = pb.Num_UID
-	if int(num.Val) > 0 {
+	if num := len(newUids); num > 0 {
 		var res *pb.AssignedIds
 		// TODO: Optimize later by prefetching. Also consolidate all the UID requests into a single
 		// pending request from this server to zero.
-		if res, err = worker.AssignUidsOverNetwork(ctx, num); err != nil {
+		if res, err = zero.AssignUids(ctx, uint32(num)); err != nil {
 			return newUids, err
 		}
 		curId := res.StartId
 		// assign generated ones now
 		for k := range newUids {
-			x.AssertTruef(curId != 0 && curId <= res.EndId, "not enough uids generated")
+			x.AssertTruef(curId != 0 && curId <= res.EndId,
+				"not enough uids generated: res: %+v . curId: %d", res, curId)
 			newUids[k] = curId
 			curId++
 		}
@@ -221,7 +204,7 @@ func ToDirectedEdges(gmuList []*gql.Mutation, newUids map[string]uint64) (
 	// Wrapper for a pointer to protos.Nquad
 	var wnq *gql.NQuad
 
-	parse := func(nq *api.NQuad, op pb.DirectedEdge_Op) error {
+	parse := func(nq *pb.NQuad, op pb.DirectedEdge_Op) error {
 		wnq = &gql.NQuad{NQuad: nq}
 		if len(nq.Subject) == 0 {
 			return nil
@@ -253,9 +236,6 @@ func ToDirectedEdges(gmuList []*gql.Mutation, newUids map[string]uint64) (
 			}
 		}
 		for _, nq := range gmu.Set {
-			if err := facets.SortAndValidate(nq.Facets); err != nil {
-				return edges, err
-			}
 			if err := parse(nq, pb.DirectedEdge_SET); err != nil {
 				return edges, err
 			}

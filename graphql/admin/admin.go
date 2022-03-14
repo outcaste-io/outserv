@@ -1,18 +1,5 @@
-/*
- * Copyright 2019 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2019 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package admin
 
@@ -44,671 +31,6 @@ const (
 		"Use the /admin API to add a GraphQL schema"
 	errResolverNotFound = "%s was not executed because no suitable resolver could be found - " +
 		"this indicates a resolver or validation bug. Please let us know by filing an issue."
-
-	// GraphQL schema for /admin endpoint.
-	graphqlAdminSchema = `
-	"""
-	The Int64 scalar type represents a signed 64‐bit numeric non‐fractional value.
-	Int64 can represent values in range [-(2^63),(2^63 - 1)].
-	"""
-	scalar Int64
-
-    """
-	The UInt64 scalar type represents an unsigned 64‐bit numeric non‐fractional value.
-	UInt64 can represent values in range [0,(2^64 - 1)].
-	"""
-    scalar UInt64
-
-	"""
-	The DateTime scalar type represents date and time as a string in RFC3339 format.
-	For example: "1985-04-12T23:20:50.52Z" represents 20 minutes and 50.52 seconds after the 23rd hour of April 12th, 1985 in UTC.
-	"""
-	scalar DateTime
-
-	"""
-	Data about the GraphQL schema being served by Dgraph.
-	"""
-	type GQLSchema @dgraph(type: "dgraph.graphql") {
-		id: ID!
-
-		"""
-		Input schema (GraphQL types) that was used in the latest schema update.
-		"""
-		schema: String!  @dgraph(pred: "dgraph.graphql.schema")
-
-		"""
-		The GraphQL schema that was generated from the 'schema' field.
-		This is the schema that is being served by Dgraph at /graphql.
-		"""
-		generatedSchema: String!
-	}
-
-	"""
-	Data about the Lambda script served by Dgraph.
-	"""
-	type LambdaScript @dgraph(type: "dgraph.graphql") {
-		"""
-		Input script (base64 encoded)
-		"""
-		script: String! @dgraph(pred: "dgraph.graphql.schema")
-	}
-
-	"""
-	A NodeState is the state of an individual node in the Dgraph cluster.
-	"""
-	type NodeState {
-
-		"""
-		Node type : either 'alpha' or 'zero'.
-		"""
-		instance: String
-
-		"""
-		Address of the node.
-		"""
-		address: String
-
-		"""
-		Node health status : either 'healthy' or 'unhealthy'.
-		"""
-		status: String
-
-		"""
-		The group this node belongs to in the Dgraph cluster.
-		See : https://dgraph.io/docs/deploy/#cluster-setup.
-		"""
-		group: String
-
-		"""
-		Version of the Dgraph binary.
-		"""
-		version: String
-
-		"""
-		Time in nanoseconds since the node started.
-		"""
-		uptime: Int64
-
-		"""
-		Time in Unix epoch time that the node was last contacted by another Zero or Alpha node.
-		"""
-		lastEcho: Int64
-
-		"""
-		List of ongoing operations in the background.
-		"""
-		ongoing: [String]
-
-		"""
-		List of predicates for which indexes are built in the background.
-		"""
-		indexing: [String]
-
-		"""
-		List of Enterprise Features that are enabled.
-		"""
-		ee_features: [String]
-	}
-
-	type MembershipState {
-		counter: UInt64
-		groups: [ClusterGroup]
-		zeros: [Member]
-		maxUID: UInt64
-		maxNsID: UInt64
-		maxTxnTs: UInt64
-		maxRaftId: UInt64
-		removed: [Member]
-		cid: String
-		license: License
-		"""
-		Contains list of namespaces. Note that this is not stored in proto's MembershipState and
-		computed at the time of query.
-		"""
-		namespaces: [UInt64]
-	}
-
-	type ClusterGroup {
-		id: UInt64
-		members: [Member]
-		tablets: [Tablet]
-		snapshotTs: UInt64
-		checksum: UInt64
-	}
-
-	type Member {
-		id: UInt64
-		groupId: UInt64
-		addr: String
-		leader: Boolean
-		amDead: Boolean
-		lastUpdate: UInt64
-		clusterInfoOnly: Boolean
-		forceGroupId: Boolean
-	}
-
-	type Tablet {
-		groupId: UInt64
-		predicate: String
-		force: Boolean
-		space: Int
-		remove: Boolean
-		readOnly: Boolean
-		moveTs: UInt64
-	}
-
-	type License {
-		user: String
-		maxNodes: UInt64
-		expiryTs: Int64
-		enabled: Boolean
-	}
-
-	directive @dgraph(type: String, pred: String) on OBJECT | INTERFACE | FIELD_DEFINITION
-	directive @id on FIELD_DEFINITION
-	directive @secret(field: String!, pred: String) on OBJECT | INTERFACE
-
-
-	type UpdateGQLSchemaPayload {
-		gqlSchema: GQLSchema
-	}
-
-	input UpdateGQLSchemaInput {
-		set: GQLSchemaPatch!
-	}
-
-	input GQLSchemaPatch {
-		schema: String!
-	}
-
-	type UpdateLambdaScriptPayload {
-		lambdaScript: LambdaScript
-	}
-
-	input UpdateLambdaScriptInput {
-		set: ScriptPatch!
-	}
-
-	input ScriptPatch {
-		script: String!
-	}
-
-	input ExportInput {
-		"""
-		Data format for the export, e.g. "rdf" or "json" (default: "rdf")
-		"""
-		format: String
-
-		"""
-		Namespace for the export in multi-tenant cluster. Users from guardians of galaxy can export
-		all namespaces by passing a negative value or specific namespaceId to export that namespace.
-		"""
-		namespace: Int
-
-		"""
-		Destination for the export: e.g. Minio or S3 bucket or /absolute/path
-		"""
-		destination: String
-
-		"""
-		Access key credential for the destination.
-		"""
-		accessKey: String
-
-		"""
-		Secret key credential for the destination.
-		"""
-		secretKey: String
-
-		"""
-		AWS session token, if required.
-		"""
-		sessionToken: String
-
-		"""
-		Set to true to allow backing up to S3 or Minio bucket that requires no credentials.
-		"""
-		anonymous: Boolean
-	}
-
-	input TaskInput {
-		id: String!
-	}
-
-	type Response {
-		code: String
-		message: String
-	}
-
-	type ExportPayload {
-		response: Response
-		taskId: String
-	}
-
-	type DrainingPayload {
-		response: Response
-	}
-
-	type ShutdownPayload {
-		response: Response
-	}
-
-	type TaskPayload {
-		kind: TaskKind
-		status: TaskStatus
-		lastUpdated: DateTime
-	}
-
-	enum TaskStatus {
-		Queued
-		Running
-		Failed
-		Success
-		Unknown
-	}
-
-	enum TaskKind {
-		Backup
-		Export
-		Unknown
-	}
-
-	input ConfigInput {
-		"""
-		Estimated memory the caches can take. Actual usage by the process would be
-		more than specified here. The caches will be updated according to the
-		cache_percentage flag.
-		"""
-		cacheMb: Float
-
-		"""
-		True value of logRequest enables logging of all the requests coming to alphas.
-		False value of logRequest disables above.
-		"""
-		logRequest: Boolean
-	}
-
-	type ConfigPayload {
-		response: Response
-	}
-
-	type Config {
-		cacheMb: Float
-	}
-
-	input RemoveNodeInput {
-		"""
-		ID of the node to be removed.
-		"""
-		nodeId: UInt64!
-
-		"""
-		ID of the group from which the node is to be removed.
-		"""
-		groupId: UInt64!
-	}
-
-	type RemoveNodePayload {
-		response: Response
-	}
-
-	input MoveTabletInput {
-		"""
-		Namespace in which the predicate exists.
-		"""
-		namespace: UInt64
-
-		"""
-		Name of the predicate to move.
-		"""
-		tablet: String!
-
-		"""
-		ID of the destination group where the predicate is to be moved.
-		"""
-		groupId: UInt64!
-	}
-
-	type MoveTabletPayload {
-		response: Response
-	}
-
-	enum AssignKind {
-		UID
-		TIMESTAMP
-		NAMESPACE_ID
-	}
-
-	input AssignInput {
-		"""
-		Choose what to assign: UID, TIMESTAMP or NAMESPACE_ID.
-		"""
-		what: AssignKind!
-
-		"""
-		How many to assign.
-		"""
-		num: UInt64!
-	}
-
-	type AssignedIds {
-		"""
-		The first UID, TIMESTAMP or NAMESPACE_ID assigned.
-		"""
-		startId: UInt64
-
-		"""
-		The last UID, TIMESTAMP or NAMESPACE_ID assigned.
-		"""
-		endId: UInt64
-
-		"""
-		TIMESTAMP for read-only transactions.
-		"""
-		readOnly: UInt64
-	}
-
-	type AssignPayload {
-		response: AssignedIds
-	}
-
-	input BackupInput {
-
-		"""
-		Destination for the backup: e.g. Minio or S3 bucket.
-		"""
-		destination: String!
-
-		"""
-		Access key credential for the destination.
-		"""
-		accessKey: String
-
-		"""
-		Secret key credential for the destination.
-		"""
-		secretKey: String
-
-		"""
-		AWS session token, if required.
-		"""
-		sessionToken: String
-
-		"""
-		Set to true to allow backing up to S3 or Minio bucket that requires no credentials.
-		"""
-		anonymous: Boolean
-
-		"""
-		Force a full backup instead of an incremental backup.
-		"""
-		forceFull: Boolean
-	}
-
-	type BackupPayload {
-		response: Response
-		taskId: String
-	}
-
-	input RestoreInput {
-
-		"""
-		Destination for the backup: e.g. Minio or S3 bucket.
-		"""
-		location: String!
-
-		"""
-		Backup ID of the backup series to restore. This ID is included in the manifest.json file.
-		If missing, it defaults to the latest series.
-		"""
-		backupId: String
-
-		"""
-		Number of the backup within the backup series to be restored. Backups with a greater value
-		will be ignored. If the value is zero or missing, the entire series will be restored.
-		"""
-		backupNum: Int
-
-		"""
-		All the backups with num >= incrementalFrom will be restored.
-		"""
-		incrementalFrom: Int
-
-		"""
-		If isPartial is set to true then the cluster will be kept in draining mode after
-		restore. This makes sure that the db is not corrupted by any mutations or tablet moves in
-		between two restores.
-		"""
-		isPartial: Boolean
-
-		"""
-		Path to the key file needed to decrypt the backup. This file should be accessible
-		by all alphas in the group. The backup will be written using the encryption key
-		with which the cluster was started, which might be different than this key.
-		"""
-		encryptionKeyFile: String
-
-		"""
-		Vault server address where the key is stored. This server must be accessible
-		by all alphas in the group. Default "http://localhost:8200".
-		"""
-		vaultAddr: String
-
-		"""
-		Path to the Vault RoleID file.
-		"""
-		vaultRoleIDFile: String
-
-		"""
-		Path to the Vault SecretID file.
-		"""
-		vaultSecretIDFile: String
-
-		"""
-		Vault kv store path where the key lives. Default "secret/data/dgraph".
-		"""
-		vaultPath: String
-
-		"""
-		Vault kv store field whose value is the key. Default "enc_key".
-		"""
-		vaultField: String
-
-		"""
-		Vault kv store field's format. Must be "base64" or "raw". Default "base64".
-		"""
-		vaultFormat: String
-
-		"""
-		Access key credential for the destination.
-		"""
-		accessKey: String
-
-		"""
-		Secret key credential for the destination.
-		"""
-		secretKey: String
-
-		"""
-		AWS session token, if required.
-		"""
-		sessionToken: String
-
-		"""
-		Set to true to allow backing up to S3 or Minio bucket that requires no credentials.
-		"""
-		anonymous: Boolean
-	}
-
-	type RestorePayload {
-		"""
-		A short string indicating whether the restore operation was successfully scheduled.
-		"""
-		code: String
-
-		"""
-		Includes the error message if the operation failed.
-		"""
-		message: String
-	}
-
-	input ListBackupsInput {
-		"""
-		Destination for the backup: e.g. Minio or S3 bucket.
-		"""
-		location: String!
-
-		"""
-		Access key credential for the destination.
-		"""
-		accessKey: String
-
-		"""
-		Secret key credential for the destination.
-		"""
-		secretKey: String
-
-		"""
-		AWS session token, if required.
-		"""
-		sessionToken: String
-
-		"""
-		Whether the destination doesn't require credentials (e.g. S3 public bucket).
-		"""
-		anonymous: Boolean
-
-	}
-
-	type BackupGroup {
-		"""
-		The ID of the cluster group.
-		"""
-		groupId: UInt64
-
-		"""
-		List of predicates assigned to the group.
-		"""
-		predicates: [String]
-	}
-
-	type Manifest {
-		"""
-		Unique ID for the backup series.
-		"""
-		backupId: String
-
-		"""
-		Number of this backup within the backup series. The full backup always has a value of one.
-		"""
-		backupNum: UInt64
-
-		"""
-		Whether this backup was encrypted.
-		"""
-		encrypted: Boolean
-
-		"""
-		List of groups and the predicates they store in this backup.
-		"""
-		groups: [BackupGroup]
-
-		"""
-		Path to the manifest file.
-		"""
-		path: String
-
-		"""
-		The timestamp at which this backup was taken. The next incremental backup will
-		start from this timestamp.
-		"""
-		since: UInt64
-
-		"""
-		The type of backup, either full or incremental.
-		"""
-		type: String
-	}
-
-	` + adminTypes + `
-
-	type Query {
-		getGQLSchema: GQLSchema
-		getLambdaScript: LambdaScript
-		health: [NodeState]
-		state: MembershipState
-		config: Config
-		task(input: TaskInput!): TaskPayload
-		"""
-		Get the information about the backups at a given location.
-		"""
-		listBackups(input: ListBackupsInput!) : [Manifest]
-		` + adminQueries + `
-	}
-
-	type Mutation {
-
-		"""
-		Update the Dgraph cluster to serve the input schema.  This may change the GraphQL
-		schema, the types and predicates in the Dgraph schema, and cause indexes to be recomputed.
-		"""
-		updateGQLSchema(input: UpdateGQLSchemaInput!) : UpdateGQLSchemaPayload
-
-		"""
-		Update the lambda script used by lambda resolvers.
-		"""
-		updateLambdaScript(input: UpdateLambdaScriptInput!) : UpdateLambdaScriptPayload
-
-		"""
-		Starts an export of all data in the cluster.  Export format should be 'rdf' (the default
-		if no format is given), or 'json'.
-		See : https://dgraph.io/docs/deploy/#export-database
-		"""
-		export(input: ExportInput!): ExportPayload
-
-		"""
-		Set (or unset) the cluster draining mode.  In draining mode no further requests are served.
-		"""
-		draining(enable: Boolean): DrainingPayload
-
-		"""
-		Shutdown this node.
-		"""
-		shutdown: ShutdownPayload
-
-		"""
-		Alter the node's config.
-		"""
-		config(input: ConfigInput!): ConfigPayload
-
-		"""
-		Remove a node from the cluster.
-		"""
-		removeNode(input: RemoveNodeInput!): RemoveNodePayload
-
-		"""
-		Move a predicate from one group to another.
-		"""
-		moveTablet(input: MoveTabletInput!): MoveTabletPayload
-
-		"""
-		Lease UIDs, Timestamps or Namespace IDs in advance.
-		"""
-		assign(input: AssignInput!): AssignPayload
-
-		"""
-		Start a binary backup.
-		"""
-		backup(input: BackupInput!) : BackupPayload
-
-		"""
-		Start restoring a binary backup.
-		"""
-		restore(input: RestoreInput!) : RestorePayload
-
-		` + adminMutations + `
-	}
- `
 )
 
 var (
@@ -764,7 +86,6 @@ var (
 		"health":          minimalAdminQryMWs, // dgraph checks Guardian auth for health
 		"state":           minimalAdminQryMWs, // dgraph checks Guardian auth for state
 		"config":          gogQryMWs,
-		"listBackups":     gogQryMWs,
 		"getGQLSchema":    stdAdminQryMWs,
 		"getLambdaScript": stdAdminQryMWs,
 		// for queries and mutations related to User/Group, dgraph handles Guardian auth,
@@ -776,12 +97,10 @@ var (
 		"getGroup":       minimalAdminQryMWs,
 	}
 	adminMutationMWConfig = map[string]resolve.MutationMiddlewares{
-		"backup":             gogMutMWs,
 		"config":             gogMutMWs,
 		"draining":           gogMutMWs,
 		"export":             stdAdminMutMWs, // dgraph handles the export by GoG internally
 		"login":              minimalAdminMutMWs,
-		"restore":            gogMutMWs,
 		"shutdown":           gogMutMWs,
 		"removeNode":         gogMutMWs,
 		"moveTablet":         gogMutMWs,
@@ -846,14 +165,14 @@ func (g *GraphQLHealthStore) updatingSchema() {
 }
 
 type adminServer struct {
-	rf       resolve.ResolverFactory
+	rf       *resolve.ResolverFactory
 	resolver *resolve.RequestResolver
 
 	// The mutex that locks schema update operations
 	mux sync.RWMutex
 
 	// The GraphQL server that's being admin'd
-	gqlServer IServeGraphQL
+	gqlServer *GqlHandler
 
 	gqlSchemas *worker.GQLSchemaStore
 	// When the schema changes, we use these to create a new RequestResolver for
@@ -866,7 +185,7 @@ type adminServer struct {
 // NewServers initializes the GraphQL servers.  It sets up an empty server for the
 // main /graphql endpoint and an admin server.  The result is mainServer, adminServer.
 func NewServers(withIntrospection bool, globalEpoch map[uint64]*uint64,
-	closer *z.Closer) (IServeGraphQL, IServeGraphQL, *GraphQLHealthStore) {
+	closer *z.Closer) (*GqlHandler, *GqlHandler, *GraphQLHealthStore) {
 	gqlSchema, err := schema.FromString("", x.GalaxyNamespace)
 	if err != nil {
 		x.Panic(err)
@@ -894,7 +213,7 @@ func NewServers(withIntrospection bool, globalEpoch map[uint64]*uint64,
 
 // newAdminResolver creates a GraphQL request resolver for the /admin endpoint.
 func newAdminResolver(
-	defaultGqlServer IServeGraphQL,
+	defaultGqlServer *GqlHandler,
 	fns *resolve.ResolverFns,
 	withIntrospection bool,
 	epoch map[uint64]*uint64,
@@ -982,7 +301,7 @@ func newAdminResolver(
 		}
 		server.mux.RUnlock()
 
-		var gqlSchema schema.Schema
+		var gqlSchema *schema.Schema
 		// on drop_all, we will receive an empty string as the schema update
 		if newSchema.Schema != "" {
 			gqlSchema, err = generateGQLSchema(newSchema, ns)
@@ -1023,56 +342,50 @@ func newAdminResolver(
 	return server.resolver
 }
 
-func newAdminResolverFactory() resolve.ResolverFactory {
+func newAdminResolverFactory() *resolve.ResolverFactory {
 	adminMutationResolvers := map[string]resolve.MutationResolverFunc{
 		"addNamespace":       resolveAddNamespace,
-		"backup":             resolveBackup,
 		"config":             resolveUpdateConfig,
 		"deleteNamespace":    resolveDeleteNamespace,
 		"draining":           resolveDraining,
 		"export":             resolveExport,
 		"login":              resolveLogin,
 		"resetPassword":      resolveResetPassword,
-		"restore":            resolveRestore,
 		"shutdown":           resolveShutdown,
 		"updateLambdaScript": resolveUpdateLambda,
 
-		"removeNode":        resolveRemoveNode,
-		"moveTablet":        resolveMoveTablet,
-		"assign":            resolveAssign,
-		"enterpriseLicense": resolveEnterpriseLicense,
+		"removeNode": resolveRemoveNode,
+		"moveTablet": resolveMoveTablet,
+		"assign":     resolveAssign,
 	}
 
 	rf := resolverFactoryWithErrorMsg(errResolverNotFound).
 		WithQueryMiddlewareConfig(adminQueryMWConfig).
 		WithMutationMiddlewareConfig(adminMutationMWConfig).
-		WithQueryResolver("health", func(q schema.Query) resolve.QueryResolver {
+		WithQueryResolver("health", func(q *schema.Field) resolve.QueryResolver {
 			return resolve.QueryResolverFunc(resolveHealth)
 		}).
-		WithQueryResolver("state", func(q schema.Query) resolve.QueryResolver {
+		WithQueryResolver("state", func(q *schema.Field) resolve.QueryResolver {
 			return resolve.QueryResolverFunc(resolveState)
 		}).
-		WithQueryResolver("config", func(q schema.Query) resolve.QueryResolver {
+		WithQueryResolver("config", func(q *schema.Field) resolve.QueryResolver {
 			return resolve.QueryResolverFunc(resolveGetConfig)
 		}).
-		WithQueryResolver("listBackups", func(q schema.Query) resolve.QueryResolver {
-			return resolve.QueryResolverFunc(resolveListBackups)
-		}).
-		WithQueryResolver("task", func(q schema.Query) resolve.QueryResolver {
+		WithQueryResolver("task", func(q *schema.Field) resolve.QueryResolver {
 			return resolve.QueryResolverFunc(resolveTask)
 		}).
-		WithQueryResolver("getLambdaScript", func(q schema.Query) resolve.QueryResolver {
+		WithQueryResolver("getLambdaScript", func(q *schema.Field) resolve.QueryResolver {
 			return resolve.QueryResolverFunc(resolveGetLambda)
 		}).
-		WithQueryResolver("getGQLSchema", func(q schema.Query) resolve.QueryResolver {
+		WithQueryResolver("getGQLSchema", func(q *schema.Field) resolve.QueryResolver {
 			return resolve.QueryResolverFunc(
-				func(ctx context.Context, query schema.Query) *resolve.Resolved {
+				func(ctx context.Context, query *schema.Field) *resolve.Resolved {
 					return &resolve.Resolved{Err: errors.Errorf(errMsgServerNotReady), Field: q}
 				})
 		}).
-		WithMutationResolver("updateGQLSchema", func(m schema.Mutation) resolve.MutationResolver {
+		WithMutationResolver("updateGQLSchema", func(m *schema.Field) resolve.MutationResolver {
 			return resolve.MutationResolverFunc(
-				func(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+				func(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 					return &resolve.Resolved{Err: errors.Errorf(errMsgServerNotReady), Field: m},
 						false
 				})
@@ -1081,7 +394,7 @@ func newAdminResolverFactory() resolve.ResolverFactory {
 		// gotta force go to evaluate the right function at each loop iteration
 		// otherwise you get variable capture issues
 		func(f resolve.MutationResolver) {
-			rf.WithMutationResolver(gqlMut, func(m schema.Mutation) resolve.MutationResolver {
+			rf.WithMutationResolver(gqlMut, func(m *schema.Field) resolve.MutationResolver {
 				return f
 			})
 		}(resolver)
@@ -1099,7 +412,7 @@ func getCurrentGraphQLSchema(namespace uint64) (*worker.GqlSchema, error) {
 	return &worker.GqlSchema{ID: uid, Schema: graphQLSchema}, nil
 }
 
-func generateGQLSchema(sch *worker.GqlSchema, ns uint64) (schema.Schema, error) {
+func generateGQLSchema(sch *worker.GqlSchema, ns uint64) (*schema.Schema, error) {
 	schHandler, err := schema.NewHandler(sch.Schema, false)
 	if err != nil {
 		return nil, err
@@ -1115,6 +428,8 @@ func generateGQLSchema(sch *worker.GqlSchema, ns uint64) (schema.Schema, error) 
 }
 
 func (as *adminServer) initServer() {
+	x.BlockUntilHealthy()
+
 	// Nothing else should be able to lock before here.  The admin resolvers aren't yet
 	// set up (they all just error), so we will obtain the lock here without contention.
 	// We then setup the admin resolvers and they must wait until we are done before the
@@ -1173,68 +488,68 @@ func (as *adminServer) addConnectedAdminResolvers() {
 	dgEx := resolve.NewDgraphExecutor()
 
 	as.rf.WithMutationResolver("updateGQLSchema",
-		func(m schema.Mutation) resolve.MutationResolver {
+		func(m *schema.Field) resolve.MutationResolver {
 			return &updateSchemaResolver{admin: as}
 		}).
 		WithQueryResolver("getGQLSchema",
-			func(q schema.Query) resolve.QueryResolver {
+			func(q *schema.Field) resolve.QueryResolver {
 				return &getSchemaResolver{admin: as}
 			}).
 		WithQueryResolver("queryGroup",
-			func(q schema.Query) resolve.QueryResolver {
+			func(q *schema.Field) resolve.QueryResolver {
 				return resolve.NewQueryResolver(qryRw, dgEx)
 			}).
 		WithQueryResolver("queryUser",
-			func(q schema.Query) resolve.QueryResolver {
+			func(q *schema.Field) resolve.QueryResolver {
 				return resolve.NewQueryResolver(qryRw, dgEx)
 			}).
 		WithQueryResolver("getGroup",
-			func(q schema.Query) resolve.QueryResolver {
+			func(q *schema.Field) resolve.QueryResolver {
 				return resolve.NewQueryResolver(qryRw, dgEx)
 			}).
 		WithQueryResolver("getCurrentUser",
-			func(q schema.Query) resolve.QueryResolver {
+			func(q *schema.Field) resolve.QueryResolver {
 				return resolve.NewQueryResolver(&currentUserResolver{baseRewriter: qryRw}, dgEx)
 			}).
 		WithQueryResolver("getUser",
-			func(q schema.Query) resolve.QueryResolver {
+			func(q *schema.Field) resolve.QueryResolver {
 				return resolve.NewQueryResolver(qryRw, dgEx)
 			}).
 		WithMutationResolver("addUser",
-			func(m schema.Mutation) resolve.MutationResolver {
+			func(m *schema.Field) resolve.MutationResolver {
 				return resolve.NewDgraphResolver(resolve.NewAddRewriter(), dgEx)
 			}).
 		WithMutationResolver("addGroup",
-			func(m schema.Mutation) resolve.MutationResolver {
+			func(m *schema.Field) resolve.MutationResolver {
 				return resolve.NewDgraphResolver(NewAddGroupRewriter(), dgEx)
 			}).
 		WithMutationResolver("updateUser",
-			func(m schema.Mutation) resolve.MutationResolver {
+			func(m *schema.Field) resolve.MutationResolver {
 				return resolve.NewDgraphResolver(resolve.NewUpdateRewriter(), dgEx)
 			}).
 		WithMutationResolver("updateGroup",
-			func(m schema.Mutation) resolve.MutationResolver {
+			func(m *schema.Field) resolve.MutationResolver {
 				return resolve.NewDgraphResolver(NewUpdateGroupRewriter(), dgEx)
 			}).
 		WithMutationResolver("deleteUser",
-			func(m schema.Mutation) resolve.MutationResolver {
+			func(m *schema.Field) resolve.MutationResolver {
 				return resolve.NewDgraphResolver(resolve.NewDeleteRewriter(), dgEx)
 			}).
 		WithMutationResolver("deleteGroup",
-			func(m schema.Mutation) resolve.MutationResolver {
+			func(m *schema.Field) resolve.MutationResolver {
 				return resolve.NewDgraphResolver(resolve.NewDeleteRewriter(), dgEx)
 			})
 }
 
-func resolverFactoryWithErrorMsg(msg string) resolve.ResolverFactory {
+func resolverFactoryWithErrorMsg(msg string) *resolve.ResolverFactory {
 	errFunc := func(name string) error { return errors.Errorf(msg, name) }
 	qErr :=
-		resolve.QueryResolverFunc(func(ctx context.Context, query schema.Query) *resolve.Resolved {
+		resolve.QueryResolverFunc(func(ctx context.Context, query *schema.Field) *resolve.Resolved {
 			return &resolve.Resolved{Err: errFunc(query.ResponseName()), Field: query}
 		})
 
 	mErr := resolve.MutationResolverFunc(
-		func(ctx context.Context, mutation schema.Mutation) (*resolve.Resolved, bool) {
+		func(ctx context.Context, mutation *schema.Field) (*resolve.Resolved, bool) {
 			return &resolve.Resolved{Err: errFunc(mutation.ResponseName()), Field: mutation}, false
 		})
 
@@ -1256,11 +571,11 @@ func (as *adminServer) incrementSchemaUpdateCounter(ns uint64) {
 	atomic.AddUint64(as.getGlobalEpoch(ns), 1)
 }
 
-func (as *adminServer) resetSchema(ns uint64, gqlSchema schema.Schema) {
+func (as *adminServer) resetSchema(ns uint64, gqlSchema *schema.Schema) {
 	// set status as updating schema
 	mainHealthStore.updatingSchema()
 
-	var resolverFactory resolve.ResolverFactory
+	var resolverFactory *resolve.ResolverFactory
 	// gqlSchema can be nil in following cases:
 	// * after DROP_ALL
 	// * if the schema hasn't yet been set even once for a non-Galaxy namespace
@@ -1274,25 +589,27 @@ func (as *adminServer) resetSchema(ns uint64, gqlSchema schema.Schema) {
 			WithConventionResolvers(gqlSchema, as.fns)
 		// If the schema is a Federated Schema then attach "_service" resolver
 		if gqlSchema.IsFederated() {
-			resolverFactory.WithQueryResolver("_service", func(s schema.Query) resolve.QueryResolver {
-				return resolve.QueryResolverFunc(func(ctx context.Context, query schema.Query) *resolve.Resolved {
-					as.mux.RLock()
-					defer as.mux.RUnlock()
-					sch, ok := as.gqlSchemas.GetCurrent(ns)
-					if !ok {
-						return resolve.EmptyResult(query,
-							fmt.Errorf("error while getting the schema for ns %d", ns))
-					}
-					handler, err := schema.NewHandler(sch.Schema, true)
-					if err != nil {
-						return resolve.EmptyResult(query, err)
-					}
-					data := handler.GQLSchemaWithoutApolloExtras()
-					return resolve.DataResult(query,
-						map[string]interface{}{"_service": map[string]interface{}{"sdl": data}},
-						nil)
+			resolverFactory.WithQueryResolver("_service",
+				func(s *schema.Field) resolve.QueryResolver {
+					return resolve.QueryResolverFunc(
+						func(ctx context.Context, query *schema.Field) *resolve.Resolved {
+							as.mux.RLock()
+							defer as.mux.RUnlock()
+							sch, ok := as.gqlSchemas.GetCurrent(ns)
+							if !ok {
+								return resolve.EmptyResult(query,
+									fmt.Errorf("error while getting the schema for ns %d", ns))
+							}
+							handler, err := schema.NewHandler(sch.Schema, true)
+							if err != nil {
+								return resolve.EmptyResult(query, err)
+							}
+							data := handler.GQLSchemaWithoutApolloExtras()
+							return resolve.DataResult(query,
+								map[string]interface{}{"_service": map[string]interface{}{"sdl": data}},
+								nil)
+						})
 				})
-			})
 		}
 
 		if as.withIntrospection {
@@ -1320,7 +637,7 @@ func (as *adminServer) lazyLoadSchema(namespace uint64) error {
 		return errors.Wrap(err, "failed to lazy-load GraphQL schema")
 	}
 
-	var generatedSchema schema.Schema
+	var generatedSchema *schema.Schema
 	if sch.Schema == "" {
 		// if there was no schema stored in Dgraph, we still need to attach resolvers to the main
 		// graphql server which should just return errors for any incoming request.
@@ -1379,7 +696,7 @@ func response(code, msg string) map[string]interface{} {
 		"response": map[string]interface{}{"code": code, "message": msg}}
 }
 
-// DestinationFields is used by both export and backup to specify destination
+// DestinationFields is used by export to specify destination
 type DestinationFields struct {
 	Destination  string
 	AccessKey    string

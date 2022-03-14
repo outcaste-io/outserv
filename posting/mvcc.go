@@ -1,18 +1,5 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package posting
 
@@ -30,7 +17,6 @@ import (
 	"github.com/outcaste-io/badger/v3"
 	"github.com/outcaste-io/badger/v3/skl"
 	"github.com/outcaste-io/badger/v3/y"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
@@ -228,14 +214,6 @@ func (ir *incrRollupi) Process(closer *z.Closer) {
 	}
 }
 
-// ShouldAbort returns whether the transaction should be aborted.
-func (txn *Txn) ShouldAbort() bool {
-	if txn == nil {
-		return false
-	}
-	return atomic.LoadUint32(&txn.shouldAbort) > 0
-}
-
 func (txn *Txn) addConflictKey(conflictKey uint64) {
 	txn.Lock()
 	defer txn.Unlock()
@@ -252,7 +230,7 @@ func (txn *Txn) Cache() *LocalCache {
 }
 
 // FillContext updates the given transaction context with data from this transaction.
-func (txn *Txn) FillContext(ctx *api.TxnContext, gid uint32) {
+func (txn *Txn) FillContext(ctx *pb.TxnContext, gid uint32) {
 	txn.Lock()
 	ctx.StartTs = txn.StartTs
 
@@ -302,7 +280,8 @@ func (txn *Txn) ToSkiplist() error {
 			glog.Errorf("Invalid Entry. len(key): %d len(val): %d\n", len(k), len(data))
 			continue
 		}
-		b.Add(y.KeyWithTs(k, math.MaxUint64),
+
+		b.Add(y.KeyWithTs(k, txn.CommitTs),
 			y.ValueStruct{
 				Value:    data,
 				UserMeta: BitDeltaPosting,
@@ -317,13 +296,12 @@ func ResetCache() {
 }
 
 // RemoveCachedKeys will delete the cached list by this txn.
-func (txn *Txn) UpdateCachedKeys(commitTs uint64) {
+func (txn *Txn) UpdateCachedKeys() {
 	if txn == nil || txn.cache == nil {
 		return
 	}
-	x.AssertTrue(commitTs > 0)
 	for key := range txn.cache.deltas {
-		lCache.SetIfPresent([]byte(key), commitTs, 0)
+		lCache.SetIfPresent([]byte(key), txn.CommitTs, 0)
 	}
 }
 

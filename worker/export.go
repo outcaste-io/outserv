@@ -1,18 +1,5 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package worker
 
@@ -39,18 +26,15 @@ import (
 	bpb "github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/ristretto/z"
 
-	"github.com/outcaste-io/dgo/v210/protos/api"
-
 	"github.com/outcaste-io/outserv/ee/enc"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/types"
-	"github.com/outcaste-io/outserv/types/facets"
 	"github.com/outcaste-io/outserv/x"
 )
 
 // DefaultExportFormat stores the name of the default format for exports.
-const DefaultExportFormat = "rdf"
+const DefaultExportFormat = "json"
 
 type exportFormat struct {
 	ext  string // file extension
@@ -64,11 +48,6 @@ var exportFormats = map[string]exportFormat{
 		pre:  "[\n",
 		post: "\n]\n",
 	},
-	"rdf": {
-		ext:  ".rdf",
-		pre:  "",
-		post: "",
-	},
 }
 
 type exporter struct {
@@ -79,22 +58,7 @@ type exporter struct {
 	readTs    uint64
 }
 
-// Map from our types to RDF type. Useful when writing storage types
-// for RDF's in export. This is the dgraph type name and rdf storage type
-// might not be the same always (e.g. - datetime and bool).
-var rdfTypeMap = map[types.TypeID]string{
-	types.StringID:   "xs:string",
-	types.DateTimeID: "xs:dateTime",
-	types.IntID:      "xs:int",
-	types.FloatID:    "xs:float",
-	types.BoolID:     "xs:boolean",
-	types.GeoID:      "geo:geojson",
-	types.BinaryID:   "xs:base64Binary",
-	types.PasswordID: "xs:password",
-}
-
 // UIDs like 0x1 look weird but 64-bit ones like 0x0000000000000001 are too long.
-var uidFmtStrRdf = "<%#x>"
 var uidFmtStrJson = "\"%#x\""
 
 // valToStr converts a posting value to a string.
@@ -106,21 +70,6 @@ func valToStr(v types.Val) (string, error) {
 
 	// Strip terminating null, if any.
 	return strings.TrimRight(v2.Value.(string), "\x00"), nil
-}
-
-// facetToString convert a facet value to a string.
-func facetToString(fct *api.Facet) (string, error) {
-	v1, err := facets.ValFor(fct)
-	if err != nil {
-		return "", errors.Wrapf(err, "getting value from facet %#v", fct)
-	}
-
-	v2 := &types.Val{Tid: types.StringID}
-	if err = types.Marshal(v1, v2); err != nil {
-		return "", errors.Wrapf(err, "marshaling facet value %v to string", v1)
-	}
-
-	return v2.Value.(string), nil
 }
 
 // escapedString converts a string into an escaped string for exports.
@@ -142,31 +91,6 @@ func (e *exporter) toJSON() (*bpb.KVList, error) {
 	// We could output more compact JSON at the cost of code complexity.
 	// Leaving it simple for now.
 
-	writeFacets := func(pfacets []*api.Facet) error {
-		for _, fct := range pfacets {
-			fmt.Fprintf(bp, `,"%s|%s":`, e.attr, fct.Key)
-
-			str, err := facetToString(fct)
-			if err != nil {
-				glog.Errorf("Ignoring error: %+v", err)
-				return nil
-			}
-
-			tid, err := facets.TypeIDFor(fct)
-			if err != nil {
-				glog.Errorf("Error getting type id from facet %#v: %v", fct, err)
-				continue
-			}
-
-			if !tid.IsNumber() {
-				str = escapedString(str)
-			}
-
-			fmt.Fprint(bp, str)
-		}
-		return nil
-	}
-
 	continuing := false
 	mapStart := fmt.Sprintf("  {\"uid\":"+uidFmtStrJson+`,"namespace":"%#x"`, e.uid, e.namespace)
 	err := e.pl.IterateAll(e.readTs, 0, func(p *pb.Posting) error {
@@ -180,9 +104,6 @@ func (e *exporter) toJSON() (*bpb.KVList, error) {
 		if p.PostingType == pb.Posting_REF {
 			fmt.Fprintf(bp, `,"%s":[`, e.attr)
 			fmt.Fprintf(bp, "{\"uid\":"+uidFmtStrJson, p.Uid)
-			if err := writeFacets(p.Facets); err != nil {
-				return errors.Wrap(err, "While writing facets for posting_REF")
-			}
 			fmt.Fprint(bp, "}]")
 		} else {
 			if p.PostingType == pb.Posting_VALUE_LANG {
@@ -206,81 +127,9 @@ func (e *exporter) toJSON() (*bpb.KVList, error) {
 			}
 
 			fmt.Fprint(bp, str)
-			if err := writeFacets(p.Facets); err != nil {
-				return errors.Wrap(err, "While writing facets for value postings")
-			}
 		}
 
 		fmt.Fprint(bp, "}")
-		return nil
-	})
-
-	kv := &bpb.KV{
-		Value:   bp.Bytes(),
-		Version: 1,
-	}
-	return listWrap(kv), err
-}
-
-func (e *exporter) toRDF() (*bpb.KVList, error) {
-	bp := new(bytes.Buffer)
-
-	prefix := fmt.Sprintf(uidFmtStrRdf+" <%s> ", e.uid, e.attr)
-	err := e.pl.IterateAll(e.readTs, 0, func(p *pb.Posting) error {
-		fmt.Fprint(bp, prefix)
-		if p.PostingType == pb.Posting_REF {
-			fmt.Fprintf(bp, uidFmtStrRdf, p.Uid)
-		} else {
-			val := types.Val{Tid: types.TypeID(p.ValType), Value: p.Value}
-			str, err := valToStr(val)
-			if err != nil {
-				glog.Errorf("Ignoring error: %+v\n", err)
-				return nil
-			}
-			fmt.Fprintf(bp, "%s", escapedString(str))
-
-			tid := types.TypeID(p.ValType)
-			if p.PostingType == pb.Posting_VALUE_LANG {
-				fmt.Fprint(bp, "@"+string(p.LangTag))
-			} else if tid != types.DefaultID {
-				rdfType, ok := rdfTypeMap[tid]
-				x.AssertTruef(ok, "Didn't find RDF type for dgraph type: %+v", tid.Name())
-				fmt.Fprint(bp, "^^<"+rdfType+">")
-			}
-		}
-		// Use label for storing namespace.
-		fmt.Fprintf(bp, " <%#x>", e.namespace)
-
-		// Facets.
-		if len(p.Facets) != 0 {
-			fmt.Fprint(bp, " (")
-			for i, fct := range p.Facets {
-				if i != 0 {
-					fmt.Fprint(bp, ",")
-				}
-				fmt.Fprint(bp, fct.Key+"=")
-
-				str, err := facetToString(fct)
-				if err != nil {
-					glog.Errorf("Ignoring error: %+v", err)
-					return nil
-				}
-
-				tid, err := facets.TypeIDFor(fct)
-				if err != nil {
-					glog.Errorf("Error getting type id from facet %#v: %v", fct, err)
-					continue
-				}
-
-				if tid == types.StringID {
-					str = escapedString(str)
-				}
-				fmt.Fprint(bp, str)
-			}
-			fmt.Fprint(bp, ")")
-		}
-		// End dot.
-		fmt.Fprint(bp, " .\n")
 		return nil
 	})
 
@@ -413,7 +262,7 @@ func (writer *ExportWriter) Close() error {
 // ExportedFiles has the relative path of files that were written during export
 type ExportedFiles []string
 
-// export creates a export of data by exporting it as an RDF gzip.
+// export creates a export of data by exporting it as an JSON gzip.
 func export(ctx context.Context, in *pb.ExportRequest) (ExportedFiles, error) {
 	if in.GroupId != groups().groupId() {
 		return nil, errors.Errorf("Export request group mismatch. Mine: %d. Requested: %d",
@@ -512,8 +361,6 @@ func ToExportKvList(pk x.ParsedKey, pl *posting.List, in *pb.ExportRequest) (*bp
 		switch in.Format {
 		case "json":
 			return e.toJSON()
-		case "rdf":
-			return e.toRDF()
 		default:
 			glog.Fatalf("Invalid export format found: %s", in.Format)
 		}
@@ -535,9 +382,6 @@ func WriteExport(writers *Writers, kv *bpb.KV, format string) error {
 	switch format {
 	case "json":
 		dataSeparator = []byte(",\n")
-	case "rdf":
-		// The separator for RDF should be empty since the toRDF function already
-		// adds newline to each RDF entry.
 	default:
 		glog.Fatalf("Invalid export format found: %s", format)
 	}
@@ -583,7 +427,7 @@ func NewWriters(req *pb.ExportRequest) (*Writers, error) {
 	// Create a UriHandler for the given destination.
 	destination := req.GetDestination()
 	if destination == "" {
-		destination = x.WorkerConfig.ExportPath
+		destination = x.WorkerConfig.Dir.Export
 	}
 	uri, err := url.Parse(destination)
 	if err != nil {
@@ -891,13 +735,8 @@ func ExportOverNetwork(ctx context.Context, input *pb.ExportRequest) (ExportedFi
 		return nil, err
 	}
 	// Get ReadTs from zero and wait for stream to catch up.
-	ts, err := Timestamps(ctx, &pb.Num{ReadOnly: true})
-	if err != nil {
-		glog.Errorf("Unable to retrieve readonly ts for export: %v\n", err)
-		return nil, err
-	}
-	readTs := ts.ReadOnly
-	glog.Infof("Got readonly ts from Zero: %d\n", readTs)
+	readTs := posting.ReadTimestamp()
+	glog.Infof("Using readTs: %d\n", readTs)
 
 	// Let's first collect all groups.
 	gids := groups().KnownGroups()

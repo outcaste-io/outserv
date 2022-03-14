@@ -1,18 +1,5 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package worker
 
@@ -29,7 +16,6 @@ import (
 
 	"github.com/outcaste-io/badger/v3"
 	bpb "github.com/outcaste-io/badger/v3/pb"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/schema"
@@ -40,7 +26,7 @@ import (
 var (
 	errEmptyPredicate = errors.Errorf("Predicate not specified")
 	errNotLeader      = errors.Errorf("Server is not leader of this group")
-	emptyPayload      = api.Payload{}
+	emptyPayload      = pb.Payload{}
 )
 
 const (
@@ -99,7 +85,9 @@ func batchAndProposeKeyValues(ctx context.Context, kvs chan *pb.KVS) error {
 				if kv.StreamId == CleanPredicate {
 					// Delete on all nodes. Remove the schema at timestamp kv.Version-1 and set it at
 					// kv.Version. kv.Version will be the TxnTs of the predicate move.
-					p := &pb.Proposal{CleanPredicate: pk.Attr, StartTs: kv.Version - 1}
+
+					// TODO: Check what this ReadTs would do later.
+					p := &pb.Proposal{CleanPredicate: pk.Attr, ReadTs: kv.Version - 1}
 					if err := n.proposeAndWait(ctx, p); err != nil {
 						glog.Errorf("Error while cleaning predicate %v %v\n", pk.Attr, err)
 						return err
@@ -150,7 +138,7 @@ func (w *grpcWorker) ReceivePredicate(stream pb.Worker_ReceivePredicateServer) e
 	// We can use count to check the number of posting lists returned in tests.
 	count := 0
 	ctx := stream.Context()
-	payload := &api.Payload{}
+	payload := &pb.Payload{}
 
 	glog.Infof("Got ReceivePredicate. Group: %d. Am leader: %v",
 		groups().groupId(), groups().Node.AmLeader())
@@ -200,7 +188,9 @@ func (w *grpcWorker) ReceivePredicate(stream pb.Worker_ReceivePredicateServer) e
 }
 
 func (w *grpcWorker) MovePredicate(ctx context.Context,
-	in *pb.MovePredicatePayload) (*api.Payload, error) {
+	in *pb.MovePredicatePayload) (*pb.Payload, error) {
+	return nil, fmt.Errorf("TODO: Support MovePredicate")
+
 	ctx, span := otrace.StartSpan(ctx, "worker.MovePredicate")
 	defer span.End()
 
@@ -232,7 +222,8 @@ func (w *grpcWorker) MovePredicate(ctx context.Context,
 		p := &pb.Proposal{
 			CleanPredicate:   in.Predicate,
 			ExpectedChecksum: in.ExpectedChecksum,
-			StartTs:          in.ReadTs,
+			ReadTs:           in.ReadTs,
+			// TODO: Should we set commitTs?
 		}
 		return &emptyPayload, groups().Node.proposeAndWait(ctx, p)
 	}

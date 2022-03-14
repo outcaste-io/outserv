@@ -1,18 +1,5 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package x
 
@@ -186,14 +173,27 @@ func TestVersionString(t *testing.T) {
 }
 
 func TestToHex(t *testing.T) {
-	require.Equal(t, []byte(`"0x0"`), ToHex(0, false))
-	require.Equal(t, []byte(`<0x0>`), ToHex(0, true))
-	require.Equal(t, []byte(`"0xf"`), ToHex(15, false))
-	require.Equal(t, []byte(`<0xf>`), ToHex(15, true))
-	require.Equal(t, []byte(`"0x19"`), ToHex(25, false))
-	require.Equal(t, []byte(`<0x19>`), ToHex(25, true))
-	require.Equal(t, []byte(`"0xff"`), ToHex(255, false))
-	require.Equal(t, []byte(`<0xff>`), ToHex(255, true))
-	require.Equal(t, []byte(`"0xffffffffffffffff"`), ToHex(math.MaxUint64, false))
-	require.Equal(t, []byte(`<0xffffffffffffffff>`), ToHex(math.MaxUint64, true))
+	require.Equal(t, []byte(`"0x0"`), ToHex(0))
+	require.Equal(t, []byte(`"0xf"`), ToHex(15))
+	require.Equal(t, []byte(`"0x19"`), ToHex(25))
+	require.Equal(t, []byte(`"0xff"`), ToHex(255))
+	require.Equal(t, []byte(`"0xffffffffffffffff"`), ToHex(math.MaxUint64))
+}
+
+func TestTimestamp(t *testing.T) {
+	require.Equal(t, uint64(2), Timestamp(0, 1))
+	require.Equal(t, uint64(4), Timestamp(0, 2))
+
+	base := uint64(16)
+	base = base << 32
+
+	require.Equal(t, base+uint64(256), Timestamp(base, 128))
+	require.Equal(t, base+uint64(1<<32-2), Timestamp(base, 1<<31-1))
+	require.Equal(t, base+uint64(0), Timestamp(base, 1<<31))
+	require.Equal(t, base+uint64(2), Timestamp(base, 1<<31+1))
+
+	msbMask := ^mask
+	require.Equal(t, base, Timestamp(base, 1<<31-1)&msbMask)
+	require.Equal(t, base, Timestamp(base, 1<<32)&msbMask)
+	require.Equal(t, base, Timestamp(base, 1<<32+1)&msbMask)
 }

@@ -1,18 +1,5 @@
-/*
- * Copyright 2019 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2019 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package resolve
 
@@ -24,11 +11,11 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/golang/glog"
-	dgoapi "github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/posting"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
@@ -64,7 +51,7 @@ const touchedUidsKey = "_total"
 
 // A MutationResolver can resolve a single mutation.
 type MutationResolver interface {
-	Resolve(ctx context.Context, mutation schema.Mutation) (*Resolved, bool)
+	Resolve(ctx context.Context, mutation *schema.Field) (*Resolved, bool)
 }
 
 // A MutationRewriter can transform a GraphQL mutation into a Dgraph mutation and
@@ -102,23 +89,23 @@ type MutationRewriter interface {
 	//     }
 	// These query will be created in case of Add or Update Mutation which references node
 	// 0x127 or Computer of name "computer1"
-	RewriteQueries(ctx context.Context, m schema.Mutation) ([]*gql.GraphQuery, []string, error)
+	RewriteQueries(ctx context.Context, m *schema.Field) ([]*gql.GraphQuery, []string, error)
 	// Rewrite rewrites GraphQL mutation m into a Dgraph mutation - that could
 	// be as simple as a single DelNquads, or could be a Dgraph upsert mutation
 	// with a query and multiple mutations guarded by conditions.
-	Rewrite(ctx context.Context, m schema.Mutation, idExistence map[string]string) ([]*UpsertMutation, error)
+	Rewrite(ctx context.Context, m *schema.Field, idExistence map[string]string) ([]*UpsertMutation, error)
 	// FromMutationResult takes a GraphQL mutation and the results of a Dgraph
 	// mutation and constructs a Dgraph query.  It's used to find the return
 	// value from a GraphQL mutation - i.e. we've run the mutation indicated by m
 	// now we need to query Dgraph to satisfy all the result fields in m.
 	FromMutationResult(
 		ctx context.Context,
-		m schema.Mutation,
+		m *schema.Field,
 		assigned map[string]string,
 		result map[string]interface{}) ([]*gql.GraphQuery, error)
 	// MutatedRootUIDs returns a list of Root UIDs that were mutated as part of the mutation.
 	MutatedRootUIDs(
-		mutation schema.Mutation,
+		mutation *schema.Field,
 		assigned map[string]string,
 		result map[string]interface{}) []string
 }
@@ -128,8 +115,7 @@ type DgraphExecutor interface {
 	// Execute performs the actual query/mutation and returns a Dgraph response. If an error
 	// occurs, that indicates that the execution failed in some way significant enough
 	// way as to not continue processing this query/mutation or others in the same request.
-	Execute(ctx context.Context, req *dgoapi.Request, field schema.Field) (*dgoapi.Response, error)
-	CommitOrAbort(ctx context.Context, tc *dgoapi.TxnContext) (*dgoapi.TxnContext, error)
+	Execute(ctx context.Context, req *pb.Request, field *schema.Field) (*pb.Response, error)
 }
 
 // An UpsertMutation is the query and mutations needed for a Dgraph upsert.
@@ -137,28 +123,28 @@ type DgraphExecutor interface {
 // be created by the upsert.
 type UpsertMutation struct {
 	Query     []*gql.GraphQuery
-	Mutations []*dgoapi.Mutation
-	NewNodes  map[string]schema.Type
+	Mutations []*pb.Mutation
+	NewNodes  map[string]*schema.Type
 }
 
 // DgraphExecutorFunc is an adapter that allows us to compose dgraph execution and
 // build a QueryExecuter from a function.  Based on the http.HandlerFunc pattern.
-type DgraphExecutorFunc func(ctx context.Context, req *dgoapi.Request) (*dgoapi.Response, error)
+type DgraphExecutorFunc func(ctx context.Context, req *pb.Request) (*pb.Response, error)
 
 // Execute calls qe(ctx, query)
 func (ex DgraphExecutorFunc) Execute(
 	ctx context.Context,
-	req *dgoapi.Request) (*dgoapi.Response, error) {
+	req *pb.Request) (*pb.Response, error) {
 
 	return ex(ctx, req)
 }
 
 // MutationResolverFunc is an adapter that allows to build a MutationResolver from
 // a function.  Based on the http.HandlerFunc pattern.
-type MutationResolverFunc func(ctx context.Context, m schema.Mutation) (*Resolved, bool)
+type MutationResolverFunc func(ctx context.Context, m *schema.Field) (*Resolved, bool)
 
 // Resolve calls mr(ctx, mutation)
-func (mr MutationResolverFunc) Resolve(ctx context.Context, m schema.Mutation) (*Resolved, bool) {
+func (mr MutationResolverFunc) Resolve(ctx context.Context, m *schema.Field) (*Resolved, bool) {
 	return mr(ctx, m)
 }
 
@@ -180,7 +166,7 @@ type dgraphResolver struct {
 	executor         DgraphExecutor
 }
 
-func (mr *dgraphResolver) Resolve(ctx context.Context, m schema.Mutation) (*Resolved, bool) {
+func (mr *dgraphResolver) Resolve(ctx context.Context, m *schema.Field) (*Resolved, bool) {
 	span := otrace.FromContext(ctx)
 	stop := x.SpanTimer(span, "resolveMutation")
 	defer stop()
@@ -199,12 +185,10 @@ func (mr *dgraphResolver) Resolve(ctx context.Context, m schema.Mutation) (*Reso
 	defer timer.Stop()
 
 	resolved, success := mr.rewriteAndExecute(ctx, m)
-	resolverTrace.Dgraph = resolved.Extensions.Tracing.Execution.Resolvers[0].Dgraph
-	resolved.Extensions.Tracing.Execution.Resolvers[0] = resolverTrace
 	return resolved, success
 }
 
-func getNumUids(m schema.Mutation, a map[string]string, r map[string]interface{}) int {
+func getNumUids(m *schema.Field, a map[string]string, r map[string]interface{}) int {
 	switch m.MutationType() {
 	case schema.AddMutation:
 		return len(a)
@@ -216,39 +200,14 @@ func getNumUids(m schema.Mutation, a map[string]string, r map[string]interface{}
 
 func (mr *dgraphResolver) rewriteAndExecute(
 	ctx context.Context,
-	mutation schema.Mutation) (*Resolved, bool) {
-	var mutResp, qryResp *dgoapi.Response
-	req := &dgoapi.Request{}
-	commit := false
-
-	defer func() {
-		if !commit && mutResp != nil && mutResp.Txn != nil {
-			mutResp.Txn.Aborted = true
-			_, err := mr.executor.CommitOrAbort(ctx, mutResp.Txn)
-			if err != nil {
-				glog.Errorf("Error occurred while aborting transaction: %s", err)
-			}
-		}
-	}()
+	mutation *schema.Field) (*Resolved, bool) {
+	var mutResp, qryResp *pb.Response
+	req := &pb.Request{}
 
 	dgraphPreMutationQueryDuration := &schema.LabeledOffsetDuration{Label: "preMutationQuery"}
 	dgraphMutationDuration := &schema.LabeledOffsetDuration{Label: "mutation"}
 	dgraphPostMutationQueryDuration := &schema.LabeledOffsetDuration{Label: "query"}
-	ext := &schema.Extensions{
-		Tracing: &schema.Trace{
-			Execution: &schema.ExecutionTrace{
-				Resolvers: []*schema.ResolverTrace{
-					{
-						Dgraph: []*schema.LabeledOffsetDuration{
-							dgraphPreMutationQueryDuration,
-							dgraphMutationDuration,
-							dgraphPostMutationQueryDuration,
-						},
-					},
-				},
-			},
-		},
-	}
+	ext := &schema.Extensions{}
 
 	emptyResult := func(err error) *Resolved {
 		return &Resolved{
@@ -393,7 +352,7 @@ func (mr *dgraphResolver) rewriteAndExecute(
 
 			queryTimer := newtimer(ctx, &dgraphPostMutationQueryDuration.OffsetDuration)
 			queryTimer.Start()
-			qryResp, err = mr.executor.Execute(ctx, &dgoapi.Request{Query: dgraph.AsString(dgQuery),
+			qryResp, err = mr.executor.Execute(ctx, &pb.Request{Query: dgraph.AsString(dgQuery),
 				ReadOnly: true}, qryField)
 			queryTimer.Stop()
 
@@ -408,7 +367,7 @@ func (mr *dgraphResolver) rewriteAndExecute(
 	}
 
 	result := make(map[string]interface{})
-	newNodes := make(map[string]schema.Type)
+	newNodes := make(map[string]*schema.Type)
 
 	mutationTimer := newtimer(ctx, &dgraphMutationDuration.OffsetDuration)
 	mutationTimer.Start()
@@ -493,26 +452,21 @@ func (mr *dgraphResolver) rewriteAndExecute(
 		return emptyResult(queryErrs), resolverFailed
 	}
 
-	txnCtx, err := mr.executor.CommitOrAbort(ctx, mutResp.Txn)
-	if err != nil {
-		return emptyResult(
-				schema.GQLWrapf(err, "mutation failed, couldn't commit transaction")),
-			resolverFailed
-	}
-	commit = true
-
 	// once committed, send async updates to configured webhooks, if any.
 	if mutation.HasLambdaOnMutate() {
 		rootUIDs := mr.mutationRewriter.MutatedRootUIDs(mutation, mutResp.GetUids(), result)
 		// NOTE: This is an async operation. We can't extract logs from webhooks.
-		go sendWebhookEvent(ctx, mutation, txnCtx.CommitTs, rootUIDs)
+		//
+		// TODO: Check if we can just send a readtimestamp, or do we need to
+		// send the exact commit timestamp.
+		go sendWebhookEvent(ctx, mutation, posting.ReadTimestamp(), rootUIDs)
 	}
 
 	// For delete mutation, we would have already populated qryResp if query field was requested.
 	if mutation.MutationType() != schema.DeleteMutation {
 		queryTimer := newtimer(ctx, &dgraphPostMutationQueryDuration.OffsetDuration)
 		queryTimer.Start()
-		qryResp, err = mr.executor.Execute(ctx, &dgoapi.Request{Query: dgraph.AsString(dgQuery),
+		qryResp, err = mr.executor.Execute(ctx, &pb.Request{Query: dgraph.AsString(dgQuery),
 			ReadOnly: true}, mutation.QueryField())
 		queryTimer.Stop()
 
@@ -539,7 +493,7 @@ func (mr *dgraphResolver) rewriteAndExecute(
 //  {"qryFieldAlias":...}
 // and the output will look like:
 //  {"addAuthor":{"qryFieldAlias":...,"numUids":2,"msg":"Deleted"}}
-func completeMutationResult(mutation schema.Mutation, qryResult []byte, numUids int) []byte {
+func completeMutationResult(mutation *schema.Field, qryResult []byte, numUids int) []byte {
 	comma := ""
 	var buf bytes.Buffer
 	x.Check2(buf.WriteRune('{'))
@@ -601,11 +555,11 @@ func completeMutationResult(mutation schema.Mutation, qryResult []byte, numUids 
 // of the new nodes failed the auth rules.
 func authorizeNewNodes(
 	ctx context.Context,
-	m schema.Mutation,
+	m *schema.Field,
 	uids map[string]string,
-	newNodeTypes map[string]schema.Type,
+	newNodeTypes map[string]*schema.Type,
 	queryExecutor DgraphExecutor,
-	txn *dgoapi.TxnContext) error {
+	txn *pb.TxnContext) error {
 
 	customClaims, err := m.GetAuthMeta().ExtractCustomClaims(ctx)
 	if err != nil {
@@ -622,7 +576,7 @@ func authorizeNewNodes(
 	// Collect all the newly created nodes in type groups
 
 	newByType := make(map[string][]uint64)
-	namesToType := make(map[string]schema.Type)
+	namesToType := make(map[string]*schema.Type)
 	for nodeName, nodeTyp := range newNodeTypes {
 		if uidStr, created := uids[nodeName]; created {
 			uid, err := strconv.ParseUint(uidStr, 0, 64)
@@ -714,7 +668,7 @@ func authorizeNewNodes(
 	}
 
 	resp, errs := queryExecutor.Execute(ctx,
-		&dgoapi.Request{
+		&pb.Request{
 			Query:   dgraph.AsString(qs),
 			StartTs: txn.GetStartTs(),
 		}, nil)

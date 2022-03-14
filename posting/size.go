@@ -1,18 +1,5 @@
-/*
- * Copyright 2019 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2019 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package posting
 
@@ -21,7 +8,6 @@ import (
 	"reflect"
 	"unsafe"
 
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/protos/pb"
 )
 
@@ -129,37 +115,5 @@ func calculatePostingSize(posting *pb.Posting) uint64 {
 	// Adding the size of each entry in LangTag array.
 	size += uint64(cap(posting.LangTag))
 
-	for _, f := range posting.Facets {
-		// Add the size of each facet.
-		size += calculateFacet(f)
-	}
-
-	return size
-}
-
-// calculateFacet is used to calculate size of a facet.
-func calculateFacet(facet *api.Facet) uint64 {
-	if facet == nil {
-		return 0
-	}
-
-	var size uint64 = 1*8 + // Key consists of 1 word.
-		3*8 + // Value array consists of 3 words.
-		1*8 + // ValType consists of 1 word.
-		3*8 + // Tokens array consists of 3 words.
-		1*8 + // Alias consists of 1 word.
-		3*8 // rounding to 16 so adding 3
-
-	// Adding size of each entry in Key array.
-	size += uint64(len(facet.Key))
-	// Adding size of each entry in Value array.
-	size += uint64(cap(facet.Value))
-
-	for _, token := range facet.Tokens {
-		// Adding size of each token.
-		size += uint64(len(token))
-	}
-	// Adding size of each entry in Alias Array.
-	size += uint64(len(facet.Alias))
 	return size
 }

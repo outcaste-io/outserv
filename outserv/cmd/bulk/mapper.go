@@ -1,18 +1,5 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package bulk
 
@@ -39,7 +26,6 @@ import (
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/tok"
 	"github.com/outcaste-io/outserv/types"
-	"github.com/outcaste-io/outserv/types/facets"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
 )
@@ -249,13 +235,6 @@ func (m *mapper) run(inputFormat chunker.InputFormat) {
 
 	for nqs := range nquads.Ch() {
 		for _, nq := range nqs {
-			if err := facets.SortAndValidate(nq.Facets); err != nil {
-				atomic.AddInt64(&m.prog.errCount, 1)
-				if !m.opt.IgnoreErrors {
-					x.Check(err)
-				}
-			}
-
 			m.processNQuad(gql.NQuad{NQuad: nq})
 			atomic.AddInt64(&m.prog.nquadCount, 1)
 		}
@@ -288,7 +267,7 @@ func (m *mapper) addMapEntry(key []byte, p *pb.Posting, shard int) {
 	atomic.AddInt64(&m.prog.mapEdgeCount, 1)
 
 	uid := p.Uid
-	if p.PostingType != pb.Posting_REF || len(p.Facets) > 0 {
+	if p.PostingType != pb.Posting_REF {
 		// Keep p
 	} else {
 		// We only needed the UID.
@@ -406,7 +385,6 @@ func (m *mapper) createPostings(nq gql.NQuad,
 			p.Uid = math.MaxUint64
 		}
 	}
-	p.Facets = nq.Facets
 
 	// Early exit for no reverse edge.
 	if sch.GetDirective() != pb.SchemaUpdate_REVERSE {

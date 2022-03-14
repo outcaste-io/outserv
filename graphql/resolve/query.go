@@ -1,18 +1,5 @@
-/*
- * Copyright 2019 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2019 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package resolve
 
@@ -25,10 +12,10 @@ import (
 	"github.com/golang/glog"
 	otrace "go.opencensus.io/trace"
 
-	dgoapi "github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 )
 
@@ -36,20 +23,20 @@ var errNotScalar = errors.New("provided value is not a scalar, can't convert it 
 
 // A QueryResolver can resolve a single query.
 type QueryResolver interface {
-	Resolve(ctx context.Context, query schema.Query) *Resolved
+	Resolve(ctx context.Context, query *schema.Field) *Resolved
 }
 
 // A QueryRewriter can build a Dgraph gql.GraphQuery from a GraphQL query,
 type QueryRewriter interface {
-	Rewrite(ctx context.Context, q schema.Query) ([]*gql.GraphQuery, error)
+	Rewrite(ctx context.Context, q *schema.Field) ([]*gql.GraphQuery, error)
 }
 
 // QueryResolverFunc is an adapter that allows to build a QueryResolver from
 // a function.  Based on the http.HandlerFunc pattern.
-type QueryResolverFunc func(ctx context.Context, query schema.Query) *Resolved
+type QueryResolverFunc func(ctx context.Context, query *schema.Field) *Resolved
 
 // Resolve calls qr(ctx, query)
-func (qr QueryResolverFunc) Resolve(ctx context.Context, query schema.Query) *Resolved {
+func (qr QueryResolverFunc) Resolve(ctx context.Context, query *schema.Field) *Resolved {
 	return qr(ctx, query)
 }
 
@@ -71,10 +58,10 @@ func NewEntitiesQueryResolver(qr QueryRewriter, ex DgraphExecutor) QueryResolver
 type queryResolver struct {
 	queryRewriter   QueryRewriter
 	executor        DgraphExecutor
-	resultCompleter ResultCompleter
+	resultCompleter CompletionFunc
 }
 
-func (qr *queryResolver) Resolve(ctx context.Context, query schema.Query) *Resolved {
+func (qr *queryResolver) Resolve(ctx context.Context, query *schema.Field) *Resolved {
 	span := otrace.FromContext(ctx)
 	stop := x.SpanTimer(span, "resolveQuery")
 	defer stop()
@@ -91,22 +78,12 @@ func (qr *queryResolver) Resolve(ctx context.Context, query schema.Query) *Resol
 
 	resolved := qr.rewriteAndExecute(ctx, query)
 	qr.resultCompleter.Complete(ctx, resolved)
-	resolverTrace.Dgraph = resolved.Extensions.Tracing.Execution.Resolvers[0].Dgraph
-	resolved.Extensions.Tracing.Execution.Resolvers[0] = resolverTrace
 	return resolved
 }
 
-func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query schema.Query) *Resolved {
+func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query *schema.Field) *Resolved {
 	dgraphQueryDuration := &schema.LabeledOffsetDuration{Label: "query"}
-	ext := &schema.Extensions{
-		Tracing: &schema.Trace{
-			Execution: &schema.ExecutionTrace{
-				Resolvers: []*schema.ResolverTrace{
-					{Dgraph: []*schema.LabeledOffsetDuration{dgraphQueryDuration}},
-				},
-			},
-		},
-	}
+	ext := &schema.Extensions{}
 
 	emptyResult := func(err error) *Resolved {
 		return &Resolved{
@@ -127,10 +104,11 @@ func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query schema.Que
 			query.ResponseName()))
 	}
 	qry := dgraph.AsString(dgQuery)
+	glog.V(2).Infof("DQL Query: %s\n", qry)
 
 	queryTimer := newtimer(ctx, &dgraphQueryDuration.OffsetDuration)
 	queryTimer.Start()
-	resp, err := qr.executor.Execute(ctx, &dgoapi.Request{Query: qry, ReadOnly: true}, query)
+	resp, err := qr.executor.Execute(ctx, &pb.Request{Query: qry, ReadOnly: true}, query)
 	queryTimer.Stop()
 
 	if err != nil && !x.IsGqlErrorList(err) {
@@ -158,7 +136,7 @@ type customDQLQueryResolver struct {
 	executor      DgraphExecutor
 }
 
-func (qr *customDQLQueryResolver) Resolve(ctx context.Context, query schema.Query) *Resolved {
+func (qr *customDQLQueryResolver) Resolve(ctx context.Context, query *schema.Field) *Resolved {
 	span := otrace.FromContext(ctx)
 	stop := x.SpanTimer(span, "resolveCustomDQLQuery")
 	defer stop()
@@ -174,23 +152,13 @@ func (qr *customDQLQueryResolver) Resolve(ctx context.Context, query schema.Quer
 	defer timer.Stop()
 
 	resolved := qr.rewriteAndExecute(ctx, query)
-	resolverTrace.Dgraph = resolved.Extensions.Tracing.Execution.Resolvers[0].Dgraph
-	resolved.Extensions.Tracing.Execution.Resolvers[0] = resolverTrace
 	return resolved
 }
 
 func (qr *customDQLQueryResolver) rewriteAndExecute(ctx context.Context,
-	query schema.Query) *Resolved {
+	query *schema.Field) *Resolved {
 	dgraphQueryDuration := &schema.LabeledOffsetDuration{Label: "query"}
-	ext := &schema.Extensions{
-		Tracing: &schema.Trace{
-			Execution: &schema.ExecutionTrace{
-				Resolvers: []*schema.ResolverTrace{
-					{Dgraph: []*schema.LabeledOffsetDuration{dgraphQueryDuration}},
-				},
-			},
-		},
-	}
+	ext := &schema.Extensions{}
 
 	emptyResult := func(err error) *Resolved {
 		resolved := EmptyResult(query, err)
@@ -213,7 +181,7 @@ func (qr *customDQLQueryResolver) rewriteAndExecute(ctx context.Context,
 	queryTimer := newtimer(ctx, &dgraphQueryDuration.OffsetDuration)
 	queryTimer.Start()
 
-	resp, err := qr.executor.Execute(ctx, &dgoapi.Request{Query: qry, Vars: vars,
+	resp, err := qr.executor.Execute(ctx, &pb.Request{Query: qry, Vars: vars,
 		ReadOnly: true}, nil)
 	queryTimer.Stop()
 
@@ -232,7 +200,7 @@ func (qr *customDQLQueryResolver) rewriteAndExecute(ctx context.Context,
 	return resolved
 }
 
-func resolveIntrospection(ctx context.Context, q schema.Query) *Resolved {
+func resolveIntrospection(ctx context.Context, q *schema.Field) *Resolved {
 	data, err := schema.Introspect(q)
 	return &Resolved{
 		Data:  data,
@@ -267,13 +235,13 @@ func convertScalarToString(val interface{}) (string, error) {
 func dqlVars(args map[string]interface{}) (map[string]string, error) {
 	vars := make(map[string]string)
 	for k, v := range args {
-		// dgoapi.Request{}.Vars accepts only string values for variables,
+		// pb.Request{}.Vars accepts only string values for variables,
 		// so need to convert all variable values to string
 		vStr, err := convertScalarToString(v)
 		if err != nil {
 			return vars, schema.GQLWrapf(err, "couldn't convert argument %s to string", k)
 		}
-		// the keys in dgoapi.Request{}.Vars are assumed to be prefixed with $
+		// the keys in pb.Request{}.Vars are assumed to be prefixed with $
 		vars["$"+k] = vStr
 	}
 	return vars, nil

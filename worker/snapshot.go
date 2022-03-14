@@ -1,18 +1,5 @@
-/*
- * Copyright 2016-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2016-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package worker
 
@@ -21,9 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/outcaste-io/ristretto/z"
 	"github.com/dustin/go-humanize"
 	"github.com/golang/glog"
+	"github.com/outcaste-io/ristretto/z"
 	"github.com/pkg/errors"
 	"go.etcd.io/etcd/raft"
 
@@ -111,7 +98,7 @@ func (n *node) populateSnapshot(snap pb.Snapshot, pl *conn.Pool) error {
 		return err
 	}
 
-	if err := deleteStalePreds(ctx, done, snap.ReadTs); err != nil {
+	if err := deleteStalePreds(ctx, done, snap.BaseTs); err != nil {
 		return err
 	}
 	// Reset the cache after having received a snapshot.
@@ -123,7 +110,7 @@ func (n *node) populateSnapshot(snap pb.Snapshot, pl *conn.Pool) error {
 		return err
 	}
 
-	x.VerifySnapshot(pstore, snap.ReadTs)
+	x.VerifySnapshot(pstore, snap.BaseTs)
 	glog.Infof("Populated snapshot with data size: %s\n", humanize.IBytes(uint64(size)))
 	return nil
 }
@@ -202,12 +189,12 @@ func doStreamSnapshot(snap *pb.Snapshot, out pb.Worker_StreamSnapshotServer) err
 	// requests. Therefore, we wait until this node has reached snap.ReadTs, before servicing the
 	// request. Any other node in the group should have the same data as the leader, once it is past
 	// the read timestamp.
-	glog.Infof("Waiting to reach timestamp: %d", snap.ReadTs)
-	if err := posting.Oracle().WaitForTs(out.Context(), snap.ReadTs); err != nil {
+	glog.Infof("Waiting to reach timestamp: %d", snap.BaseTs)
+	if err := posting.Oracle().WaitForTs(out.Context(), snap.BaseTs); err != nil {
 		return err
 	}
 
-	stream := pstore.NewStreamAt(snap.ReadTs)
+	stream := pstore.NewStreamAt(snap.BaseTs)
 	stream.LogPrefix = "Sending Snapshot"
 	// Use the default implementation. We no longer try to generate a rolled up posting list here.
 	// Instead, we just stream out all the versions as they are.

@@ -1,18 +1,5 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package worker
 
@@ -36,10 +23,6 @@ const (
 
 // Options contains options for the Dgraph server.
 type Options struct {
-	// PostingDir is the path to the directory storing the postings..
-	PostingDir string
-	// WALDir is the path to the directory storing the write-ahead log.
-	WALDir string
 	// MutationsMode is the mode used to handle mutation requests.
 	MutationsMode int
 	// AuthToken is the token to be passed for Alter HTTP requests.
@@ -80,26 +63,8 @@ func SetConfiguration(newConfig *Options) {
 var AvailableMemory int64
 
 func (opt *Options) validate() {
-	pd, err := filepath.Abs(opt.PostingDir)
-	x.Check(err)
-	wd, err := filepath.Abs(opt.WALDir)
-	x.Check(err)
-	td, err := filepath.Abs(x.WorkerConfig.TmpDir)
-	x.Check(err)
-	x.AssertTruef(pd != wd,
-		"Posting and WAL directory cannot be the same ('%s').", opt.PostingDir)
-	x.AssertTruef(pd != td,
-		"Posting and Tmp directory cannot be the same ('%s').", opt.PostingDir)
-	x.AssertTruef(wd != td,
-		"WAL and Tmp directory cannot be the same ('%s').", opt.WALDir)
 	if opt.Audit != nil {
-		ad, err := filepath.Abs(opt.Audit.Output)
+		_, err := filepath.Abs(opt.Audit.Output)
 		x.Check(err)
-		x.AssertTruef(ad != pd,
-			"Posting directory and Audit Output cannot be the same ('%s').", opt.Audit.Output)
-		x.AssertTruef(ad != wd,
-			"WAL directory and Audit Output cannot be the same ('%s').", opt.Audit.Output)
-		x.AssertTruef(ad != td,
-			"Tmp directory and Audit Output cannot be the same ('%s').", opt.Audit.Output)
 	}
 }

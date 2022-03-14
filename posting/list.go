@@ -1,18 +1,5 @@
-/*
- * Copyright 2015-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2015-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package posting
 
@@ -27,17 +14,16 @@ import (
 	"github.com/dgryski/go-farm"
 	"github.com/pkg/errors"
 
+	"github.com/golang/protobuf/proto"
 	bpb "github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/outserv/codec"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/types"
-	"github.com/outcaste-io/outserv/types/facets"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
 	"github.com/outcaste-io/sroar"
-	"github.com/golang/protobuf/proto"
 )
 
 var (
@@ -249,7 +235,6 @@ func NewPosting(t *pb.DirectedEdge) *pb.Posting {
 		PostingType: postingType,
 		LangTag:     []byte(t.Lang),
 		Op:          op,
-		Facets:      t.Facets,
 	}
 	return p
 }
@@ -430,10 +415,6 @@ func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.DirectedEdge) uint64 {
 
 func (l *List) addMutationInternal(ctx context.Context, txn *Txn, t *pb.DirectedEdge) error {
 	l.AssertLock()
-
-	if txn.ShouldAbort() {
-		return x.ErrConflict
-	}
 
 	mpost := NewPosting(t)
 	mpost.StartTs = txn.StartTs
@@ -1015,64 +996,6 @@ func (l *List) Rollup(alloc *z.Allocator) ([]*bpb.KV, error) {
 	return kvs, nil
 }
 
-// ToBackupPostingList uses rollup to generate a single list with no splits.
-// It's used during backup so that each backed up posting list is stored in a single key.
-func (l *List) ToBackupPostingList(
-	bl *pb.BackupPostingList, alloc *z.Allocator, buf *z.Buffer) (*bpb.KV, error) {
-
-	bl.Reset()
-	l.RLock()
-	defer l.RUnlock()
-
-	out, err := l.rollup(math.MaxUint64, false)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed when calling List.rollup")
-	}
-	// out is only nil when the list's minTs is greater than readTs but readTs
-	// is math.MaxUint64 so that's not possible. Assert that's true.
-	x.AssertTrue(out != nil)
-
-	if l.forbid {
-		kv := y.NewKV(alloc)
-		kv.Key = alloc.Copy(l.key)
-		kv.Value = nil
-		kv.Version = out.newMinTs
-		kv.UserMeta = alloc.Copy([]byte{BitForbidPosting})
-		return kv, nil
-	}
-
-	ol := out.plist
-	bm := sroar.NewBitmap()
-	if ol.Bitmap != nil {
-		bm = sroar.FromBuffer(ol.Bitmap)
-	}
-
-	buf.Reset()
-	codec.DecodeToBuffer(buf, bm)
-	bl.UidBytes = buf.Bytes()
-
-	bl.Postings = ol.Postings
-	bl.CommitTs = ol.CommitTs
-	bl.Splits = ol.Splits
-
-	val := alloc.Allocate(bl.Size())
-	n, err := bl.MarshalToSizedBuffer(val)
-	if err != nil {
-		return nil, err
-	}
-
-	kv := y.NewKV(alloc)
-	kv.Key = alloc.Copy(l.key)
-	kv.Value = val[:n]
-	kv.Version = out.newMinTs
-	if isPlistEmpty(ol) {
-		kv.UserMeta = alloc.Copy([]byte{BitEmptyPosting})
-	} else {
-		kv.UserMeta = alloc.Copy([]byte{BitCompletePosting})
-	}
-	return kv, nil
-}
-
 func (out *rollupOutput) marshalPostingListPart(alloc *z.Allocator,
 	baseKey []byte, startUid uint64, plist *pb.PostingList) (*bpb.KV, error) {
 	key, err := x.SplitKey(baseKey, startUid)
@@ -1249,7 +1172,7 @@ func (l *List) encode(out *rollupOutput, readTs uint64, split bool) error {
 			plist = out.parts[startUid]
 		}
 
-		if p.Facets != nil || p.PostingType != pb.Posting_REF {
+		if p.PostingType != pb.Posting_REF {
 			plist.Postings = append(plist.Postings, p)
 		}
 		return nil
@@ -1398,22 +1321,6 @@ func (l *List) AllUntaggedValues(readTs uint64) ([]types.Val, error) {
 		return nil
 	})
 	return vals, errors.Wrapf(err, "cannot retrieve untagged values from list with key %s",
-		hex.EncodeToString(l.key))
-}
-
-// allUntaggedFacets returns facets for all untagged values. Since works well only for
-// fetching facets for list predicates as lang tag in not allowed for list predicates.
-func (l *List) allUntaggedFacets(readTs uint64) ([]*pb.Facets, error) {
-	l.AssertRLock()
-	var facets []*pb.Facets
-	err := l.iterate(readTs, 0, func(p *pb.Posting) error {
-		if len(p.LangTag) == 0 {
-			facets = append(facets, &pb.Facets{Facets: p.Facets})
-		}
-		return nil
-	})
-
-	return facets, errors.Wrapf(err, "cannot retrieve untagged facets from list with key %s",
 		hex.EncodeToString(l.key))
 }
 
@@ -1607,35 +1514,6 @@ func (l *List) findPosting(readTs uint64, uid uint64) (found bool, pos *pb.Posti
 		"cannot retrieve posting for UID %d from list with key %s", uid, hex.EncodeToString(l.key))
 }
 
-// Facets gives facets for the posting representing value.
-func (l *List) Facets(readTs uint64, param *pb.FacetParams, langs []string,
-	listType bool) ([]*pb.Facets, error) {
-	l.RLock()
-	defer l.RUnlock()
-
-	var fcs []*pb.Facets
-	if listType {
-		fs, err := l.allUntaggedFacets(readTs)
-		if err != nil {
-			return nil, errors.Wrapf(err, "cannot retrieve facets for predicate of list type")
-		}
-
-		for _, fcts := range fs {
-			fcs = append(fcs, &pb.Facets{Facets: facets.CopyFacets(fcts.Facets, param)})
-		}
-		return fcs, nil
-	}
-	p, err := l.postingFor(readTs, langs)
-	switch {
-	case err == ErrNoValue:
-		return nil, err
-	case err != nil:
-		return nil, errors.Wrapf(err, "cannot retrieve facet")
-	}
-	fcs = append(fcs, &pb.Facets{Facets: facets.CopyFacets(p.Facets, param)})
-	return fcs, nil
-}
-
 // readListPart reads one split of a posting list from Badger.
 func (l *List) readListPart(startUid uint64) (*pb.PostingList, error) {
 	key, err := x.SplitKey(l.key, startUid)
@@ -1728,26 +1606,4 @@ func (l *List) PartSplits() []uint64 {
 	splits := make([]uint64, len(l.plist.Splits))
 	copy(splits, l.plist.Splits)
 	return splits
-}
-
-// FromBackupPostingList converts a posting list in the format used for backups to a
-// normal posting list.
-func FromBackupPostingList(bl *pb.BackupPostingList) *pb.PostingList {
-	l := pb.PostingList{}
-	if bl == nil {
-		return &l
-	}
-
-	var r *sroar.Bitmap
-	if len(bl.Uids) > 0 {
-		r = sroar.NewBitmap()
-		r.SetMany(bl.Uids)
-	} else if len(bl.UidBytes) > 0 {
-		r = codec.FromBackup(bl.UidBytes)
-	}
-	l.Bitmap = r.ToBuffer()
-	l.Postings = bl.Postings
-	l.CommitTs = bl.CommitTs
-	l.Splits = bl.Splits
-	return &l
 }

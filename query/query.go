@@ -1,18 +1,5 @@
-/*
- * Copyright 2015-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2015-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package query
 
@@ -26,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/outcaste-io/sroar"
 	"github.com/golang/glog"
+	"github.com/outcaste-io/sroar"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
 	"google.golang.org/grpc/metadata"
@@ -38,7 +25,6 @@ import (
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/types"
-	"github.com/outcaste-io/outserv/types/facets"
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
 )
@@ -100,11 +86,10 @@ import (
 // the query. It also contains information about the time it took to convert the
 // result into a format(JSON/Protocol Buffer) that the client expects.
 type Latency struct {
-	Start           time.Time     `json:"-"`
-	Parsing         time.Duration `json:"query_parsing"`
-	AssignTimestamp time.Duration `json:"assign_timestamp"`
-	Processing      time.Duration `json:"processing"`
-	Json            time.Duration `json:"json_conversion"`
+	Start      time.Time     `json:"-"`
+	Parsing    time.Duration `json:"query_parsing"`
+	Processing time.Duration `json:"processing"`
+	Json       time.Duration `json:"json_conversion"`
 }
 
 // params contains the list of parameters required to execute a SubGraph.
@@ -128,18 +113,9 @@ type params struct {
 	// Langs is the list of languages and their preferred order for looking up a predicate value.
 	Langs []string
 
-	// Facet tells us about the requested facets and their aliases.
-	Facet *pb.FacetParams
-	// FacetsOrder keeps ordering for facets. Each entry stores name of the facet key and
-	// OrderDesc(will be true if results should be ordered by desc order of key) information for it.
-	FacetsOrder []*gql.FacetOrder
-
 	// Var is the name of the variable defined in this SubGraph
 	// (e.g. in "x as name", this would be x).
 	Var string
-	// FacetVar is a map of predicate to the facet variable alias
-	// for e.g. @facets(L1 as weight) the map would be { "weight": "L1" }
-	FacetVar map[string]string
 	// NeedsVar is the list of variables required by this SubGraph along with their type.
 	NeedsVar []gql.VarContext
 
@@ -276,13 +252,10 @@ type SubGraph struct {
 	// In graph terms, a list is a slice of outgoing edges from a node.
 	uidMatrix []*pb.List
 
-	// facetsMatrix contains the facet values. There would a list corresponding to each uid in
-	// uidMatrix.
 	// TODO: Would make sense to move these to a map.
-	facetsMatrix []*pb.FacetsList
-	ExpandPreds  []*pb.ValueList
-	GroupbyRes   []*groupResults // one result for each uid list.
-	LangTags     []*pb.LangList
+	ExpandPreds []*pb.ValueList
+	GroupbyRes  []*groupResults // one result for each uid list.
+	LangTags    []*pb.LangList
 
 	// SrcUIDs is a list of unique source UIDs. They are always copies of destUIDs
 	// of parent nodes in GraphQL structure.
@@ -563,9 +536,6 @@ func treeCopy(gq *gql.GraphQuery, sg *SubGraph) error {
 		args := params{
 			Alias:        gchild.Alias,
 			Expand:       gchild.Expand,
-			Facet:        gchild.Facets,
-			FacetsOrder:  gchild.FacetsOrder,
-			FacetVar:     gchild.FacetVar,
 			GetUid:       sg.Params.GetUid,
 			IgnoreReflex: sg.Params.IgnoreReflex,
 			Langs:        gchild.Langs,
@@ -608,10 +578,6 @@ func treeCopy(gq *gql.GraphQuery, sg *SubGraph) error {
 		}
 		if err := args.fill(gchild); err != nil {
 			return err
-		}
-
-		if len(args.Order) != 0 && len(args.FacetsOrder) != 0 {
-			return errors.Errorf("Cannot specify order at both args and facets")
 		}
 
 		dst := &SubGraph{
@@ -957,19 +923,17 @@ func createTaskQuery(ctx context.Context, sg *SubGraph) (*pb.Query, error) {
 	first, offset := calculatePaginationParams(sg)
 
 	out := &pb.Query{
-		ReadTs:       sg.ReadTs,
-		Cache:        int32(sg.Cache),
-		Attr:         x.NamespaceAttr(namespace, attr),
-		Langs:        sg.Params.Langs,
-		Reverse:      reverse,
-		SrcFunc:      srcFunc,
-		AfterUid:     sg.Params.AfterUID,
-		DoCount:      len(sg.Filters) == 0 && sg.Params.DoCount,
-		FacetParam:   sg.Params.Facet,
-		FacetsFilter: sg.facetsFilter,
-		ExpandAll:    sg.Params.ExpandAll,
-		First:        first,
-		Offset:       offset,
+		ReadTs:    sg.ReadTs,
+		Cache:     int32(sg.Cache),
+		Attr:      x.NamespaceAttr(namespace, attr),
+		Langs:     sg.Params.Langs,
+		Reverse:   reverse,
+		SrcFunc:   srcFunc,
+		AfterUid:  sg.Params.AfterUID,
+		DoCount:   len(sg.Filters) == 0 && sg.Params.DoCount,
+		ExpandAll: sg.Params.ExpandAll,
+		First:     first,
+		Offset:    offset,
 	}
 
 	// Use the orderedUIDs if present, it will only be present for the shortest path case.
@@ -1073,11 +1037,6 @@ func evalLevelAgg(
 	for _, ch := range parent.Children {
 		if sg == ch {
 			continue
-		}
-		for _, v := range ch.Params.FacetVar {
-			if v == needsVar {
-				relSG = ch
-			}
 		}
 		for _, cch := range ch.Children {
 			// Find the sibling node whose child has the required variable.
@@ -1325,32 +1284,6 @@ func (sg *SubGraph) populatePostAggregation(doneVars map[string]varValue, path [
 	return sg.valueVarAggregation(doneVars, path, parent)
 }
 
-// Filters might have updated the destuids. facetMatrix should also be updated to exclude uids that
-// were removed..
-func (sg *SubGraph) updateFacetMatrix() {
-	if len(sg.facetsMatrix) != len(sg.uidMatrix) {
-		return
-	}
-
-	for lidx, l := range sg.uidMatrix {
-		// For scalar predicates, uid list would be empty, we don't need to update facetsMatrix.
-		// If its an uid predicate and uid list is empty then also we don't need to update
-		// facetsMatrix, as results won't be returned to client in outputnode.go.
-		uids := codec.GetUids(l)
-		if len(uids) == 0 {
-			continue
-		}
-		out := sg.facetsMatrix[lidx].FacetsList[:0]
-		for idx, uid := range uids {
-			// If uid wasn't filtered then we keep the facet for it.
-			if sg.DestMap.Contains(uid) {
-				out = append(out, sg.facetsMatrix[lidx].FacetsList[idx])
-			}
-		}
-		sg.facetsMatrix[lidx].FacetsList = out
-	}
-}
-
 // updateUidMatrix is used to filter out the uids in uidMatrix which are not part of DestUIDs
 // anymore. Some uids might have been removed from DestUids after application of filters,
 // we remove them from the uidMatrix as well.
@@ -1358,9 +1291,8 @@ func (sg *SubGraph) updateFacetMatrix() {
 // uidMatrix since they are both sorted. Otherwise we must filter out the uids within the
 // lists in uidMatrix which are not in DestUIDs.
 func (sg *SubGraph) updateUidMatrix() {
-	sg.updateFacetMatrix()
 	for _, l := range sg.uidMatrix {
-		if len(sg.Params.Order) > 0 || len(sg.Params.FacetsOrder) > 0 {
+		if len(sg.Params.Order) > 0 {
 			// We can't do intersection directly as the list is not sorted by UIDs.
 			// So do filter.
 			algo.ApplyFilter(l, func(uid uint64, idx int) bool {
@@ -1478,7 +1410,7 @@ func (sg *SubGraph) populateVarMap(doneVars map[string]varValue, sgPath []*SubGr
 func (sg *SubGraph) updateVars(doneVars map[string]varValue, sgPath []*SubGraph) error {
 	// NOTE: although we initialize doneVars (req.Vars) in ProcessQuery, this nil check is for
 	// non-root lookups that happen to other nodes. Don't use len(doneVars) == 0 !
-	if doneVars == nil || (sg.Params.Var == "" && sg.Params.FacetVar == nil) {
+	if doneVars == nil || sg.Params.Var == "" {
 		return nil
 	}
 
@@ -1486,7 +1418,7 @@ func (sg *SubGraph) updateVars(doneVars map[string]varValue, sgPath []*SubGraph)
 	if err := sg.populateUidValVar(doneVars, sgPathCopy); err != nil {
 		return err
 	}
-	return sg.populateFacetVars(doneVars, sgPathCopy)
+	return nil
 }
 
 // populateUidValVar populates the value of the variable into doneVars.
@@ -1613,76 +1545,6 @@ func (sg *SubGraph) populateUidValVar(doneVars map[string]varValue, sgPath []*Su
 			Vals:        make(map[uint64]types.Val),
 			strList:     sg.valueMatrix,
 			UidMap:      sroar.NewBitmap(),
-		}
-	}
-	return nil
-}
-
-// populateFacetVars walks the facetsMatrix to compute the value of a facet variable.
-// It sums up the value for float/int type facets so that there is only variable corresponding
-// to each uid in the uidMatrix.
-func (sg *SubGraph) populateFacetVars(doneVars map[string]varValue, sgPath []*SubGraph) error {
-	if len(sg.Params.FacetVar) == 0 || sg.Params.Facet == nil {
-		return nil
-	}
-
-	sgPath = append(sgPath, sg)
-	for _, it := range sg.Params.Facet.Param {
-		fvar, ok := sg.Params.FacetVar[it.Key]
-		if !ok {
-			continue
-		}
-		// Assign an empty value for every facet that was assigned to a variable and hence is part
-		// of FacetVar.
-		doneVars[fvar] = varValue{
-			Vals: make(map[uint64]types.Val),
-			path: sgPath,
-		}
-	}
-
-	if len(sg.facetsMatrix) == 0 {
-		return nil
-	}
-
-	// Note: We ignore the facets if its a value edge as we can't
-	// attach the value to any node.
-	for i, uids := range sg.uidMatrix {
-		for j, uid := range codec.GetUids(uids) {
-			facet := sg.facetsMatrix[i].FacetsList[j]
-			for _, f := range facet.Facets {
-				fvar, ok := sg.Params.FacetVar[f.Key]
-				if !ok {
-					continue
-				}
-				if pVal, ok := doneVars[fvar].Vals[uid]; !ok {
-					fVal, err := facets.ValFor(f)
-					if err != nil {
-						return err
-					}
-
-					doneVars[fvar].Vals[uid] = fVal
-				} else {
-					// If the value is int/float we add them up. Else we throw an error as
-					// many to one maps are not allowed for other types.
-					nVal, err := facets.ValFor(f)
-					if err != nil {
-						return err
-					}
-
-					if nVal.Tid != types.IntID && nVal.Tid != types.FloatID {
-						return errors.Errorf("Repeated id with non int/float value for " +
-							"facet var encountered.")
-					}
-					ag := aggregator{name: "sum"}
-					ag.Apply(pVal)
-					ag.Apply(nVal)
-					fVal, err := ag.Value()
-					if err != nil {
-						continue
-					}
-					doneVars[fvar].Vals[uid] = fVal
-				}
-			}
 		}
 	}
 	return nil
@@ -2006,7 +1868,7 @@ func expandSubgraph(ctx context.Context, sg *SubGraph) ([]*SubGraph, error) {
 			preds = getPredicatesFromTypes(namespace, typeNames)
 			// We check if enterprise is enabled and only
 			// restrict preds to allowed preds if ACL is turned on.
-			if worker.EnterpriseEnabled() && sg.Params.AllowedPreds != nil {
+			if sg.Params.AllowedPreds != nil {
 				// Take intersection of both the predicate lists
 				intersectPreds := make([]string, 0)
 				hashMap := make(map[string]bool)
@@ -2062,7 +1924,6 @@ func expandSubgraph(ctx context.Context, sg *SubGraph) ([]*SubGraph, error) {
 			}
 			temp.Params.IsInternal = false
 			temp.Params.Expand = ""
-			temp.Params.Facet = &pb.FacetParams{AllKeys: true}
 			for _, cf := range child.Filters {
 				s := &SubGraph{}
 				recursiveCopy(s, cf)
@@ -2205,7 +2066,6 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 
 			sg.uidMatrix = result.UidMatrix
 			sg.valueMatrix = result.ValueMatrix
-			sg.facetsMatrix = result.FacetMatrix
 			sg.counts = result.Counts
 			sg.LangTags = result.LangMatrix
 			sg.List = result.List
@@ -2314,7 +2174,7 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 		}
 	}
 
-	if len(sg.Params.Order) == 0 && len(sg.Params.FacetsOrder) == 0 {
+	if len(sg.Params.Order) == 0 {
 		// for `has` function when there is no filtering and ordering, we fetch
 		// correct paginated results so no need to apply pagination here.
 		if !(len(sg.Filters) == 0 && sg.SrcFunc != nil && sg.SrcFunc.Name == "has") {
@@ -2502,16 +2362,11 @@ func (sg *SubGraph) applyPagination(ctx context.Context) error {
 // applyOrderAndPagination orders each posting list by a given attribute
 // before applying pagination.
 func (sg *SubGraph) applyOrderAndPagination(ctx context.Context) error {
-	if len(sg.Params.Order) == 0 && len(sg.Params.FacetsOrder) == 0 {
+	if len(sg.Params.Order) == 0 {
 		return nil
 	}
 
 	sg.updateUidMatrix()
-
-	// See if we need to apply order based on facet.
-	if len(sg.Params.FacetsOrder) != 0 {
-		return sg.sortAndPaginateUsingFacet(ctx)
-	}
 
 	for _, it := range sg.Params.NeedsVar {
 		// TODO(pawan) - Return error if user uses var order with predicates.
@@ -2553,21 +2408,6 @@ func (sg *SubGraph) applyOrderAndPagination(ctx context.Context) error {
 	}
 
 	x.AssertTrue(len(result.UidMatrix) == len(sg.uidMatrix))
-	if sg.facetsMatrix != nil {
-		// The order of uids in the lists which are part of the uidMatrix would have been changed
-		// after sort. We want to update the order of lists in the facetMatrix accordingly.
-		for idx, rl := range result.UidMatrix {
-			fl := make([]*pb.Facets, 0, len(sg.facetsMatrix[idx].FacetsList))
-			for _, uid := range codec.GetUids(rl) {
-				// Find index of this uid in original sorted uid list.
-				oidx := algo.IndexOf(sg.uidMatrix[idx], uid)
-				// Find corresponding facet.
-				fl = append(fl, sg.facetsMatrix[idx].FacetsList[oidx])
-			}
-			sg.facetsMatrix[idx].FacetsList = fl
-		}
-	}
-
 	sg.uidMatrix = result.UidMatrix
 	// Update the destUids as we might have removed some UIDs for which we didn't find any values
 	// while sorting.
@@ -2595,92 +2435,6 @@ func (sg *SubGraph) updateDestUids() {
 	// current destUID and mark it. Then we scan over this bool array and
 	// rebuild destUIDs.
 	sg.DestMap = codec.Merge(sg.uidMatrix)
-}
-
-func (sg *SubGraph) sortAndPaginateUsingFacet(ctx context.Context) error {
-	if len(sg.facetsMatrix) == 0 {
-		return nil
-	}
-	if len(sg.facetsMatrix) != len(sg.uidMatrix) {
-		return errors.Errorf("Facet matrix and UID matrix mismatch: %d vs %d",
-			len(sg.facetsMatrix), len(sg.uidMatrix))
-	}
-
-	orderbyKeys := make(map[string]int)
-	var orderDesc []bool
-	for i, order := range sg.Params.FacetsOrder {
-		orderbyKeys[order.Key] = i
-		orderDesc = append(orderDesc, order.Desc)
-	}
-
-	for i := 0; i < len(sg.uidMatrix); i++ {
-		ul := sg.uidMatrix[i]
-		fl := sg.facetsMatrix[i]
-		uids := ul.SortedUids[:0]
-		facetList := fl.FacetsList[:0]
-
-		values := make([][]types.Val, len(ul.SortedUids))
-		for i := 0; i < len(values); i++ {
-			values[i] = make([]types.Val, len(sg.Params.FacetsOrder))
-		}
-
-		for j := 0; j < len(ul.SortedUids); j++ {
-			uid := ul.SortedUids[j]
-			f := fl.FacetsList[j]
-			uids = append(uids, uid)
-			facetList = append(facetList, f)
-
-			// Since any facet can come only once in f.Facets, we can have counter to check if we
-			// have populated all facets or not. Once we are done populating all facets
-			// we can break out of below loop.
-			remainingFacets := len(orderbyKeys)
-			// TODO: We are searching sequentially, explore if binary search is useful here.
-			for _, it := range f.Facets {
-				idx, ok := orderbyKeys[it.Key]
-				if !ok {
-					continue
-				}
-
-				fVal, err := facets.ValFor(it)
-				if err != nil {
-					return err
-				}
-				// If type is not sortable, we are ignoring it.
-				if types.IsSortable(fVal.Tid) {
-					values[j][idx] = fVal
-				}
-
-				remainingFacets--
-				if remainingFacets == 0 {
-					break
-				}
-			}
-		}
-		if len(values) == 0 {
-			continue
-		}
-
-		if err := types.SortWithFacet(values, &uids, facetList, orderDesc, ""); err != nil {
-			return err
-		}
-		sg.uidMatrix[i].SortedUids = uids
-		// We need to update the facetmarix corresponding to changes to uidmatrix.
-		sg.facetsMatrix[i].FacetsList = facetList
-	}
-
-	if sg.Params.Count != 0 || sg.Params.Offset != 0 {
-		// Apply the pagination.
-		for i := 0; i < len(sg.uidMatrix); i++ {
-			start, end := x.PageRange(sg.Params.Count, sg.Params.Offset, len(sg.uidMatrix[i].SortedUids))
-			sg.uidMatrix[i].SortedUids = sg.uidMatrix[i].SortedUids[start:end]
-			// We also have to paginate the facetsMatrix for safety.
-			sg.facetsMatrix[i].FacetsList = sg.facetsMatrix[i].FacetsList[start:end]
-		}
-	}
-
-	// Update the destUids as we might have removed some UIDs.
-	sg.updateDestUids()
-	return nil
 }
 
 func (sg *SubGraph) sortAndPaginateUsingVar(ctx context.Context) error {

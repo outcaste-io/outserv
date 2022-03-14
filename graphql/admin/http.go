@@ -1,18 +1,5 @@
-/*
- * Copyright 2019 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2019 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package admin
 
@@ -20,7 +7,6 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"github.com/outcaste-io/outserv/ee/audit"
 	"io"
 	"io/ioutil"
 	"mime"
@@ -29,14 +15,15 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/dgraph-io/graphql-transport-ws/graphqlws"
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/edgraph"
+	"github.com/outcaste-io/outserv/ee/audit"
 	"github.com/outcaste-io/outserv/graphql/api"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/graphql/subscription"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/dgraph-io/graphql-transport-ws/graphqlws"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
 )
@@ -47,19 +34,7 @@ const (
 	touchedUidsHeader = "Graphql-TouchedUids"
 )
 
-// An IServeGraphQL can serve a GraphQL endpoint (currently only ons http)
-type IServeGraphQL interface {
-	// After Set is called, this IServeGraphQL serves the new resolvers for the given namespace ns.
-	Set(ns uint64, schemaEpoch *uint64, resolver *resolve.RequestResolver)
-
-	// HTTPHandler returns a http.Handler that serves GraphQL.
-	HTTPHandler() http.Handler
-
-	// ResolveWithNs processes a GQL Request using the correct resolver and returns a GQL Response
-	ResolveWithNs(ctx context.Context, ns uint64, gqlReq *schema.Request) *schema.Response
-}
-
-type graphqlHandler struct {
+type GqlHandler struct {
 	resolver    map[uint64]*resolve.RequestResolver
 	handler     http.Handler
 	poller      map[uint64]*subscription.Poller
@@ -68,8 +43,8 @@ type graphqlHandler struct {
 }
 
 // NewServer returns a new IServeGraphQL that can serve the given resolvers
-func NewServer() IServeGraphQL {
-	gh := &graphqlHandler{
+func NewServer() *GqlHandler {
+	gh := &GqlHandler{
 		resolver: make(map[uint64]*resolve.RequestResolver),
 		poller:   make(map[uint64]*subscription.Poller),
 	}
@@ -77,7 +52,8 @@ func NewServer() IServeGraphQL {
 	return gh
 }
 
-func (gh *graphqlHandler) Set(ns uint64, schemaEpoch *uint64, resolver *resolve.RequestResolver) {
+// After Set is called, this serves the new resolvers for the given namespace ns.
+func (gh *GqlHandler) Set(ns uint64, schemaEpoch *uint64, resolver *resolve.RequestResolver) {
 	gh.resolverMux.Lock()
 	gh.resolver[ns] = resolver
 	gh.resolverMux.Unlock()
@@ -87,11 +63,13 @@ func (gh *graphqlHandler) Set(ns uint64, schemaEpoch *uint64, resolver *resolve.
 	gh.pollerMux.Unlock()
 }
 
-func (gh *graphqlHandler) HTTPHandler() http.Handler {
+// HTTPHandler returns a http.Handler that serves GraphQL.
+func (gh *GqlHandler) HTTPHandler() http.Handler {
 	return gh.handler
 }
 
-func (gh *graphqlHandler) ResolveWithNs(ctx context.Context, ns uint64,
+// ResolveWithNs processes a GQL Request using the correct resolver and returns a GQL Response
+func (gh *GqlHandler) ResolveWithNs(ctx context.Context, ns uint64,
 	gqlReq *schema.Request) *schema.Response {
 	gh.resolverMux.RLock()
 	resolver := gh.resolver[ns]
@@ -131,7 +109,7 @@ func WriteErrorResponse(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 type graphqlSubscription struct {
-	graphqlHandler *graphqlHandler
+	graphqlHandler *GqlHandler
 }
 
 func (gs *graphqlSubscription) isValid(namespace uint64) error {
@@ -226,7 +204,7 @@ func (gs *graphqlSubscription) Subscribe(
 	return res.UpdateCh, ctx.Err()
 }
 
-func (gh *graphqlHandler) Handler() http.Handler {
+func (gh *GqlHandler) Handler() http.Handler {
 	return graphqlws.NewHandlerFunc(&graphqlSubscription{
 		graphqlHandler: gh,
 	}, gh)
@@ -235,12 +213,11 @@ func (gh *graphqlHandler) Handler() http.Handler {
 // ServeHTTP handles GraphQL queries and mutations that get resolved
 // via GraphQL->Dgraph->GraphQL.  It writes a valid GraphQL JSON response
 // to w.
-func (gh *graphqlHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (gh *GqlHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, span := trace.StartSpan(r.Context(), "handler")
 	defer span.End()
 
 	ns, _ := strconv.ParseUint(r.Header.Get("resolver"), 10, 64)
-	glog.Infof("namespace: %d. Got GraphQL request over HTTP.", ns)
 	if err := gh.isValid(ns); err != nil {
 		glog.Errorf("namespace: %d. graphqlHandler not initialised: %s", ns, err)
 		WriteErrorResponse(w, r, errors.New(resolve.ErrInternal))
@@ -280,7 +257,7 @@ func (gh *graphqlHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	write(w, res, strings.Contains(r.Header.Get("Accept-Encoding"), "gzip"))
 }
 
-func (gh *graphqlHandler) isValid(namespace uint64) error {
+func (gh *GqlHandler) isValid(namespace uint64) error {
 	gh.resolverMux.RLock()
 	defer gh.resolverMux.RUnlock()
 	switch {

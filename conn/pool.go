@@ -1,18 +1,5 @@
-/*
- * Copyright 2016-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2016-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package conn
 
@@ -24,7 +11,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
@@ -101,23 +87,23 @@ func (p *Pools) GetAll() []*Pool {
 	return pool
 }
 
+func (p *Pools) Close() {
+	for _, pool := range p.GetAll() {
+		pool.shutdown()
+	}
+}
+
 // RemoveInvalid removes invalid nodes from the list of pools.
 func (p *Pools) RemoveInvalid(state *pb.MembershipState) {
 	// Keeps track of valid IP addresses, assigned to active nodes. We do this
 	// to avoid removing valid IP addresses from the Removed list.
 	validAddr := make(map[string]struct{})
-	for _, group := range state.Groups {
-		for _, member := range group.Members {
-			validAddr[member.Addr] = struct{}{}
-		}
-	}
-	for _, member := range state.Zeros {
+	for _, member := range state.Members {
 		validAddr[member.Addr] = struct{}{}
 	}
-	for _, member := range state.Removed {
-		// Some nodes could have the same IP address. So, check before disconnecting.
-		if _, valid := validAddr[member.Addr]; !valid {
-			p.remove(member.Addr)
+	for _, pool := range p.GetAll() {
+		if _, has := validAddr[pool.Addr]; !has {
+			p.remove(pool.Addr)
 		}
 	}
 }
@@ -229,7 +215,7 @@ func (p *Pool) listenToHeartbeat() error {
 	ctx, cancel := context.WithCancel(p.closer.Ctx())
 	defer cancel()
 
-	s, err := c.Heartbeat(ctx, &api.Payload{})
+	s, err := c.Heartbeat(ctx, &pb.Payload{})
 	if err != nil {
 		return err
 	}
@@ -298,7 +284,7 @@ func (p *Pool) MonitorHealth() {
 			if err == nil {
 				// Make a dummy request to test out the connection.
 				client := pb.NewRaftClient(conn)
-				_, err = client.IsPeer(ctx, &pb.RaftContext{})
+				_, err = client.IsPeer(ctx, &pb.RaftContext{WhoIs: "alpha"})
 			}
 			cancel()
 			if err == nil {

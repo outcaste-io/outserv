@@ -1,18 +1,5 @@
-/*
- * Copyright 2020 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package query
 
@@ -61,7 +48,7 @@ type customFieldResult struct {
 	// parents are all the parents which have the same resolved value for the custom childField
 	parents []fastJsonNode
 	// childField is the custom field which has been resolved
-	childField gqlSchema.Field
+	childField *gqlSchema.Field
 	// childVal is the result of resolving the custom childField from remote HTTP endpoint.
 	// A child node is attached to all the parents with this value.
 	childVal []byte
@@ -69,11 +56,11 @@ type customFieldResult struct {
 
 // encodeInput represents the input required for the encode call.
 type encodeInput struct {
-	parentField gqlSchema.Field   // parentField is the parent of all the fields in childSelSet
-	parentPath  []interface{}     // parentPath is the path for parent field in JSON response
-	fj          fastJsonNode      // fj is the fastJson node corresponding to parentField
-	fjIsRoot    bool              // fjIsRoot tells whether fj is the root fastJson node or not
-	childSelSet []gqlSchema.Field // childSelSet contains all the fields in the selection set of
+	parentField *gqlSchema.Field   // parentField is the parent of all the fields in childSelSet
+	parentPath  []interface{}      // parentPath is the path for parent field in JSON response
+	fj          fastJsonNode       // fj is the fastJson node corresponding to parentField
+	fjIsRoot    bool               // fjIsRoot tells whether fj is the root fastJson node or not
+	childSelSet []*gqlSchema.Field // childSelSet contains all the fields in the selection set of
 	// parentField. Data corresponding to childSelSet will be present in fj's children.
 }
 
@@ -178,9 +165,9 @@ func (genc *graphQLEncoder) encode(encInp encodeInput) bool {
 	seenField := make(map[string]bool) // seenField map keeps track of fields which have been seen
 	// as part of interface to avoid double entry in the resulting response
 
-	var curSelection gqlSchema.Field // used to store the current selection in the childSelSet
-	var curSelectionIsDgList bool    // indicates whether the curSelection is list stored in Dgraph
-	var cur, next fastJsonNode       // used to iterate over data in fastJson nodes
+	var curSelection *gqlSchema.Field // used to store the current selection in the childSelSet
+	var curSelectionIsDgList bool     // indicates whether the curSelection is list stored in Dgraph
+	var cur, next fastJsonNode        // used to iterate over data in fastJson nodes
 
 	// We need to keep iterating only if:
 	// 1. There is data to be processed for the current level. AND,
@@ -541,7 +528,7 @@ func (genc *graphQLEncoder) extractDgraphTypes(child fastJsonNode) (fastJsonNode
 // The keys in the returned map correspond to the name of a required field.
 // Values in the map correspond to the extracted data for a required field.
 func (genc *graphQLEncoder) extractRequiredFieldsData(parentNode fastJsonNode,
-	rfDefs map[string]gqlSchema.FieldDefinition) (map[string]interface{}, []string) {
+	rfDefs map[string]*gqlSchema.FieldDefinition) (map[string]interface{}, []string) {
 	child := genc.children(parentNode)
 	// first, just skip all the custom nodes
 	for ; child != nil && genc.getCustom(child); child = child.next {
@@ -588,7 +575,7 @@ func (genc *graphQLEncoder) extractRequiredFieldsData(parentNode fastJsonNode,
 // If the current field had @custom(http: {...}), then we need to find the fastJson node which
 // stores data for this field from the customNodes mapping, and use that to write the value
 // for this field.
-func (genc *graphQLEncoder) writeCustomField(curSelection gqlSchema.Field,
+func (genc *graphQLEncoder) writeCustomField(curSelection *gqlSchema.Field,
 	customNodes map[uint16]fastJsonNode, parentPath []interface{}) bool {
 	if cNode := customNodes[genc.idForAttr(curSelection.DgraphAlias())]; cNode != nil {
 		// if we found the custom fastJson node, then directly write the value stored
@@ -609,14 +596,14 @@ func (genc *graphQLEncoder) writeCustomField(curSelection gqlSchema.Field,
 	return false
 }
 
-func (genc *graphQLEncoder) initChildAttrId(field gqlSchema.Field) {
+func (genc *graphQLEncoder) initChildAttrId(field *gqlSchema.Field) {
 	for _, f := range field.SelectionSet() {
 		_ = genc.idForAttr(f.DgraphAlias())
 		genc.initChildAttrId(f)
 	}
 }
 
-func (genc *graphQLEncoder) processCustomFields(field gqlSchema.Field, n fastJsonNode) {
+func (genc *graphQLEncoder) processCustomFields(field *gqlSchema.Field, n fastJsonNode) {
 	if field.HasCustomHTTPChild() {
 		// initially, create attr ids for all the descendents of this field,
 		// so that they don't result in race-conditions later
@@ -672,9 +659,9 @@ func (genc *graphQLEncoder) processCustomFields(field gqlSchema.Field, n fastJso
 			wg.Done()
 		}()
 		// extract the representations for Apollo _entities query and store them in GraphQL encoder
-		if q, ok := field.(gqlSchema.Query); ok && q.QueryType() == gqlSchema.EntitiesQuery {
+		if field.QueryType() == gqlSchema.EntitiesQuery {
 			// ignore the error here, as that should have been taken care of during query rewriting
-			genc.entityRepresentations, _ = q.RepresentationsArg()
+			genc.entityRepresentations, _ = field.RepresentationsArg()
 		}
 		// start resolving the custom fields
 		genc.resolveCustomFields(field.SelectionSet(), []fastJsonNode{genc.children(n)})
@@ -710,7 +697,7 @@ func (genc *graphQLEncoder) processCustomFields(field gqlSchema.Field, n fastJso
 //
 // For fields without custom directive we recursively call resolveCustomFields and let it do the
 // work.
-func (genc *graphQLEncoder) resolveCustomFields(childFields []gqlSchema.Field,
+func (genc *graphQLEncoder) resolveCustomFields(childFields []*gqlSchema.Field,
 	parentNodeHeads []fastJsonNode) {
 	wg := &sync.WaitGroup{}
 	for _, childField := range childFields {
@@ -741,7 +728,7 @@ func (genc *graphQLEncoder) resolveCustomFields(childFields []gqlSchema.Field,
 //  - benchmark concurrency for the worker goroutines: channels vs mutexes?
 //    https://medium.com/@_orcaman/when-too-much-concurrency-slows-you-down-golang-9c144ca305a
 //  - worry about path in errors and how to deal with them, specially during completion step
-func (genc *graphQLEncoder) resolveCustomField(childField gqlSchema.Field,
+func (genc *graphQLEncoder) resolveCustomField(childField *gqlSchema.Field,
 	parentNodeHeads []fastJsonNode, wg *sync.WaitGroup) {
 	defer wg.Done() // signal when this goroutine finishes execution
 
@@ -1021,7 +1008,7 @@ func (genc *graphQLEncoder) resolveCustomField(childField gqlSchema.Field,
 // }
 // In the example above, resolveNestedFields would be called on classes field and parentNodeHeads
 // would be the list of head pointers for all the user fastJson nodes.
-func (genc *graphQLEncoder) resolveNestedFields(childField gqlSchema.Field,
+func (genc *graphQLEncoder) resolveNestedFields(childField *gqlSchema.Field,
 	parentNodeHeads []fastJsonNode, wg *sync.WaitGroup) {
 	defer wg.Done() // signal when this goroutine finishes execution
 
@@ -1089,7 +1076,7 @@ func (genc *graphQLEncoder) resolveNestedFields(childField gqlSchema.Field,
 // 		}
 // which doesn't request any aggregate properties. In this case the fastJson node won't have any
 // children and we just need to write null as the value of the query.
-func (genc *graphQLEncoder) completeRootAggregateQuery(fj fastJsonNode, query gqlSchema.Field,
+func (genc *graphQLEncoder) completeRootAggregateQuery(fj fastJsonNode, query *gqlSchema.Field,
 	qryPath []interface{}) fastJsonNode {
 	if genc.children(fj) == nil {
 		x.Check2(genc.buf.Write(gqlSchema.JsonNull))
@@ -1154,7 +1141,7 @@ func (genc *graphQLEncoder) completeRootAggregateQuery(fj fastJsonNode, query gq
 // 		  }
 // 		}
 func (genc *graphQLEncoder) completeAggregateChildren(fj fastJsonNode,
-	field gqlSchema.Field, fieldPath []interface{}, respIsNull bool) fastJsonNode {
+	field *gqlSchema.Field, fieldPath []interface{}, respIsNull bool) fastJsonNode {
 	if !respIsNull {
 		// first we need to skip all the nodes returned with the attr of field as they are not
 		// needed in GraphQL.
@@ -1208,7 +1195,7 @@ func (genc *graphQLEncoder) completeAggregateChildren(fj fastJsonNode,
 
 // completeGeoObject builds a json GraphQL result object for the underlying geo type.
 // Currently, it supports Point, Polygon and MultiPolygon.
-func completeGeoObject(path []interface{}, field gqlSchema.Field, val map[string]interface{},
+func completeGeoObject(path []interface{}, field *gqlSchema.Field, val map[string]interface{},
 	buf *bytes.Buffer) *x.GqlError {
 	coordinate, _ := val[gqlSchema.Coordinates].([]interface{})
 	if coordinate == nil {
@@ -1232,7 +1219,7 @@ func completeGeoObject(path []interface{}, field gqlSchema.Field, val map[string
 
 // completePoint takes in coordinates from dgraph response like [12.32, 123.32], and builds
 // a JSON GraphQL result object for Point like { "longitude" : 12.32 , "latitude" : 123.32 }.
-func completePoint(field gqlSchema.Field, coordinate []interface{}, buf *bytes.Buffer) {
+func completePoint(field *gqlSchema.Field, coordinate []interface{}, buf *bytes.Buffer) {
 	comma := ""
 
 	x.Check2(buf.WriteRune('{'))
@@ -1260,7 +1247,7 @@ func completePoint(field gqlSchema.Field, coordinate []interface{}, buf *bytes.B
 // completePolygon converts the Dgraph result to GraphQL Polygon type.
 // Dgraph output: coordinate: [[[22.22,11.11],[16.16,15.15],[21.21,20.2]],[[22.28,11.18],[16.18,15.18],[21.28,20.28]]]
 // Graphql output: { coordinates: [ { points: [{ latitude: 11.11, longitude: 22.22}, { latitude: 15.15, longitude: 16.16} , { latitude: 20.20, longitude: 21.21} ]}, { points: [{ latitude: 11.18, longitude: 22.28}, { latitude: 15.18, longitude: 16.18} , { latitude: 20.28, longitude: 21.28}]} ] }
-func completePolygon(field gqlSchema.Field, polygon []interface{}, buf *bytes.Buffer) {
+func completePolygon(field *gqlSchema.Field, polygon []interface{}, buf *bytes.Buffer) {
 	comma1 := ""
 
 	x.Check2(buf.WriteRune('{'))
@@ -1323,7 +1310,7 @@ func completePolygon(field gqlSchema.Field, polygon []interface{}, buf *bytes.Bu
 }
 
 // completeMultiPolygon converts the Dgraph result to GraphQL MultiPolygon type.
-func completeMultiPolygon(field gqlSchema.Field, multiPolygon []interface{}, buf *bytes.Buffer) {
+func completeMultiPolygon(field *gqlSchema.Field, multiPolygon []interface{}, buf *bytes.Buffer) {
 	comma1 := ""
 
 	x.Check2(buf.WriteRune('{'))
@@ -1358,7 +1345,7 @@ func completeMultiPolygon(field gqlSchema.Field, multiPolygon []interface{}, buf
 }
 
 // cantCoerceScalar tells whether a scalar value can be coerced to its corresponding GraphQL scalar.
-func cantCoerceScalar(val []byte, field gqlSchema.Field) bool {
+func cantCoerceScalar(val []byte, field *gqlSchema.Field) bool {
 	switch field.Type().Name() {
 	case "Int":
 		// Although GraphQL layer would have input coercion for Int,
@@ -1408,13 +1395,13 @@ func checkAndStripComma(buf *bytes.Buffer) {
 
 // getTypename returns the JSON bytes for the __typename field, given the dgraph.type values
 // extracted from dgraph response.
-func getTypename(f gqlSchema.Field, dgraphTypes []string) []byte {
+func getTypename(f *gqlSchema.Field, dgraphTypes []string) []byte {
 	return []byte(`"` + f.TypeName(dgraphTypes) + `"`)
 }
 
 // writeGraphQLNull writes null value for the given field to the buffer.
 // If the field is non-nullable, it returns false, otherwise it returns true.
-func writeGraphQLNull(f gqlSchema.Field, buf *bytes.Buffer, keyEndPos int) bool {
+func writeGraphQLNull(f *gqlSchema.Field, buf *bytes.Buffer, keyEndPos int) bool {
 	if b := f.NullValue(); b != nil {
 		buf.Truncate(keyEndPos) // truncate to make sure we write null correctly
 		x.Check2(buf.Write(b))

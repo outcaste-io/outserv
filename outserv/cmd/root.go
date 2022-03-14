@@ -1,18 +1,5 @@
-/*
- * Copyright 2017-2021 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2021 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package cmd
 
@@ -29,21 +16,13 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/outcaste-io/outserv/backup"
 	"github.com/outcaste-io/outserv/outserv/cmd/alpha"
-	"github.com/outcaste-io/outserv/outserv/cmd/bulk"
 	"github.com/outcaste-io/outserv/outserv/cmd/cert"
-	"github.com/outcaste-io/outserv/outserv/cmd/conv"
 	"github.com/outcaste-io/outserv/outserv/cmd/debug"
 	"github.com/outcaste-io/outserv/outserv/cmd/debuginfo"
 	"github.com/outcaste-io/outserv/outserv/cmd/decrypt"
-	"github.com/outcaste-io/outserv/outserv/cmd/increment"
-	"github.com/outcaste-io/outserv/outserv/cmd/live"
 	"github.com/outcaste-io/outserv/outserv/cmd/migrate"
 	"github.com/outcaste-io/outserv/outserv/cmd/version"
-	"github.com/outcaste-io/outserv/outserv/cmd/zero"
-	"github.com/outcaste-io/outserv/updatemanifest"
-	"github.com/outcaste-io/outserv/upgrade"
 	"github.com/outcaste-io/outserv/x"
 
 	"github.com/pkg/errors"
@@ -85,10 +64,11 @@ var rootConf = viper.New()
 
 // subcommands initially contains all default sub-commands.
 var subcommands = []*x.SubCommand{
-	&bulk.Bulk, &backup.LsBackup, &backup.ExportBackup, &cert.Cert, &conv.Conv, &live.Live,
-	&alpha.Alpha, &zero.Zero, &version.Version, &debug.Debug, &migrate.Migrate,
-	&debuginfo.DebugInfo, &upgrade.Upgrade, &decrypt.Decrypt, &increment.Increment,
-	&updatemanifest.UpdateManifest,
+	// TODO: Consider if we need bulk loader.
+	// TODO: Consider if we need live loader.
+	&cert.Cert,
+	&alpha.Alpha, &version.Version, &debug.Debug, &migrate.Migrate,
+	&debuginfo.DebugInfo, &decrypt.Decrypt,
 }
 
 func initCmds() {

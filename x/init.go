@@ -1,18 +1,5 @@
-/*
- * Copyright 2016-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2016-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package x
 
@@ -72,8 +59,6 @@ func Init() {
 
 // BuildDetails returns a string containing details about the Dgraph binary.
 func BuildDetails() string {
-	licenseInfo := `Licensed under the Apache Public License 2.0`
-
 	buf := z.CallocNoRef(1, "X.BuildDetails")
 	jem := len(buf) > 0
 	z.Free(buf)
@@ -88,15 +73,11 @@ Branch            : %v
 Go version        : %v
 jemalloc enabled  : %v
 
-For Outserv official documentation, visit https://dgraph.io/docs.
-For discussions about Outserv     , visit https://discuss.outcaste.io.
-
-%s.
-Copyright 2015-2021 Dgraph Labs, Inc.
+Licensed under Smart License v1.0 1.0. Copyright 2022 Outcaste LLC
 
 `,
 		dgraphVersion, dgraphCodename, ExecutableChecksum(), lastCommitSHA, lastCommitTime, gitBranch,
-		runtime.Version(), jem, licenseInfo)
+		runtime.Version(), jem)
 }
 
 // PrintVersion prints version and other helpful information if --version.

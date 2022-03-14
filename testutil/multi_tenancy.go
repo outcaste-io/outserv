@@ -356,7 +356,7 @@ export(input: {destination: $dst, format: $f, accessKey: $acc, secretKey: $sec})
 		Query: exportRequest,
 		Variables: map[string]interface{}{
 			"dst": dest,
-			"f":   "rdf",
+			"f":   "json",
 			"acc": accessKey,
 			"sec": secretKey,
 		},

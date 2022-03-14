@@ -33,7 +33,7 @@ func TestReserverPredicateForMutation(t *testing.T) {
 
 func TestAlteringReservedTypesAndPredicatesShouldFail(t *testing.T) {
 	ctx, _ := context.WithTimeout(context.Background(), 100*time.Second)
-	dg, err := testutil.DgraphClientWithGroot(testutil.SockAddr)
+	dg, err := testutil.DgraphClient(testutil.SockAddr)
 	require.NoError(t, err)
 
 	op := &api.Operation{Schema: `

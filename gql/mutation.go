@@ -1,25 +1,11 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package gql
 
 import (
 	"strconv"
 
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/x"
@@ -33,8 +19,8 @@ var (
 // Mutation stores the strings corresponding to set and delete operations.
 type Mutation struct {
 	Cond         string
-	Set          []*api.NQuad
-	Del          []*api.NQuad
+	Set          []*pb.NQuad
+	Del          []*pb.NQuad
 	AllowedPreds []string
 
 	Metadata *pb.Metadata
@@ -56,28 +42,28 @@ func ParseUid(xid string) (uint64, error) {
 
 // NQuad is an alias for the NQuad type in the API protobuf library.
 type NQuad struct {
-	*api.NQuad
+	*pb.NQuad
 }
 
-func TypeValFrom(val *api.Value) types.Val {
+func TypeValFrom(val *pb.Value) types.Val {
 	switch val.Val.(type) {
-	case *api.Value_BytesVal:
+	case *pb.Value_BytesVal:
 		return types.Val{Tid: types.BinaryID, Value: val.GetBytesVal()}
-	case *api.Value_IntVal:
+	case *pb.Value_IntVal:
 		return types.Val{Tid: types.IntID, Value: val.GetIntVal()}
-	case *api.Value_StrVal:
+	case *pb.Value_StrVal:
 		return types.Val{Tid: types.StringID, Value: val.GetStrVal()}
-	case *api.Value_BoolVal:
+	case *pb.Value_BoolVal:
 		return types.Val{Tid: types.BoolID, Value: val.GetBoolVal()}
-	case *api.Value_DoubleVal:
+	case *pb.Value_DoubleVal:
 		return types.Val{Tid: types.FloatID, Value: val.GetDoubleVal()}
-	case *api.Value_GeoVal:
+	case *pb.Value_GeoVal:
 		return types.Val{Tid: types.GeoID, Value: val.GetGeoVal()}
-	case *api.Value_DatetimeVal:
+	case *pb.Value_DatetimeVal:
 		return types.Val{Tid: types.DateTimeID, Value: val.GetDatetimeVal()}
-	case *api.Value_PasswordVal:
+	case *pb.Value_PasswordVal:
 		return types.Val{Tid: types.PasswordID, Value: val.GetPasswordVal()}
-	case *api.Value_DefaultVal:
+	case *pb.Value_DefaultVal:
 		return types.Val{Tid: types.DefaultID, Value: val.GetDefaultVal()}
 	}
 
@@ -120,7 +106,6 @@ func (nq NQuad) createEdgePrototype(subjectUid uint64) *pb.DirectedEdge {
 		Attr:      nq.Predicate,
 		Namespace: nq.Namespace,
 		Lang:      nq.Lang,
-		Facets:    nq.Facets,
 	}
 }
 
@@ -158,7 +143,6 @@ func (nq NQuad) ToDeletePredEdge() (*pb.DirectedEdge, error) {
 		Attr:      nq.Predicate,
 		Namespace: nq.Namespace,
 		Lang:      nq.Lang,
-		Facets:    nq.Facets,
 		Op:        pb.DirectedEdge_DEL,
 	}
 

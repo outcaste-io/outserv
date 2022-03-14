@@ -1,18 +1,5 @@
-/*
- * Copyright 2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package worker
 
@@ -229,9 +216,9 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 		cctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		errCh := make(chan error, 1)
+		resCh := make(chan conn.ProposalResult, 1)
 		pctx := &conn.ProposalCtx{
-			ErrCh: errCh,
+			ResCh: resCh,
 			Ctx:   cctx,
 		}
 		x.AssertTruef(n.Proposals.Store(key, pctx), "Found existing proposal with key: [%x]", key)
@@ -248,9 +235,9 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 
 		for {
 			select {
-			case err = <-errCh:
+			case pres := <-resCh:
 				// We arrived here by a call to n.Proposals.Done().
-				return err
+				return pres.Err
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-timer.C:
@@ -289,10 +276,10 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 		// Each retry creates a new proposal, which adds to the number of pending proposals. We
 		// should consider this into account, when adding new proposals to the system.
 		switch {
-		case proposal.Delta != nil: // Is a delta.
-			// If a proposal is important (like delta updates), let's not run it via the limiter
-			// below. We should always propose it irrespective of how many pending proposals there
-			// might be.
+		case proposal.BaseTimestamp > 0:
+			// If a proposal is important (like setting base timestamp), let's
+			// not run it via the limiter below. We should always propose it
+			// irrespective of how many pending proposals there might be.
 		default:
 			span.Annotatef(nil, "incr with %d", i)
 			if err := limiter.incr(ctx, i); err != nil {

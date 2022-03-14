@@ -1,18 +1,5 @@
-/*
- * Copyright 2016-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2016-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package worker
 
@@ -27,7 +14,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	"github.com/outcaste-io/badger/v3"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/algo"
 	"github.com/outcaste-io/outserv/codec"
 	"github.com/outcaste-io/outserv/conn"
@@ -37,7 +23,6 @@ import (
 	ctask "github.com/outcaste-io/outserv/task"
 	"github.com/outcaste-io/outserv/tok"
 	"github.com/outcaste-io/outserv/types"
-	"github.com/outcaste-io/outserv/types/facets"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/sroar"
 	otrace "go.opencensus.io/trace"
@@ -330,11 +315,6 @@ func (qs *queryState) handleValuePostings(ctx context.Context, args funcArgs) er
 	srcFn := args.srcFn
 	q := args.q
 
-	facetsTree, err := preprocessFilter(q.FacetsFilter)
-	if err != nil {
-		return err
-	}
-
 	span := otrace.FromContext(ctx)
 	stop := x.SpanTimer(span, "handleValuePostings")
 	defer stop()
@@ -396,7 +376,7 @@ func (qs *queryState) handleValuePostings(ctx context.Context, args funcArgs) er
 
 			// If count is being requested, there is no need to populate value and facets matrix.
 			if q.DoCount {
-				count, err := countForValuePostings(args, pl, facetsTree, listType)
+				count, err := countForValuePostings(args, pl, listType)
 				if err != nil && err != posting.ErrNoValue {
 					return err
 				}
@@ -406,7 +386,7 @@ func (qs *queryState) handleValuePostings(ctx context.Context, args funcArgs) er
 				continue
 			}
 
-			vals, fcs, err := retrieveValuesAndFacets(args, pl, facetsTree, listType)
+			vals, err := retrieveValuesAndFacets(args, pl, listType)
 			switch {
 			case err == posting.ErrNoValue || (err == nil && len(vals) == 0):
 				// This branch is taken when the value does not exist in the pl or
@@ -414,7 +394,6 @@ func (qs *queryState) handleValuePostings(ctx context.Context, args funcArgs) er
 				// We add empty lists to the UidMatrix, FaceMatrix, ValueMatrix and
 				// LangMatrix so that all these data structure have predicatble layouts.
 				out.UidMatrix = append(out.UidMatrix, &pb.List{})
-				out.FacetMatrix = append(out.FacetMatrix, &pb.FacetsList{})
 				out.ValueMatrix = append(out.ValueMatrix,
 					&pb.ValueList{Values: []*pb.TaskValue{}})
 				if q.ExpandAll {
@@ -473,9 +452,6 @@ func (qs *queryState) handleValuePostings(ctx context.Context, args funcArgs) er
 			}
 			out.ValueMatrix = append(out.ValueMatrix, &vl)
 
-			// Add facets to result.
-			out.FacetMatrix = append(out.FacetMatrix, fcs)
-
 			switch {
 			case srcFn.fnType == aggregatorFn:
 				// Add an empty UID list to make later processing consistent
@@ -523,13 +499,12 @@ func (qs *queryState) handleValuePostings(ctx context.Context, args funcArgs) er
 		out.UidMatrix = append(out.UidMatrix, chunk.UidMatrix...)
 		out.Counts = append(out.Counts, chunk.Counts...)
 		out.ValueMatrix = append(out.ValueMatrix, chunk.ValueMatrix...)
-		out.FacetMatrix = append(out.FacetMatrix, chunk.FacetMatrix...)
 		out.LangMatrix = append(out.LangMatrix, chunk.LangMatrix...)
 	}
 	return nil
 }
 
-func facetsFilterValuePostingList(args funcArgs, pl *posting.List, facetsTree *facetsTree,
+func facetsFilterValuePostingList(args funcArgs, pl *posting.List,
 	listType bool, fn func(p *pb.Posting)) error {
 	q := args.q
 
@@ -573,15 +548,7 @@ func facetsFilterValuePostingList(args funcArgs, pl *posting.List, facetsTree *f
 			}
 		}
 
-		// If filterTree is nil, applyFacetsTree returns true and nil error.
-		picked, err := applyFacetsTree(p.Facets, facetsTree)
-		if err != nil {
-			return err
-		}
-		if picked {
-			fn(p)
-		}
-
+		fn(p)
 		if pickMultiplePostings {
 			return nil // Continue iteration.
 		}
@@ -591,10 +558,10 @@ func facetsFilterValuePostingList(args funcArgs, pl *posting.List, facetsTree *f
 	})
 }
 
-func countForValuePostings(args funcArgs, pl *posting.List, facetsTree *facetsTree,
+func countForValuePostings(args funcArgs, pl *posting.List,
 	listType bool) (int, error) {
 	var filteredCount int
-	err := facetsFilterValuePostingList(args, pl, facetsTree, listType, func(p *pb.Posting) {
+	err := facetsFilterValuePostingList(args, pl, listType, func(p *pb.Posting) {
 		filteredCount++
 	})
 	if err != nil {
@@ -604,29 +571,24 @@ func countForValuePostings(args funcArgs, pl *posting.List, facetsTree *facetsTr
 	return filteredCount, nil
 }
 
-func retrieveValuesAndFacets(args funcArgs, pl *posting.List, facetsTree *facetsTree,
-	listType bool) ([]types.Val, *pb.FacetsList, error) {
-	q := args.q
+func retrieveValuesAndFacets(args funcArgs, pl *posting.List,
+	listType bool) ([]types.Val, error) {
 	var vals []types.Val
-	var fcs []*pb.Facets
 
-	err := facetsFilterValuePostingList(args, pl, facetsTree, listType, func(p *pb.Posting) {
+	err := facetsFilterValuePostingList(args, pl, listType, func(p *pb.Posting) {
 		vals = append(vals, types.Val{
 			Tid:   types.TypeID(p.ValType),
 			Value: p.Value,
 		})
-		if q.FacetParam != nil {
-			fcs = append(fcs, &pb.Facets{Facets: facets.CopyFacets(p.Facets, q.FacetParam)})
-		}
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return vals, &pb.FacetsList{FacetsList: fcs}, nil
+	return vals, nil
 }
 
-func facetsFilterUidPostingList(pl *posting.List, facetsTree *facetsTree, opts posting.ListOptions,
+func facetsFilterUidPostingList(pl *posting.List, opts posting.ListOptions,
 	fn func(*pb.Posting)) error {
 
 	// We want to iterate over this to allow picking up all the facets.
@@ -635,57 +597,35 @@ func facetsFilterUidPostingList(pl *posting.List, facetsTree *facetsTree, opts p
 		if p.PostingType != pb.Posting_REF {
 			return nil
 		}
-		pick, err := applyFacetsTree(p.Facets, facetsTree)
-		if err != nil {
-			return err
-		}
-		if pick {
-			fn(p)
-		}
+		fn(p)
 		return nil
 	})
 }
 
-func countForUidPostings(args funcArgs, pl *posting.List, facetsTree *facetsTree,
+func countForUidPostings(args funcArgs, pl *posting.List,
 	opts posting.ListOptions) (int, error) {
 
-	if facetsTree == nil {
-		return pl.Length(opts.ReadTs, opts.AfterUid), nil
-	}
-
-	// We have a valid facetsTree. So, we'd do the filtering by iteration.
-	var filteredCount int
-	err := facetsFilterUidPostingList(pl, facetsTree, opts, func(p *pb.Posting) {
-		filteredCount++
-	})
-	return filteredCount, err
+	return pl.Length(opts.ReadTs, opts.AfterUid), nil
 }
 
-func retrieveUidsAndFacets(args funcArgs, pl *posting.List, facetsTree *facetsTree,
-	opts posting.ListOptions) (*pb.List, []*pb.Facets, error) {
-	q := args.q
+func retrieveUidsAndFacets(args funcArgs, pl *posting.List,
+	opts posting.ListOptions) (*pb.List, error) {
 
 	res := sroar.NewBitmap()
-	var fcsList []*pb.Facets
 
 	// [1] q.FacetParam == nil, facetsTree == nil => No facets. Pick all UIDs.
 	// [2] q.FacetParam == nil, facetsTree != nil => No facets. Pick selective UIDs.
 	// [3] q.FacetParam != nil, facetsTree != nil => Pick facets. Pick selective UIDs.
 	// [4] q.FacetParam != nil, facetsTree == nil => Pick facets. Pick all UIDs.
 
-	err := facetsFilterUidPostingList(pl, facetsTree, opts, func(p *pb.Posting) {
+	err := facetsFilterUidPostingList(pl, opts, func(p *pb.Posting) {
 		res.Set(p.Uid)
-		if q.FacetParam != nil {
-			fcsList = append(fcsList, &pb.Facets{
-				Facets: facets.CopyFacets(p.Facets, q.FacetParam),
-			})
-		}
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	// TODO(Ahsan): Need to figure out for what all cases we need sortedList.
-	return codec.ToSortedList(res), fcsList, nil
+	return codec.ToSortedList(res), nil
 }
 
 // This function handles operations on uid posting lists. Index keys, reverse keys and some data
@@ -695,11 +635,6 @@ func (qs *queryState) handleUidPostings(
 	ctx context.Context, args funcArgs, opts posting.ListOptions) error {
 	srcFn := args.srcFn
 	q := args.q
-
-	facetsTree, err := preprocessFilter(q.FacetsFilter)
-	if err != nil {
-		return err
-	}
 
 	span := otrace.FromContext(ctx)
 	stop := x.SpanTimer(span, "handleUidPostings")
@@ -774,7 +709,7 @@ func (qs *queryState) handleUidPostings(
 				if i == 0 {
 					span.Annotate(nil, "DoCount")
 				}
-				count, err := countForUidPostings(args, pl, facetsTree, opts)
+				count, err := countForUidPostings(args, pl, opts)
 				if err != nil {
 					return err
 				}
@@ -824,18 +759,6 @@ func (qs *queryState) handleUidPostings(
 					tlist := codec.OneUid(uids[i])
 					out.UidMatrix = append(out.UidMatrix, tlist)
 				}
-			case q.FacetParam != nil || facetsTree != nil:
-				if i == 0 {
-					span.Annotate(nil, "default with facets")
-				}
-				uidList, fcsList, err := retrieveUidsAndFacets(args, pl, facetsTree, opts)
-				if err != nil {
-					return err
-				}
-				out.UidMatrix = append(out.UidMatrix, uidList)
-				if q.FacetParam != nil {
-					out.FacetMatrix = append(out.FacetMatrix, &pb.FacetsList{FacetsList: fcsList})
-				}
 			default:
 				if i == 0 {
 					span.Annotate(nil, "default no facets")
@@ -868,7 +791,6 @@ func (qs *queryState) handleUidPostings(
 	// All goroutines are done. Now attach their results.
 	out := args.out
 	for _, chunk := range outputs {
-		out.FacetMatrix = append(out.FacetMatrix, chunk.FacetMatrix...)
 		out.Counts = append(out.Counts, chunk.Counts...)
 		out.UidMatrix = append(out.UidMatrix, chunk.UidMatrix...)
 	}
@@ -879,13 +801,6 @@ func (qs *queryState) handleUidPostings(
 	span.Annotatef(nil, "Total number of elements in matrix: %d", total)
 	return nil
 }
-
-const (
-	// UseTxnCache indicates the transaction cache should be used.
-	UseTxnCache = iota
-	// NoCache indicates no caches should be used.
-	NoCache
-)
 
 // processTask processes the query, accumulates and returns the result.
 func processTask(ctx context.Context, q *pb.Query, gid uint32) (*pb.Result, error) {
@@ -901,9 +816,8 @@ func processTask(ctx context.Context, q *pb.Query, gid uint32) (*pb.Result, erro
 		return nil, err
 	}
 	if span != nil {
-		maxAssigned := posting.Oracle().MaxAssigned()
-		span.Annotatef(nil, "Done waiting for maxAssigned. Attr: %q ReadTs: %d Max: %d",
-			q.Attr, q.ReadTs, maxAssigned)
+		span.Annotatef(nil, "Done waiting for ts. Attr: %q ReadTs: %d",
+			q.Attr, q.ReadTs)
 	}
 	if err := groups().ChecksumsMatch(ctx); err != nil {
 		return nil, err
@@ -927,12 +841,9 @@ func processTask(ctx context.Context, q *pb.Query, gid uint32) (*pb.Result, erro
 	}
 
 	var qs queryState
-	if q.Cache == UseTxnCache {
-		qs.cache = posting.Oracle().CacheAt(q.ReadTs)
-	}
-	if qs.cache == nil {
-		qs.cache = posting.NoCache(q.ReadTs)
-	}
+
+	// TODO: Perhaps create a new cache to use, instead of not using any cache?
+	qs.cache = posting.NoCache(q.ReadTs)
 	// For now, remove the query level cache. It is causing contention for queries with high
 	// fan-out.
 	out, err := qs.helpProcessTask(ctx, q, gid)
@@ -2027,78 +1938,6 @@ func (w *grpcWorker) ServeTask(ctx context.Context, q *pb.Query) (*pb.Result, er
 	}
 }
 
-// applyFacetsTree : we return error only when query has some problems.
-// like Or has 3 arguments, argument facet val overflows integer.
-// returns true if postingFacets can be included.
-func applyFacetsTree(postingFacets []*api.Facet, ftree *facetsTree) (bool, error) {
-	if ftree == nil {
-		return true, nil
-	}
-	if ftree.function != nil {
-		var fc *api.Facet
-		for _, fci := range postingFacets {
-			if fci.Key == ftree.function.key {
-				fc = fci
-				break
-			}
-		}
-		if fc == nil { // facet is not there
-			return false, nil
-		}
-
-		switch ftree.function.fnType {
-		case compareAttrFn: // lt, gt, le, ge, eq
-			fVal, err := facets.ValFor(fc)
-			if err != nil {
-				return false, err
-			}
-
-			v, ok := ftree.function.typesToVal[fVal.Tid]
-			if !ok {
-				// Not found in map and hence convert it here.
-				v, err = types.Convert(ftree.function.val, fVal.Tid)
-				if err != nil {
-					// ignore facet if not of appropriate type.
-					return false, nil
-				}
-			}
-
-			return types.CompareVals(ftree.function.name, fVal, v), nil
-
-		case standardFn: // allofterms, anyofterms
-			facetType, err := facets.TypeIDFor(fc)
-			if err != nil {
-				return false, err
-			}
-			if facetType != types.StringID {
-				return false, nil
-			}
-			return filterOnStandardFn(ftree.function.name, fc.Tokens, ftree.function.tokens)
-		}
-		return false, errors.Errorf("Fn %s not supported in facets filtering.", ftree.function.name)
-	}
-
-	res := make([]bool, 0, 2) // We can have max two children for a node.
-	for _, c := range ftree.children {
-		r, err := applyFacetsTree(postingFacets, c)
-		if err != nil {
-			return false, err
-		}
-		res = append(res, r)
-	}
-
-	// we have already checked for number of children in preprocessFilter
-	switch ftree.op {
-	case "not":
-		return !res[0], nil
-	case "and":
-		return res[0] && res[1], nil
-	case "or":
-		return res[0] || res[1], nil
-	}
-	return false, errors.Errorf("Unexpected behavior in applyFacetsTree.")
-}
-
 // filterOnStandardFn : tells whether facet corresponding to fcTokens can be taken or not.
 // fcTokens and argTokens should be sorted.
 func filterOnStandardFn(fname string, fcTokens []string, argTokens []string) (bool, error) {
@@ -2140,103 +1979,10 @@ func filterOnStandardFn(fname string, fcTokens []string, argTokens []string) (bo
 	return false, errors.Errorf("Fn %s not supported in facets filtering.", fname)
 }
 
-type facetsFunc struct {
-	name   string
-	key    string
-	args   []string
-	tokens []string
-	val    types.Val
-	fnType FuncType
-	// typesToVal stores converted vals of the function val for all common types. Converting
-	// function val to particular type val(check applyFacetsTree()) consumes significant amount of
-	// time. This maps helps in doing conversion only once(check preprocessFilter()).
-	typesToVal map[types.TypeID]types.Val
-}
-type facetsTree struct {
-	op       string
-	children []*facetsTree
-	function *facetsFunc
-}
-
 // commonTypeIDs is list of type ids which are more common. In preprocessFilter() we keep converted
 // values for these typeIDs at every function node.
 var commonTypeIDs = [...]types.TypeID{types.StringID, types.IntID, types.FloatID,
 	types.DateTimeID, types.BoolID, types.DefaultID}
-
-func preprocessFilter(tree *pb.FilterTree) (*facetsTree, error) {
-	if tree == nil {
-		return nil, nil
-	}
-	ftree := &facetsTree{}
-	ftree.op = strings.ToLower(tree.Op)
-	if tree.Func != nil {
-		ftree.function = &facetsFunc{}
-		ftree.function.key = tree.Func.Key
-		ftree.function.args = tree.Func.Args
-
-		fnType, fname := parseFuncTypeHelper(tree.Func.Name)
-		if len(tree.Func.Args) != 1 {
-			return nil, errors.Errorf("One argument expected in %s, but got %d.",
-				fname, len(tree.Func.Args))
-		}
-
-		ftree.function.name = fname
-		ftree.function.fnType = fnType
-
-		switch fnType {
-		case compareAttrFn:
-			ftree.function.val = types.Val{Tid: types.StringID, Value: []byte(tree.Func.Args[0])}
-			ftree.function.typesToVal = make(map[types.TypeID]types.Val, len(commonTypeIDs))
-			for _, typeID := range commonTypeIDs {
-				// TODO: if conversion is not possible we are not putting anything to map. In
-				// applyFacetsTree we check if entry for a type is not present, we try to convert
-				// it. This double conversion can be avoided.
-				cv, err := types.Convert(ftree.function.val, typeID)
-				if err != nil {
-					continue
-				}
-				ftree.function.typesToVal[typeID] = cv
-			}
-		case standardFn:
-			argTokens, aerr := tok.GetTermTokens(tree.Func.Args)
-			if aerr != nil { // query error ; stop processing.
-				return nil, aerr
-			}
-			sort.Strings(argTokens)
-			ftree.function.tokens = argTokens
-		default:
-			return nil, errors.Errorf("Fn %s not supported in preprocessFilter.", fname)
-		}
-		return ftree, nil
-	}
-
-	for _, c := range tree.Children {
-		ftreec, err := preprocessFilter(c)
-		if err != nil {
-			return nil, err
-		}
-		ftree.children = append(ftree.children, ftreec)
-	}
-
-	numChild := len(tree.Children)
-	switch ftree.op {
-	case "not":
-		if numChild != 1 {
-			return nil, errors.Errorf("Expected 1 child for not but got %d.", numChild)
-		}
-	case "and":
-		if numChild != 2 {
-			return nil, errors.Errorf("Expected 2 child for not but got %d.", numChild)
-		}
-	case "or":
-		if numChild != 2 {
-			return nil, errors.Errorf("Expected 2 child for not but got %d.", numChild)
-		}
-	default:
-		return nil, errors.Errorf("Unsupported operation in facet filtering: %s.", tree.Op)
-	}
-	return ftree, nil
-}
 
 type countParams struct {
 	readTs  uint64

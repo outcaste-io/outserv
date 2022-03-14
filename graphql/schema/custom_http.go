@@ -1,18 +1,5 @@
-/*
- * Copyright 2021 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2021 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package schema
 
@@ -75,7 +62,7 @@ func MakeHttpRequest(client *http.Client, method, url string, header http.Header
 // errors. Any other kind of error is a hard error.
 // For REST requests, any error is a hard error, including those returned from the remote endpoint.
 func (fconf *FieldHTTPConfig) MakeAndDecodeHTTPRequest(client *http.Client, url string,
-	body interface{}, field Field) (interface{}, x.GqlErrorList, x.GqlErrorList) {
+	body interface{}, field *Field) (interface{}, x.GqlErrorList, x.GqlErrorList) {
 	var b []byte
 	var err error
 	// need this check to make sure that we don't send body as []byte(`null`)
@@ -138,30 +125,30 @@ func (fconf *FieldHTTPConfig) MakeAndDecodeHTTPRequest(client *http.Client, url 
 	return response, softErrs, nil
 }
 
-func keyNotFoundError(f Field, key string) *x.GqlError {
+func keyNotFoundError(f *Field, key string) *x.GqlError {
 	return f.GqlErrorf(nil, "Evaluation of custom field failed because key: %s "+
 		"could not be found in the JSON response returned by external request "+
 		"for field: %s within type: %s.", key, f.Name(), f.GetObjectName())
 }
 
-func jsonMarshalError(err error, f Field, input interface{}) *x.GqlError {
+func jsonMarshalError(err error, f *Field, input interface{}) *x.GqlError {
 	return f.GqlErrorf(nil, "Evaluation of custom field failed because json marshaling "+
 		"(of: %+v) returned an error: %s for field: %s within type: %s.", input, err, f.Name(),
 		f.GetObjectName())
 }
 
-func jsonUnmarshalError(err error, f Field) *x.GqlError {
+func jsonUnmarshalError(err error, f *Field) *x.GqlError {
 	return f.GqlErrorf(nil, "Evaluation of custom field failed because json unmarshalling"+
 		" result of external request failed (with error: %s) for field: %s within type: %s.",
 		err, f.Name(), f.GetObjectName())
 }
 
-func externalRequestError(err error, f Field) *x.GqlError {
+func externalRequestError(err error, f *Field) *x.GqlError {
 	return f.GqlErrorf(nil, "Evaluation of custom field failed because external request"+
 		" returned an error: %s for field: %s within type: %s.", err, f.Name(), f.GetObjectName())
 }
 
-func GetBodyForLambda(ctx context.Context, field Field, parents,
+func GetBodyForLambda(ctx context.Context, field *Field, parents,
 	args interface{}) map[string]interface{} {
 	ns, _ := x.ExtractJWTNamespace(ctx)
 	accessJWT, _ := x.ExtractJwt(ctx)
