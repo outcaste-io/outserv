@@ -82,8 +82,6 @@ and visible to everyone. And provide as much freedom as possible for others to
 use, modify or build commercial services around the software, under our motto of
 open ethos.
 
-> Not open source. Open ethos.
-
 **TL;DR: A software under Smart License provides a direct income stream to the
 developer so they can focus on the software, while eliminating the rift between
 free v/s paid feature set, opaque pricing models or disallowing others from
@@ -113,6 +111,3 @@ functionality in the software that is protected by the license key.*
 *SL1.0: The software contains a module that allows the licensor to monetize your use of
 the software. You may not move, change, disable, or circumvent this functionality
 in the software.*
-
-You can see a full diff of Elastic 2.0 vs Smart 1.0 license here (TODO: add link).
-
