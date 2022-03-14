@@ -44,7 +44,7 @@ However, the fork must continue to abide by the limitations of the Smart
 License, which includes keeping the monetization module, licensing, copyright
 and other notices.
 
-### 5. If I copy only certain parts of the code into another program, do I still need to pay?
+### 6. If I copy only certain parts of the code into another program, do I still need to pay?
 
 Yes. If you copy any part of the codebase under the Smart License,
 your program should pay and do the equivalent of what the monetization module
@@ -53,7 +53,7 @@ would have done.
 If you use any of this software, you must keep and not circumvent the
 monetization module. You can't use only other portions of the software.
 
-### 6. Why build this license? Why charge for this software?
+### 7. Why build this license? Why charge for this software?
 
 We have built a lot of open-source software in the past, with none of them
 providing any source of income for the developers. Currently, there are three ways
@@ -99,7 +99,7 @@ free v/s paid feature set, opaque pricing models, or disallowing others from
 building commercial services.**
 
 
-### 7. How does Smart License compare against Elastic License?
+### 8. How does Smart License compare against Elastic License?
 
 Smart License is modeled after Elastic License 2.0 but differs in the limitations
 it imposes.
