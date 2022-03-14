@@ -61,8 +61,10 @@ to fund the development of open source.
 
 a. Use your personal savings to fund the development. Or, have your company fund
     the development of the project.
-a. Build open-source part-time while working for another company, if they allow that.
-a. Take money from VCs. This generally results in building proprietary features
+
+b. Build open-source part-time while working for another company, if they allow that.
+
+c. Take money from VCs. This generally results in building proprietary features
     and a cloud-managed service to monetize the software.
 
 **Option a:** If possible, this is the best way to go. But, might not be available as an
