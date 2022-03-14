@@ -1,5 +1,5 @@
-// Portions Copyright 2016-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
+// Portions Copyright 2016-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package x
 
@@ -73,7 +73,7 @@ Branch            : %v
 Go version        : %v
 jemalloc enabled  : %v
 
-Licensed under Smart License 1.0. Copyright 2022 Outcaste, Inc.
+Licensed under Smart License v1.0 1.0. Copyright 2022 Outcaste LLC
 
 `,
 		dgraphVersion, dgraphCodename, ExecutableChecksum(), lastCommitSHA, lastCommitTime, gitBranch,

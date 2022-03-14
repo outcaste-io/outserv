@@ -247,12 +247,12 @@ Over years of writing big scalable systems, we are convinced that striving for s
 
 Every new source file must begin with a license header.
 
-Copyright yyyy-yyyy Outcaste, Inc. are available under the Smart License.
+Copyright yyyy-yyyy Outcaste LLC. Licensed under the Smart License v1.0.
 
 If you're modifying existing Apache licensed files files, please modify the header to this:
 
-Portions Copyright yyyy-yyyy Dgraph Labs, Inc. are available under the Apache 2.0 license.
-Portions Copyright yyyy-yyyy Outcaste, Inc. are available under the Smart License.
+Portions Copyright yyyy-yyyy Dgraph Labs, Inc. are available under the Apache License v2.0.
+Portions Copyright yyyy-yyyy Outcaste LLC are available under the Smart License v1.0.
 
 ### Signed Commits
 

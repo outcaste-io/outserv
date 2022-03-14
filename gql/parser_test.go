@@ -17,13 +17,10 @@
 package gql
 
 import (
-	"bytes"
 	"os"
 	"runtime/debug"
 	"testing"
 
-	"github.com/outcaste-io/dgo/v210/protos/api"
-	"github.com/outcaste-io/outserv/chunker"
 	"github.com/outcaste-io/outserv/lex"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
@@ -1040,22 +1037,6 @@ func TestInvalidValUsage(t *testing.T) {
 	_, err := Parse(Request{Str: query})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Query syntax invalid.")
-}
-
-func parseNquads(b []byte) ([]*api.NQuad, error) {
-	var lexer lex.Lexer
-	var nqs []*api.NQuad
-	for _, line := range bytes.Split(b, []byte{'\n'}) {
-		nq, err := chunker.ParseRDF(string(line), &lexer)
-		if err == chunker.ErrEmpty {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		nqs = append(nqs, &nq)
-	}
-	return nqs, nil
 }
 
 func TestUidInWithNoParseErrors(t *testing.T) {

@@ -1,5 +1,5 @@
-// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
+// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package admin
 
@@ -21,7 +21,7 @@ type loginInput struct {
 	RefreshToken string
 }
 
-func resolveLogin(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+func resolveLogin(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	glog.Info("Got login request")
 
 	input := getLoginInput(m)
@@ -52,7 +52,7 @@ func resolveLogin(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bo
 
 }
 
-func getLoginInput(m schema.Mutation) *loginInput {
+func getLoginInput(m *schema.Field) *loginInput {
 	// We should be able to convert these to string as GraphQL schema validation should ensure this.
 	// If the input wasn't specified, then the arg value would be nil and the string value empty.
 

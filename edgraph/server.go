@@ -1,5 +1,5 @@
-// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package edgraph
 
@@ -1118,7 +1118,7 @@ type queryContext struct {
 	// This would be set only if the request is a query from GraphQL layer,
 	// otherwise it would be nil. (Eg. nil cases: in case of a DQL query,
 	// a mutation being executed from GraphQL layer).
-	gqlField gqlSchema.Field
+	gqlField *gqlSchema.Field
 	// nquadsCount maintains numbers of nquads which would be inserted as part of this request.
 	// In some cases(mostly upserts), numbers of nquads to be inserted can to huge(we have seen upto
 	// 1B) and resulting in OOM. We are limiting number of nquads which can be inserted in
@@ -1132,7 +1132,7 @@ type Request struct {
 	// req is the incoming gRPC request
 	req *pb.Request
 	// gqlField is the GraphQL field for which the request is being sent
-	gqlField gqlSchema.Field
+	gqlField *gqlSchema.Field
 	// doAuth tells whether this request needs ACL authorization or not
 	doAuth AuthMode
 }
@@ -1240,7 +1240,7 @@ func getAuthMode(ctx context.Context) AuthMode {
 
 // QueryGraphQL handles only GraphQL queries, neither mutations nor DQL.
 func (s *Server) QueryGraphQL(ctx context.Context, req *pb.Request,
-	field gqlSchema.Field) (*pb.Response, error) {
+	field *gqlSchema.Field) (*pb.Response, error) {
 	// Add a timeout for queries which don't have a deadline set. We don't want to
 	// apply a timeout if it's a mutation, that's currently handled by flag
 	// "txn-abort-after".

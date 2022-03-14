@@ -1,5 +1,5 @@
-// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
+// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package admin
 
@@ -27,7 +27,7 @@ type assignInput struct {
 	Num  uint32
 }
 
-func resolveAssign(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+func resolveAssign(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	input, err := getAssignInput(m)
 	if err != nil {
 		return resolve.EmptyResult(m, err), false
@@ -64,7 +64,7 @@ func resolveAssign(ctx context.Context, m schema.Mutation) (*resolve.Resolved, b
 	), true
 }
 
-func getAssignInput(m schema.Mutation) (*assignInput, error) {
+func getAssignInput(m *schema.Field) (*assignInput, error) {
 	inputArg, ok := m.ArgValue(schema.InputArgName).(map[string]interface{})
 	if !ok {
 		return nil, inputArgError(errors.Errorf("can't convert input to map"))

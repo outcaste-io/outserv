@@ -1,4 +1,4 @@
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
+// Copyright 2022 Outcaste LLC. Licensed under the Smart License v1.0.
 
 package admin
 
@@ -33,7 +33,7 @@ type clusterGroup struct {
 	Checksum   uint64       `json:"checksum,omitempty"`
 }
 
-func resolveState(ctx context.Context, q schema.Query) *resolve.Resolved {
+func resolveState(ctx context.Context, q *schema.Field) *resolve.Resolved {
 	resp, err := (&edgraph.Server{}).State(ctx)
 	if err != nil {
 		return resolve.EmptyResult(q, errors.Errorf("%s: %s", x.Error, err.Error()))

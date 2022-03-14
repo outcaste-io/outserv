@@ -1,5 +1,5 @@
-// Portions Copyright 2017-2020 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
+// Portions Copyright 2017-2020 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package edgraph
 
@@ -121,7 +121,6 @@ func ProcessPersistedQuery(ctx context.Context, gqlReq *schema.Request) error {
 		ctx := context.WithValue(ctx, IsGraphql, true)
 		_, err := (&Server{}).doQuery(ctx, req)
 		return err
-
 	}
 
 	if len(shaQueryRes.Me) != 1 {

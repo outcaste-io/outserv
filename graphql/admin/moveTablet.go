@@ -1,5 +1,5 @@
-// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
+// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package admin
 
@@ -20,7 +20,7 @@ type moveTabletInput struct {
 	GroupId   uint32
 }
 
-func resolveMoveTablet(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+func resolveMoveTablet(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	panic("TODO: Implement resolveMoveTablet")
 	// input, err := getMoveTabletInput(m)
 	// if err != nil {
@@ -43,7 +43,7 @@ func resolveMoveTablet(ctx context.Context, m schema.Mutation) (*resolve.Resolve
 	// ), true
 }
 
-func getMoveTabletInput(m schema.Mutation) (*moveTabletInput, error) {
+func getMoveTabletInput(m *schema.Field) (*moveTabletInput, error) {
 	inputArg, ok := m.ArgValue(schema.InputArgName).(map[string]interface{})
 	if !ok {
 		return nil, inputArgError(errors.Errorf("can't convert input to map"))

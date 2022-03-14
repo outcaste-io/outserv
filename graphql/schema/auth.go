@@ -1,18 +1,5 @@
-/*
- * Copyright 2020 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package schema
 
@@ -48,7 +35,7 @@ type RuleNode struct {
 	Or        []*RuleNode
 	And       []*RuleNode
 	Not       *RuleNode
-	Rule      Query
+	Rule      *Field
 	DQLRule   *gql.GraphQuery
 	RBACRule  *RBACQuery
 	Variables ast.VariableDefinitionList
@@ -214,7 +201,7 @@ func createEmptyDQLRule(typeName string) *RuleNode {
 	}
 }
 
-func authRules(sch *schema) (map[string]*TypeAuth, error) {
+func authRules(sch *Schema) (map[string]*TypeAuth, error) {
 	s := sch.schema
 	//TODO: Add position in error.
 	var errResult, err error
@@ -322,7 +309,7 @@ func mergeAuthRules(
 }
 
 func parseAuthDirective(
-	sch *schema,
+	sch *Schema,
 	typ *ast.Definition,
 	dir *ast.Directive) (*AuthContainer, error) {
 
@@ -361,7 +348,7 @@ func parseAuthDirective(
 	return result, errResult
 }
 
-func parseAuthNode(sch *schema, typ *ast.Definition, val *ast.Value) (*RuleNode, error) {
+func parseAuthNode(sch *Schema, typ *ast.Definition, val *ast.Value) (*RuleNode, error) {
 
 	if len(val.Children) == 0 {
 		return nil, gqlerror.Errorf("Type %s: @auth: no arguments - "+
@@ -526,7 +513,7 @@ func validateRBACOperators(typ *ast.Definition, query *RBACQuery) (bool, string)
 	return true, ""
 }
 
-func gqlValidateRule(sch *schema, typ *ast.Definition, rule string, node *RuleNode) error {
+func gqlValidateRule(sch *Schema, typ *ast.Definition, rule string, node *RuleNode) error {
 	doc, gqlErr := parser.ParseQuery(&ast.Source{Input: rule})
 	if gqlErr != nil {
 		return gqlerror.Errorf("Type %s: @auth: failed to parse GraphQL rule "+
@@ -575,7 +562,7 @@ func gqlValidateRule(sch *schema, typ *ast.Definition, rule string, node *RuleNo
 			"rules,but found %s", typ.Name, typ.Name, f.Name)
 	}
 
-	opWrapper := &operation{
+	opWrapper := &Operation{
 		op:                      op,
 		query:                   rule,
 		doc:                     doc,
@@ -587,7 +574,8 @@ func gqlValidateRule(sch *schema, typ *ast.Definition, rule string, node *RuleNo
 	// recursively expand fragments in operation as selection set fields
 	recursivelyExpandFragmentSelections(f, opWrapper)
 
-	node.Rule = &query{
+	node.Rule = &Field{
+		Kind:  QueryKind,
 		field: f,
 		op:    opWrapper,
 		sel:   op.SelectionSet[0]}

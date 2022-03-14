@@ -1,5 +1,5 @@
-// Portions Copyright 2017-2021 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
+// Portions Copyright 2017-2021 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package alpha
 
@@ -64,7 +64,7 @@ var (
 	Alpha x.SubCommand
 
 	// need this here to refer it in admin_backup.go
-	adminServer admin.IServeGraphQL
+	adminServer *admin.GqlHandler
 	initDone    uint32
 )
 
@@ -75,12 +75,7 @@ var jsLambda embed.FS
 func init() {
 	Alpha.Cmd = &cobra.Command{
 		Use:   "alpha",
-		Short: "Run Dgraph Alpha database server",
-		Long: `
-A Dgraph Alpha instance stores the data. Each Dgraph Alpha is responsible for
-storing and serving one data group. If multiple Alphas serve the same group,
-they form a Raft group and provide synchronous replication.
-`,
+		Short: "Run Outserv GraphQL server",
 		Run: func(cmd *cobra.Command, args []string) {
 			defer x.StartProfile(Alpha.Conf).Stop()
 			run()
@@ -631,7 +626,8 @@ func setupServer(closer *z.Closer) {
 	e := new(uint64)
 	atomic.StoreUint64(e, 0)
 	globalEpoch[x.GalaxyNamespace] = e
-	var mainServer admin.IServeGraphQL
+
+	var mainServer *admin.GqlHandler
 	var gqlHealthStore *admin.GraphQLHealthStore
 	// Do not use := notation here because adminServer is a global variable.
 	mainServer, adminServer, gqlHealthStore = admin.NewServers(introspection,

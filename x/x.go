@@ -1,5 +1,5 @@
-// Portions Copyright 2015-2021 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart license.
+// Portions Copyright 2015-2021 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package x
 
@@ -1194,6 +1194,7 @@ func ToHex(i uint64) []byte {
 	return out
 }
 
+// TODO: Fix this all up.
 // RootTemplate defines the help template for dgraph command.
 var RootTemplate string = `Dgraph is a horizontally scalable and distributed graph database,
 providing ACID transactions, consistent replication and linearizable reads.

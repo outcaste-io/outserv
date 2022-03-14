@@ -1,5 +1,5 @@
-// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package query
 
@@ -188,7 +188,8 @@ func AssignUids(ctx context.Context, gmuList []*gql.Mutation) (map[string]uint64
 		curId := res.StartId
 		// assign generated ones now
 		for k := range newUids {
-			x.AssertTruef(curId != 0 && curId <= res.EndId, "not enough uids generated")
+			x.AssertTruef(curId != 0 && curId <= res.EndId,
+				"not enough uids generated: res: %+v . curId: %d", res, curId)
 			newUids[k] = curId
 			curId++
 		}

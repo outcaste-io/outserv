@@ -577,30 +577,6 @@ func TestLangsFunctionMultipleLangs(t *testing.T) {
 	require.Contains(t, err.Error(), "\":\"")
 }
 
-func TestParseOrderbyFacet(t *testing.T) {
-	query := `
-	query {
-		me(func: uid(0x1)) {
-			friends @facets {
-				name @facets(facet1)
-			}
-			hometown
-			age
-		}
-	}
-`
-	res, err := Parse(Request{Str: query})
-	require.NoError(t, err)
-	require.NotNil(t, res.Query[0])
-	require.Equal(t, []string{"friends", "hometown", "age"}, childAttrs(res.Query[0]))
-	require.NotNil(t, res.Query[0].Children[0].Facets)
-	require.Equal(t, true, res.Query[0].Children[0].Facets.AllKeys)
-	require.Equal(t, []string{"name"}, childAttrs(res.Query[0].Children[0]))
-	require.NotNil(t, res.Query[0].Children[0].Children[0].Facets)
-	require.Equal(t, false, res.Query[0].Children[0].Children[0].Facets.AllKeys)
-	require.Equal(t, "facet1", res.Query[0].Children[0].Children[0].Facets.Param[0].Key)
-}
-
 func TestParseRegexp1(t *testing.T) {
 	query := `
 	{

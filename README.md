@@ -78,4 +78,4 @@ Frequently asked questions about the license are addressed in
 [LICENSE_FAQ.md](LICENSE_FAQ.md).
 
 Certain portions of this project are licensed by contributors or others
-under the terms of open source licenses such as the Apache 2.0 license.
+under the terms of open source licenses such as the Apache License v2.0.

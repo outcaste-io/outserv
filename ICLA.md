@@ -2,7 +2,7 @@
 ### Individual Contributor License Agreement ("Agreement")
 
 Thank you for your interest in the
-"Project", owned and run by Outcaste, Inc. ("Outcaste").
+"Project", owned and run by Outcaste LLC ("Outcaste").
 In order to clarify the intellectual property license
 granted with Contributions from any person or entity, Outcaste
 must have a Contributor License Agreement ("CLA") on file that has
