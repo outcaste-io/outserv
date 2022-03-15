@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -227,6 +228,7 @@ func (n *node) applyProposal(e raftpb.Entry) error {
 		dst.MaxNsID += uint64(p.NumNsids)
 	case p.CoreHours > 0.0:
 		dst.CoreHours += p.CoreHours
+		dst.CoreHours = math.Round(dst.CoreHours*1000.0) / 1000.0
 	}
 
 	// Now assign the new state back.
