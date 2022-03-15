@@ -494,6 +494,9 @@ func getDgraphDirPredArg(def *ast.FieldDefinition) *ast.Argument {
 }
 
 // genDgSchema generates Dgraph schema from a valid graphql schema.
+//
+// TODO: This function can just directly spit out the pb.SchemaUpdates list
+// instead of creating the schema in string.
 func genDgSchema(gqlSch *ast.Schema, definitions []string,
 	providesFieldsMap map[string]map[string]bool) string {
 	var typeStrings []string
