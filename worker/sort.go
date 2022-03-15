@@ -229,20 +229,7 @@ func sortWithIndex(ctx context.Context, ts *pb.SortMessage) *sortresult {
 		return resultWithError(errors.Errorf("Attribute %s is not sortable.", order.Attr))
 	}
 
-	var prefix []byte
-	if len(order.Langs) > 0 {
-		// Only one languge is allowed.
-		lang := order.Langs[0]
-		tokenizer = tok.GetTokenizerForLang(tokenizer, lang)
-		langTokenizer, ok := tokenizer.(tok.ExactTokenizer)
-		if !ok {
-			return resultWithError(errors.Errorf(
-				"Failed to get tokenizer for Attribute %s for language %s.", order.Attr, lang))
-		}
-		prefix = langTokenizer.Prefix()
-	} else {
-		prefix = []byte{tokenizer.Identifier()}
-	}
+	prefix := []byte{tokenizer.Identifier()}
 
 	// Iterate over every bucket / token.
 	iterOpt := badger.DefaultIteratorOptions
@@ -394,7 +381,6 @@ func multiSort(ctx context.Context, r *sortresult, ts *pb.SortMessage) error {
 		in := &pb.Query{
 			Attr:    ts.Order[i].Attr,
 			UidList: codec.ToSortedList(dest),
-			Langs:   ts.Order[i].Langs,
 			ReadTs:  ts.ReadTs,
 		}
 		go fetchValues(ctx, in, i, och)
@@ -451,7 +437,7 @@ func multiSort(ctx context.Context, r *sortresult, ts *pb.SortMessage) error {
 		for j, uid := range ul.SortedUids {
 			vals[j] = sortVals[uid]
 		}
-		if err := types.Sort(vals, &ul.SortedUids, desc, ""); err != nil {
+		if err := types.Sort(vals, &ul.SortedUids, desc); err != nil {
 			return err
 		}
 		// Paginate
@@ -754,13 +740,6 @@ func sortByValue(ctx context.Context, ts *pb.SortMessage, ul *pb.List,
 	multiSortVals := make([]types.Val, 0, lenList)
 	order := ts.Order[0]
 
-	var lang string
-	if langCount := len(order.Langs); langCount == 1 {
-		lang = order.Langs[0]
-	} else if langCount > 1 {
-		return nil, errors.Errorf("Sorting on multiple language is not supported.")
-	}
-
 	// nullsList is the list of UIDs for which value doesn't exist.
 	var nullsList []uint64
 	var nullVals [][]types.Val
@@ -770,7 +749,7 @@ func sortByValue(ctx context.Context, ts *pb.SortMessage, ul *pb.List,
 			return multiSortVals, ctx.Err()
 		default:
 			uid := ul.SortedUids[i]
-			val, err := fetchValue(uid, order.Attr, order.Langs, typ, ts.ReadTs)
+			val, err := fetchValue(uid, order.Attr, typ, ts.ReadTs)
 			if err != nil {
 				// Value couldn't be found or couldn't be converted to the sort type.
 				// It will be appended to the end of the result based on the pagination.
@@ -783,7 +762,7 @@ func sortByValue(ctx context.Context, ts *pb.SortMessage, ul *pb.List,
 			values = append(values, []types.Val{val})
 		}
 	}
-	err := types.Sort(values, &uids, []bool{order.Desc}, lang)
+	err := types.Sort(values, &uids, []bool{order.Desc})
 	ul.SortedUids = append(uids, nullsList...)
 	values = append(values, nullVals...)
 	if len(ts.Order) > 1 {
@@ -795,7 +774,7 @@ func sortByValue(ctx context.Context, ts *pb.SortMessage, ul *pb.List,
 }
 
 // fetchValue gets the value for a given UID.
-func fetchValue(uid uint64, attr string, langs []string, scalar types.TypeID,
+func fetchValue(uid uint64, attr string, scalar types.TypeID,
 	readTs uint64) (types.Val, error) {
 	// Don't put the values in memory
 	pl, err := posting.GetNoStore(x.DataKey(attr, uid), readTs)
@@ -803,7 +782,7 @@ func fetchValue(uid uint64, attr string, langs []string, scalar types.TypeID,
 		return types.Val{}, err
 	}
 
-	src, err := pl.ValueFor(readTs, langs)
+	src, err := pl.ValueFor(readTs)
 
 	if err != nil {
 		return types.Val{}, err

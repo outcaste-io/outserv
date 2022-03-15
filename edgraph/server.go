@@ -639,13 +639,6 @@ func validateDQLSchemaForGraphQL(ctx context.Context,
 				"and is missing @upsert that is expected by the GraphQL API.",
 				x.ParseAttr(gqlPred.Predicate))
 		}
-		// if gqlSchema had @lang, then dqlSchema must have it. dqlSchema can't remove @lang.
-		// if gqlSchema didn't had @lang, it is allowed to dqlSchema to add it.
-		if gqlPred.Lang && !dqlPred.Lang {
-			return errors.Errorf("can't alter predicate %s as it is used by the GraphQL API, "+
-				"and is missing @lang that is expected by the GraphQL API.",
-				x.ParseAttr(gqlPred.Predicate))
-		}
 	}
 
 	return nil

@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/outserv/billing"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/ee"
 	"github.com/outcaste-io/outserv/ee/audit"
@@ -775,7 +776,7 @@ func run() {
 
 	raft := z.NewSuperFlag(Alpha.Conf.GetString("raft")).MergeAndCheckDefault(worker.RaftDefaults)
 	x.WorkerConfig = x.WorkerOptions{
-		PeerAddr:            strings.Split(Alpha.Conf.GetString("zero"), ","),
+		PeerAddr:            strings.Split(Alpha.Conf.GetString("peer"), ","),
 		Raft:                raft,
 		WhiteListedIPRanges: ips,
 		StrictMutations:     opts.MutationsMode == worker.StrictMutations,
@@ -938,8 +939,9 @@ func run() {
 		glog.Errorf("Grpc serve returned with error: %+v", err)
 	}()
 
-	updaters := z.NewCloser(3)
+	updaters := z.NewCloser(4)
 	go func() {
+		billing.Run(updaters)
 		zero.Run(updaters, bindall)
 
 		worker.StartRaftNodes(worker.State.WALstore, bindall)

@@ -19,10 +19,10 @@ package worker
 import (
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/tok"
 	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/golang/glog"
 )
 
 type matchFunc func(types.Val, *stringFilter) bool
@@ -30,7 +30,6 @@ type matchFunc func(types.Val, *stringFilter) bool
 type stringFilter struct {
 	funcName  string
 	funcType  FuncType
-	lang      string
 	tokens    []string
 	match     matchFunc
 	ineqValue types.Val
@@ -101,7 +100,7 @@ func tokenizeValue(value types.Val, filter *stringFilter) []string {
 	// tokenizer was used in previous stages of query processing, it has to be available
 	x.AssertTrue(found)
 
-	tokens, err := tok.BuildTokens(value.Value, tok.GetTokenizerForLang(tokenizer, filter.lang))
+	tokens, err := tok.BuildTokens(value.Value, tokenizer)
 	if err != nil {
 		glog.Errorf("Error while building tokens: %s", err)
 		return []string{}

@@ -10,7 +10,6 @@ import (
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	"golang.org/x/text/collate"
-	"golang.org/x/text/language"
 )
 
 type sortBase struct {
@@ -82,7 +81,7 @@ func IsSortable(tid TypeID) bool {
 
 // SortWithFacet sorts the given array in-place and considers the given facets to calculate
 // the proper ordering.
-func SortWithFacet(v [][]Val, ul *[]uint64, desc []bool, lang string) error {
+func SortWithFacet(v [][]Val, ul *[]uint64, desc []bool) error {
 	if len(v) == 0 || len(v[0]) == 0 {
 		return nil
 	}
@@ -94,14 +93,6 @@ func SortWithFacet(v [][]Val, ul *[]uint64, desc []bool, lang string) error {
 	}
 
 	var cl *collate.Collator
-	if lang != "" {
-		// Collator is nil if we are unable to parse the language.
-		// We default to bytewise comparison in that case.
-		if langTag, err := language.Parse(lang); err == nil {
-			cl = collate.New(langTag)
-		}
-	}
-
 	b := sortBase{v, desc, ul, cl}
 	toBeSorted := byValue{b}
 	sort.Sort(toBeSorted)
@@ -109,8 +100,8 @@ func SortWithFacet(v [][]Val, ul *[]uint64, desc []bool, lang string) error {
 }
 
 // Sort sorts the given array in-place.
-func Sort(v [][]Val, ul *[]uint64, desc []bool, lang string) error {
-	return SortWithFacet(v, ul, desc, lang)
+func Sort(v [][]Val, ul *[]uint64, desc []bool) error {
+	return SortWithFacet(v, ul, desc)
 }
 
 // Less returns true if a is strictly less than b.
