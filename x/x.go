@@ -854,16 +854,6 @@ func (t *Timer) String() string {
 	return fmt.Sprintf("Timer Total: %s. Breakdown: %v", t.Total(), t.records)
 }
 
-// PredicateLang extracts the language from a predicate (or facet) name.
-// Returns the predicate and the language tag, if any.
-func PredicateLang(s string) (string, string) {
-	i := strings.LastIndex(s, "@")
-	if i <= 0 {
-		return s, ""
-	}
-	return s[0:i], s[i+1:]
-}
-
 // DivideAndRule is used to divide a number of tasks among multiple go routines.
 func DivideAndRule(num int) (numGo, width int) {
 	numGo, width = 64, 0

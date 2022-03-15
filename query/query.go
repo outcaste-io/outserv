@@ -110,9 +110,6 @@ type params struct {
 	GetUid bool
 	// Order is the list of predicates to sort by and their sort order.
 	Order []*pb.Order
-	// Langs is the list of languages and their preferred order for looking up a predicate value.
-	Langs []string
-
 	// Var is the name of the variable defined in this SubGraph
 	// (e.g. in "x as name", this would be x).
 	Var string
@@ -255,7 +252,6 @@ type SubGraph struct {
 	// TODO: Would make sense to move these to a map.
 	ExpandPreds []*pb.ValueList
 	GroupbyRes  []*groupResults // one result for each uid list.
-	LangTags    []*pb.LangList
 
 	// SrcUIDs is a list of unique source UIDs. They are always copies of destUIDs
 	// of parent nodes in GraphQL structure.
@@ -322,10 +318,6 @@ func (sg *SubGraph) createSrcFunction(gf *gql.Function) {
 		sg.SrcFunc.IsLenVar = false
 		return
 	}
-
-	if gf.Lang != "" {
-		sg.Params.Langs = append(sg.Params.Langs, gf.Lang)
-	}
 }
 
 // DebugPrint prints out the SubGraph tree in a nice format for debugging purposes.
@@ -366,14 +358,6 @@ var (
 func (sg *SubGraph) isSimilar(ssg *SubGraph) bool {
 	if sg.Attr != ssg.Attr {
 		return false
-	}
-	if len(sg.Params.Langs) != len(ssg.Params.Langs) {
-		return false
-	}
-	for i := 0; i < len(sg.Params.Langs) && i < len(ssg.Params.Langs); i++ {
-		if sg.Params.Langs[i] != ssg.Params.Langs[i] {
-			return false
-		}
 	}
 	if sg.Params.DoCount {
 		return ssg.Params.DoCount
@@ -538,7 +522,6 @@ func treeCopy(gq *gql.GraphQuery, sg *SubGraph) error {
 			Expand:       gchild.Expand,
 			GetUid:       sg.Params.GetUid,
 			IgnoreReflex: sg.Params.IgnoreReflex,
-			Langs:        gchild.Langs,
 			NeedsVar:     append(gchild.NeedsVar[:0:0], gchild.NeedsVar...),
 			Normalize:    gchild.Normalize || sg.Params.Normalize,
 			Order:        gchild.Order,
@@ -789,7 +772,6 @@ func newGraph(ctx context.Context, gq *gql.GraphQuery) (*SubGraph, error) {
 		GetUid:           isDebug(ctx),
 		IgnoreReflex:     gq.IgnoreReflex,
 		IsEmpty:          gq.IsEmpty,
-		Langs:            gq.Langs,
 		NeedsVar:         append(gq.NeedsVar[:0:0], gq.NeedsVar...),
 		Normalize:        gq.Normalize,
 		Order:            gq.Order,
@@ -914,11 +896,6 @@ func createTaskQuery(ctx context.Context, sg *SubGraph) (*pb.Query, error) {
 		}
 	}
 
-	// If the lang is set to *, query all the languages.
-	if len(sg.Params.Langs) == 1 && sg.Params.Langs[0] == "*" {
-		sg.Params.ExpandAll = true
-	}
-
 	// first is to limit how many results we want.
 	first, offset := calculatePaginationParams(sg)
 
@@ -926,7 +903,6 @@ func createTaskQuery(ctx context.Context, sg *SubGraph) (*pb.Query, error) {
 		ReadTs:    sg.ReadTs,
 		Cache:     int32(sg.Cache),
 		Attr:      x.NamespaceAttr(namespace, attr),
-		Langs:     sg.Params.Langs,
 		Reverse:   reverse,
 		SrcFunc:   srcFunc,
 		AfterUid:  sg.Params.AfterUID,
@@ -2067,7 +2043,6 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 			sg.uidMatrix = result.UidMatrix
 			sg.valueMatrix = result.ValueMatrix
 			sg.counts = result.Counts
-			sg.LangTags = result.LangMatrix
 			sg.List = result.List
 
 			if sg.Params.DoCount {
@@ -2236,7 +2211,6 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 				Params: params{
 					Alias:        it.Alias,
 					IgnoreResult: true,
-					Langs:        it.Langs,
 				},
 			})
 		}
@@ -2420,9 +2394,8 @@ func (sg *SubGraph) createOrderForTask(ns uint64) []*pb.Order {
 	out := []*pb.Order{}
 	for _, o := range sg.Params.Order {
 		oc := &pb.Order{
-			Attr:  x.NamespaceAttr(ns, o.Attr),
-			Desc:  o.Desc,
-			Langs: o.Langs,
+			Attr: x.NamespaceAttr(ns, o.Attr),
+			Desc: o.Desc,
 		}
 		out = append(out, oc)
 	}
@@ -2462,7 +2435,7 @@ func (sg *SubGraph) sortAndPaginateUsingVar(ctx context.Context) error {
 		if len(values) == 0 {
 			continue
 		}
-		if err := types.Sort(values, &uids, []bool{sg.Params.Order[0].Desc}, ""); err != nil {
+		if err := types.Sort(values, &uids, []bool{sg.Params.Order[0].Desc}); err != nil {
 			return err
 		}
 		sg.uidMatrix[i].SortedUids = uids

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/golang/protobuf/proto"
 	"github.com/outcaste-io/badger/v3"
 	"github.com/outcaste-io/outserv/algo"
 	"github.com/outcaste-io/outserv/codec"
@@ -396,21 +395,9 @@ func (qs *queryState) handleValuePostings(ctx context.Context, args funcArgs) er
 				out.UidMatrix = append(out.UidMatrix, &pb.List{})
 				out.ValueMatrix = append(out.ValueMatrix,
 					&pb.ValueList{Values: []*pb.TaskValue{}})
-				if q.ExpandAll {
-					// To keep the cardinality same as that of ValueMatrix.
-					out.LangMatrix = append(out.LangMatrix, &pb.LangList{})
-				}
 				continue
 			case err != nil:
 				return err
-			}
-
-			if q.ExpandAll {
-				langTags, err := pl.GetLangTags(args.q.ReadTs)
-				if err != nil {
-					return err
-				}
-				out.LangMatrix = append(out.LangMatrix, &pb.LangList{Lang: langTags})
 			}
 
 			res := sroar.NewBitmap()
@@ -499,7 +486,6 @@ func (qs *queryState) handleValuePostings(ctx context.Context, args funcArgs) er
 		out.UidMatrix = append(out.UidMatrix, chunk.UidMatrix...)
 		out.Counts = append(out.Counts, chunk.Counts...)
 		out.ValueMatrix = append(out.ValueMatrix, chunk.ValueMatrix...)
-		out.LangMatrix = append(out.LangMatrix, chunk.LangMatrix...)
 	}
 	return nil
 }
@@ -508,46 +494,15 @@ func facetsFilterValuePostingList(args funcArgs, pl *posting.List,
 	listType bool, fn func(p *pb.Posting)) error {
 	q := args.q
 
-	var langMatch *pb.Posting
-	var err error
-
 	// We need to pick multiple postings only in two cases:
 	// 1. ExpandAll is true.
 	// 2. Attribute type is of list type and no lang tag is specified in query.
-	pickMultiplePostings := q.ExpandAll || (listType && len(q.Langs) == 0)
-
-	if !pickMultiplePostings {
-		// Retrieve the posting that matches the language preferences.
-		if len(q.Langs) > 0 {
-			langMatch, err = pl.PostingFor(q.ReadTs, q.Langs)
-			if err != nil && err != posting.ErrNoValue {
-				return err
-			}
-		}
-	}
+	pickMultiplePostings := q.ExpandAll || listType
 
 	// TODO(Ashish): This function starts iteration from start(afterUID is always 0). This can be
 	// optimized in come cases. For example when we know lang tag to fetch, we can directly jump
 	// to posting starting with that UID(check list.ValueFor()).
 	return pl.Iterate(q.ReadTs, 0, func(p *pb.Posting) error {
-		if q.ExpandAll {
-			// If q.ExpandAll is true we need to consider all postings irrespective of langs.
-		} else if listType && len(q.Langs) == 0 {
-			// Don't retrieve tagged values unless explicitly asked.
-			if len(p.LangTag) > 0 {
-				return nil
-			}
-		} else {
-			// Don't retrieve tagged values unless explicitly asked.
-			if len(q.Langs) == 0 && len(p.LangTag) > 0 {
-				return nil
-			}
-			// Only consider the posting that matches our language preferences.
-			if len(q.Langs) > 0 && !proto.Equal(p, langMatch) {
-				return nil
-			}
-		}
-
 		fn(p)
 		if pickMultiplePostings {
 			return nil // Continue iteration.
@@ -877,16 +832,6 @@ func (qs *queryState) helpProcessTask(ctx context.Context, q *pb.Query, gid uint
 		return nil, errors.Errorf("Predicate %s is not indexed", x.ParseAttr(q.Attr))
 	}
 
-	if len(q.Langs) > 0 && !schema.State().HasLang(attr) {
-		return nil, errors.Errorf("Language tags can only be used with predicates of string type"+
-			" having @lang directive in schema. Got: [%v]", x.ParseAttr(attr))
-	}
-	if len(q.Langs) == 1 && q.Langs[0] == "*" {
-		// Reset the Langs fields. The ExpandAll field is set to true already so there's no
-		// more need to store the star value in this field.
-		q.Langs = nil
-	}
-
 	typ, err := schema.State().TypeOf(attr)
 	if err != nil {
 		// All schema checks are done before this, this type is only used to
@@ -976,34 +921,8 @@ func (qs *queryState) helpProcessTask(ctx context.Context, q *pb.Query, gid uint
 		}
 	}
 
-	// For string matching functions, check the language. We are not checking here
-	// for hasFn as filtering for it has already been done in handleHasFunction.
-	if srcFn.fnType != hasFn && needsStringFiltering(srcFn, q.Langs, attr) {
-		span.Annotate(nil, "filterStringFunction")
-		if err := qs.filterStringFunction(args); err != nil {
-			return nil, err
-		}
-	}
-
 	out.IntersectDest = srcFn.intersectDest
 	return out, nil
-}
-
-func needsStringFiltering(srcFn *functionContext, langs []string, attr string) bool {
-	if !srcFn.isStringFn {
-		return false
-	}
-
-	// If a predicate doesn't have @lang directive in schema, we don't need to do any string
-	// filtering.
-	if !schema.State().HasLang(attr) {
-		return false
-	}
-
-	return langForFunc(langs) != "." &&
-		(srcFn.fnType == standardFn || srcFn.fnType == hasFn ||
-			srcFn.fnType == fullTextSearchFn || srcFn.fnType == compareAttrFn ||
-			srcFn.fnType == customIndexFn)
 }
 
 func (qs *queryState) handleCompareScalarFunction(ctx context.Context, arg funcArgs) error {
@@ -1079,9 +998,7 @@ func (qs *queryState) handleRegexFunction(ctx context.Context, arg funcArgs) err
 	}
 
 	isList := schema.State().IsList(attr)
-	lang := langForFunc(arg.q.Langs)
-
-	span.Annotatef(nil, "Total uids: %d, list: %t lang: %v", uids.GetCardinality(), isList, lang)
+	span.Annotatef(nil, "Total uids: %d, list: %t", uids.GetCardinality(), isList)
 
 	filtered := sroar.NewBitmap()
 	itr := uids.NewIterator()
@@ -1098,11 +1015,8 @@ func (qs *queryState) handleRegexFunction(ctx context.Context, arg funcArgs) err
 
 		vals := make([]types.Val, 1)
 		switch {
-		case lang != "":
-			vals[0], err = pl.ValueForTag(arg.q.ReadTs, lang)
-
 		case isList:
-			vals, err = pl.AllUntaggedValues(arg.q.ReadTs)
+			vals, err = pl.AllValues(arg.q.ReadTs)
 
 		default:
 			vals[0], err = pl.Value(arg.q.ReadTs)
@@ -1163,7 +1077,6 @@ func (qs *queryState) handleCompareFunction(ctx context.Context, arg funcArgs) e
 
 	x.AssertTrue(len(arg.out.UidMatrix) > 0)
 	isList := schema.State().IsList(attr)
-	lang := langForFunc(arg.q.Langs)
 
 	filterRow := func(row int, compareFunc func(types.Val) bool) error {
 		select {
@@ -1174,76 +1087,43 @@ func (qs *queryState) handleCompareFunction(ctx context.Context, arg funcArgs) e
 
 		var filterErr error
 		algo.ApplyFilter(arg.out.UidMatrix[row], func(uid uint64, i int) bool {
-			switch lang {
-			case "":
-				if isList {
-					pl, err := posting.GetNoStore(x.DataKey(attr, uid), arg.q.ReadTs)
-					if err != nil {
-						filterErr = err
-						return false
-					}
-					svs, err := pl.AllUntaggedValues(arg.q.ReadTs)
-					if err != nil {
-						if err != posting.ErrNoValue {
-							filterErr = err
-						}
-						return false
-					}
-					for _, sv := range svs {
-						dst, err := types.Convert(sv, typ)
-						if err == nil && compareFunc(dst) {
-							return true
-						}
-					}
-
-					return false
-				}
-
+			if isList {
 				pl, err := posting.GetNoStore(x.DataKey(attr, uid), arg.q.ReadTs)
 				if err != nil {
 					filterErr = err
 					return false
 				}
-				sv, err := pl.Value(arg.q.ReadTs)
+				svs, err := pl.AllValues(arg.q.ReadTs)
 				if err != nil {
 					if err != posting.ErrNoValue {
 						filterErr = err
 					}
 					return false
 				}
-				dst, err := types.Convert(sv, typ)
-				return err == nil && compareFunc(dst)
-			case ".":
-				pl, err := posting.GetNoStore(x.DataKey(attr, uid), arg.q.ReadTs)
-				if err != nil {
-					filterErr = err
-					return false
-				}
-				values, err := pl.AllValues(arg.q.ReadTs) // does not return ErrNoValue
-				if err != nil {
-					filterErr = err
-					return false
-				}
-				for _, sv := range values {
+				for _, sv := range svs {
 					dst, err := types.Convert(sv, typ)
 					if err == nil && compareFunc(dst) {
 						return true
 					}
 				}
+
 				return false
-			default:
-				sv, err := fetchValue(uid, attr, arg.q.Langs, typ, arg.q.ReadTs)
-				if err != nil {
-					if err != posting.ErrNoValue {
-						filterErr = err
-					}
-					return false
-				}
-				if sv.Value == nil {
-					return false
-				}
-				return compareFunc(sv)
 			}
+
+			pl, err := posting.GetNoStore(x.DataKey(attr, uid), arg.q.ReadTs)
+			if err != nil {
+				filterErr = err
+				return false
+			}
+			sv, err := pl.Value(arg.q.ReadTs)
+			if err != nil {
+				if err != posting.ErrNoValue {
+					filterErr = err
+				}
+				return false
+			}
+			dst, err := types.Convert(sv, typ)
+			return err == nil && compareFunc(dst)
 		})
 		if filterErr != nil {
 			return err
@@ -1324,8 +1204,7 @@ func (qs *queryState) handleMatchFunction(ctx context.Context, arg funcArgs) err
 	}
 
 	isList := schema.State().IsList(attr)
-	lang := langForFunc(arg.q.Langs)
-	span.Annotatef(nil, "Total uids: %d, list: %t lang: %v", uids.GetCardinality(), isList, lang)
+	span.Annotatef(nil, "Total uids: %d, list: %t", uids.GetCardinality(), isList)
 	// arg.out.UidMatrix = append(arg.out.UidMatrix, uids)
 
 	matchQuery := strings.Join(arg.srcFn.tokens, "")
@@ -1345,11 +1224,8 @@ func (qs *queryState) handleMatchFunction(ctx context.Context, arg funcArgs) err
 
 		vals := make([]types.Val, 1)
 		switch {
-		case lang != "":
-			vals[0], err = pl.ValueForTag(arg.q.ReadTs, lang)
-
 		case isList:
-			vals, err = pl.AllUntaggedValues(arg.q.ReadTs)
+			vals, err = pl.AllValues(arg.q.ReadTs)
 
 		default:
 			vals[0], err = pl.Value(arg.q.ReadTs)
@@ -1479,16 +1355,12 @@ func (qs *queryState) filterStringFunction(arg funcArgs) error {
 		uids.Or(bm)
 	}
 
-	lang := langForFunc(arg.q.Langs)
 	filter := &stringFilter{
 		funcName: arg.srcFn.fname,
 		funcType: arg.srcFn.fnType,
-		lang:     lang,
 	}
 	switch arg.srcFn.fnType {
 	case hasFn:
-		// Dont do anything, as filtering based on lang is already
-		// done above.
 		filter = nil
 	case fullTextSearchFn:
 		filter.tokens = arg.srcFn.tokens
@@ -1518,7 +1390,7 @@ func (qs *queryState) filterStringFunction(arg funcArgs) error {
 	// the difference.
 	remove := sroar.NewBitmap()
 	for uid := itr.Next(); uid > 0; uid = itr.Next() {
-		vals, err := qs.getValsForUID(attr, lang, uid, arg.q.ReadTs)
+		vals, err := qs.getValsForUID(attr, uid, arg.q.ReadTs)
 		switch {
 		case err == posting.ErrNoValue:
 			continue
@@ -1548,7 +1420,7 @@ func (qs *queryState) filterStringFunction(arg funcArgs) error {
 	return nil
 }
 
-func (qs *queryState) getValsForUID(attr, lang string, uid, ReadTs uint64) ([]types.Val, error) {
+func (qs *queryState) getValsForUID(attr string, uid, ReadTs uint64) ([]types.Val, error) {
 	key := x.DataKey(attr, uid)
 	pl, err := qs.cache.Get(key)
 	if err != nil {
@@ -1557,20 +1429,12 @@ func (qs *queryState) getValsForUID(attr, lang string, uid, ReadTs uint64) ([]ty
 
 	var vals []types.Val
 	var val types.Val
-	if lang == "" {
-		if schema.State().IsList(attr) {
-			// NOTE: we will never reach here if this function is called from handleHasFunction, as
-			// @lang is not allowed for list predicates.
-			vals, err = pl.AllValues(ReadTs)
-		} else {
-			val, err = pl.Value(ReadTs)
-			vals = append(vals, val)
-		}
+	if schema.State().IsList(attr) {
+		vals, err = pl.AllValues(ReadTs)
 	} else {
-		val, err = pl.ValueForTag(ReadTs, lang)
+		val, err = pl.Value(ReadTs)
 		vals = append(vals, val)
 	}
-
 	return vals, err
 }
 
@@ -1704,14 +1568,8 @@ func parseSrcFn(ctx context.Context, q *pb.Query) (*functionContext, error) {
 				continue
 			}
 
-			var lang string
-			if len(q.Langs) > 0 {
-				// Only one language is allowed.
-				lang = q.Langs[0]
-			}
-
 			// Get tokens ge/le ineqValueToken.
-			if tokens, fc.ineqValueToken, err = getInequalityTokens(ctx, q.ReadTs, attr, f, lang,
+			if tokens, fc.ineqValueToken, err = getInequalityTokens(ctx, q.ReadTs, attr, f,
 				ineqValues); err != nil {
 				return nil, err
 			}
@@ -1781,7 +1639,7 @@ func parseSrcFn(ctx context.Context, q *pb.Query) (*functionContext, error) {
 			return nil, errors.Errorf("Attribute %s is not indexed with type %s", x.ParseAttr(attr),
 				required)
 		}
-		if fc.tokens, err = getStringTokens(q.SrcFunc.Args, langForFunc(q.Langs), fnType); err != nil {
+		if fc.tokens, err = getStringTokens(q.SrcFunc.Args, fnType); err != nil {
 			return nil, err
 		}
 		fc.intersectDest = needsIntersect(f)
@@ -1826,8 +1684,7 @@ func parseSrcFn(ctx context.Context, q *pb.Query) (*functionContext, error) {
 		if !ok {
 			return nil, errors.Errorf("Could not find tokenizer with name %q", tokerName)
 		}
-		fc.tokens, _ = tok.BuildTokens(valToTok.Value,
-			tok.GetTokenizerForLang(tokenizer, langForFunc(q.Langs)))
+		fc.tokens, _ = tok.BuildTokens(valToTok.Value, tokenizer)
 		fc.intersectDest = needsIntersect(f)
 		fc.n = len(fc.tokens)
 	case regexFn:
@@ -2114,21 +1971,6 @@ func (qs *queryState) handleHasFunction(ctx context.Context, q *pb.Query, out *p
 	it := txn.NewIterator(itOpt)
 	defer it.Close()
 
-	lang := langForFunc(q.Langs)
-	needFiltering := needsStringFiltering(srcFn, q.Langs, q.Attr)
-
-	// This function checks if we should include uid in result or not when has is queried with
-	// @lang(eg: has(name@en)). We need to do this inside this function to return correct result
-	// for first.
-	checkInclusion := func(uid uint64) error {
-		if !needFiltering {
-			return nil
-		}
-
-		_, err := qs.getValsForUID(q.Attr, lang, uid, q.ReadTs)
-		return err
-	}
-
 	skipCnt := int32(0)
 	setCnt := 0
 	res := sroar.NewBitmap()
@@ -2165,14 +2007,6 @@ loop:
 			continue
 		}
 		if item.UserMeta()&posting.BitCompletePosting > 0 {
-			// This bit would only be set if there are valid uids in Bitmap.
-			err := checkInclusion(pk.Uid)
-			switch {
-			case err == posting.ErrNoValue:
-				continue
-			case err != nil:
-				return err
-			}
 			// skip entries upto Offset and do not store in the result.
 			if skipCnt < q.Offset {
 				skipCnt++
@@ -2198,13 +2032,6 @@ loop:
 		case err != nil:
 			return err
 		case !empty:
-			err := checkInclusion(pk.Uid)
-			switch {
-			case err == posting.ErrNoValue:
-				continue
-			case err != nil:
-				return err
-			}
 			// skip entries upto Offset and do not store in the result.
 			if skipCnt < q.Offset {
 				skipCnt++

@@ -106,12 +106,7 @@ func (e *exporter) toJSON() (*bpb.KVList, error) {
 			fmt.Fprintf(bp, "{\"uid\":"+uidFmtStrJson, p.Uid)
 			fmt.Fprint(bp, "}]")
 		} else {
-			if p.PostingType == pb.Posting_VALUE_LANG {
-				fmt.Fprintf(bp, `,"%s@%s":`, e.attr, string(p.LangTag))
-			} else {
-				fmt.Fprintf(bp, `,"%s":`, e.attr)
-			}
-
+			fmt.Fprintf(bp, `,"%s":`, e.attr)
 			val := types.Val{Tid: types.TypeID(p.ValType), Value: p.Value}
 			str, err := valToStr(val)
 			if err != nil {
@@ -165,9 +160,6 @@ func toSchema(attr string, update *pb.SchemaUpdate) *bpb.KV {
 	}
 	if update.GetCount() {
 		x.Check2(buf.WriteString(" @count"))
-	}
-	if update.GetLang() {
-		x.Check2(buf.WriteString(" @lang"))
 	}
 	if update.GetUpsert() {
 		x.Check2(buf.WriteString(" @upsert"))

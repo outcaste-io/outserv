@@ -1420,11 +1420,6 @@ func (sg *SubGraph) preTraverse(enc *encoder, uid uint64, dst fastJsonNode) erro
 				return err
 			}
 		default:
-			if pc.Params.Alias == "" && len(pc.Params.Langs) > 0 && pc.Params.Langs[0] != "*" {
-				fieldName += "@"
-				fieldName += strings.Join(pc.Params.Langs, ":")
-			}
-
 			// calculate it once to avoid multiple call to idToAttr()
 			fieldID := enc.idForAttr(fieldName)
 			// Add len of fieldName to enc.curSize.
@@ -1441,24 +1436,16 @@ func (sg *SubGraph) preTraverse(enc *encoder, uid uint64, dst fastJsonNode) erro
 				continue
 			}
 
-			for i, tv := range pc.valueMatrix[idx].Values {
+			for _, tv := range pc.valueMatrix[idx].Values {
 				// if conversion not possible, we ignore it in the result.
 				sv, convErr := convertWithBestEffort(tv, pc.Attr)
 				if convErr != nil {
 					return convErr
 				}
 
-				if pc.Params.ExpandAll && len(pc.LangTags[idx].Lang) != 0 {
-					if i >= len(pc.LangTags[idx].Lang) {
-						return errors.Errorf(
-							"pb.error: all lang tags should be either present or absent")
-					}
+				if pc.Params.ExpandAll {
 					fieldNameWithTag := fieldName
-					lang := pc.LangTags[idx].Lang[i]
-					if lang != "" && lang != "*" {
-						fieldNameWithTag += "@" + lang
-					}
-					encodeAsList := pc.List && lang == ""
+					encodeAsList := pc.List
 					if err := enc.AddListValue(dst, enc.idForAttr(fieldNameWithTag),
 						sv, encodeAsList); err != nil {
 						return err
@@ -1466,7 +1453,7 @@ func (sg *SubGraph) preTraverse(enc *encoder, uid uint64, dst fastJsonNode) erro
 					continue
 				}
 
-				encodeAsList := pc.List && len(pc.Params.Langs) == 0
+				encodeAsList := pc.List
 				if !pc.Params.Normalize {
 					err := enc.AddListValue(dst, fieldID, sv, encodeAsList)
 					if err != nil {

@@ -64,54 +64,6 @@ func TestQueryEmptyDefaultNames(t *testing.T) {
 		js)
 }
 
-func TestQueryEmptyDefaultNameWithLanguage(t *testing.T) {
-	query := `{
-	  people(func: eq(name, "")) {
-		name@ko:en:hi
-	  }
-	}`
-	js := processQueryNoErr(t, query)
-	require.JSONEq(t,
-		`{"data":{"people": [{"name@ko:en:hi":"상현"},{"name@ko:en:hi":"Amit"}]}}`,
-		js)
-}
-
-func TestQueryNamesThatAreEmptyInLanguage(t *testing.T) {
-	query := `{
-	  people(func: eq(name@hi, "")) {
-		name@en
-	  }
-	}`
-	js := processQueryNoErr(t, query)
-	require.JSONEq(t,
-		`{"data":{"people": [{"name@en":"Andrew"}]}}`,
-		js)
-}
-
-func TestQueryNamesInLanguage(t *testing.T) {
-	query := `{
-	  people(func: eq(name@hi, "अमित")) {
-		name@en
-	  }
-	}`
-	js := processQueryNoErr(t, query)
-	require.JSONEq(t,
-		`{"data":{"people": [{"name@en":"Amit"}]}}`,
-		js)
-}
-
-func TestQueryAllLanguages(t *testing.T) {
-	query := `{
-	  people(func: eq(name@hi, "अमित")) {
-		name@*
-	  }
-	}`
-	js := processQueryNoErr(t, query)
-	require.JSONEq(t,
-		`{"data":{"people": [{"name@en":"Amit", "name@hi":"अमित", "name":""}]}}`,
-		js)
-}
-
 func TestQueryNamesBeforeA(t *testing.T) {
 	query := `{
 	  people(func: lt(name, "A")) {
