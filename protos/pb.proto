@@ -198,12 +198,10 @@ message Mutations {
   uint32 group_id = 1;
   repeated DirectedEdge edges = 3;
   repeated SchemaUpdate schema = 4;
-  repeated TypeUpdate types = 6;
   enum DropOp {
     NONE = 0;
     ALL = 1;
     DATA = 2;
-    TYPE = 3;
   }
   DropOp drop_op = 7;
   string drop_value = 8;
@@ -282,8 +280,6 @@ message KVS {
   // Predicates is the list of predicates known by the leader at the time of the
   // snapshot.
   repeated string predicates = 3;
-  // Types is the list of types known by the leader at the time of the snapshot.
-  repeated string types = 4;
 }
 
 // Posting messages.
@@ -400,11 +396,6 @@ message SchemaUpdate {
   reserved "explicit";
 }
 
-message TypeUpdate {
-  string type_name = 1;
-  repeated SchemaUpdate fields = 2;
-}
-
 message MapHeader {
   repeated bytes partition_keys = 1;
 }
@@ -506,7 +497,6 @@ message Operation {
     ALL = 1;
     DATA = 2;
     ATTR = 3;
-    TYPE = 4;
   }
   DropOp drop_op = 4;
 
@@ -707,7 +697,6 @@ message UpdateGraphQLSchemaRequest {
   uint64 start_ts = 1;
   string graphql_schema = 2;
   repeated SchemaUpdate dgraph_preds = 3;
-  repeated TypeUpdate dgraph_types = 4;
   string lambda_script = 5;
   Op op = 6;
 }
@@ -720,7 +709,6 @@ message UpdateGraphQLSchemaResponse {
 message BulkMeta {
   int64 edge_count = 1;
   map<string, SchemaUpdate> schema_map = 2;
-  repeated TypeUpdate types = 3;
 }
 
 message DeleteNsRequest {

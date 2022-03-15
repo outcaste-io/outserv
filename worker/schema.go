@@ -19,7 +19,6 @@ package worker
 import (
 	"context"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
 
@@ -236,30 +235,4 @@ func (w *grpcWorker) Schema(ctx context.Context, s *pb.SchemaRequest) (*pb.Schem
 		return &emptySchemaResult, errors.Errorf("This server doesn't serve group id: %v", s.GroupId)
 	}
 	return getSchema(ctx, s)
-}
-
-// GetTypes processes the type requests and retrieves the desired types.
-func GetTypes(ctx context.Context, req *pb.SchemaRequest) ([]*pb.TypeUpdate, error) {
-	if len(req.Types) == 0 && len(req.Predicates) > 0 {
-		return nil, nil
-	}
-
-	var typeNames []string
-	var out []*pb.TypeUpdate
-
-	if len(req.Types) == 0 {
-		typeNames = schema.State().Types()
-	} else {
-		typeNames = req.Types
-	}
-
-	for _, name := range typeNames {
-		typeUpdate, found := schema.State().GetType(name)
-		if !found {
-			continue
-		}
-		out = append(out, proto.Clone(&typeUpdate).(*pb.TypeUpdate))
-	}
-
-	return out, nil
 }

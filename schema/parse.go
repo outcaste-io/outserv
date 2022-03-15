@@ -299,63 +299,6 @@ func resolveTokenizers(updates []*pb.SchemaUpdate) error {
 	return nil
 }
 
-func parseTypeDeclaration(it *lex.ItemIterator, ns uint64) (*pb.TypeUpdate, error) {
-	// Iterator is currently on the token corresponding to the keyword type.
-	if it.Item().Typ != itemText || it.Item().Val != "type" {
-		return nil, it.Item().Errorf("Expected type keyword. Got %v", it.Item().Val)
-	}
-
-	it.Next()
-	if it.Item().Typ != itemText {
-		return nil, it.Item().Errorf("Expected type name. Got %v", it.Item().Val)
-	}
-	typeUpdate := &pb.TypeUpdate{TypeName: x.NamespaceAttr(ns, it.Item().Val)}
-
-	it.Next()
-	if it.Item().Typ != itemLeftCurl {
-		return nil, it.Item().Errorf("Expected {. Got %v", it.Item().Val)
-	}
-
-	var fields []*pb.SchemaUpdate
-	for it.Next() {
-		item := it.Item()
-
-		switch item.Typ {
-		case itemRightCurl:
-			it.Next()
-			if it.Item().Typ != itemNewLine && it.Item().Typ != lex.ItemEOF {
-				return nil, it.Item().Errorf(
-					"Expected new line or EOF after type declaration. Got %v", it.Item())
-			}
-			it.Prev()
-
-			fieldSet := make(map[string]struct{})
-			for _, field := range fields {
-				if _, ok := fieldSet[field.GetPredicate()]; ok {
-					return nil, it.Item().Errorf("Duplicate fields with name: %s",
-						x.ParseAttr(field.GetPredicate()))
-				}
-
-				fieldSet[field.GetPredicate()] = struct{}{}
-			}
-
-			typeUpdate.Fields = fields
-			return typeUpdate, nil
-		case itemText:
-			field, err := parseTypeField(it, typeUpdate.TypeName, ns)
-			if err != nil {
-				return nil, err
-			}
-			fields = append(fields, field)
-		case itemNewLine:
-			// Ignore empty lines.
-		default:
-			return nil, it.Item().Errorf("Unexpected token. Got %v", it.Item().Val)
-		}
-	}
-	return nil, errors.Errorf("Shouldn't reach here.")
-}
-
 func parseTypeField(it *lex.ItemIterator, typeName string, ns uint64) (*pb.SchemaUpdate, error) {
 	field := &pb.SchemaUpdate{Predicate: x.NamespaceAttr(ns, it.Item().Val)}
 	var list bool
@@ -434,27 +377,6 @@ func parseNamespace(it *lex.ItemIterator) (uint64, error) {
 // ParsedSchema represents the parsed schema and type updates.
 type ParsedSchema struct {
 	Preds []*pb.SchemaUpdate
-	Types []*pb.TypeUpdate
-}
-
-func isTypeDeclaration(item lex.Item, it *lex.ItemIterator) bool {
-	if item.Val != "type" {
-		return false
-	}
-
-	nextItems, err := it.Peek(2)
-	switch {
-	case err != nil || len(nextItems) != 2:
-		return false
-
-	case nextItems[0].Typ != itemText:
-		return false
-
-	case nextItems[1].Typ != itemLeftCurl:
-		return false
-	}
-
-	return true
 }
 
 // parse parses a schema string and returns the schema representation for it.
@@ -478,15 +400,6 @@ func parse(s string, namespace uint64) (*ParsedSchema, error) {
 	}
 
 	parseTypeOrSchema := func(item lex.Item, it *lex.ItemIterator, ns uint64) error {
-		if isTypeDeclaration(item, it) {
-			typeUpdate, err := parseTypeDeclaration(it, ns)
-			if err != nil {
-				return err
-			}
-			result.Types = append(result.Types, typeUpdate)
-			return nil
-		}
-
 		schema, err := parseScalarPair(it, item.Val, ns)
 		if err != nil {
 			return err

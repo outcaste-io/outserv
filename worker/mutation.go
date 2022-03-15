@@ -320,31 +320,6 @@ func createSchema(attr string, typ types.TypeID, hint pb.Metadata_HintType, ts u
 	return updateSchema(&s, ts)
 }
 
-func runTypeMutation(ctx context.Context, update *pb.TypeUpdate, ts uint64) error {
-	current := *update
-	schema.State().SetType(update.TypeName, current)
-	return updateType(update.TypeName, *update, ts)
-}
-
-// We commit schema to disk in blocking way, should be ok because this happens
-// only during schema mutations or we see a new predicate.
-func updateType(typeName string, t pb.TypeUpdate, ts uint64) error {
-	schema.State().SetType(typeName, t)
-	txn := pstore.NewTransactionAt(ts, true)
-	defer txn.Discard()
-	data, err := t.Marshal()
-	x.Check(err)
-	e := &badger.Entry{
-		Key:      x.TypeKey(typeName),
-		Value:    data,
-		UserMeta: posting.BitSchemaPosting,
-	}
-	if err := txn.SetEntry(e.WithDiscard()); err != nil {
-		return err
-	}
-	return txn.CommitAt(ts, nil)
-}
-
 func hasEdges(attr string, startTs uint64) bool {
 	pk := x.ParsedKey{Attr: attr}
 	iterOpt := badger.DefaultIteratorOptions
@@ -606,18 +581,6 @@ func populateMutationMap(src *pb.Mutations) (map[uint32]*pb.Mutations, error) {
 		}
 	}
 
-	// Type definitions are sent to all groups.
-	if len(src.Types) > 0 {
-		for _, gid := range groups().KnownGroups() {
-			mu := mm[gid]
-			if mu == nil {
-				mu = &pb.Mutations{GroupId: gid}
-				mm[gid] = mu
-			}
-			mu.Types = src.Types
-		}
-	}
-
 	return mm, nil
 }
 
@@ -633,9 +596,6 @@ func MutateOverNetwork(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, er
 	defer span.End()
 
 	tctx := &pb.TxnContext{}
-	if err := verifyTypes(ctx, m); err != nil {
-		return tctx, err
-	}
 	mutationMap, err := populateMutationMap(m)
 	if err != nil {
 		return tctx, err
@@ -666,94 +626,6 @@ func MutateOverNetwork(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, er
 	}
 	close(resCh)
 	return tctx, e
-}
-
-func verifyTypes(ctx context.Context, m *pb.Mutations) error {
-	// Create a set of all the predicates included in this schema request.
-	reqPredSet := make(map[string]struct{}, len(m.Schema))
-	for _, schemaUpdate := range m.Schema {
-		reqPredSet[schemaUpdate.Predicate] = struct{}{}
-	}
-
-	// Create a set of all the predicates already present in the schema.
-	var fields []string
-	for _, t := range m.Types {
-		if t.TypeName == "" {
-			return errors.Errorf("Type name must be specified in type update")
-		}
-
-		if err := typeSanityCheck(t); err != nil {
-			return err
-		}
-
-		for _, field := range t.Fields {
-			fieldName := field.Predicate
-			ns, attr := x.ParseNamespaceAttr(fieldName)
-			if attr[0] == '~' {
-				fieldName = x.NamespaceAttr(ns, attr[1:])
-			}
-
-			if _, ok := reqPredSet[fieldName]; !ok {
-				fields = append(fields, fieldName)
-			}
-		}
-	}
-
-	// Retrieve the schema for those predicates.
-	schemas, err := GetSchemaOverNetwork(ctx, &pb.SchemaRequest{Predicates: fields})
-	if err != nil {
-		return errors.Wrapf(err, "cannot retrieve predicate information")
-	}
-	schemaSet := make(map[string]struct{})
-	for _, schemaNode := range schemas {
-		schemaSet[schemaNode.Predicate] = struct{}{}
-	}
-
-	for _, t := range m.Types {
-		// Verify all the fields in the type are already on the schema or come included in
-		// this request.
-		for _, field := range t.Fields {
-			fieldName := field.Predicate
-			ns, attr := x.ParseNamespaceAttr(fieldName)
-			if attr[0] == '~' {
-				fieldName = x.NamespaceAttr(ns, attr[1:])
-			}
-
-			_, inSchema := schemaSet[fieldName]
-			_, inRequest := reqPredSet[fieldName]
-			if !inSchema && !inRequest {
-				return errors.Errorf(
-					"Schema does not contain a matching predicate for field %s in type %s",
-					field.Predicate, t.TypeName)
-			}
-		}
-	}
-
-	return nil
-}
-
-// typeSanityCheck performs basic sanity checks on the given type update.
-func typeSanityCheck(t *pb.TypeUpdate) error {
-	for _, field := range t.Fields {
-		if x.ParseAttr(field.Predicate) == "" {
-			return errors.Errorf("Field in type definition must have a name")
-		}
-
-		if field.ValueType == pb.Posting_OBJECT && field.ObjectTypeName == "" {
-			return errors.Errorf(
-				"Field with value type OBJECT must specify the name of the object type")
-		}
-
-		if field.Directive != pb.SchemaUpdate_NONE {
-			return errors.Errorf("Field in type definition cannot have a directive")
-		}
-
-		if len(field.Tokenizer) > 0 {
-			return errors.Errorf("Field in type definition cannot have tokenizers")
-		}
-	}
-
-	return nil
 }
 
 func (w *grpcWorker) proposeAndWait(ctx context.Context, txnCtx *pb.TxnContext,
