@@ -80,7 +80,6 @@ func parseDirective(it *lex.ItemIterator, schema *pb.SchemaUpdate, t types.TypeI
 			return next.Errorf("@lang directive can only be specified for string type."+
 				" Got: [%v] for attr: [%v]", t.Name(), schema.Predicate)
 		}
-		schema.Lang = true
 	default:
 		return next.Errorf("Invalid index specification")
 	}

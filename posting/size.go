@@ -112,8 +112,5 @@ func calculatePostingSize(posting *pb.Posting) uint64 {
 		1*8 // CommitTs consists of 1 word..
 	size += uint64(cap(posting.Value))
 
-	// Adding the size of each entry in LangTag array.
-	size += uint64(cap(posting.LangTag))
-
 	return size
 }

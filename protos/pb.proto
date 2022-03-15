@@ -38,8 +38,9 @@ message SrcFunction {
 }
 
 message Query {
+  reserved 2; // It was used for language list for attribute
+
   string attr = 1;
-  repeated string langs = 2;  // language list for attribute
   fixed64 after_uid = 3;      // Only return UIDs greater than this.
   bool do_count = 4;          // Are we just getting lengths?
 
@@ -69,23 +70,19 @@ message ValueList {
   repeated TaskValue values = 1;
 }
 
-message LangList {
-  repeated string lang = 1;
-}
-
 message Result {
+  reserved 6; // It was used for LangList
   repeated List uid_matrix = 1;
   repeated ValueList value_matrix = 2;
   repeated uint32 counts = 3;
   bool intersect_dest = 4;
-  repeated LangList lang_matrix = 6;
   bool list = 7;
 }
 
 message Order {
+  reserved 3; // It was used for langs
   string attr = 1;
   bool desc = 2;
-  repeated string langs = 3;
 }
 
 message SortMessage {
@@ -179,12 +176,12 @@ message Tablet {
 
 message DirectedEdge {
   reserved 6;                      // This was used for label.
+  reserved 7;                      // This was used for lang.
   fixed64 entity = 1;              // Subject or source node / UID.
   string attr = 2;                 // Attribute or predicate. Labels the edge.
   bytes value = 3;                 // Edge points to a value.
   Posting.ValType value_type = 4;  // The type of the value
   fixed64 value_id = 5;            // Object or destination node / UID.
-  string lang = 7;
   enum Op {
     SET = 0;
     DEL = 1;
@@ -288,6 +285,7 @@ message KVS {
 
 // Posting messages.
 message Posting {
+  reserved 5; // This was used for lang tag.
   reserved 6;  // This was used for label.
   fixed64 uid = 1;
   bytes value = 2;
@@ -306,12 +304,11 @@ message Posting {
   }
   ValType val_type = 3;
   enum PostingType {
+    reserved 2; // This was used for lang value.
     REF = 0;         // UID
     VALUE = 1;       // simple, plain value
-    VALUE_LANG = 2;  // value with specified language
   }
   PostingType posting_type = 4;
-  bytes lang_tag = 5;  // Only set for VALUE_LANG
 
   // TODO: op is only used temporarily. See if we can remove it from here.
   uint32 op = 12;
@@ -353,6 +350,8 @@ message SchemaRequest {
 }
 
 message SchemaNode {
+  reserved 9; // This was used for lang.
+
   string predicate = 1;
   string type = 2;
   bool index = 3;
@@ -361,7 +360,6 @@ message SchemaNode {
   bool count = 6;
   bool list = 7;
   bool upsert = 8;
-  bool lang = 9;
   bool no_conflict = 10;
 }
 
@@ -370,6 +368,7 @@ message SchemaResult {
 }
 
 message SchemaUpdate {
+  reserved 9; // This was used for lang.
   string predicate = 1;
   Posting.ValType value_type = 2;
   enum Directive {
@@ -383,7 +382,6 @@ message SchemaUpdate {
   bool count = 5;
   bool list = 6;
   bool upsert = 8;
-  bool lang = 9;
 
   // Fields required for type system.
   bool non_nullable = 10;
