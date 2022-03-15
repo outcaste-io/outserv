@@ -17,33 +17,28 @@
 package chunker
 
 import (
-	"context"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"math"
+	"sort"
 	"testing"
 	"time"
 
-	"github.com/golang/glog"
-	"github.com/outcaste-io/outserv/testutil"
-	"github.com/outcaste-io/outserv/tok"
-
 	"github.com/outcaste-io/dgo/v210/protos/api"
-	"github.com/outcaste-io/outserv/types"
+	"github.com/outcaste-io/outserv/protos/pb"
+
 	"github.com/stretchr/testify/require"
 )
 
-func makeNquad(sub, pred string, val *api.Value) *api.NQuad {
-	return &api.NQuad{
+func makeNquad(sub, pred string, val *pb.Value) *pb.NQuad {
+	return &pb.NQuad{
 		Subject:     sub,
 		Predicate:   pred,
 		ObjectValue: val,
 	}
 }
 
-func makeNquadEdge(sub, pred, obj string) *api.NQuad {
-	return &api.NQuad{
+func makeNquadEdge(sub, pred, obj string) *pb.NQuad {
+	return &pb.NQuad{
 		Subject:   sub,
 		Predicate: pred,
 		ObjectId:  obj,
@@ -51,6 +46,7 @@ func makeNquadEdge(sub, pred, obj string) *api.NQuad {
 }
 
 type School struct {
+	Uid  string `json:"uid,omitempty"`
 	Name string `json:"name,omitempty"`
 }
 
@@ -71,46 +67,26 @@ type Person struct {
 	School    *School    `json:"school,omitempty"`
 }
 
-func Parse(b []byte, op int) ([]*api.NQuad, error) {
+func Parse(b []byte, op int) ([]*pb.NQuad, error) {
 	nqs := NewNQuadBuffer(1000)
 	err := nqs.ParseJSON(b, op)
 	return nqs.nquads, err
 }
 
 // FastParse uses buf.FastParseJSON() simdjson parser.
-func FastParse(b []byte, op int) ([]*api.NQuad, error) {
+func FastParse(b []byte, op int) ([]*pb.NQuad, error) {
 	nqs := NewNQuadBuffer(1000)
 	err := nqs.FastParseJSON(b, op)
 	return nqs.nquads, err
 }
 
-func (exp *Experiment) verify() {
-	// insert the data into dgraph
-	dg, err := testutil.DgraphClientWithGroot(testutil.SockAddr)
-	if err != nil {
-		exp.t.Fatalf("Error while getting a dgraph client: %v", err)
-	}
-
-	ctx := context.Background()
-	require.NoError(exp.t, dg.Alter(ctx, &api.Operation{DropAll: true}), "drop all failed")
-	require.NoError(exp.t, dg.Alter(ctx, &api.Operation{Schema: exp.schema}),
-		"schema change failed")
-
-	_, err = dg.NewTxn().Mutate(ctx,
-		&api.Mutation{Set: exp.nqs, CommitNow: true})
-	require.NoError(exp.t, err, "mutation failed")
-
-	response, err := dg.NewReadOnlyTxn().Query(ctx, exp.query)
-	require.NoError(exp.t, err, "query failed")
-	testutil.CompareJSON(exp.t, exp.expected, string(response.GetJson()))
-}
-
-type Experiment struct {
-	t        *testing.T
-	nqs      []*api.NQuad
-	schema   string
-	query    string
-	expected string
+func Sort(nq []*pb.NQuad) {
+	sort.Slice(nq, func(i, j int) bool {
+		return nq[i].Subject < nq[j].Subject
+	})
+	sort.Slice(nq, func(i, j int) bool {
+		return nq[i].Predicate < nq[j].Predicate
+	})
 }
 
 func TestNquadsFromJson1(t *testing.T) {
@@ -139,28 +115,6 @@ func TestNquadsFromJson1(t *testing.T) {
 	fastNQ, err := FastParse(b, SetNquads)
 	require.NoError(t, err)
 	require.Equal(t, 5, len(fastNQ))
-
-	exp := &Experiment{
-		t:      t,
-		nqs:    nq,
-		schema: "name: string @index(exact) .",
-		query: `{alice(func: eq(name, "Alice")) {
-name
-age
-married
-address
-}}`,
-		expected: `{"alice": [
-{"name": "Alice",
-"age": 26,
-"married": true,
-"address": {"coordinates": [2,1.1], "type": "Point"}}
-]}
-`}
-	exp.verify()
-
-	exp.nqs = fastNQ
-	exp.verify()
 }
 
 func TestNquadsFromJson2(t *testing.T) {
@@ -187,64 +141,57 @@ func TestNquadsFromJson2(t *testing.T) {
 	fastNQ, err := FastParse(b, SetNquads)
 	require.NoError(t, err)
 	require.Equal(t, 6, len(fastNQ))
-
-	exp := &Experiment{
-		t:      t,
-		nqs:    nq,
-		schema: "name: string @index(exact) .",
-		query: `{alice(func: eq(name, "Alice")) {
-name
-friend {
-  name
-  married
-}}}`,
-		expected: `{"alice":[{
-"name":"Alice",
-"friend": [
-{"name":"Charlie", "married":false},
-{"name":"Bob"}
-]
-}]}`,
-	}
-	exp.verify()
-
-	exp.nqs = fastNQ
-	exp.verify()
 }
 
 func TestNquadsFromJson3(t *testing.T) {
 	p := Person{
+		Uid:  "_:alice",
 		Name: "Alice",
 		School: &School{
+			Uid:  "_:school",
 			Name: "Wellington Public School",
+		},
+	}
+
+	expectedNquads := []pb.NQuad{
+		{
+			Subject:     "_:alice",
+			Predicate:   "name",
+			ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "Alice"}},
+		},
+		{
+			Subject:     "_:school",
+			Predicate:   "name",
+			ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "Wellington Public School"}},
+		},
+		{
+			Subject:   "_:alice",
+			Predicate: "school",
+			ObjectId:  "_:school",
 		},
 	}
 
 	b, err := json.Marshal(p)
 	require.NoError(t, err)
+
 	nq, err := Parse(b, SetNquads)
 	require.NoError(t, err)
-
+	Sort(nq)
 	fastNQ, err := FastParse(b, SetNquads)
 	require.NoError(t, err)
+	Sort(fastNQ)
 
-	exp := &Experiment{
-		t:      t,
-		nqs:    nq,
-		schema: "name: string @index(exact) .",
-		query: `{alice(func: eq(name, "Alice")) {
-name
-school {name}
-}}`,
-		expected: `{"alice":[{
-"name":"Alice",
-"school": [{"name":"Wellington Public School"}]
-}]}`,
+	for i, test := range expectedNquads {
+		require.Equal(t, test.Subject, nq[i].Subject)
+		require.Equal(t, test.Predicate, nq[i].Predicate)
+		require.Equal(t, test.ObjectValue, nq[i].ObjectValue)
+		require.Equal(t, test.ObjectId, nq[i].ObjectId)
+
+		require.Equal(t, test.Subject, fastNQ[i].Subject)
+		require.Equal(t, test.Predicate, fastNQ[i].Predicate)
+		require.Equal(t, test.ObjectValue, fastNQ[i].ObjectValue)
+		require.Equal(t, test.ObjectId, fastNQ[i].ObjectId)
 	}
-	exp.verify()
-
-	exp.nqs = fastNQ
-	exp.verify()
 }
 
 func TestNquadsFromJson4(t *testing.T) {
@@ -255,24 +202,7 @@ func TestNquadsFromJson4(t *testing.T) {
 
 	fastNQ, err := FastParse([]byte(json), SetNquads)
 	require.NoError(t, err)
-
-	exp := &Experiment{
-		t:      t,
-		nqs:    nq,
-		schema: "name: string @index(exact) .",
-		query: `{alice(func: eq(name, "Alice")) {
-name
-mobile
-car
-age
-weight
-}}`,
-		expected: fmt.Sprintf(`{"alice":%s}`, json),
-	}
-	exp.verify()
-
-	exp.nqs = fastNQ
-	exp.verify()
+	_, _ = nq, fastNQ
 }
 
 func TestNquadsFromJsonMap(t *testing.T) {
@@ -287,22 +217,7 @@ func TestNquadsFromJsonMap(t *testing.T) {
 
 	fastNQ, err := FastParse([]byte(json), SetNquads)
 	require.NoError(t, err)
-
-	exp := &Experiment{
-		t:      t,
-		nqs:    nq,
-		schema: "name: string @index(exact) .",
-		query: `{people(func: eq(name, "Alice")) {
-age
-name
-friends {name}
-}}`,
-		expected: fmt.Sprintf(`{"people":[%s]}`, json),
-	}
-	exp.verify()
-
-	exp.nqs = fastNQ
-	exp.verify()
+	_, _ = nq, fastNQ
 }
 
 func TestNquadsFromMultipleJsonObjects(t *testing.T) {
@@ -372,36 +287,21 @@ func TestNquadsFromMultipleJsonObjects(t *testing.T) {
 
 	fastNQ, err := FastParse([]byte(json), SetNquads)
 	require.NoError(t, err)
-
-	exp := &Experiment{
-		t:      t,
-		nqs:    nq,
-		schema: "name: string @index(exact) .",
-		query: `{people(func: has(age), orderasc: name) @recurse {
-name
-age
-friends
-}}`,
-		expected: fmt.Sprintf(`{"people":%s}`, json),
-	}
-	exp.verify()
-
-	exp.nqs = fastNQ
-	exp.verify()
+	_, _ = nq, fastNQ
 }
 
 func TestJsonNumberParsing(t *testing.T) {
 	tests := []struct {
 		in  string
-		out *api.Value
+		out *pb.Value
 	}{
-		{`{"uid": "1", "key": 9223372036854775299}`, &api.Value{Val: &api.Value_IntVal{IntVal: 9223372036854775299}}},
-		{`{"uid": "1", "key": 9223372036854775299.0}`, &api.Value{Val: &api.Value_DoubleVal{DoubleVal: 9223372036854775299.0}}},
+		{`{"uid": "1", "key": 9223372036854775299}`, &pb.Value{Val: &pb.Value_IntVal{IntVal: 9223372036854775299}}},
+		{`{"uid": "1", "key": 9223372036854775299.0}`, &pb.Value{Val: &pb.Value_DoubleVal{DoubleVal: 9223372036854775299.0}}},
 		{`{"uid": "1", "key": 27670116110564327426}`, nil},
-		{`{"uid": "1", "key": "23452786"}`, &api.Value{Val: &api.Value_StrVal{StrVal: "23452786"}}},
-		{`{"uid": "1", "key": "23452786.2378"}`, &api.Value{Val: &api.Value_StrVal{StrVal: "23452786.2378"}}},
-		{`{"uid": "1", "key": -1e10}`, &api.Value{Val: &api.Value_DoubleVal{DoubleVal: -1e+10}}},
-		{`{"uid": "1", "key": 0E-0}`, &api.Value{Val: &api.Value_DoubleVal{DoubleVal: 0}}},
+		{`{"uid": "1", "key": "23452786"}`, &pb.Value{Val: &pb.Value_StrVal{StrVal: "23452786"}}},
+		{`{"uid": "1", "key": "23452786.2378"}`, &pb.Value{Val: &pb.Value_StrVal{StrVal: "23452786.2378"}}},
+		{`{"uid": "1", "key": -1e10}`, &pb.Value{Val: &pb.Value_DoubleVal{DoubleVal: -1e+10}}},
+		{`{"uid": "1", "key": 0E-0}`, &pb.Value{Val: &pb.Value_DoubleVal{DoubleVal: 0}}},
 	}
 
 	for i, test := range tests {
@@ -490,23 +390,7 @@ func TestNquadsFromJson_EmptyUid(t *testing.T) {
 
 	fastNQ, err := FastParse([]byte(json), SetNquads)
 	require.NoError(t, err)
-
-	exp := &Experiment{
-		t:      t,
-		nqs:    nq,
-		schema: "name: string @index(exact) .",
-		query: `{alice(func: eq(name, "Alice")) {
-name
-following { name}
-school { name}
-}}`,
-		expected: `{"alice":[{"name":"Alice","following":[{"name":"Bob"}],"school":[{
-"name":"Crown Public School"}]}]}`,
-	}
-	exp.verify()
-
-	exp.nqs = fastNQ
-	exp.verify()
+	_, _ = nq, fastNQ
 }
 
 func TestNquadsFromJson_BlankNodes(t *testing.T) {
@@ -517,23 +401,7 @@ func TestNquadsFromJson_BlankNodes(t *testing.T) {
 
 	fastNQ, err := FastParse([]byte(json), SetNquads)
 	require.NoError(t, err)
-
-	exp := &Experiment{
-		t:      t,
-		nqs:    nq,
-		schema: "name: string @index(exact) .",
-		query: `{alice(func: eq(name, "Alice")) {
-name
-following { name}
-school { name}
-}}`,
-		expected: `{"alice":[{"name":"Alice","following":[{"name":"Bob"}],"school":[{
-"name":"Crown Public School"}]}]}`,
-	}
-	exp.verify()
-
-	exp.nqs = fastNQ
-	exp.verify()
+	_, _ = nq, fastNQ
 }
 
 func TestNquadsDeleteEdges(t *testing.T) {
@@ -547,408 +415,12 @@ func TestNquadsDeleteEdges(t *testing.T) {
 	require.Equal(t, 3, len(fastNQ))
 }
 
-func checkCount(t *testing.T, nq []*api.NQuad, pred string, count int) {
-	for _, n := range nq {
-		if n.Predicate == pred {
-			require.Equal(t, count, len(n.Facets))
-			break
-		}
-	}
-}
-
 func getMapOfFacets(facets []*api.Facet) map[string]*api.Facet {
 	res := make(map[string]*api.Facet)
 	for _, f := range facets {
 		res[f.Key] = f
 	}
 	return res
-}
-
-func checkFacets(t *testing.T, nq []*api.NQuad, pred string, facets []*api.Facet) {
-	for _, n := range nq {
-		if n.Predicate == pred {
-			require.Equal(t, len(facets), len(n.Facets),
-				fmt.Sprintf("expected %d facets, got %d", len(facets), len(n.Facets)))
-
-			expectedFacets := getMapOfFacets(facets)
-			actualFacets := getMapOfFacets(n.Facets)
-			for key, f := range expectedFacets {
-				actualF, ok := actualFacets[key]
-				if !ok {
-					t.Fatalf("facet for key %s not found", key)
-				}
-				require.Equal(t, f, actualF, fmt.Sprintf("expected:%v\ngot:%v", f, actualF))
-			}
-		}
-	}
-}
-
-func TestNquadsFromJsonFacets1(t *testing.T) {
-	// test the 5 data types on facets, string, bool, int, float and datetime
-	operation := "READ WRITE"
-	operationTokens, err := tok.GetTermTokens([]string{operation})
-	require.NoError(t, err, "unable to get tokens from the string %s", operation)
-
-	timeStr := "2006-01-02T15:04:05Z"
-	time, err := types.ParseTime(timeStr)
-	if err != nil {
-		t.Fatalf("unable to convert string %s to time", timeStr)
-	}
-	timeBinary, err := time.MarshalBinary()
-	if err != nil {
-		t.Fatalf("unable to marshal time %v to binary", time)
-	}
-
-	carPrice := 30000.56
-	var priceBytes [8]byte
-	u := math.Float64bits(float64(carPrice))
-	binary.LittleEndian.PutUint64(priceBytes[:], u)
-
-	carAge := 3
-	var ageBytes [8]byte
-	binary.LittleEndian.PutUint64(ageBytes[:], uint64(carAge))
-
-	json := fmt.Sprintf(`[{"name":"Alice","mobile":"040123456","car":"MA0123",`+
-		`"mobile|operation": "%s",
-         "car|first":true,
-         "car|age": %d,
-         "car|price": %f,
-         "car|since": "%s"
-}]`, operation, carAge, carPrice, timeStr)
-
-	nq, err := Parse([]byte(json), SetNquads)
-	require.NoError(t, err)
-	require.Equal(t, 3, len(nq))
-
-	fastNQ, err := FastParse([]byte(json), SetNquads)
-	require.NoError(t, err)
-	require.Equal(t, 3, len(fastNQ))
-
-	for _, n := range nq {
-		glog.Infof("%v", n)
-	}
-
-	for _, n := range fastNQ {
-		glog.Infof("%v", n)
-	}
-
-	checkFacets(t, nq, "mobile", []*api.Facet{
-		{
-			Key:     "operation",
-			Value:   []byte(operation),
-			ValType: api.Facet_STRING,
-			Tokens:  operationTokens,
-		},
-	})
-
-	checkFacets(t, fastNQ, "mobile", []*api.Facet{
-		{
-			Key:     "operation",
-			Value:   []byte(operation),
-			ValType: api.Facet_STRING,
-			Tokens:  operationTokens,
-		},
-	})
-
-	checkFacets(t, nq, "car", []*api.Facet{
-		{
-			Key:     "first",
-			Value:   []byte{1},
-			ValType: api.Facet_BOOL,
-		},
-		{
-			Key:     "age",
-			Value:   ageBytes[:],
-			ValType: api.Facet_INT,
-		},
-		{
-			Key:     "price",
-			Value:   priceBytes[:],
-			ValType: api.Facet_FLOAT,
-		},
-		{
-			Key:     "since",
-			Value:   timeBinary,
-			ValType: api.Facet_DATETIME,
-		},
-	})
-
-	checkFacets(t, fastNQ, "car", []*api.Facet{
-		{
-			Key:     "first",
-			Value:   []byte{1},
-			ValType: api.Facet_BOOL,
-		},
-		{
-			Key:     "age",
-			Value:   ageBytes[:],
-			ValType: api.Facet_INT,
-		},
-		{
-			Key:     "price",
-			Value:   priceBytes[:],
-			ValType: api.Facet_FLOAT,
-		},
-		{
-			Key:     "since",
-			Value:   timeBinary,
-			ValType: api.Facet_DATETIME,
-		},
-	})
-}
-
-func TestNquadsFromJsonFacets2(t *testing.T) {
-	// Dave has uid facets which should go on the edge between Alice and Dave
-	json := `[{"name":"Alice","friend":[{"name":"Dave","friend|close":"true"}]}]`
-
-	nq, err := Parse([]byte(json), SetNquads)
-	require.NoError(t, err)
-	require.Equal(t, 3, len(nq))
-	checkCount(t, nq, "friend", 1)
-
-	fastNQ, err := FastParse([]byte(json), SetNquads)
-	require.NoError(t, err)
-	require.Equal(t, 3, len(fastNQ))
-	checkCount(t, fastNQ, "friend", 1)
-}
-
-// Test valid facets json.
-func TestNquadsFromJsonFacets3(t *testing.T) {
-	json := `
-	[
-		{
-			"name":"Alice",
-			"friend": ["Joshua", "David", "Josh"],
-			"friend|from": {
-				"0": "school",
-				"2": "college"
-			},
-			"friend|age": {
-				"1": 20,
-				"2": 21
-			}
-		}
-	]`
-
-	nqs, err := Parse([]byte(json), SetNquads)
-	require.NoError(t, err)
-	require.Equal(t, 4, len(nqs))
-	for _, nq := range nqs {
-		predVal := nq.ObjectValue.GetStrVal()
-		switch predVal {
-		case "Alice":
-			require.Equal(t, 0, len(nq.Facets))
-		case "Joshua":
-			require.Equal(t, 1, len(nq.Facets))
-		case "David":
-			require.Equal(t, 1, len(nq.Facets))
-		case "Josh":
-			require.Equal(t, 2, len(nq.Facets))
-		}
-	}
-
-	fastNQ, err := FastParse([]byte(json), SetNquads)
-	require.NoError(t, err)
-	require.Equal(t, 4, len(fastNQ))
-	for _, nq := range fastNQ {
-		predVal := nq.ObjectValue.GetStrVal()
-		switch predVal {
-		case "Alice":
-			require.Equal(t, 0, len(nq.Facets))
-		case "Joshua":
-			require.Equal(t, 1, len(nq.Facets))
-		case "David":
-			require.Equal(t, 1, len(nq.Facets))
-		case "Josh":
-			require.Equal(t, 2, len(nq.Facets))
-		}
-	}
-}
-
-// Test invalid facet format with scalar list predicate.
-func TestNquadsFromJsonFacets4(t *testing.T) {
-	type input struct {
-		Name     string
-		ErrorOut bool
-		Json     string
-	}
-
-	inputs := []input{
-		{
-			"facets_should_be_map",
-			true,
-			`
-			[
-				{
-					"name":"Alice",
-					"friend": ["Joshua", "David", "Josh"],
-					"friend|age": 20
-				}
-			]`,
-		},
-		{
-			"predicate_should_be_list",
-			true,
-			`
-			[
-				{
-					"name":"Alice",
-					"friend": "Joshua",
-					"friend|age": {
-						"0": 20
-					}
-				}
-			]`,
-		},
-		{
-			"only_scalar_values_in_facet_map",
-			true,
-			`
-			[
-				{
-					"name":"Alice",
-					"friend": ["Joshua"],
-					"friend|age": {
-						"0": {
-							"1": 20
-						}
-					}
-				}
-			]`,
-		},
-		{
-			"invalid_key_in_facet_map",
-			true,
-			`
-			[
-				{
-					"name":"Alice",
-					"friend": ["Joshua"],
-					"friend|age": {
-						"a": 20
-					}
-				}
-			]`,
-		},
-		{
-			// Facets will be ignored here.
-			"predicate_is_null",
-			false,
-			`
-			[
-				{
-					"name":"Alice",
-					"friend": null,
-					"friend|age": {
-						"0": 20
-					}
-				}
-			]`,
-		},
-		{
-			// Facets will be ignored here.
-			"empty_scalar_list",
-			false,
-			`
-			[
-				{
-					"name":"Alice",
-					"friend": [],
-					"friend|age": {
-						"0": 20
-					}
-				}
-			]`,
-		},
-		{
-			"facet_map_is_null",
-			false,
-			`
-			[
-				{
-					"name":"Alice",
-					"friend": ["Joshua"],
-					"friend|age": null
-				}
-			]`,
-		},
-		{
-			"facet_vales_should_not_be_list",
-			true,
-			`
-			[
-				{
-					"name":"Alice",
-					"friend": ["Joshua", "David", "Josh"],
-					"friend|age": ["20"]
-				}
-			]`,
-		},
-		{
-			// Facets with higher index will be ignored.
-			"facet_map_with_index_greater_than_scalarlist_length",
-			false,
-			`
-			[
-				{
-					"name":"Alice",
-					"friend": ["Joshua", "David", "Josh"],
-					"friend|age": {
-						"100": 30,
-						"20": 28
-					}
-				}
-			]`,
-		},
-	}
-
-	for _, input := range inputs {
-		_, err := Parse([]byte(input.Json), SetNquads)
-		if input.ErrorOut {
-			require.Error(t, err, "TestNquadsFromJsonFacets4-%s", input.Name)
-		} else {
-			require.NoError(t, err, "TestNquadsFromJsonFacets4-%s", input.Name)
-		}
-
-		_, err = FastParse([]byte(input.Json), SetNquads)
-		if input.ErrorOut {
-			require.Error(t, err, "TestNquadsFromJsonFacets4-%s", input.Name)
-		} else {
-			require.NoError(t, err, "TestNquadsFromJsonFacets4-%s", input.Name)
-		}
-	}
-}
-
-func TestNquadsFromJsonFacets5(t *testing.T) {
-	// Dave has uid facets which should go on the edge between Alice and Dave,
-	// AND Emily has uid facets which should go on the edge between Dave and Emily
-	json := `[
-		{
-			"name": "Alice",
-			"friend": [
-				{
-					"name": "Dave",
-					"friend|close": true,
-					"friend": [
-						{
-							"name": "Emily",
-							"friend|close": true
-						}
-					]
-				}
-			]
-		}
-	]`
-
-	nq, err := Parse([]byte(json), SetNquads)
-	require.NoError(t, err)
-	require.Equal(t, 5, len(nq))
-	checkCount(t, nq, "friend", 1)
-
-	fastNQ, err := FastParse([]byte(json), SetNquads)
-	require.NoError(t, err)
-	require.Equal(t, 5, len(fastNQ))
-	checkCount(t, fastNQ, "friend", 1)
 }
 
 func TestNquadsFromJsonError1(t *testing.T) {
