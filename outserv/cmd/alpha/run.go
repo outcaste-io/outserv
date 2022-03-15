@@ -775,7 +775,7 @@ func run() {
 
 	raft := z.NewSuperFlag(Alpha.Conf.GetString("raft")).MergeAndCheckDefault(worker.RaftDefaults)
 	x.WorkerConfig = x.WorkerOptions{
-		PeerAddr:            strings.Split(Alpha.Conf.GetString("zero"), ","),
+		PeerAddr:            strings.Split(Alpha.Conf.GetString("peer"), ","),
 		Raft:                raft,
 		WhiteListedIPRanges: ips,
 		StrictMutations:     opts.MutationsMode == worker.StrictMutations,
