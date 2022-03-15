@@ -33,6 +33,5 @@ be between 1 to 4 core-hours per hour.
 ## Mechanism
 
 Every server in the cluster tracks its own usage and sends that information for
-accumulation via Zero. The Zero leader charges every 15 days or $100, whichever
-comes earlier. This mechanism might change in the future. It's best to look at
-the code for a definitive answer.
+accumulation via Zero. The Zero leader charges every $100. This mechanism might
+change in the future. It's best to look at the code for a definitive answer.
