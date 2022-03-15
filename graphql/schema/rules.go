@@ -266,6 +266,7 @@ func typeNameValidation(schema *ast.SchemaDocument) gqlerror.List {
 		// The static types that we define in schemaExtras
 		"Int64":                true,
 		"DateTime":             true,
+		"Upload":               true,
 		"DgraphIndex":          true,
 		"AuthRule":             true,
 		"HTTPMethod":           true,

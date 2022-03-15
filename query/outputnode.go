@@ -671,6 +671,13 @@ func valToBytes(v types.Val) ([]byte, error) {
 		return []byte(fmt.Sprintf("\"%#x\"", v.Value)), nil
 	case types.PasswordID:
 		return []byte(fmt.Sprintf("%q", v.Value.(string))), nil
+	case types.UploadID:
+		switch str := v.Value.(type) {
+		case string:
+			return stringJsonMarshal(str), nil
+		default:
+			return json.Marshal(str)
+		}
 	default:
 		return nil, errors.New("Unsupported types.Val.Tid")
 	}

@@ -63,6 +63,8 @@ func TypeValFrom(val *pb.Value) types.Val {
 		return types.Val{Tid: types.DateTimeID, Value: val.GetDatetimeVal()}
 	case *pb.Value_PasswordVal:
 		return types.Val{Tid: types.PasswordID, Value: val.GetPasswordVal()}
+	case *pb.Value_UploadVal:
+		return types.Val{Tid: types.UploadID, Value: val.GetUploadVal()}
 	case *pb.Value_DefaultVal:
 		return types.Val{Tid: types.DefaultID, Value: val.GetDefaultVal()}
 	}
@@ -76,7 +78,7 @@ func byteVal(nq NQuad) ([]byte, types.TypeID, error) {
 	p := TypeValFrom(nq.ObjectValue)
 	// These three would have already been marshalled to bytes by the client or
 	// in parse function.
-	if p.Tid == types.GeoID || p.Tid == types.DateTimeID {
+	if p.Tid == types.GeoID || p.Tid == types.DateTimeID || p.Tid == types.UploadID {
 		return p.Value.([]byte), p.Tid, nil
 	}
 

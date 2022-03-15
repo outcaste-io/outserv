@@ -56,6 +56,8 @@ const (
 	// StringID represents the string type.
 	StringID = TypeID(pb.Posting_STRING)
 	// UndefinedID represents the undefined type.
+	UploadID = TypeID(pb.Posting_UPLOAD)
+	// UndefinedID represents the undefined type.
 	UndefinedID = TypeID(100)
 )
 
@@ -70,6 +72,7 @@ var typeNameMap = map[string]TypeID{
 	"uid":      UidID,
 	"string":   StringID,
 	"password": PasswordID,
+	"upload":   UploadID,
 }
 
 // TypeID represents the type of the data.
@@ -103,6 +106,8 @@ func (t TypeID) Name() string {
 		return "string"
 	case PasswordID:
 		return "password"
+	case UploadID:
+		return "upload"
 	}
 	return ""
 }
@@ -186,6 +191,10 @@ func ValueForType(id TypeID) Val {
 	case PasswordID:
 		var p string
 		return Val{PasswordID, p}
+
+	case UploadID:
+		var b []byte
+		return Val{UploadID, b}
 
 	default:
 		return Val{}

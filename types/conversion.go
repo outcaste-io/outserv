@@ -5,6 +5,7 @@ package types
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"math"
@@ -77,6 +78,8 @@ func Convert(from Val, toID TypeID) (Val, error) {
 				*res = w
 			case PasswordID:
 				*res = string(data)
+			case UploadID:
+				*res = base64.StdEncoding.EncodeToString(data)
 			default:
 				return to, cantConvert(fromID, toID)
 			}
@@ -130,6 +133,12 @@ func Convert(from Val, toID TypeID) (Val, error) {
 					return to, err
 				}
 				*res = p
+			case UploadID:
+				u, err := base64.StdEncoding.DecodeString(vc)
+				if err != nil {
+					return to, errors.Wrapf(err, "Error while decoding: [%s] as upload", vc)
+				}
+				*res = u
 			default:
 				return to, cantConvert(fromID, toID)
 			}
@@ -290,6 +299,16 @@ func Convert(from Val, toID TypeID) (Val, error) {
 				return to, cantConvert(fromID, toID)
 			}
 		}
+	case UploadID:
+		{
+			vc := string(data)
+			switch toID {
+			case BinaryID:
+				*res = []byte(vc)
+			default:
+				return to, cantConvert(fromID, toID)
+			}
+		}
 	default:
 		return to, cantConvert(fromID, toID)
 	}
@@ -421,6 +440,16 @@ func Marshal(from Val, to *Val) error {
 		default:
 			return cantConvert(fromID, toID)
 		}
+	case UploadID:
+		{
+			vc := val.([]byte)
+			switch toID {
+			case BinaryID:
+				*res = vc
+			default:
+				return cantConvert(fromID, toID)
+			}
+		}
 	default:
 		return cantConvert(fromID, toID)
 	}
@@ -489,6 +518,12 @@ func ObjectValue(id TypeID, value interface{}) (*pb.Value, error) {
 			return def, errors.Errorf("Expected value of type password. Got : %v", value)
 		}
 		return &pb.Value{Val: &pb.Value_PasswordVal{PasswordVal: v}}, nil
+	case UploadID:
+		var v string
+		if v, ok = value.(string); !ok {
+			return def, errors.Errorf("Expected value of type string. Got : %v", value)
+		}
+		return &pb.Value{Val: &pb.Value_StrVal{StrVal: v}}, nil
 	default:
 		return def, errors.Errorf("ObjectValue not available for: %v", id)
 	}
@@ -523,6 +558,8 @@ func (v Val) MarshalJSON() ([]byte, error) {
 		return json.Marshal(v.Safe().(string))
 	case PasswordID:
 		return json.Marshal(v.Value.(string))
+	case UploadID:
+		return json.Marshal(v.Safe().(string))
 	}
 	return nil, errors.Errorf("Invalid type for MarshalJSON: %v", v.Tid)
 }
