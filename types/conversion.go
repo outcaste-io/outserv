@@ -1,18 +1,5 @@
-/*
- * Copyright 2016-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2016-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package types
 
@@ -25,12 +12,11 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/pkg/errors"
 	geom "github.com/twpayne/go-geom"
 	"github.com/twpayne/go-geom/encoding/geojson"
 	"github.com/twpayne/go-geom/encoding/wkb"
-
-	"github.com/outcaste-io/dgo/v210/protos/api"
 )
 
 // Convert converts the value to given scalar type.
@@ -441,9 +427,9 @@ func Marshal(from Val, to *Val) error {
 	return nil
 }
 
-// ObjectValue converts into api.Value.
-func ObjectValue(id TypeID, value interface{}) (*api.Value, error) {
-	def := &api.Value{Val: &api.Value_StrVal{StrVal: ""}}
+// ObjectValue converts into pb.Value.
+func ObjectValue(id TypeID, value interface{}) (*pb.Value, error) {
+	def := &pb.Value{Val: &pb.Value_StrVal{StrVal: ""}}
 	var ok bool
 	// Lets set the object value according to the storage type.
 	switch id {
@@ -452,37 +438,37 @@ func ObjectValue(id TypeID, value interface{}) (*api.Value, error) {
 		if v, ok = value.(string); !ok {
 			return def, errors.Errorf("Expected value of type string. Got : %v", value)
 		}
-		return &api.Value{Val: &api.Value_StrVal{StrVal: v}}, nil
+		return &pb.Value{Val: &pb.Value_StrVal{StrVal: v}}, nil
 	case DefaultID:
 		var v string
 		if v, ok = value.(string); !ok {
 			return def, errors.Errorf("Expected value of type string. Got : %v", value)
 		}
-		return &api.Value{Val: &api.Value_DefaultVal{DefaultVal: v}}, nil
+		return &pb.Value{Val: &pb.Value_DefaultVal{DefaultVal: v}}, nil
 	case IntID:
 		var v int64
 		if v, ok = value.(int64); !ok {
 			return def, errors.Errorf("Expected value of type int64. Got : %v", value)
 		}
-		return &api.Value{Val: &api.Value_IntVal{IntVal: v}}, nil
+		return &pb.Value{Val: &pb.Value_IntVal{IntVal: v}}, nil
 	case FloatID:
 		var v float64
 		if v, ok = value.(float64); !ok {
 			return def, errors.Errorf("Expected value of type float64. Got : %v", value)
 		}
-		return &api.Value{Val: &api.Value_DoubleVal{DoubleVal: v}}, nil
+		return &pb.Value{Val: &pb.Value_DoubleVal{DoubleVal: v}}, nil
 	case BoolID:
 		var v bool
 		if v, ok = value.(bool); !ok {
 			return def, errors.Errorf("Expected value of type bool. Got : %v", value)
 		}
-		return &api.Value{Val: &api.Value_BoolVal{BoolVal: v}}, nil
+		return &pb.Value{Val: &pb.Value_BoolVal{BoolVal: v}}, nil
 	case BinaryID:
 		var v []byte
 		if v, ok = value.([]byte); !ok {
 			return def, errors.Errorf("Expected value of type []byte. Got : %v", value)
 		}
-		return &api.Value{Val: &api.Value_BytesVal{BytesVal: v}}, nil
+		return &pb.Value{Val: &pb.Value_BytesVal{BytesVal: v}}, nil
 	// Geo and datetime are stored in binary format in the N-Quad, so lets
 	// convert them here.
 	case GeoID:
@@ -490,19 +476,19 @@ func ObjectValue(id TypeID, value interface{}) (*api.Value, error) {
 		if err != nil {
 			return def, err
 		}
-		return &api.Value{Val: &api.Value_GeoVal{GeoVal: b}}, nil
+		return &pb.Value{Val: &pb.Value_GeoVal{GeoVal: b}}, nil
 	case DateTimeID:
 		b, err := toBinary(id, value)
 		if err != nil {
 			return def, err
 		}
-		return &api.Value{Val: &api.Value_DatetimeVal{DatetimeVal: b}}, nil
+		return &pb.Value{Val: &pb.Value_DatetimeVal{DatetimeVal: b}}, nil
 	case PasswordID:
 		var v string
 		if v, ok = value.(string); !ok {
 			return def, errors.Errorf("Expected value of type password. Got : %v", value)
 		}
-		return &api.Value{Val: &api.Value_PasswordVal{PasswordVal: v}}, nil
+		return &pb.Value{Val: &pb.Value_PasswordVal{PasswordVal: v}}, nil
 	default:
 		return def, errors.Errorf("ObjectValue not available for: %v", id)
 	}

@@ -1,49 +1,27 @@
-/*
- * Copyright 2016-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2016-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 // Package worker contains code for pb.worker communication to perform
 // queries and mutations.
 package worker
 
 import (
-	"fmt"
-	"log"
-	"math"
-	"net"
 	"sync"
 	"sync/atomic"
 
 	"github.com/outcaste-io/badger/v3"
 	badgerpb "github.com/outcaste-io/badger/v3/pb"
-	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
-	"go.opencensus.io/plugin/ocgrpc"
 
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 )
 
 var (
-	pstore       *badger.DB
-	workerServer *grpc.Server
-	raftServer   conn.RaftServer
+	pstore *badger.DB
 
 	// In case of flaky network connectivity we would try to keep upto maxPendingEntries in wal
 	// so that the nodes which have lagged behind leader can just replay entries instead of
@@ -51,37 +29,18 @@ var (
 	// are taken
 )
 
-func workerPort() int {
-	return x.Config.PortOffset + x.PortInternal
-}
-
 // Init initializes this package.
 func Init(ps *badger.DB) {
 	pstore = ps
 	// needs to be initialized after group config
 	limiter = rateLimiter{c: sync.NewCond(&sync.Mutex{}), max: int(x.WorkerConfig.Raft.GetInt64("pending-proposals"))}
 	go limiter.bleed()
-
-	grpcOpts := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(x.GrpcMaxSize),
-		grpc.MaxSendMsgSize(x.GrpcMaxSize),
-		grpc.MaxConcurrentStreams(math.MaxInt32),
-		grpc.StatsHandler(&ocgrpc.ServerHandler{}),
-	}
-
-	if x.WorkerConfig.TLSServerConfig != nil {
-		grpcOpts = append(grpcOpts, grpc.Creds(credentials.NewTLS(x.WorkerConfig.TLSServerConfig)))
-	}
-	workerServer = grpc.NewServer(grpcOpts...)
 }
 
 // grpcWorker struct implements the gRPC server interface.
 type grpcWorker struct {
 	sync.Mutex
 }
-
-// grpcWorker implements pb.WorkerServer.
-var _ pb.WorkerServer = (*grpcWorker)(nil)
 
 func (w *grpcWorker) Subscribe(
 	req *pb.SubscriptionRequest, stream pb.Worker_SubscribeServer) error {
@@ -102,22 +61,8 @@ func (w *grpcWorker) Subscribe(
 
 // RunServer initializes a tcp server on port which listens to requests from
 // other workers for pb.communication.
-func RunServer(bindall bool) {
-	laddr := "localhost"
-	if bindall {
-		laddr = "0.0.0.0"
-	}
-	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", laddr, workerPort()))
-	if err != nil {
-		log.Fatalf("While running server: %v", err)
-	}
-	glog.Infof("Worker listening at address: %v", ln.Addr())
-
-	pb.RegisterWorkerServer(workerServer, &grpcWorker{})
-	pb.RegisterRaftServer(workerServer, &raftServer)
-	if err := workerServer.Serve(ln); err != nil {
-		glog.Errorf("Error while calling Serve: %+v", err)
-	}
+func Register(server *grpc.Server) {
+	pb.RegisterWorkerServer(server, &grpcWorker{})
 }
 
 // StoreStats returns stats for data store.
@@ -138,9 +83,6 @@ func BlockingStop() {
 
 	glog.Infof("Stopping node...")
 	groups().Node.closer.SignalAndWait()
-
-	glog.Infof("Stopping worker server...")
-	workerServer.Stop()
 
 	groups().Node.cdcTracker.Close()
 }

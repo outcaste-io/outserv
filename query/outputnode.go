@@ -1,5 +1,5 @@
-// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package query
 
@@ -25,7 +25,6 @@ import (
 	geom "github.com/twpayne/go-geom"
 	"github.com/twpayne/go-geom/encoding/geojson"
 
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/algo"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/task"
@@ -35,7 +34,9 @@ import (
 )
 
 // ToJson converts the list of subgraph into a JSON response by calling toFastJSON.
-func ToJson(ctx context.Context, l *Latency, sgl []*SubGraph, field gqlSchema.Field) ([]byte, error) {
+func ToJson(ctx context.Context, l *Latency, sgl []*SubGraph,
+	field *gqlSchema.Field) ([]byte, error) {
+
 	sgr := &SubGraph{}
 	for _, sg := range sgl {
 		if sg.Params.Alias == "var" || sg.Params.Alias == "shortest" {
@@ -441,7 +442,7 @@ func (enc *encoder) getScalarVal(fj fastJsonNode) ([]byte, error) {
 	}
 	if (fj.meta & uidNodeBit) > 0 {
 		uid := binary.BigEndian.Uint64(data)
-		return x.ToHex(uid, false), nil
+		return x.ToHex(uid), nil
 	}
 	return data, nil
 }
@@ -1094,13 +1095,13 @@ func processNodeUids(fj fastJsonNode, enc *encoder, sg *SubGraph) error {
 
 // Extensions represents the extra information appended to query results.
 type Extensions struct {
-	Latency *api.Latency    `json:"server_latency,omitempty"`
-	Txn     *api.TxnContext `json:"txn,omitempty"`
-	Metrics *api.Metrics    `json:"metrics,omitempty"`
+	Latency *pb.Latency    `json:"server_latency,omitempty"`
+	Txn     *pb.TxnContext `json:"txn,omitempty"`
+	Metrics *pb.Metrics    `json:"metrics,omitempty"`
 }
 
 func (sg *SubGraph) toFastJSON(
-	ctx context.Context, l *Latency, field gqlSchema.Field) ([]byte, error) {
+	ctx context.Context, l *Latency, field *gqlSchema.Field) ([]byte, error) {
 	encodingStart := time.Now()
 	defer func() {
 		l.Json = time.Since(encodingStart)
@@ -1154,7 +1155,7 @@ func (sg *SubGraph) toDqlJSON(enc *encoder, n fastJsonNode) error {
 	return enc.encode(n)
 }
 
-func (sg *SubGraph) toGraphqlJSON(genc *graphQLEncoder, n fastJsonNode, f gqlSchema.Field) error {
+func (sg *SubGraph) toGraphqlJSON(genc *graphQLEncoder, n fastJsonNode, f *gqlSchema.Field) error {
 	// GraphQL queries will always have at least one query whose results are visible to users,
 	// implying that the root fastJson node will always have at least one child. So, no need
 	// to check for the case where there are no children for the root fastJson node.
@@ -1168,7 +1169,7 @@ func (sg *SubGraph) toGraphqlJSON(genc *graphQLEncoder, n fastJsonNode, f gqlSch
 		parentPath:  f.PreAllocatePathSlice(),
 		fj:          n,
 		fjIsRoot:    true,
-		childSelSet: []gqlSchema.Field{f},
+		childSelSet: []*gqlSchema.Field{f},
 	}) {
 		// if genc.encode() didn't finish successfully here, that means we need to send
 		// data as null in the GraphQL response like this:
@@ -1255,13 +1256,6 @@ func alreadySeen(parentIds []uint64, uid uint64) bool {
 		}
 	}
 	return false
-}
-
-func facetName(fieldName string, f *api.Facet) string {
-	if f.Alias != "" {
-		return f.Alias
-	}
-	return fieldName + x.FacetDelimeter + f.Key
 }
 
 // This method gets the values and children for a subprotos.

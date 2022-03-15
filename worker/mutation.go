@@ -1,5 +1,5 @@
-// Portions Copyright 2016-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
+// Portions Copyright 2016-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package worker
 
@@ -12,14 +12,12 @@ import (
 	"time"
 
 	"github.com/outcaste-io/badger/v3/y"
-	"google.golang.org/grpc/metadata"
 
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
 
 	"github.com/outcaste-io/badger/v3"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -511,38 +509,8 @@ func ValidateAndConvert(edge *pb.DirectedEdge, su *pb.SchemaUpdate) error {
 	return nil
 }
 
-// AssignNsIdsOverNetwork sends a request to assign Namespace IDs to the current zero leader.
-func AssignNsIdsOverNetwork(ctx context.Context, num *pb.Num) (*pb.AssignedIds, error) {
-	pl := groups().Leader(0)
-	if pl == nil {
-		return nil, conn.ErrNoConnection
-	}
-
-	con := pl.Get()
-	c := pb.NewZeroClient(con)
-	num.Type = pb.Num_NS_ID
-	return c.AssignIds(ctx, num)
-}
-
-// AssignUidsOverNetwork sends a request to assign UIDs to blank nodes to the current zero leader.
-func AssignUidsOverNetwork(ctx context.Context, num *pb.Num) (*pb.AssignedIds, error) {
-	// Pass on the incoming metadata to the zero. Namespace from the metadata is required by zero.
-	if md, ok := metadata.FromIncomingContext(ctx); ok {
-		ctx = metadata.NewOutgoingContext(ctx, md)
-	}
-	pl := groups().Leader(0)
-	if pl == nil {
-		return nil, conn.ErrNoConnection
-	}
-
-	con := pl.Get()
-	c := pb.NewZeroClient(con)
-	num.Type = pb.Num_UID
-	return c.AssignIds(ctx, num)
-}
-
 // TODO: Do we need fillTxnContext?
-func fillTxnContext(tctx *api.TxnContext, startTs uint64) {
+func fillTxnContext(tctx *pb.TxnContext, startTs uint64) {
 	if txn := posting.GetTxn(startTs); txn != nil {
 		txn.FillContext(tctx, groups().groupId())
 	}
@@ -555,7 +523,7 @@ func fillTxnContext(tctx *api.TxnContext, startTs uint64) {
 func proposeOrSend(ctx context.Context, gid uint32, m *pb.Mutations, chr chan res) {
 	res := res{}
 	if groups().ServesGroup(gid) {
-		res.ctx = &api.TxnContext{}
+		res.ctx = &pb.TxnContext{}
 		res.err = (&grpcWorker{}).proposeAndWait(ctx, res.ctx, m)
 		chr <- res
 		return
@@ -568,7 +536,7 @@ func proposeOrSend(ctx context.Context, gid uint32, m *pb.Mutations, chr chan re
 		return
 	}
 
-	var tc *api.TxnContext
+	var tc *pb.TxnContext
 	c := pb.NewWorkerClient(pl.Get())
 
 	ch := make(chan error, 1)
@@ -651,16 +619,16 @@ func populateMutationMap(src *pb.Mutations) (map[uint32]*pb.Mutations, error) {
 
 type res struct {
 	err error
-	ctx *api.TxnContext
+	ctx *pb.TxnContext
 }
 
 // MutateOverNetwork checks which group should be running the mutations
 // according to the group config and sends it to that instance.
-func MutateOverNetwork(ctx context.Context, m *pb.Mutations) (*api.TxnContext, error) {
+func MutateOverNetwork(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, error) {
 	ctx, span := otrace.StartSpan(ctx, "worker.MutateOverNetwork")
 	defer span.End()
 
-	tctx := &api.TxnContext{}
+	tctx := &pb.TxnContext{}
 	if err := verifyTypes(ctx, m); err != nil {
 		return tctx, err
 	}
@@ -673,7 +641,6 @@ func MutateOverNetwork(ctx context.Context, m *pb.Mutations) (*api.TxnContext, e
 	resCh := make(chan res, len(mutationMap))
 	for gid, mu := range mutationMap {
 		if gid == 0 {
-			span.Annotatef(nil, "state: %+v", groups().state)
 			span.Annotatef(nil, "Group id zero for mutation: %+v", mu)
 			return tctx, errNonExistentTablet
 		}
@@ -785,7 +752,7 @@ func typeSanityCheck(t *pb.TypeUpdate) error {
 	return nil
 }
 
-func (w *grpcWorker) proposeAndWait(ctx context.Context, txnCtx *api.TxnContext,
+func (w *grpcWorker) proposeAndWait(ctx context.Context, txnCtx *pb.TxnContext,
 	m *pb.Mutations) error {
 	if x.WorkerConfig.StrictMutations {
 		for _, edge := range m.Edges {
@@ -805,11 +772,11 @@ func (w *grpcWorker) proposeAndWait(ctx context.Context, txnCtx *api.TxnContext,
 }
 
 // Mutate is used to apply mutations over the network on other instances.
-func (w *grpcWorker) Mutate(ctx context.Context, m *pb.Mutations) (*api.TxnContext, error) {
+func (w *grpcWorker) Mutate(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, error) {
 	ctx, span := otrace.StartSpan(ctx, "worker.Mutate")
 	defer span.End()
 
-	txnCtx := &api.TxnContext{}
+	txnCtx := &pb.TxnContext{}
 	if ctx.Err() != nil {
 		return txnCtx, ctx.Err()
 	}

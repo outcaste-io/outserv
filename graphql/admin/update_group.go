@@ -1,13 +1,15 @@
+// Copyright 2022 Outcaste LLC. Licensed under the Smart License v1.0.
+
 package admin
 
 import (
 	"context"
 	"fmt"
 
-	dgoapi "github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 )
 
@@ -22,7 +24,7 @@ func NewUpdateGroupRewriter() resolve.MutationRewriter {
 // nodes. It does not rewrite any queries.
 func (urw *updateGroupRewriter) RewriteQueries(
 	ctx context.Context,
-	m schema.Mutation) ([]*gql.GraphQuery, []string, error) {
+	m *schema.Field) ([]*gql.GraphQuery, []string, error) {
 
 	urw.VarGen = resolve.NewVariableGenerator()
 	urw.XidMetadata = resolve.NewXidMetadata()
@@ -37,7 +39,7 @@ func (urw *updateGroupRewriter) RewriteQueries(
 // name as another rule.
 func (urw *updateGroupRewriter) Rewrite(
 	ctx context.Context,
-	m schema.Mutation,
+	m *schema.Field,
 	idExistence map[string]string) ([]*resolve.UpsertMutation, error) {
 
 	inp := m.ArgValue(schema.InputArgName).(map[string]interface{})
@@ -52,7 +54,7 @@ func (urw *updateGroupRewriter) Rewrite(
 	srcUID := resolve.MutationQueryVarUID
 
 	var errSet, errDel error
-	var mutSet, mutDel []*dgoapi.Mutation
+	var mutSet, mutDel []*pb.Mutation
 	ruleType := m.MutatedType().Field("rules").Type()
 
 	if setArg != nil {
@@ -88,11 +90,11 @@ func (urw *updateGroupRewriter) Rewrite(
 				"dgraph.rule.permission": %v
 			}`, variable, permission))
 
-			mutSet = append(mutSet, &dgoapi.Mutation{
+			mutSet = append(mutSet, &pb.Mutation{
 				SetJson: nonExistentJson,
 				Cond: fmt.Sprintf(`@if(gt(len(%s),0) AND eq(len(%s),0))`, resolve.MutationQueryVar,
 					variable),
-			}, &dgoapi.Mutation{
+			}, &pb.Mutation{
 				SetJson: existsJson,
 				Cond: fmt.Sprintf(`@if(gt(len(%s),0) AND gt(len(%s),0))`, resolve.MutationQueryVar,
 					variable),
@@ -122,7 +124,7 @@ func (urw *updateGroupRewriter) Rewrite(
 				}
 			]`, srcUID, variable, variable))
 
-			mutDel = append(mutDel, &dgoapi.Mutation{
+			mutDel = append(mutDel, &pb.Mutation{
 				DeleteJson: deleteJson,
 				Cond: fmt.Sprintf(`@if(gt(len(%s),0) AND gt(len(%s),0))`, resolve.MutationQueryVar,
 					variable),
@@ -148,7 +150,7 @@ func (urw *updateGroupRewriter) Rewrite(
 // FromMutationResult rewrites the query part of a GraphQL update mutation into a Dgraph query.
 func (urw *updateGroupRewriter) FromMutationResult(
 	ctx context.Context,
-	mutation schema.Mutation,
+	mutation *schema.Field,
 	assigned map[string]string,
 	result map[string]interface{}) ([]*gql.GraphQuery, error) {
 
@@ -156,7 +158,7 @@ func (urw *updateGroupRewriter) FromMutationResult(
 }
 
 func (urw *updateGroupRewriter) MutatedRootUIDs(
-	mutation schema.Mutation,
+	mutation *schema.Field,
 	assigned map[string]string,
 	result map[string]interface{}) []string {
 	return ((*resolve.UpdateRewriter)(urw)).MutatedRootUIDs(mutation, assigned, result)

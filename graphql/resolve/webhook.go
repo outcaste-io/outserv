@@ -1,18 +1,5 @@
-/*
- * Copyright 2021 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2021 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package resolve
 
@@ -71,7 +58,7 @@ type deleteEvent struct {
 // sendWebhookEvent forms an HTTP payload required for the webhooks configured with @lambdaOnMutate
 // directive, and then sends that payload to the lambda URL configured with Alpha. There is no
 // guarantee that the payload will be delivered successfully to the lambda server.
-func sendWebhookEvent(ctx context.Context, m schema.Mutation, commitTs uint64, rootUIDs []string) {
+func sendWebhookEvent(ctx context.Context, m *schema.Field, commitTs uint64, rootUIDs []string) {
 	accessJWT, _ := x.ExtractJwt(ctx)
 	ns, _ := x.ExtractNamespace(ctx)
 	var authHeader *authHeaderPayload

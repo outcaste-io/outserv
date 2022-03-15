@@ -1,33 +1,17 @@
-/*
- * Copyright 2020 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package admin
 
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strconv"
 
 	"github.com/pkg/errors"
 
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
-	"github.com/outcaste-io/outserv/protos/pb"
-	"github.com/outcaste-io/outserv/worker"
 )
 
 type removeNodeInput struct {
@@ -35,25 +19,26 @@ type removeNodeInput struct {
 	GroupId uint32
 }
 
-func resolveRemoveNode(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
-	input, err := getRemoveNodeInput(m)
-	if err != nil {
-		return resolve.EmptyResult(m, err), false
-	}
+func resolveRemoveNode(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
+	panic("TODO: Implement resolveRemoveNode")
+	// input, err := getRemoveNodeInput(m)
+	// if err != nil {
+	// 	return resolve.EmptyResult(m, err), false
+	// }
 
-	if _, err = worker.RemoveNodeOverNetwork(ctx, &pb.RemoveNodeRequest{NodeId: input.NodeId,
-		GroupId: input.GroupId}); err != nil {
-		return resolve.EmptyResult(m, err), false
-	}
+	// if _, err = worker.RemoveNodeOverNetwork(ctx, &pb.RemoveNodeRequest{NodeId: input.NodeId,
+	// 	GroupId: input.GroupId}); err != nil {
+	// 	return resolve.EmptyResult(m, err), false
+	// }
 
-	return resolve.DataResult(m,
-		map[string]interface{}{m.Name(): response("Success",
-			fmt.Sprintf("Removed node with group: %v, idx: %v", input.GroupId, input.NodeId))},
-		nil,
-	), true
+	// return resolve.DataResult(m,
+	// 	map[string]interface{}{m.Name(): response("Success",
+	// 		fmt.Sprintf("Removed node with group: %v, idx: %v", input.GroupId, input.NodeId))},
+	// 	nil,
+	// ), true
 }
 
-func getRemoveNodeInput(m schema.Mutation) (*removeNodeInput, error) {
+func getRemoveNodeInput(m *schema.Field) (*removeNodeInput, error) {
 	inputArg, ok := m.ArgValue(schema.InputArgName).(map[string]interface{})
 	if !ok {
 		return nil, inputArgError(errors.Errorf("can't convert input to map"))

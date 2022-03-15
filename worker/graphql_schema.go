@@ -1,5 +1,5 @@
-// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
+// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package worker
 
@@ -19,6 +19,7 @@ import (
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/outserv/zero"
 	"github.com/pkg/errors"
 )
 
@@ -164,7 +165,7 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 	c := codec.ListCardinality(res.GetUidMatrix()[0])
 	if uidMtrxLen == 0 || (uidMtrxLen == 1 && c == 0) {
 		// if there was no schema node earlier, then need to assign a new uid for the node
-		res, err := AssignUidsOverNetwork(ctx, &pb.Num{Val: 1, Type: pb.Num_UID})
+		res, err := zero.AssignUids(ctx, 1)
 		if err != nil {
 			return nil, err
 		}

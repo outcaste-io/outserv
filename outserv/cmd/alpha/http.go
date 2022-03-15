@@ -1,5 +1,5 @@
-// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package alpha
 
@@ -20,12 +20,11 @@ import (
 	"time"
 
 	"github.com/outcaste-io/outserv/graphql/admin"
+	"github.com/outcaste-io/outserv/protos/pb"
 
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/golang/glog"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/edgraph"
-	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/query"
 	"github.com/outcaste-io/outserv/x"
@@ -202,7 +201,7 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 	}
 
-	req := api.Request{
+	req := pb.Request{
 		Vars:    params.Variables,
 		Query:   params.Query,
 		StartTs: startTs,
@@ -230,16 +229,6 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 		if isReadOnly {
 			req.ReadOnly = true
 		}
-	}
-
-	// If rdf is set true, then response will be in rdf format.
-	rdfResponse, err := parseBool(r, "rdf")
-	if err != nil {
-		x.SetStatus(w, x.ErrorInvalidRequest, err.Error())
-		return
-	}
-	if rdfResponse {
-		req.RespFormat = api.Request_RDF
 	}
 
 	// Core processing happens here.
@@ -271,11 +260,7 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 		x.Check2(out.Write(js))
 	}
 	x.Check2(out.WriteRune('{'))
-	if rdfResponse {
-		writeEntry("data", resp.Rdf)
-	} else {
-		writeEntry("data", resp.Json)
-	}
+	writeEntry("data", resp.Json)
 	x.Check2(out.WriteRune(','))
 	writeEntry("extensions", js)
 	x.Check2(out.WriteRune('}'))
@@ -311,7 +296,7 @@ func mutationHandler(w http.ResponseWriter, r *http.Request) {
 	// start parsing the query
 	parseStart := time.Now()
 
-	var req *api.Request
+	var req *pb.Request
 	contentType := r.Header.Get("Content-Type")
 	mediaType, contentTypeParams, err := mime.ParseMediaType(contentType)
 	if err != nil {
@@ -332,7 +317,7 @@ func mutationHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		req = &api.Request{}
+		req = &pb.Request{}
 		if queryText, ok := ms["query"]; ok && queryText != nil {
 			req.Query, err = strconv.Unquote(string(queryText.bs))
 			if err != nil {
@@ -343,8 +328,8 @@ func mutationHandler(w http.ResponseWriter, r *http.Request) {
 
 		// JSON API support both keys 1. mutations  2. set,delete,cond
 		// We want to maintain the backward compatibility of the API here.
-		extractMutation := func(jsMap map[string]*skipJSONUnmarshal) (*api.Mutation, error) {
-			mu := &api.Mutation{}
+		extractMutation := func(jsMap map[string]*skipJSONUnmarshal) (*pb.Mutation, error) {
+			mu := &pb.Mutation{}
 			empty := true
 			if setJSON, ok := jsMap["set"]; ok && setJSON != nil {
 				empty = false
@@ -391,17 +376,9 @@ func mutationHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-	case "application/rdf":
-		// Parse N-Quads.
-		req, err = gql.ParseMutation(string(body))
-		if err != nil {
-			x.SetStatus(w, x.ErrorInvalidRequest, err.Error())
-			return
-		}
-
 	default:
 		x.SetStatus(w, x.ErrorInvalidRequest, "Unsupported Content-Type. "+
-			"Supported content types are application/json, application/rdf")
+			"Supported content types are application/json")
 		return
 	}
 
@@ -462,7 +439,7 @@ func alterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	op := &api.Operation{}
+	op := &pb.Operation{}
 	if err := jsonpb.UnmarshalString(string(b), op); err != nil {
 		op.Schema = string(b)
 	}
@@ -557,7 +534,7 @@ func graphqlProbeHandler(gqlHealthStore *admin.GraphQLHealthStore, globalEpoch m
 }
 
 func resolveWithAdminServer(gqlReq *schema.Request, r *http.Request,
-	adminServer admin.IServeGraphQL) *schema.Response {
+	adminServer *admin.GqlHandler) *schema.Response {
 	md := metadata.New(nil)
 	ctx := metadata.NewIncomingContext(context.Background(), md)
 	ctx = x.AttachAccessJwt(ctx, r)

@@ -1,18 +1,5 @@
-/*
- * Copyright 2019 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2019 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package schema
 
@@ -23,25 +10,18 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/outcaste-io/outserv/graphql/authorization"
-	"github.com/outcaste-io/outserv/x"
 	"github.com/dgraph-io/gqlparser/v2/ast"
 	"github.com/dgraph-io/gqlparser/v2/gqlerror"
 	"github.com/dgraph-io/gqlparser/v2/parser"
 	"github.com/dgraph-io/gqlparser/v2/validator"
+	"github.com/outcaste-io/outserv/graphql/authorization"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
 
 // A Handler can produce valid GraphQL and Dgraph schemas given an input of
 // types and relationships
-type Handler interface {
-	MetaInfo() *metaInfo
-	DGSchema() string
-	GQLSchema() string
-	GQLSchemaWithoutApolloExtras() string
-}
-
-type handler struct {
+type Handler struct {
 	input          string
 	originalDefs   []string
 	completeSchema *ast.Schema
@@ -51,7 +31,7 @@ type handler struct {
 
 // FromString builds a GraphQL Schema from input string, or returns any parsing
 // or validation errors.
-func FromString(schema string, ns uint64) (Schema, error) {
+func FromString(schema string, ns uint64) (*Schema, error) {
 	// validator.Prelude includes a bunch of predefined types which help with schema introspection
 	// queries, hence we include it as part of the schema.
 	doc, gqlErr := parser.ParseSchemas(validator.Prelude, &ast.Source{Input: schema})
@@ -67,15 +47,15 @@ func FromString(schema string, ns uint64) (Schema, error) {
 	return AsSchema(gqlSchema, ns)
 }
 
-func (s *handler) MetaInfo() *metaInfo {
+func (s *Handler) MetaInfo() *metaInfo {
 	return s.schemaMeta
 }
 
-func (s *handler) GQLSchema() string {
+func (s *Handler) GQLSchema() string {
 	return Stringify(s.completeSchema, s.originalDefs, false)
 }
 
-func (s *handler) DGSchema() string {
+func (s *Handler) DGSchema() string {
 	return s.dgraphSchema
 }
 
@@ -85,7 +65,7 @@ func (s *handler) DGSchema() string {
 // as they are failing in the schema validation which is a bug
 // in their library. See here:
 // https://github.com/apollographql/apollo-server/issues/3655
-func (s *handler) GQLSchemaWithoutApolloExtras() string {
+func (s *Handler) GQLSchemaWithoutApolloExtras() string {
 	typeMapCopy := make(map[string]*ast.Definition)
 	for typ, defn := range s.completeSchema.Types {
 		// Exclude "union _Entity = ..." definition from types
@@ -282,7 +262,7 @@ func parseMetaInfo(sch string) (*metaInfo, error) {
 
 // NewHandler processes the input schema. If there are no errors, it returns
 // a valid Handler, otherwise it returns nil and an error.
-func NewHandler(input string, apolloServiceQuery bool) (Handler, error) {
+func NewHandler(input string, apolloServiceQuery bool) (*Handler, error) {
 	if input == "" {
 		return nil, gqlerror.Errorf("No schema specified")
 	}
@@ -416,7 +396,7 @@ func NewHandler(input string, apolloServiceQuery bool) (Handler, error) {
 		}
 	}
 
-	return &handler{
+	return &Handler{
 		input:          input,
 		dgraphSchema:   dgSchema,
 		completeSchema: sch,

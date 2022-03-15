@@ -1,5 +1,5 @@
-// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
+// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package admin
 
@@ -14,7 +14,7 @@ import (
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/protos/pb"
-	"github.com/outcaste-io/outserv/worker"
+	"github.com/outcaste-io/outserv/zero"
 )
 
 const (
@@ -24,22 +24,21 @@ const (
 
 type assignInput struct {
 	What string
-	Num  uint64
+	Num  uint32
 }
 
-func resolveAssign(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
+func resolveAssign(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	input, err := getAssignInput(m)
 	if err != nil {
 		return resolve.EmptyResult(m, err), false
 	}
 
 	var resp *pb.AssignedIds
-	num := &pb.Num{Val: input.Num}
 	switch input.What {
 	case uid:
-		resp, err = worker.AssignUidsOverNetwork(ctx, num)
+		resp, err = zero.AssignUids(ctx, input.Num)
 	case namespaceId:
-		resp, err = worker.AssignNsIdsOverNetwork(ctx, num)
+		resp, err = zero.AssignNsids(ctx, input.Num)
 	default:
 		err = fmt.Errorf("Invalid request for resolveAssign")
 	}
@@ -65,7 +64,7 @@ func resolveAssign(ctx context.Context, m schema.Mutation) (*resolve.Resolved, b
 	), true
 }
 
-func getAssignInput(m schema.Mutation) (*assignInput, error) {
+func getAssignInput(m *schema.Field) (*assignInput, error) {
 	inputArg, ok := m.ArgValue(schema.InputArgName).(map[string]interface{})
 	if !ok {
 		return nil, inputArgError(errors.Errorf("can't convert input to map"))
@@ -77,7 +76,7 @@ func getAssignInput(m schema.Mutation) (*assignInput, error) {
 		return nil, inputArgError(errors.Errorf("can't convert input.what to string"))
 	}
 
-	num, err := parseAsUint64(inputArg["num"])
+	num, err := parseAsUint32(inputArg["num"])
 	if err != nil {
 		return nil, inputArgError(schema.GQLWrapf(err, "can't convert input.num to uint64"))
 	}

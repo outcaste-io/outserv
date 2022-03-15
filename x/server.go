@@ -1,3 +1,5 @@
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
+
 package x
 
 import (
@@ -10,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/outcaste-io/ristretto/z"
 	"github.com/golang/glog"
+	"github.com/outcaste-io/ristretto/z"
 	"github.com/soheilhy/cmux"
 )
 
@@ -26,9 +28,7 @@ func StartListenHttpAndHttps(l net.Listener, tlsCfg *tls.Config, closer *z.Close
 	m := cmux.New(l)
 	startServers(m, tlsCfg)
 	err := m.Serve()
-	if err != nil {
-		glog.Errorf("error from cmux serve: %v", err)
-	}
+	glog.Errorf("m.Serve done with error: %v", err)
 }
 
 func startServers(m cmux.CMux, tlsConf *tls.Config) {

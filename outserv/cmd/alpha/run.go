@@ -1,12 +1,11 @@
-// Portions Copyright 2017-2021 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
+// Portions Copyright 2017-2021 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package alpha
 
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"embed"
 	"fmt"
 	"log"
@@ -27,13 +26,14 @@ import (
 	"time"
 
 	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/ee"
 	"github.com/outcaste-io/outserv/ee/audit"
+	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/zero"
 
 	"github.com/golang/glog"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/edgraph"
-	"github.com/outcaste-io/outserv/ee/enc"
 	"github.com/outcaste-io/outserv/graphql/admin"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/schema"
@@ -50,8 +50,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	_ "google.golang.org/grpc/encoding/gzip" // grpc compression
-	"google.golang.org/grpc/health"
-	hapi "google.golang.org/grpc/health/grpc_health_v1"
 
 	_ "github.com/dgraph-io/gqlparser/v2/validator/rules" // make gql validator init() all rules
 )
@@ -66,7 +64,7 @@ var (
 	Alpha x.SubCommand
 
 	// need this here to refer it in admin_backup.go
-	adminServer admin.IServeGraphQL
+	adminServer *admin.GqlHandler
 	initDone    uint32
 )
 
@@ -77,12 +75,7 @@ var jsLambda embed.FS
 func init() {
 	Alpha.Cmd = &cobra.Command{
 		Use:   "alpha",
-		Short: "Run Dgraph Alpha database server",
-		Long: `
-A Dgraph Alpha instance stores the data. Each Dgraph Alpha is responsible for
-storing and serving one data group. If multiple Alphas serve the same group,
-they form a Raft group and provide synchronous replication.
-`,
+		Short: "Run Outserv GraphQL server",
 		Run: func(cmd *cobra.Command, args []string) {
 			defer x.StartProfile(Alpha.Conf).Stop()
 			run()
@@ -104,17 +97,22 @@ they form a Raft group and provide synchronous replication.
 	// --encryption and --vault Superflag
 	ee.RegisterAclAndEncFlags(flag)
 
-	flag.StringP("postings", "p", "p", "Directory to store posting lists.")
-	flag.String("tmp", "t", "Directory to store temporary buffers.")
+	flag.String("data", x.DataDefaults, z.NewSuperFlagHelp(x.DataDefaults).
+		Head("Directories to store data in").
+		Flag("dir", "If provided, all data goes into this directory.").
+		Flag("p", "Directory to store state").
+		Flag("w", "Directory to store Alpha Raft write-ahead logs").
+		Flag("zw", "Directory to store Zero Raft write-ahead logs").
+		Flag("t", "Directory to store temporary files and buffers").
+		Flag("export", "Directory to store exports").
+		String())
 
-	flag.StringP("wal", "w", "w", "Directory to store raft write-ahead logs.")
-	flag.String("export", "export", "Folder in which to store exports.")
-	flag.StringP("zero", "z", fmt.Sprintf("localhost:%d", x.PortZeroGrpc),
-		"Comma separated list of Dgraph Zero addresses of the form IP_ADDRESS:PORT.")
+	flag.String("peer", "",
+		"Comma separated list of Dgraph Peer addresses of the form IP_ADDRESS:PORT.")
 
 	// Useful for running multiple servers on the same machine.
 	flag.IntP("port_offset", "o", 0,
-		"Value added to all listening port numbers. [Internal=7080, HTTP=8080, Grpc=9080]")
+		"Value added to all listening port numbers. [Internal=7080, HTTP=8080]")
 
 	// Custom plugins.
 	flag.String("custom_tokenizers", "",
@@ -359,10 +357,6 @@ func httpPort() int {
 	return x.Config.PortOffset + x.PortHTTP
 }
 
-func grpcPort() int {
-	return x.Config.PortOffset + x.PortGrpc
-}
-
 func healthCheck(w http.ResponseWriter, r *http.Request) {
 	x.AddCorsHeaders(w)
 	var err error
@@ -372,7 +366,7 @@ func healthCheck(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 
 		ctx := x.AttachAccessJwt(context.Background(), r)
-		var resp *api.Response
+		var resp *pb.Response
 		if resp, err = (&edgraph.Server{}).Health(ctx, true); err != nil {
 			x.SetStatus(w, x.Error, err.Error())
 			return
@@ -397,7 +391,7 @@ func healthCheck(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var resp *api.Response
+	var resp *pb.Response
 	if resp, err = (&edgraph.Server{}).Health(context.Background(), false); err != nil {
 		x.SetStatus(w, x.Error, err.Error())
 		return
@@ -419,7 +413,7 @@ func stateHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	ctx = x.AttachAccessJwt(ctx, r)
 
-	var aResp *api.Response
+	var aResp *pb.Response
 	if aResp, err = (&edgraph.Server{}).State(ctx); err != nil {
 		x.SetStatus(w, x.Error, err.Error())
 		return
@@ -460,6 +454,8 @@ func setupLambdaServer(closer *z.Closer) {
 		return
 	}
 
+	tmpDir := x.WorkerConfig.Dir.Tmp
+
 	// Copy over all the embedded files to actual files.
 	dir := "dist"
 	files, err := jsLambda.ReadDir(dir)
@@ -468,7 +464,7 @@ func setupLambdaServer(closer *z.Closer) {
 		// The separator for embedded files is forward-slash even on Windows.
 		data, err := jsLambda.ReadFile(dir + "/" + file.Name())
 		x.Check(err)
-		filename := filepath.Join(x.WorkerConfig.TmpDir, file.Name())
+		filename := filepath.Join(tmpDir, file.Name())
 		file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 		x.Check(err)
 		_, err = file.Write(data)
@@ -495,9 +491,10 @@ func setupLambdaServer(closer *z.Closer) {
 	}
 
 	// Entry point of the script is index.js.
-	filename := filepath.Join(x.WorkerConfig.TmpDir, "index.js")
+	filename := filepath.Join(tmpDir, "index.js")
 	dgraphUrl := fmt.Sprintf("http://127.0.0.1:%d", httpPort())
 
+	// TODO: If node is not installed, we should not run any lambda servers.
 	glog.Infoln("Setting up lambda servers")
 	for i := range lambdas {
 		go func(i int) {
@@ -577,35 +574,7 @@ func setupLambdaServer(closer *z.Closer) {
 	}()
 }
 
-func serveGRPC(l net.Listener, tlsCfg *tls.Config, closer *z.Closer) {
-	defer closer.Done()
-
-	x.RegisterExporters(Alpha.Conf, "dgraph.alpha")
-
-	opt := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(x.GrpcMaxSize),
-		grpc.MaxSendMsgSize(x.GrpcMaxSize),
-		grpc.MaxConcurrentStreams(1000),
-		grpc.StatsHandler(&ocgrpc.ServerHandler{}),
-		grpc.UnaryInterceptor(audit.AuditRequestGRPC),
-	}
-	if tlsCfg != nil {
-		opt = append(opt, grpc.Creds(credentials.NewTLS(tlsCfg)))
-	}
-
-	s := grpc.NewServer(opt...)
-	api.RegisterDgraphServer(s, &edgraph.Server{})
-	hapi.RegisterHealthServer(s, health.NewServer())
-	worker.RegisterZeroProxyServer(s)
-
-	err := s.Serve(l)
-	glog.Errorf("GRPC listener canceled: %v\n", err)
-	s.Stop()
-}
-
 func setupServer(closer *z.Closer) {
-	go worker.RunServer(bindall) // For pb.communication.
-
 	laddr := "localhost"
 	if bindall {
 		laddr = "0.0.0.0"
@@ -617,11 +586,6 @@ func setupServer(closer *z.Closer) {
 	}
 
 	httpListener, err := setupListener(laddr, httpPort())
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	grpcListener, err := setupListener(laddr, grpcPort())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -662,7 +626,8 @@ func setupServer(closer *z.Closer) {
 	e := new(uint64)
 	atomic.StoreUint64(e, 0)
 	globalEpoch[x.GalaxyNamespace] = e
-	var mainServer admin.IServeGraphQL
+
+	var mainServer *admin.GqlHandler
 	var gqlHealthStore *admin.GraphQLHealthStore
 	// Do not use := notation here because adminServer is a global variable.
 	mainServer, adminServer, gqlHealthStore = admin.NewServers(introspection,
@@ -705,8 +670,7 @@ func setupServer(closer *z.Closer) {
 	// Initialize the lambda server
 	setupLambdaServer(x.ServerCloser)
 	// Initialize the servers.
-	x.ServerCloser.AddRunning(3)
-	go serveGRPC(grpcListener, tlsCfg, x.ServerCloser)
+	x.ServerCloser.AddRunning(2)
 	go x.StartListenHttpAndHttps(httpListener, tlsCfg, x.ServerCloser)
 	go func() {
 		defer x.ServerCloser.Done()
@@ -716,16 +680,11 @@ func setupServer(closer *z.Closer) {
 		e = globalEpoch[x.GalaxyNamespace]
 		atomic.StoreUint64(e, math.MaxUint64)
 
-		// Stops grpc/http servers; Already accepted connections are not closed.
-		if err := grpcListener.Close(); err != nil {
-			glog.Warningf("Error while closing gRPC listener: %s", err)
-		}
-		if err := httpListener.Close(); err != nil {
-			glog.Warningf("Error while closing HTTP listener: %s", err)
-		}
+		// Stops http servers; Already accepted connections are not closed.
+		err := httpListener.Close()
+		glog.Infof("HTTP listener closed with error: %v", err)
 	}()
 
-	glog.Infoln("gRPC server started.  Listening on port", grpcPort())
 	glog.Infoln("HTTP server started.  Listening on port", httpPort())
 
 	atomic.AddUint32(&initDone, 1)
@@ -734,7 +693,7 @@ func setupServer(closer *z.Closer) {
 	for {
 		if x.HealthCheck() == nil {
 			// Audit is enterprise feature.
-			x.Check(audit.InitAuditorIfNecessary(worker.Config.Audit, worker.EnterpriseEnabled))
+			x.Check(audit.InitAuditorIfNecessary(worker.Config.Audit, nil))
 			break
 		}
 		time.Sleep(500 * time.Millisecond)
@@ -747,13 +706,6 @@ func run() {
 
 	telemetry := z.NewSuperFlag(Alpha.Conf.GetString("telemetry")).MergeAndCheckDefault(
 		x.TelemetryDefaults)
-	if telemetry.GetBool("sentry") {
-		x.InitSentry(enc.EeBuild)
-		defer x.FlushSentry()
-		x.ConfigureSentryScope("alpha")
-		x.WrapPanics()
-		x.SentryOptOutNote()
-	}
 
 	bindall = Alpha.Conf.GetBool("bindall")
 	cache := z.NewSuperFlag(Alpha.Conf.GetString("cache")).MergeAndCheckDefault(
@@ -775,9 +727,8 @@ func run() {
 	security := z.NewSuperFlag(Alpha.Conf.GetString("security")).MergeAndCheckDefault(
 		worker.SecurityDefaults)
 	conf := audit.GetAuditConf(Alpha.Conf.GetString("audit"))
+
 	opts := worker.Options{
-		PostingDir:      Alpha.Conf.GetString("postings"),
-		WALDir:          Alpha.Conf.GetString("wal"),
 		CacheMb:         totalCache,
 		CachePercentage: cachePercentage,
 
@@ -824,9 +775,7 @@ func run() {
 
 	raft := z.NewSuperFlag(Alpha.Conf.GetString("raft")).MergeAndCheckDefault(worker.RaftDefaults)
 	x.WorkerConfig = x.WorkerOptions{
-		TmpDir:              Alpha.Conf.GetString("tmp"),
-		ExportPath:          Alpha.Conf.GetString("export"),
-		ZeroAddr:            strings.Split(Alpha.Conf.GetString("zero"), ","),
+		PeerAddr:            strings.Split(Alpha.Conf.GetString("peer"), ","),
 		Raft:                raft,
 		WhiteListedIPRanges: ips,
 		StrictMutations:     opts.MutationsMode == worker.StrictMutations,
@@ -847,7 +796,7 @@ func run() {
 	}
 
 	// Set the directory for temporary buffers.
-	z.SetTmpDir(x.WorkerConfig.TmpDir)
+	z.SetTmpDir(x.WorkerConfig.Dir.Tmp)
 
 	x.WorkerConfig.EncryptionKey = keys.EncKey
 
@@ -951,8 +900,48 @@ func run() {
 		}
 	}()
 
-	updaters := z.NewCloser(2)
+	grpcOpts := []grpc.ServerOption{
+		grpc.MaxRecvMsgSize(x.GrpcMaxSize),
+		grpc.MaxSendMsgSize(x.GrpcMaxSize),
+		grpc.MaxConcurrentStreams(math.MaxInt32),
+		grpc.StatsHandler(&ocgrpc.ServerHandler{}),
+	}
+	if x.WorkerConfig.TLSServerConfig != nil {
+		grpcOpts = append(grpcOpts, grpc.Creds(credentials.NewTLS(x.WorkerConfig.TLSServerConfig)))
+	}
+	grpcServer := grpc.NewServer(grpcOpts...)
+	laddr := "localhost"
+	if bindall {
+		laddr = "0.0.0.0"
+	}
+	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", laddr, x.WorkerPort()))
+	if err != nil {
+		log.Fatalf("While running server: %v", err)
+	}
+	glog.Infof("Worker listening at address: %v", ln.Addr())
+
+	// Register the internal Grpc services.
+	conn.Register(grpcServer)
+	worker.Register(grpcServer)
+
+	grpcServerCloser := z.NewCloser(1)
 	go func() {
+		defer grpcServerCloser.Done()
+
+		go func() {
+			<-grpcServerCloser.HasBeenClosed()
+			grpcServer.Stop()
+		}()
+
+		glog.Infof("Starting to serve Grpc connetions")
+		err := grpcServer.Serve(ln)
+		glog.Errorf("Grpc serve returned with error: %+v", err)
+	}()
+
+	updaters := z.NewCloser(3)
+	go func() {
+		zero.Run(updaters, bindall)
+
 		worker.StartRaftNodes(worker.State.WALstore, bindall)
 		atomic.AddUint32(&initDone, 1)
 
@@ -967,15 +956,15 @@ func run() {
 	adminCloser := z.NewCloser(1)
 
 	setupServer(adminCloser)
-	glog.Infoln("GRPC and HTTP stopped.")
+	glog.Infoln("HTTP stopped.")
 
 	// This might not close until group is given the signal to close. So, only signal here,
 	// wait for it after group is closed.
 	updaters.Signal()
 
-	edgraph.Cleanup()
+	edgraph.StopServingQueries()
 	worker.BlockingStop()
-	glog.Infoln("worker stopped.")
+	glog.Infoln("Worker stopped.")
 
 	adminCloser.SignalAndWait()
 	glog.Infoln("adminCloser closed.")
@@ -983,11 +972,16 @@ func run() {
 	audit.Close()
 
 	worker.State.Dispose()
-	x.RemoveCidFile()
 	glog.Info("worker.State disposed.")
 
 	updaters.Wait()
 	glog.Infoln("updaters closed.")
+
+	grpcServerCloser.SignalAndWait()
+	glog.Infof("Internal Grpc server closed.")
+
+	conn.GetPools().Close()
+	glog.Infof("Shutdown all connections.")
 
 	glog.Infoln("Server shutdown. Bye!")
 }

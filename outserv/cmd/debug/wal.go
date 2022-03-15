@@ -1,18 +1,5 @@
-/*
- * Copyright 2019 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2019 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package debug
 
@@ -78,20 +65,11 @@ func printBasic(store RaftStore) (uint64, uint64) {
 		var zs pb.ZeroSnapshot
 		if err := ds.Unmarshal(snap.Data); err == nil {
 			fmt.Printf("Snapshot Alpha: %+v\n", ds)
+
 		} else if err := zs.Unmarshal(snap.Data); err == nil {
-			for gid, group := range zs.State.GetGroups() {
-				fmt.Printf("\nGROUP: %d\n", gid)
-				for _, member := range group.GetMembers() {
-					fmt.Printf("Member: %+v .\n", member)
-				}
-				for _, tablet := range group.GetTablets() {
-					fmt.Printf("Tablet: %+v .\n", tablet)
-				}
-				group.Members = nil
-				group.Tablets = nil
-				fmt.Printf("Group: %d %+v .\n", gid, group)
+			for _, tablet := range zs.State.GetTablets() {
+				fmt.Printf("Tablet: %+v .\n", tablet)
 			}
-			zs.State.Groups = nil
 			fmt.Printf("\nSnapshot Zero: %+v\n", zs)
 		} else {
 			fmt.Printf("Unable to unmarshal Dgraph snapshot: %v", err)

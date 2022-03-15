@@ -1,18 +1,5 @@
-/*
- * Copyright 2021 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2021 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package worker
 
@@ -31,6 +18,7 @@ import (
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/raftwal"
 	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/outserv/zero"
 	"github.com/outcaste-io/ristretto/z"
 	"github.com/pkg/errors"
 )
@@ -54,13 +42,10 @@ func TaskStatusOverNetwork(ctx context.Context, req *pb.TaskStatusRequest,
 	}
 
 	// Find the Alpha with the required Raft ID.
+	st := zero.MembershipState()
 	var addr string
-	for _, group := range groups().state.GetGroups() {
-		for _, member := range group.GetMembers() {
-			if member.GetId() == raftId {
-				addr = member.GetAddr()
-			}
-		}
+	if member, has := st.Members[raftId]; has {
+		addr = member.Addr
 	}
 	if addr == "" {
 		return nil, fmt.Errorf("the Alpha that served that task is not available")
@@ -96,7 +81,7 @@ var (
 
 // InitTasks initializes the global Tasks variable.
 func InitTasks() {
-	path := filepath.Join(x.WorkerConfig.TmpDir, "tasks.buf")
+	path := filepath.Join(x.WorkerConfig.Dir.Tmp, "tasks.buf")
 	log, err := z.NewTreePersistent(path)
 	x.Check(err)
 

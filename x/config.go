@@ -1,26 +1,16 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package x
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
+	"path/filepath"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/badger/v3"
 	"github.com/outcaste-io/ristretto/z"
 	"github.com/spf13/viper"
@@ -95,13 +85,21 @@ type IPRange struct {
 	Lower, Upper net.IP
 }
 
+var DataDefaults = `dir=data; p=; w=; t=; zw=; export=;`
+
+type Dir struct {
+	Posting     string
+	RaftWal     string
+	Tmp         string
+	ZeroRaftWal string
+	Export      string
+}
+
 // WorkerOptions stores the options for the worker package. It's declared here
 // since it's used by multiple packages.
 type WorkerOptions struct {
-	// TmpDir is a directory to store temporary buffers.
-	TmpDir string
-	// ExportPath indicates the folder to which exported data will be saved.
-	ExportPath string
+	// Data stores the list of directories to use.
+	Dir Dir
 	// Trace options:
 	//
 	// ratio float64 - the ratio of queries to trace (must be between 0 and 1)
@@ -110,10 +108,9 @@ type WorkerOptions struct {
 	Trace *z.SuperFlag
 	// MyAddr stores the address and port for this alpha.
 	MyAddr string
-	// ZeroAddr stores the list of address:port for the zero instances associated with this alpha.
-	// Alpha would communicate via only one zero address from the list. All
-	// the other addresses serve as fallback.
-	ZeroAddr []string
+	// PeerAddr stores the list of address:port for the other instances in the
+	// cluster. You just need one active address to work.
+	PeerAddr []string
 	// TLS client config which will be used to connect with zero and alpha internally
 	TLSClientConfig *tls.Config
 	// TLS server config which will be used to initiate server internal port
@@ -132,9 +129,6 @@ type WorkerOptions struct {
 	HmacSecret Sensitive
 	// AbortOlderThan tells Dgraph to discard transactions that are older than this duration.
 	AbortOlderThan time.Duration
-	// ProposedGroupId will be used if there's a file in the p directory called group_id with the
-	// proposed group ID for this server.
-	ProposedGroupId uint32
 	// StartTime is the start time of the alpha
 	StartTime time.Time
 	// Security options:
@@ -160,10 +154,58 @@ var WorkerConfig WorkerOptions
 
 func (w *WorkerOptions) Parse(conf *viper.Viper) {
 	w.MyAddr = conf.GetString("my")
+	if w.MyAddr == "" {
+		w.MyAddr = fmt.Sprintf("localhost:%d", Config.PortOffset+PortInternal)
+
+	} else {
+		// check if address is valid or not
+		Check(ValidateAddress(w.MyAddr))
+		bindall := conf.GetBool("bindall")
+		if !bindall {
+			glog.Errorln("--my flag is provided without bindall." +
+				" Did you forget to specify bindall?")
+		}
+	}
 	w.Trace = z.NewSuperFlag(conf.GetString("trace")).MergeAndCheckDefault(TraceDefaults)
 
 	survive := conf.GetString("survive")
 	AssertTruef(survive == "process" || survive == "filesystem",
 		"Invalid survival mode: %s", survive)
 	w.HardSync = survive == "filesystem"
+
+	AssertTruef(len(w.PeerAddr) > 0, "Provide at least one peer node address")
+	for _, addr := range w.PeerAddr {
+		AssertTruef(addr != w.MyAddr,
+			"Peer address %s and my address (IP:Port) %s can't be the same.",
+			addr, w.MyAddr)
+	}
+
+	data := z.NewSuperFlag(conf.GetString("data")).MergeAndCheckDefault(DataDefaults)
+	dir := data.GetPath("dir")
+
+	paths := make(map[string]int)
+	getAbsPath := func(v string) string {
+		var res string
+		if d := data.GetPath(v); len(d) > 0 {
+			res = d
+		} else {
+			res = filepath.Join(dir, v)
+		}
+		paths[res]++
+		return res
+	}
+	w.Dir.Posting = getAbsPath("p")
+	w.Dir.RaftWal = getAbsPath("w")
+	w.Dir.Tmp = getAbsPath("t")
+	w.Dir.ZeroRaftWal = getAbsPath("zw")
+	w.Dir.Export = getAbsPath("export")
+
+	for path, count := range paths {
+		AssertTruef(count == 1,
+			"All data directories have to be unique. Found repetition with '%s'.", path)
+	}
+}
+
+func WorkerPort() int {
+	return Config.PortOffset + PortInternal
 }

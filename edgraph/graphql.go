@@ -1,18 +1,5 @@
-/*
- * Copyright 2017-2020 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2020 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package edgraph
 
@@ -24,8 +11,8 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
@@ -70,7 +57,7 @@ func ProcessPersistedQuery(ctx context.Context, gqlReq *schema.Request) error {
 		"$join": join,
 	}
 	req := &Request{
-		req: &api.Request{
+		req: &pb.Request{
 			Query:    queryForSHA,
 			Vars:     variables,
 			ReadOnly: true,
@@ -108,19 +95,19 @@ func ProcessPersistedQuery(ctx context.Context, gqlReq *schema.Request) error {
 		}
 
 		req = &Request{
-			req: &api.Request{
-				Mutations: []*api.Mutation{
+			req: &pb.Request{
+				Mutations: []*pb.Mutation{
 					{
-						Set: []*api.NQuad{
+						Set: []*pb.NQuad{
 							{
 								Subject:     "_:a",
 								Predicate:   "dgraph.graphql.p_query",
-								ObjectValue: &api.Value{Val: &api.Value_StrVal{StrVal: join}},
+								ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: join}},
 							},
 							{
 								Subject:   "_:a",
 								Predicate: "dgraph.type",
-								ObjectValue: &api.Value{Val: &api.Value_StrVal{
+								ObjectValue: &pb.Value{Val: &pb.Value_StrVal{
 									StrVal: "dgraph.graphql.persisted_query"}},
 							},
 						},
@@ -134,7 +121,6 @@ func ProcessPersistedQuery(ctx context.Context, gqlReq *schema.Request) error {
 		ctx := context.WithValue(ctx, IsGraphql, true)
 		_, err := (&Server{}).doQuery(ctx, req)
 		return err
-
 	}
 
 	if len(shaQueryRes.Me) != 1 {

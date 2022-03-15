@@ -1,5 +1,5 @@
-// Portions Copyright 2017 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart license.
+// Portions Copyright 2017 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 // Style guide for Protocol Buffer 3.
 // Use CamelCase (with an initial capital) for message names – for example,
@@ -10,7 +10,6 @@ syntax = "proto3";
 
 package pb;
 
-import "api.proto";
 import "github.com/outcaste-io/badger/v3/pb/pb.proto";
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
@@ -100,11 +99,12 @@ message SortResult {
 }
 
 message RaftContext {
-  fixed64 id = 1;
-  uint32 group = 2;
-  string addr = 3;
-  uint64 snapshot_ts = 4;
-  bool is_learner = 5;
+  string who_is = 1;
+  fixed64 id = 2;
+  uint32 group = 3;
+  string addr = 4;
+  uint64 snapshot_ts = 5;
+  bool is_learner = 6;
 }
 
 // Member stores information about RAFT group member for a single RAFT node.
@@ -118,68 +118,33 @@ message Member {
   bool am_dead = 5 [(gogoproto.jsontag) = "amDead,omitempty"];
   uint64 last_update = 6 [(gogoproto.jsontag) = "lastUpdate,omitempty"];
   bool learner = 7;
-
-  bool cluster_info_only = 13
-      [(gogoproto.jsontag) = "clusterInfoOnly,omitempty"];
-  bool force_group_id = 14 [(gogoproto.jsontag) = "forceGroupId,omitempty"];
-}
-
-message Group {
-  map<uint64, Member> members = 1;  // Raft ID is the key.
-  map<string, Tablet> tablets = 2;  // Predicate + others are key.
-  uint64 snapshot_ts = 3;           // Stores Snapshot transaction ts.
-  uint64 checksum = 4;              // Stores a checksum.
-  uint64 checkpoint_ts = 5;         // Stores checkpoint ts as seen by leader.
-}
-
-message License {
-  string user = 1;
-  uint64 maxNodes = 2;
-  int64 expiryTs = 3;
-  bool enabled = 4;
 }
 
 message ZeroProposal {
-  reserved 5; // Was used by maxTxnTs.
-  reserved 7; // Was used for Txn.
-  reserved 8; // Was used for string key.
-
   map<uint32, uint64> snapshot_ts = 1;  // Group ID -> Snapshot Ts.
   Member member = 2;
-  Tablet tablet = 3;
-  uint64 maxUID = 4;
-  uint64 maxNsID = 12;
-  uint64 maxRaftId = 6;
-  string cid = 9;  // Used as unique identifier for the cluster.
-  License license = 10;
-  ZeroSnapshot snapshot = 11;  // Used to make Zeros take a snapshot.
-  // 12 has already been used.
-  DeleteNsRequest delete_ns = 13;  // Used to delete namespace.
-  repeated Tablet tablets = 14;
+  repeated Tablet tablets = 3;
+
+  uint32 num_uids = 4;
+  uint32 num_nsids = 5;
+
+  string cid = 6;  // Used as unique identifier for the cluster.
+  DeleteNsRequest delete_ns = 7;  // Used to delete namespace.
 }
 
 // MembershipState is used to pack together the current membership state of all
 // the nodes in the caller server; and the membership updates recorded by the
 // callee server since the provided lastUpdate.
 message MembershipState {
-  uint64 counter = 1;  // Used to find latest membershipState in case of race.
-  map<uint32, Group> groups = 2;
-  map<uint64, Member> zeros = 3;
-  uint64 maxUID = 4;
-  uint64 maxTxnTs = 5;
-  uint64 maxNsID = 10;
-  uint64 maxRaftId = 6;
-  repeated Member removed = 7;
-  string cid = 8;  // Used to uniquely identify the Dgraph cluster.
-  License license = 9;
-  // 10 has already been used.
-}
+  map<uint64, Member> members = 1;
+  map<uint32, uint64> leaders = 2;
+  map<string, Tablet> tablets = 3;
+  repeated uint64 removed = 4; // Raft IDs of removed members.
 
-message ConnectionState {
-  Member member = 1;
-  MembershipState state = 2;
-  // Used to determine the timstamp for reading after bulk load.
-  uint64 max_pending = 3;
+  uint64 raft_index = 5;
+  uint64 maxUID = 6;
+  uint64 maxNsID = 7;
+  string cid = 8;  // Used to uniquely identify the Dgraph cluster.
 }
 
 message HealthInfo {
@@ -190,10 +155,9 @@ message HealthInfo {
   string version = 5;
   int64 uptime = 6;
   int64 lastEcho = 7;
-  repeated string ongoing = 8;
-  repeated string indexing = 9;
-  repeated string ee_features = 10;
-  uint64 read_ts = 11;
+  uint64 read_ts = 8;
+  repeated string ongoing = 9;
+  repeated string indexing = 10;
 }
 
 message Tablet {
@@ -286,7 +250,6 @@ message Proposal {
   uint64 base_timestamp = 1; // Use this timestamp to derive commit timestamps.
   Mutations mutations = 2;
   repeated badgerpb3.KV kv = 4;
-  MembershipState state = 5;
   // Delete the predicate which was moved to other group.
   string clean_predicate = 6;
   Snapshot snapshot = 9;  // Used to tell the group when to take snapshot.
@@ -459,41 +422,175 @@ message PeerResponse {
 
 message RaftBatch {
   RaftContext context = 1;
-  api.Payload payload = 2;
+  Payload payload = 2;
 }
+
+/* The following are from api.proto */
+
+message Payload {
+  bytes Data = 1;
+}
+
+message TxnContext {
+  uint64 start_ts = 1;
+  uint64 commit_ts = 2;
+  bool aborted = 3;
+  repeated string keys = 4;  // List of keys to be used for conflict detection.
+  repeated string preds = 5; // List of predicates involved in this transaction.
+  string hash = 6;
+}
+
+message Request {
+  uint64 start_ts = 1;
+
+  string query = 4;
+  map<string, string> vars = 5; // Support for GraphQL like variables.
+  bool read_only = 6;
+  bool best_effort = 7;
+
+  repeated Mutation mutations = 12;
+  bool commit_now = 13;
+  enum RespFormat {
+    JSON = 0;
+    RDF = 1;
+  }
+  RespFormat resp_format = 14;
+  string hash = 15;
+}
+
+message Uids {
+  repeated string uids = 1;
+}
+
+message ListOfString {
+    repeated string value = 1;
+}
+
+message Response {
+  bytes json = 1;
+  TxnContext txn = 2;
+  Latency latency = 3;
+  // Metrics contains all metrics related to the query.
+  Metrics metrics = 4;
+  // uids contains a mapping of blank_node => uid for the node. It only returns uids
+  // that were created as part of a mutation.
+  map<string, string> uids = 12;
+  bytes rdf = 13;
+  map<string, ListOfString> hdrs = 14;
+}
+
+message Mutation {
+  bytes set_json = 1;
+  bytes delete_json = 2;
+  bytes set_nquads = 3;
+  bytes del_nquads = 4;
+  repeated NQuad set = 5;
+  repeated NQuad del = 6;
+
+  // This is being used for upserts.
+  string cond = 9;
+
+  // This field is a duplicate of the one in Request and placed here for convenience.
+  bool commit_now = 14;
+}
+
+message Operation {
+  string schema = 1;
+  string drop_attr = 2;
+  bool drop_all = 3;
+
+  enum DropOp {
+    NONE = 0;
+    ALL = 1;
+    DATA = 2;
+    ATTR = 3;
+    TYPE = 4;
+  }
+  DropOp drop_op = 4;
+
+  // If drop_op is ATTR or TYPE, drop_value holds the name of the predicate or
+  // type to delete.
+  string drop_value = 5;
+
+  // run indexes in background.
+  bool run_in_background = 6;
+}
+
+message Check {}
+
+message Version {
+  string tag = 1;
+}
+
+message Latency {
+  uint64 parsing_ns = 1;
+  uint64 processing_ns = 2;
+  uint64 encoding_ns = 3;
+  uint64 assign_timestamp_ns = 4;
+  uint64 total_ns = 5;
+}
+
+message Metrics {
+  // num_uids is the map of number of uids processed by each attribute.
+  map<string, uint64> num_uids = 1;
+}
+
+message NQuad {
+  string subject = 1;
+  string predicate = 2;
+  string object_id = 3;
+  Value object_value = 4;
+  uint64 namespace = 5;
+  string lang = 6;
+}
+
+message Value {
+  oneof val {
+    string default_val = 1;
+    bytes bytes_val = 2;
+    int64 int_val = 3;
+    bool bool_val = 4;
+    string str_val = 5;
+    double double_val = 6;
+    bytes geo_val = 7;  // Geo data in WKB format
+    bytes date_val = 8;
+    bytes datetime_val = 9;
+    string password_val = 10;
+    uint64 uid_val=11;
+  }
+}
+
+message LoginRequest {
+  string userid = 1;
+  string password = 2;
+  string refresh_token = 3;
+  uint64 namespace = 4;
+}
+
+message Jwt {
+  string access_jwt = 1;
+  string refresh_jwt = 2;
+}
+
+/* End of api.proto */
 
 service Raft {
-  rpc Heartbeat(api.Payload) returns (stream HealthInfo) {}
-  rpc RaftMessage(stream RaftBatch) returns (api.Payload) {}
-  rpc JoinCluster(RaftContext) returns (api.Payload) {}
+  rpc Heartbeat(Payload) returns (stream HealthInfo) {}
+  rpc RaftMessage(stream RaftBatch) returns (Payload) {}
+  rpc JoinCluster(RaftContext) returns (Payload) {}
   rpc IsPeer(RaftContext) returns (PeerResponse) {}
-}
-
-service Zero {
-  // These 3 endpoints are for handling membership.
-  rpc Connect(Member) returns (ConnectionState) {}
-  rpc UpdateMembership(Group) returns (api.Payload) {}
-  rpc StreamMembership(api.Payload) returns (stream MembershipState) {}
-
-  rpc ShouldServe(Tablet) returns (Tablet) {}
-  rpc Inform(TabletRequest) returns (TabletResponse) {}
-  rpc AssignIds(Num) returns (AssignedIds) {}
-  rpc DeleteNamespace(DeleteNsRequest) returns (Status) {}
-  rpc RemoveNode(RemoveNodeRequest) returns (Status) {}
-  rpc MoveTablet(MoveTabletRequest) returns (Status) {}
-  rpc ApplyLicense(ApplyLicenseRequest) returns (Status) {}
 }
 
 service Worker {
   // Data serving RPCs.
-  rpc Mutate(Mutations) returns (api.TxnContext) {}
+  rpc Mutate(Mutations) returns (TxnContext) {}
   rpc ServeTask(Query) returns (Result) {}
   rpc StreamSnapshot(stream Snapshot) returns (stream KVS) {}
   rpc Sort(SortMessage) returns (SortResult) {}
   rpc Schema(SchemaRequest) returns (SchemaResult) {}
   rpc Export(ExportRequest) returns (ExportResponse) {}
-  rpc ReceivePredicate(stream KVS) returns (api.Payload) {}
-  rpc MovePredicate(MovePredicatePayload) returns (api.Payload) {}
+  rpc ReceivePredicate(stream KVS) returns (Payload) {}
+  rpc MovePredicate(MovePredicatePayload) returns (Payload) {}
   rpc Subscribe(SubscriptionRequest) returns (stream badgerpb3.KVList) {}
   rpc UpdateGraphQLSchema(UpdateGraphQLSchemaRequest) returns (UpdateGraphQLSchemaResponse) {}
   rpc DeleteNamespace(DeleteNsRequest) returns (Status) {}
@@ -549,10 +646,6 @@ message MoveTabletRequest {
   uint64 namespace = 1;
   string tablet = 2;
   uint32 dstGroup = 3;
-}
-
-message ApplyLicenseRequest {
-  bytes license = 1;
 }
 
 message SnapshotMeta {

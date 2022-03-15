@@ -1,5 +1,5 @@
-// Portions Copyright 2015-2021 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart license.
+// Portions Copyright 2015-2021 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package x
 
@@ -34,13 +34,10 @@ import (
 	bo "github.com/outcaste-io/badger/v3/options"
 	"github.com/outcaste-io/badger/v3/pb"
 	badgerpb "github.com/outcaste-io/badger/v3/pb"
-	"github.com/outcaste-io/dgo/v210"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/ristretto/z"
 
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	"go.opencensus.io/plugin/ocgrpc"
 	"go.opencensus.io/trace"
 	"golang.org/x/crypto/ssh/terminal"
@@ -91,22 +88,13 @@ const (
 	// message sizes allowable on the client size when dialing.
 	GrpcMaxSize = math.MaxInt32
 
-	// PortZeroGrpc is the default gRPC port for zero.
-	PortZeroGrpc = 5080
-	// PortZeroHTTP is the default HTTP port for zero.
-	PortZeroHTTP = 6080
 	// PortInternal is the default port for internal use.
 	PortInternal = 7080
 	// PortHTTP is the default HTTP port for alpha.
 	PortHTTP = 8080
-	// PortGrpc is the default gRPC port for alpha.
-	PortGrpc = 9080
 	// ForceAbortDifference is the maximum allowed difference between
 	// AppliedUntil - TxnMarks.DoneUntil() before old transactions start getting aborted.
 	ForceAbortDifference = 5000
-
-	// FacetDelimeter is the symbol used to distinguish predicate names from facets.
-	FacetDelimeter = "|"
 
 	// GrootId is the ID of the admin user for ACLs.
 	GrootId = "groot"
@@ -973,86 +961,6 @@ func WithAuthorizationCredentials(authToken string) grpc.DialOption {
 	return grpc.WithPerRPCCredentials(&authorizationCredentials{authToken})
 }
 
-// GetDgraphClient creates a Dgraph client based on the following options in the configuration:
-// --slash_grpc_endpoint specifies the grpc endpoint for slash. It takes precedence over --alpha and TLS
-// --alpha specifies a comma separated list of endpoints to connect to
-// --tls "ca-cert=; client-cert=; client-key=;" etc specify the TLS configuration of the connection
-// --retries specifies how many times we should retry the connection to each endpoint upon failures
-// --user and --password specify the credentials we should use to login with the server
-func GetDgraphClient(conf *viper.Viper, login bool) (*dgo.Dgraph, CloseFunc) {
-	var alphas string
-	if conf.GetString("slash_grpc_endpoint") != "" {
-		alphas = conf.GetString("slash_grpc_endpoint")
-	} else {
-		alphas = conf.GetString("alpha")
-	}
-
-	if len(alphas) == 0 {
-		glog.Fatalf("The --alpha option must be set in order to connect to Dgraph")
-	}
-
-	fmt.Printf("\nRunning transaction with dgraph endpoint: %v\n", alphas)
-	tlsCfg, err := LoadClientTLSConfig(conf)
-	Checkf(err, "While loading TLS configuration")
-
-	ds := strings.Split(alphas, ",")
-	var conns []*grpc.ClientConn
-	var clients []api.DgraphClient
-
-	retries := 1
-	if conf.IsSet("retries") {
-		retries = conf.GetInt("retries")
-		if retries < 1 {
-			retries = 1
-		}
-	}
-
-	dialOpts := []grpc.DialOption{}
-	if conf.GetString("slash_grpc_endpoint") != "" && conf.IsSet("auth_token") {
-		dialOpts = append(dialOpts, WithAuthorizationCredentials(conf.GetString("auth_token")))
-	}
-
-	for _, d := range ds {
-		var conn *grpc.ClientConn
-		for i := 0; i < retries; i++ {
-			conn, err = SetupConnection(d, tlsCfg, false, dialOpts...)
-			if err == nil {
-				break
-			}
-			fmt.Printf("While trying to setup connection: %v. Retrying...\n", err)
-			time.Sleep(time.Second)
-		}
-		if conn == nil {
-			Fatalf("Could not setup connection after %d retries", retries)
-		}
-
-		conns = append(conns, conn)
-		dc := api.NewDgraphClient(conn)
-		clients = append(clients, dc)
-	}
-
-	dg := dgo.NewDgraphClient(clients...)
-	creds := z.NewSuperFlag(conf.GetString("creds"))
-	user := creds.GetString("user")
-	if login && len(user) > 0 {
-		err = GetPassAndLogin(dg, &CredOpt{
-			UserID:    user,
-			Password:  creds.GetString("password"),
-			Namespace: creds.GetUint64("namespace"),
-		})
-		Checkf(err, "While retrieving password and logging in")
-	}
-
-	closeFunc := func() {
-		for _, c := range conns {
-			if err := c.Close(); err != nil {
-				glog.Warningf("Error closing connection to Dgraph client: %v", err)
-			}
-		}
-	}
-	return dg, closeFunc
-}
-
 // AskUserPassword prompts the user to enter the password for the given user ID.
 func AskUserPassword(userid string, pwdType string, times int) (string, error) {
 	AssertTrue(times == 1 || times == 2)
@@ -1080,26 +988,6 @@ func AskUserPassword(userid string, pwdType string, times int) (string, error) {
 		}
 	}
 	return password, nil
-}
-
-// GetPassAndLogin uses the given credentials and client to perform the login operation.
-func GetPassAndLogin(dg *dgo.Dgraph, opt *CredOpt) error {
-	password := opt.Password
-	if len(password) == 0 {
-		var err error
-		password, err = AskUserPassword(opt.UserID, "Current", 1)
-		if err != nil {
-			return err
-		}
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := dg.LoginIntoNamespace(ctx, opt.UserID, password, opt.Namespace); err != nil {
-		return errors.Wrapf(err, "unable to login to the %v account", opt.UserID)
-	}
-	fmt.Println("Login successful.")
-	// update the context so that it has the admin jwt token
-	return nil
 }
 
 func IsGuardian(groups []string) bool {
@@ -1281,30 +1169,22 @@ func ParseCompression(cStr string) (bo.CompressionType, int) {
 // ToHex converts a uint64 to a hex byte array. If rdf is true it will
 // use < > brackets to delimit the value. Otherwise it will use quotes
 // like JSON requires.
-func ToHex(i uint64, rdf bool) []byte {
+func ToHex(i uint64) []byte {
 	var b [16]byte
 	tmp := strconv.AppendUint(b[:0], i, 16)
 
 	out := make([]byte, len(tmp)+3+1)
-	if rdf {
-		out[0] = '<'
-	} else {
-		out[0] = '"'
-	}
+	out[0] = '"'
 
 	out[1] = '0'
 	out[2] = 'x'
 	n := copy(out[3:], tmp)
-
-	if rdf {
-		out[3+n] = '>'
-	} else {
-		out[3+n] = '"'
-	}
+	out[3+n] = '"'
 
 	return out
 }
 
+// TODO: Fix this all up.
 // RootTemplate defines the help template for dgraph command.
 var RootTemplate string = `Dgraph is a horizontally scalable and distributed graph database,
 providing ACID transactions, consistent replication and linearizable reads.

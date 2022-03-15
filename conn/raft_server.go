@@ -1,18 +1,5 @@
-/*
- * Copyright 2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package conn
 
@@ -26,12 +13,12 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	"go.etcd.io/etcd/raft/raftpb"
 	otrace "go.opencensus.io/trace"
+	"google.golang.org/grpc"
 )
 
 type sendmsg struct {
@@ -56,10 +43,15 @@ func (r *lockedSource) Seed(seed int64) {
 	r.src.Seed(seed)
 }
 
+type ProposalResult struct {
+	Err  error
+	Data interface{}
+}
+
 // ProposalCtx stores the context for a proposal with extra information.
 type ProposalCtx struct {
 	Found uint32
-	ErrCh chan error
+	ResCh chan ProposalResult
 	Ctx   context.Context
 }
 
@@ -106,7 +98,7 @@ func (p *proposals) Delete(key uint64) {
 	delete(p.all, key)
 }
 
-func (p *proposals) Done(key uint64, err error) {
+func (p *proposals) Done(key uint64, res ProposalResult) {
 	if key == 0 {
 		return
 	}
@@ -120,38 +112,43 @@ func (p *proposals) Done(key uint64, err error) {
 		return
 	}
 	delete(p.all, key)
-	pd.ErrCh <- err
+	pd.ResCh <- res
 }
 
 // RaftServer is a wrapper around node that implements the Raft service.
 type RaftServer struct {
-	m    sync.RWMutex
-	node *Node
+	m     sync.RWMutex
+	nodes map[string]*Node
+}
+
+var rs *RaftServer
+
+func init() {
+	rs = &RaftServer{nodes: make(map[string]*Node)}
+}
+
+func Register(server *grpc.Server) {
+	pb.RegisterRaftServer(server, rs)
 }
 
 // UpdateNode safely updates the node.
-func (w *RaftServer) UpdateNode(n *Node) {
-	w.m.Lock()
-	defer w.m.Unlock()
-	w.node = n
+func UpdateNode(whoIs string, n *Node) {
+	rs.m.Lock()
+	defer rs.m.Unlock()
+	rs.nodes[whoIs] = n
 }
 
 // GetNode safely retrieves the node.
-func (w *RaftServer) GetNode() *Node {
-	w.m.RLock()
-	defer w.m.RUnlock()
-	return w.node
-}
-
-// NewRaftServer returns a pointer to a new RaftServer instance.
-func NewRaftServer(n *Node) *RaftServer {
-	return &RaftServer{node: n}
+func (rs *RaftServer) GetNode(whoIs string) *Node {
+	rs.m.RLock()
+	defer rs.m.RUnlock()
+	return rs.nodes[whoIs]
 }
 
 // IsPeer checks whether this node is a peer of the node sending the request.
-func (w *RaftServer) IsPeer(ctx context.Context, rc *pb.RaftContext) (
+func (rs *RaftServer) IsPeer(ctx context.Context, rc *pb.RaftContext) (
 	*pb.PeerResponse, error) {
-	node := w.GetNode()
+	node := rs.GetNode(rc.WhoIs)
 	if node == nil || node.Raft() == nil {
 		return &pb.PeerResponse{}, ErrNoNode
 	}
@@ -171,13 +168,13 @@ func (w *RaftServer) IsPeer(ctx context.Context, rc *pb.RaftContext) (
 }
 
 // JoinCluster handles requests to join the cluster.
-func (w *RaftServer) JoinCluster(ctx context.Context,
-	rc *pb.RaftContext) (*api.Payload, error) {
+func (rs *RaftServer) JoinCluster(ctx context.Context,
+	rc *pb.RaftContext) (*pb.Payload, error) {
 	if ctx.Err() != nil {
-		return &api.Payload{}, ctx.Err()
+		return &pb.Payload{}, ctx.Err()
 	}
 
-	node := w.GetNode()
+	node := rs.GetNode(rc.WhoIs)
 	if node == nil || node.Raft() == nil {
 		return nil, ErrNoNode
 	}
@@ -186,25 +183,32 @@ func (w *RaftServer) JoinCluster(ctx context.Context,
 }
 
 // RaftMessage handles RAFT messages.
-func (w *RaftServer) RaftMessage(server pb.Raft_RaftMessageServer) error {
+func (rs *RaftServer) RaftMessage(server pb.Raft_RaftMessageServer) error {
 	ctx := server.Context()
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	span := otrace.FromContext(ctx)
+	done := make(map[uint64]bool)
 
-	node := w.GetNode()
-	if node == nil || node.Raft() == nil {
-		return ErrNoNode
-	}
-	span.Annotatef(nil, "Stream server is node %#x", node.Id)
+	step := func(batch *pb.RaftBatch) error {
+		rc := batch.GetContext()
+		node := rs.GetNode(rc.WhoIs)
+		if node == nil || node.Raft() == nil {
+			glog.Warningf("No node found for %s\n", rc.WhoIs)
+			return ErrNoNode
+		}
+		if !done[rc.Id] {
+			node.Connect(rc.Id, rc.Addr)
+			done[rc.Id] = true
+		}
 
-	var rc *pb.RaftContext
-	raft := node.Raft()
-	step := func(data []byte) error {
+		span.Annotatef(nil, "Stream server is node %#x", node.Id)
 		ctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
 
+		raft := node.Raft()
+		data := batch.Payload.GetData()
 		for idx := 0; idx < len(data); {
 			x.AssertTruef(len(data[idx:]) >= 4,
 				"Slice left of size: %v. Expected at least 4.", len(data[idx:]))
@@ -250,21 +254,8 @@ func (w *RaftServer) RaftMessage(server pb.Raft_RaftMessageServer) error {
 		if err != nil {
 			return err
 		}
-		if loop%1e6 == 0 {
-			glog.V(2).Infof("%d messages received by %#x from %#x", loop, node.Id, rc.GetId())
-		}
-		if loop == 1 {
-			rc = batch.GetContext()
-			span.Annotatef(nil, "Stream from %#x", rc.GetId())
-			if rc != nil {
-				node.Connect(rc.Id, rc.Addr)
-			}
-		}
-		if batch.Payload == nil {
-			continue
-		}
-		data := batch.Payload.Data
-		if err := step(data); err != nil {
+		if err := step(batch); err != nil {
+			glog.Errorf("Error while stepping: %s\n", err)
 			return err
 		}
 	}
@@ -272,11 +263,13 @@ func (w *RaftServer) RaftMessage(server pb.Raft_RaftMessageServer) error {
 
 // Heartbeat rpc call is used to check connection with other workers after worker
 // tcp server for this instance starts.
-func (w *RaftServer) Heartbeat(_ *api.Payload, stream pb.Raft_HeartbeatServer) error {
+func (rs *RaftServer) Heartbeat(_ *pb.Payload, stream pb.Raft_HeartbeatServer) error {
 	ticker := time.NewTicker(echoDuration)
 	defer ticker.Stop()
 
-	node := w.GetNode()
+	// Hardcoding alpha here. We shouldn't need to switch between zero and
+	// alpha.
+	node := rs.GetNode("alpha")
 	if node == nil {
 		return ErrNoNode
 	}

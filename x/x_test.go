@@ -1,5 +1,5 @@
-// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart license.
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package x
 
@@ -173,16 +173,11 @@ func TestVersionString(t *testing.T) {
 }
 
 func TestToHex(t *testing.T) {
-	require.Equal(t, []byte(`"0x0"`), ToHex(0, false))
-	require.Equal(t, []byte(`<0x0>`), ToHex(0, true))
-	require.Equal(t, []byte(`"0xf"`), ToHex(15, false))
-	require.Equal(t, []byte(`<0xf>`), ToHex(15, true))
-	require.Equal(t, []byte(`"0x19"`), ToHex(25, false))
-	require.Equal(t, []byte(`<0x19>`), ToHex(25, true))
-	require.Equal(t, []byte(`"0xff"`), ToHex(255, false))
-	require.Equal(t, []byte(`<0xff>`), ToHex(255, true))
-	require.Equal(t, []byte(`"0xffffffffffffffff"`), ToHex(math.MaxUint64, false))
-	require.Equal(t, []byte(`<0xffffffffffffffff>`), ToHex(math.MaxUint64, true))
+	require.Equal(t, []byte(`"0x0"`), ToHex(0))
+	require.Equal(t, []byte(`"0xf"`), ToHex(15))
+	require.Equal(t, []byte(`"0x19"`), ToHex(25))
+	require.Equal(t, []byte(`"0xff"`), ToHex(255))
+	require.Equal(t, []byte(`"0xffffffffffffffff"`), ToHex(math.MaxUint64))
 }
 
 func TestTimestamp(t *testing.T) {

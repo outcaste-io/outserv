@@ -1,5 +1,5 @@
-// Portions Copyright 2015-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart License.
+// Portions Copyright 2015-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package query
 
@@ -1859,7 +1859,7 @@ func expandSubgraph(ctx context.Context, sg *SubGraph) ([]*SubGraph, error) {
 			preds = getPredicatesFromTypes(namespace, typeNames)
 			// We check if enterprise is enabled and only
 			// restrict preds to allowed preds if ACL is turned on.
-			if worker.EnterpriseEnabled() && sg.Params.AllowedPreds != nil {
+			if sg.Params.AllowedPreds != nil {
 				// Take intersection of both the predicate lists
 				intersectPreds := make([]string, 0)
 				hashMap := make(map[string]bool)

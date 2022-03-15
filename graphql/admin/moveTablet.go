@@ -1,18 +1,5 @@
-/*
- * Copyright 2020 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package admin
 
@@ -25,8 +12,6 @@ import (
 
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
-	"github.com/outcaste-io/outserv/protos/pb"
-	"github.com/outcaste-io/outserv/worker"
 )
 
 type moveTabletInput struct {
@@ -35,29 +20,30 @@ type moveTabletInput struct {
 	GroupId   uint32
 }
 
-func resolveMoveTablet(ctx context.Context, m schema.Mutation) (*resolve.Resolved, bool) {
-	input, err := getMoveTabletInput(m)
-	if err != nil {
-		return resolve.EmptyResult(m, err), false
-	}
+func resolveMoveTablet(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
+	panic("TODO: Implement resolveMoveTablet")
+	// input, err := getMoveTabletInput(m)
+	// if err != nil {
+	// 	return resolve.EmptyResult(m, err), false
+	// }
 
 	// gRPC call returns a nil status if the error is non-nil
-	status, err := worker.MoveTabletOverNetwork(ctx, &pb.MoveTabletRequest{
-		Namespace: input.Namespace,
-		Tablet:    input.Tablet,
-		DstGroup:  input.GroupId,
-	})
-	if err != nil {
-		return resolve.EmptyResult(m, err), false
-	}
+	// status, err := worker.MoveTabletOverNetwork(ctx, &pb.MoveTabletRequest{
+	// 	Namespace: input.Namespace,
+	// 	Tablet:    input.Tablet,
+	// 	DstGroup:  input.GroupId,
+	// })
+	// if err != nil {
+	// 	return resolve.EmptyResult(m, err), false
+	// }
 
-	return resolve.DataResult(m,
-		map[string]interface{}{m.Name(): response("Success", status.GetMsg())},
-		nil,
-	), true
+	// return resolve.DataResult(m,
+	// 	map[string]interface{}{m.Name(): response("Success", status.GetMsg())},
+	// 	nil,
+	// ), true
 }
 
-func getMoveTabletInput(m schema.Mutation) (*moveTabletInput, error) {
+func getMoveTabletInput(m *schema.Field) (*moveTabletInput, error) {
 	inputArg, ok := m.ArgValue(schema.InputArgName).(map[string]interface{})
 	if !ok {
 		return nil, inputArgError(errors.Errorf("can't convert input to map"))

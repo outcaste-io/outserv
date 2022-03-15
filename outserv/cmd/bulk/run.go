@@ -1,18 +1,5 @@
-/*
- * Copyright 2017-2021 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2021 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package bulk
 
@@ -35,7 +22,6 @@ import (
 	"github.com/outcaste-io/outserv/filestore"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
-	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/ristretto/z"
 
 	"github.com/outcaste-io/outserv/tok"
@@ -212,14 +198,8 @@ func run() {
 		tlsConf, err := x.LoadClientTLSConfigForInternalPort(Bulk.Conf)
 		x.Check(err)
 		// Need to set zero addr in WorkerConfig before checking the license.
-		x.WorkerConfig.ZeroAddr = []string{opt.ZeroAddr}
+		x.WorkerConfig.PeerAddr = []string{opt.ZeroAddr}
 		x.WorkerConfig.TLSClientConfig = tlsConf
-		if !worker.EnterpriseEnabled() {
-			// Crash since the enterprise license is not enabled..
-			log.Fatal("Enterprise License needed for the Encryption feature.")
-		} else {
-			log.Printf("Encryption feature enabled.")
-		}
 	}
 	fmt.Printf("Encrypted input: %v; Encrypted output: %v\n", opt.Encrypted, opt.EncryptedOut)
 
@@ -232,7 +212,7 @@ func run() {
 		os.Exit(1)
 	}
 	if opt.DataFiles == "" {
-		fmt.Fprint(os.Stderr, "RDF or JSON file(s) location must be specified.\n")
+		fmt.Fprint(os.Stderr, "JSON file(s) location must be specified.\n")
 		os.Exit(1)
 	} else {
 		fileList := strings.Split(opt.DataFiles, ",")

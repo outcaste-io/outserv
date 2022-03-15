@@ -1,5 +1,5 @@
-// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache 2.0 license.
-// Portions Copyright 2022 Outcaste, Inc. are available under the Smart license.
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package posting
 
@@ -17,7 +17,6 @@ import (
 	"github.com/outcaste-io/badger/v3"
 	"github.com/outcaste-io/badger/v3/skl"
 	"github.com/outcaste-io/badger/v3/y"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
@@ -231,7 +230,7 @@ func (txn *Txn) Cache() *LocalCache {
 }
 
 // FillContext updates the given transaction context with data from this transaction.
-func (txn *Txn) FillContext(ctx *api.TxnContext, gid uint32) {
+func (txn *Txn) FillContext(ctx *pb.TxnContext, gid uint32) {
 	txn.Lock()
 	ctx.StartTs = txn.StartTs
 
