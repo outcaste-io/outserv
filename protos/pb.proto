@@ -358,7 +358,6 @@ message SchemaNode {
   bool list = 7;
   bool upsert = 8;
   bool lang = 9;
-  bool no_conflict = 10;
 }
 
 message SchemaResult {
@@ -378,21 +377,10 @@ message SchemaUpdate {
   repeated string tokenizer = 4;
   bool count = 5;
   bool list = 6;
-  bool upsert = 8;
-  bool lang = 9;
-
-  // Fields required for type system.
-  bool non_nullable = 10;
-  bool non_nullable_list = 11;
-
-  // If value_type is OBJECT, then this represents an object type with a custom
-  // name. This field stores said name.
-  string object_type_name = 12;
-
-  bool no_conflict = 13;
+  bool upsert = 7;
+  bool lang = 8;
 
   // Deleted field:
-  reserved 7;
   reserved "explicit";
 }
 
@@ -428,8 +416,6 @@ message TxnContext {
   uint64 start_ts = 1;
   uint64 commit_ts = 2;
   bool aborted = 3;
-  repeated string keys = 4;  // List of keys to be used for conflict detection.
-  repeated string preds = 5; // List of predicates involved in this transaction.
   string hash = 6;
 }
 
@@ -650,19 +636,6 @@ message SnapshotMeta {
 message Status {
   int32 code = 1;
   string msg = 2;
-}
-
-message DropOperation {
-  enum DropOp {
-    ALL = 0;
-    DATA = 1;
-    ATTR = 2;
-    NS = 3;
-  }
-  DropOp drop_op = 1;
-  // When drop_op is ATTR, drop_value will be the name of the ATTR; empty
-  // otherwise.
-  string drop_value = 2;
 }
 
 message ExportRequest {

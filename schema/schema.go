@@ -371,12 +371,6 @@ func (s *state) HasLang(pred string) bool {
 	return false
 }
 
-func (s *state) HasNoConflict(pred string) bool {
-	s.RLock()
-	defer s.RUnlock()
-	return s.predicate[pred].GetNoConflict()
-}
-
 // IndexingInProgress checks whether indexing is going on for a given predicate.
 func (s *state) IndexingInProgress() bool {
 	s.RLock()

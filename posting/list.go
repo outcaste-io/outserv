@@ -369,8 +369,6 @@ func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.DirectedEdge) uint64 {
 
 	var conflictKey uint64
 	switch {
-	case schema.State().HasNoConflict(t.Attr):
-		break
 	case schema.State().HasUpsert(t.Attr):
 		// Consider checking to see if a email id is unique. A user adds:
 		// <uid> <email> "email@email.org", and there's a string equal tokenizer
@@ -437,11 +435,6 @@ func (l *List) addMutationInternal(ctx context.Context, txn *Txn, t *pb.Directed
 		return errors.Wrapf(err, "cannot update mutation layer of key %s with value %+v",
 			hex.EncodeToString(l.key), mpost)
 	}
-
-	// We ensure that commit marks are applied to posting lists in the right
-	// order. We can do so by proposing them in the same order as received by the Oracle delta
-	// stream from Zero, instead of in goroutines.
-	txn.addConflictKey(GetConflictKey(pk, l.key, t))
 	return nil
 }
 

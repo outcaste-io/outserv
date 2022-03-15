@@ -13,7 +13,6 @@ import (
 	"io/ioutil"
 	"mime"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -402,13 +401,6 @@ func mutationHandler(w http.ResponseWriter, r *http.Request) {
 	e := query.Extensions{
 		Txn:     resp.Txn,
 		Latency: resp.Latency,
-	}
-	sort.Strings(e.Txn.Keys)
-	sort.Strings(e.Txn.Preds)
-
-	// Don't send keys array which is part of txn context if its commit immediately.
-	if req.CommitNow {
-		e.Txn.Keys = e.Txn.Keys[:0]
 	}
 
 	response := map[string]interface{}{}

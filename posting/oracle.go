@@ -40,10 +40,6 @@ type Txn struct {
 	// Fields which can changed after init
 	sync.Mutex
 
-	// Keeps track of conflict keys that should be used to determine if this
-	// transaction conflicts with another.
-	conflicts map[uint64]struct{}
-
 	cache *LocalCache // This pointer does not get modified.
 	ErrCh chan error
 

@@ -111,8 +111,6 @@ func populateSchema(attr string, fields []string) *pb.SchemaNode {
 			schemaNode.Upsert = pred.GetUpsert()
 		case "lang":
 			schemaNode.Lang = pred.GetLang()
-		case "noconflict":
-			schemaNode.NoConflict = pred.GetNoConflict()
 		default:
 			//pass
 		}

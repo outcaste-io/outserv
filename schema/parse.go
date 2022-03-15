@@ -27,7 +27,6 @@ import (
 	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/x"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 )
 
@@ -73,8 +72,6 @@ func parseDirective(it *lex.ItemIterator, schema *pb.SchemaUpdate, t types.TypeI
 		schema.Count = true
 	case "upsert":
 		schema.Upsert = true
-	case "noconflict":
-		schema.NoConflict = true
 	case "lang":
 		if t != types.StringID || schema.List {
 			return next.Errorf("@lang directive can only be specified for string type."+
@@ -299,60 +296,6 @@ func resolveTokenizers(updates []*pb.SchemaUpdate) error {
 	return nil
 }
 
-func parseTypeField(it *lex.ItemIterator, typeName string, ns uint64) (*pb.SchemaUpdate, error) {
-	field := &pb.SchemaUpdate{Predicate: x.NamespaceAttr(ns, it.Item().Val)}
-	var list bool
-	it.Next()
-
-	// Simplified type definitions only require the field name. If a new line is found,
-	// proceed to the next field in the type.
-	if it.Item().Typ == itemNewLine {
-		return field, nil
-	}
-
-	// For the sake of backwards-compatibility, process type definitions in the old format,
-	// but ignore the information after the colon.
-	if it.Item().Typ != itemColon {
-		return nil, it.Item().Errorf("Missing colon in type declaration. Got %v", it.Item().Val)
-	}
-
-	it.Next()
-	if it.Item().Typ == itemLeftSquare {
-		list = true
-		it.Next()
-	}
-
-	if it.Item().Typ != itemText {
-		return nil, it.Item().Errorf("Missing field type in type declaration. Got %v",
-			it.Item().Val)
-	}
-
-	it.Next()
-	if it.Item().Typ == itemExclamationMark {
-		it.Next()
-	}
-
-	if list {
-		if it.Item().Typ != itemRightSquare {
-			return nil, it.Item().Errorf("Expected matching square bracket. Got %v", it.Item().Val)
-		}
-		it.Next()
-
-		if it.Item().Typ == itemExclamationMark {
-			it.Next()
-		}
-	}
-
-	if it.Item().Typ != itemNewLine {
-		return nil, it.Item().Errorf("Expected new line after field declaration. Got %v",
-			it.Item().Val)
-	}
-
-	glog.Warningf("Type declaration for type %s includes deprecated information about field type "+
-		"for field %s which will be ignored.", typeName, x.ParseAttr(field.Predicate))
-	return field, nil
-}
-
 func parseNamespace(it *lex.ItemIterator) (uint64, error) {
 	nextItems, err := it.Peek(2)
 	if err != nil {
@@ -399,7 +342,7 @@ func parse(s string, namespace uint64) (*ParsedSchema, error) {
 		return nil, err
 	}
 
-	parseTypeOrSchema := func(item lex.Item, it *lex.ItemIterator, ns uint64) error {
+	parseSchema := func(item lex.Item, it *lex.ItemIterator, ns uint64) error {
 		schema, err := parseScalarPair(it, item.Val, ns)
 		if err != nil {
 			return err
@@ -425,7 +368,7 @@ func parse(s string, namespace uint64) (*ParsedSchema, error) {
 			if namespace != math.MaxUint64 {
 				ns = uint64(namespace)
 			}
-			if err := parseTypeOrSchema(item, it, ns); err != nil {
+			if err := parseSchema(item, it, ns); err != nil {
 				return nil, err
 			}
 
@@ -441,7 +384,7 @@ func parse(s string, namespace uint64) (*ParsedSchema, error) {
 			}
 			// We have already called next in parseNamespace.
 			item := it.Item()
-			if err := parseTypeOrSchema(item, it, ns); err != nil {
+			if err := parseSchema(item, it, ns); err != nil {
 				return nil, err
 			}
 

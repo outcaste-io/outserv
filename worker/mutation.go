@@ -619,10 +619,6 @@ func MutateOverNetwork(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, er
 		if res.err != nil {
 			e = res.err
 		}
-		if res.ctx != nil {
-			tctx.Keys = append(tctx.Keys, res.ctx.Keys...)
-			tctx.Preds = append(tctx.Preds, res.ctx.Preds...)
-		}
 	}
 	close(resCh)
 	return tctx, e
