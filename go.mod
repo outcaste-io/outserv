@@ -35,7 +35,7 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/golang/snappy v0.0.4
 	github.com/google/codesearch v1.0.0
-	github.com/google/go-cmp v0.5.5
+	github.com/google/go-cmp v0.5.7
 	github.com/google/uuid v1.1.5
 	github.com/gorilla/websocket v1.4.2
 	github.com/graph-gophers/graphql-go v0.0.0-20201113091052-beb923fada29
@@ -52,6 +52,7 @@ require (
 	github.com/prometheus/client_golang v1.0.0
 	github.com/prometheus/common v0.6.0 // indirect
 	github.com/sergi/go-diff v1.1.0
+	github.com/shirou/gopsutil/v3 v3.22.2
 	github.com/soheilhy/cmux v0.1.4
 	github.com/spf13/cast v1.3.0
 	github.com/spf13/cobra v0.0.5
@@ -68,7 +69,7 @@ require (
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210816183151-1e6c022a8912
+	golang.org/x/sys v0.0.0-20220111092808-5a964db01320
 	golang.org/x/text v0.3.6
 	golang.org/x/tools v0.1.6-0.20210802203754-9b21a8868e16
 	google.golang.org/api v0.46.0
