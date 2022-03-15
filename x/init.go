@@ -73,7 +73,7 @@ Branch            : %v
 Go version        : %v
 jemalloc enabled  : %v
 
-Licensed under Smart License v1.0 1.0. Copyright 2022 Outcaste LLC
+Licensed under Smart License v1.0. Copyright 2022 Outcaste LLC.
 
 `,
 		dgraphVersion, dgraphCodename, ExecutableChecksum(), lastCommitSHA, lastCommitTime, gitBranch,
