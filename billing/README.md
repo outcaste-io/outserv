@@ -1,7 +1,6 @@
 # Monetization
 
-Billing module is the monetization module as mentioned in the Smart License
-v1.0.
+This is the monetization module mentioned in the Smart License.
 
 ## Pricing
 
