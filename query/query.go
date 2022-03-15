@@ -359,14 +359,6 @@ func (sg *SubGraph) isSimilar(ssg *SubGraph) bool {
 	if sg.Attr != ssg.Attr {
 		return false
 	}
-	if len(sg.Params.Langs) != len(ssg.Params.Langs) {
-		return false
-	}
-	for i := 0; i < len(sg.Params.Langs) && i < len(ssg.Params.Langs); i++ {
-		if sg.Params.Langs[i] != ssg.Params.Langs[i] {
-			return false
-		}
-	}
 	if sg.Params.DoCount {
 		return ssg.Params.DoCount
 	}
@@ -530,7 +522,6 @@ func treeCopy(gq *gql.GraphQuery, sg *SubGraph) error {
 			Expand:       gchild.Expand,
 			GetUid:       sg.Params.GetUid,
 			IgnoreReflex: sg.Params.IgnoreReflex,
-			Langs:        gchild.Langs,
 			NeedsVar:     append(gchild.NeedsVar[:0:0], gchild.NeedsVar...),
 			Normalize:    gchild.Normalize || sg.Params.Normalize,
 			Order:        gchild.Order,
@@ -781,7 +772,6 @@ func newGraph(ctx context.Context, gq *gql.GraphQuery) (*SubGraph, error) {
 		GetUid:           isDebug(ctx),
 		IgnoreReflex:     gq.IgnoreReflex,
 		IsEmpty:          gq.IsEmpty,
-		Langs:            gq.Langs,
 		NeedsVar:         append(gq.NeedsVar[:0:0], gq.NeedsVar...),
 		Normalize:        gq.Normalize,
 		Order:            gq.Order,
@@ -904,11 +894,6 @@ func createTaskQuery(ctx context.Context, sg *SubGraph) (*pb.Query, error) {
 				return nil, errors.Errorf("Unsupported use of value var")
 			}
 		}
-	}
-
-	// If the lang is set to *, query all the languages.
-	if len(sg.Params.Langs) == 1 && sg.Params.Langs[0] == "*" {
-		sg.Params.ExpandAll = true
 	}
 
 	// first is to limit how many results we want.
