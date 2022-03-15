@@ -18,7 +18,6 @@ package chunker
 
 import (
 	"encoding/json"
-	"fmt"
 	"sort"
 	"testing"
 	"time"
@@ -80,13 +79,40 @@ func FastParse(b []byte, op int) ([]*pb.NQuad, error) {
 	return nqs.nquads, err
 }
 
-func Sort(nq []*pb.NQuad) {
-	sort.Slice(nq, func(i, j int) bool {
-		return nq[i].Subject < nq[j].Subject
-	})
-	sort.Slice(nq, func(i, j int) bool {
+func sortNquad(nq []*pb.NQuad) {
+	sort.SliceStable(nq, func(i, j int) bool {
 		return nq[i].Predicate < nq[j].Predicate
 	})
+	sort.SliceStable(nq, func(i, j int) bool {
+		return nq[i].Subject < nq[j].Subject
+	})
+
+}
+
+func (exp *Experiment) verify() {
+	nq, err := Parse(exp.json, SetNquads)
+	require.NoError(exp.t, err)
+	sortNquad(nq)
+	fastNQ, err := FastParse(exp.json, SetNquads)
+	require.NoError(exp.t, err)
+	sortNquad(fastNQ)
+	for i, test := range exp.expected {
+		require.Equal(exp.t, test.Subject, nq[i].Subject)
+		require.Equal(exp.t, test.Predicate, nq[i].Predicate)
+		require.Equal(exp.t, test.ObjectValue, nq[i].ObjectValue)
+		require.Equal(exp.t, test.ObjectId, nq[i].ObjectId)
+
+		require.Equal(exp.t, test.Subject, fastNQ[i].Subject)
+		require.Equal(exp.t, test.Predicate, fastNQ[i].Predicate)
+		require.Equal(exp.t, test.ObjectValue, fastNQ[i].ObjectValue)
+		require.Equal(exp.t, test.ObjectId, fastNQ[i].ObjectId)
+	}
+}
+
+type Experiment struct {
+	t        *testing.T
+	json     []byte
+	expected []pb.NQuad
 }
 
 func TestNquadsFromJson1(t *testing.T) {
@@ -152,99 +178,136 @@ func TestNquadsFromJson3(t *testing.T) {
 			Name: "Wellington Public School",
 		},
 	}
-
-	expectedNquads := []pb.NQuad{
-		{
-			Subject:     "_:alice",
-			Predicate:   "name",
-			ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "Alice"}},
-		},
-		{
-			Subject:     "_:school",
-			Predicate:   "name",
-			ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "Wellington Public School"}},
-		},
-		{
-			Subject:   "_:alice",
-			Predicate: "school",
-			ObjectId:  "_:school",
-		},
-	}
-
 	b, err := json.Marshal(p)
 	require.NoError(t, err)
-
-	nq, err := Parse(b, SetNquads)
-	require.NoError(t, err)
-	Sort(nq)
-	fastNQ, err := FastParse(b, SetNquads)
-	require.NoError(t, err)
-	Sort(fastNQ)
-
-	for i, test := range expectedNquads {
-		require.Equal(t, test.Subject, nq[i].Subject)
-		require.Equal(t, test.Predicate, nq[i].Predicate)
-		require.Equal(t, test.ObjectValue, nq[i].ObjectValue)
-		require.Equal(t, test.ObjectId, nq[i].ObjectId)
-
-		require.Equal(t, test.Subject, fastNQ[i].Subject)
-		require.Equal(t, test.Predicate, fastNQ[i].Predicate)
-		require.Equal(t, test.ObjectValue, fastNQ[i].ObjectValue)
-		require.Equal(t, test.ObjectId, fastNQ[i].ObjectId)
+	exp := &Experiment{
+		t:    t,
+		json: b,
+		expected: []pb.NQuad{
+			{
+				Subject:     "_:alice",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "Alice"}},
+			},
+			{
+				Subject:   "_:alice",
+				Predicate: "school",
+				ObjectId:  "_:school",
+			},
+			{
+				Subject:     "_:school",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "Wellington Public School"}},
+			},
+		},
 	}
+	exp.verify()
 }
 
 func TestNquadsFromJson4(t *testing.T) {
-	json := `[{"name":"Alice","mobile":"040123456","car":"MA0123", "age": 21, "weight": 58.7}]`
-
-	nq, err := Parse([]byte(json), SetNquads)
-	require.NoError(t, err)
-
-	fastNQ, err := FastParse([]byte(json), SetNquads)
-	require.NoError(t, err)
-	_, _ = nq, fastNQ
+	exp := &Experiment{
+		t:    t,
+		json: []byte(`[{"uid":"_:alice","name":"Alice","mobile":"040123456","car":"MA0123", "age": 21, "weight": 58.7}]`),
+		expected: []pb.NQuad{
+			{
+				Subject:     "_:alice",
+				Predicate:   "age",
+				ObjectValue: &pb.Value{Val: &pb.Value_IntVal{IntVal: 21}},
+			},
+			{
+				Subject:     "_:alice",
+				Predicate:   "car",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "MA0123"}},
+			},
+			{
+				Subject:     "_:alice",
+				Predicate:   "mobile",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "040123456"}},
+			},
+			{
+				Subject:     "_:alice",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "Alice"}},
+			},
+			{
+				Subject:     "_:alice",
+				Predicate:   "weight",
+				ObjectValue: &pb.Value{Val: &pb.Value_DoubleVal{DoubleVal: 58.7}},
+			},
+		},
+	}
+	exp.verify()
 }
 
 func TestNquadsFromJsonMap(t *testing.T) {
-	json := `{"name":"Alice",
+	json := `{"uid":"_:alice","name":"Alice",
 "age": 25,
 "friends": [{
+"uid": "_:bob",
 "name": "Bob"
 }]}`
 
-	nq, err := Parse([]byte(json), SetNquads)
-	require.NoError(t, err)
-
-	fastNQ, err := FastParse([]byte(json), SetNquads)
-	require.NoError(t, err)
-	_, _ = nq, fastNQ
+	exp := &Experiment{
+		t:    t,
+		json: []byte(json),
+		expected: []pb.NQuad{
+			{
+				Subject:     "_:alice",
+				Predicate:   "age",
+				ObjectValue: &pb.Value{Val: &pb.Value_IntVal{IntVal: 25}},
+			},
+			{
+				Subject:   "_:alice",
+				Predicate: "friends",
+				ObjectId:  "_:bob",
+			},
+			{
+				Subject:     "_:alice",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "Alice"}},
+			},
+			{
+				Subject:     "_:bob",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "Bob"}},
+			},
+		},
+	}
+	exp.verify()
 }
 
 func TestNquadsFromMultipleJsonObjects(t *testing.T) {
 	json := `
 [
   {
+    "uid": "_:A",
     "name": "A",
     "age": 25,
     "friends": [
       {
+        "uid": "_:A1",
         "name": "A1",
         "friends": [
           {
+            "uid": "_:A11",
             "name": "A11"
           },
           {
+            "uid": "_:A12",
             "name": "A12"
           }
         ]
       },
      {
+        "uid": "_:A2",
         "name": "A2",
         "friends": [
           {
+            "uid": "_:A21",
             "name": "A21"
           },
           {
+            "uid": "_:A22",
             "name": "A22"
           }
         ]
@@ -252,27 +315,34 @@ func TestNquadsFromMultipleJsonObjects(t *testing.T) {
     ]
   },
   {
+    "uid": "_:B",
     "name": "B",
     "age": 26,
     "friends": [
       {
+        "uid": "_:B1",
         "name": "B1",
         "friends": [
           {
+            "uid": "_:B11",
             "name": "B11"
           },
           {
+            "uid": "_:B12",
             "name": "B12"
           }
         ]
       },
      {
+        "uid": "_:B2",
         "name": "B2",
         "friends": [
           {
+            "uid": "_:B21",
             "name": "B21"
           },
           {
+            "uid": "_:B22",
             "name": "B22"
           }
         ]
@@ -281,13 +351,155 @@ func TestNquadsFromMultipleJsonObjects(t *testing.T) {
   }
 ]
 `
+	exp := &Experiment{
+		t:    t,
+		json: []byte(json),
+		expected: []pb.NQuad{
+			{
+				Subject:     "_:A",
+				Predicate:   "age",
+				ObjectValue: &pb.Value{Val: &pb.Value_IntVal{IntVal: 25}},
+			},
+			{
+				Subject:   "_:A",
+				Predicate: "friends",
+				ObjectId:  "_:A1",
+			},
+			{
+				Subject:   "_:A",
+				Predicate: "friends",
+				ObjectId:  "_:A2",
+			},
+			{
+				Subject:     "_:A",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "A"}},
+			},
+			{
+				Subject:   "_:A1",
+				Predicate: "friends",
+				ObjectId:  "_:A11",
+			},
+			{
+				Subject:   "_:A1",
+				Predicate: "friends",
+				ObjectId:  "_:A12",
+			},
+			{
+				Subject:     "_:A1",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "A1"}},
+			},
+			{
+				Subject:     "_:A11",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "A11"}},
+			},
+			{
+				Subject:     "_:A12",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "A12"}},
+			},
 
-	nq, err := Parse([]byte(json), SetNquads)
-	require.NoError(t, err)
+			{
+				Subject:   "_:A2",
+				Predicate: "friends",
+				ObjectId:  "_:A21",
+			},
+			{
+				Subject:   "_:A2",
+				Predicate: "friends",
+				ObjectId:  "_:A22",
+			},
+			{
+				Subject:     "_:A2",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "A2"}},
+			},
+			{
+				Subject:     "_:A21",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "A21"}},
+			},
+			{
+				Subject:     "_:A22",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "A22"}},
+			},
+			{
+				Subject:     "_:B",
+				Predicate:   "age",
+				ObjectValue: &pb.Value{Val: &pb.Value_IntVal{IntVal: 26}},
+			},
+			{
+				Subject:   "_:B",
+				Predicate: "friends",
+				ObjectId:  "_:B1",
+			},
+			{
+				Subject:   "_:B",
+				Predicate: "friends",
+				ObjectId:  "_:B2",
+			},
+			{
+				Subject:     "_:B",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "B"}},
+			},
+			{
+				Subject:   "_:B1",
+				Predicate: "friends",
+				ObjectId:  "_:B11",
+			},
+			{
+				Subject:   "_:B1",
+				Predicate: "friends",
+				ObjectId:  "_:B12",
+			},
+			{
+				Subject:     "_:B1",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "B1"}},
+			},
+			{
+				Subject:     "_:B11",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "B11"}},
+			},
+			{
+				Subject:     "_:B12",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "B12"}},
+			},
 
-	fastNQ, err := FastParse([]byte(json), SetNquads)
-	require.NoError(t, err)
-	_, _ = nq, fastNQ
+			{
+				Subject:   "_:B2",
+				Predicate: "friends",
+				ObjectId:  "_:B21",
+			},
+			{
+				Subject:   "_:B2",
+				Predicate: "friends",
+				ObjectId:  "_:B22",
+			},
+			{
+				Subject:     "_:B2",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "B2"}},
+			},
+			{
+				Subject:     "_:B21",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "B21"}},
+			},
+			{
+				Subject:     "_:B22",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "B22"}},
+			},
+		},
+	}
+	exp.verify()
 }
 
 func TestJsonNumberParsing(t *testing.T) {
@@ -304,11 +516,8 @@ func TestJsonNumberParsing(t *testing.T) {
 		{`{"uid": "1", "key": 0E-0}`, &pb.Value{Val: &pb.Value_DoubleVal{DoubleVal: 0}}},
 	}
 
-	for i, test := range tests {
+	for _, test := range tests {
 		nqs, err := Parse([]byte(test.in), SetNquads)
-		if i == 2 {
-			fmt.Println(err)
-		}
 		if test.out != nil {
 			require.NoError(t, err, "%T", err)
 			require.Equal(t, makeNquad("1", "key", test.out), nqs[0])
@@ -317,9 +526,6 @@ func TestJsonNumberParsing(t *testing.T) {
 		}
 
 		fastNQ, err := FastParse([]byte(test.in), SetNquads)
-		if i == 2 {
-			fmt.Println(err)
-		}
 		if test.out != nil {
 			require.NoError(t, err, "%T", err)
 			require.Equal(t, makeNquad("1", "key", test.out), fastNQ[0])
@@ -331,7 +537,6 @@ func TestJsonNumberParsing(t *testing.T) {
 
 func TestNquadsFromJson_UidOutofRangeError(t *testing.T) {
 	json := `{"uid":"0xa14222b693e4ba34123","name":"Name","following":[{"name":"Bob"}],"school":[{"uid":"","name@en":"Crown Public School"}]}`
-
 	_, err := Parse([]byte(json), SetNquads)
 	require.Error(t, err)
 
@@ -385,23 +590,115 @@ func TestNquadsFromJson_NegativeUidError(t *testing.T) {
 func TestNquadsFromJson_EmptyUid(t *testing.T) {
 	json := `{"uid":"","name":"Alice","following":[{"name":"Bob"}],"school":[{"uid":"",
 "name":"Crown Public School"}]}`
+
 	nq, err := Parse([]byte(json), SetNquads)
 	require.NoError(t, err)
+	sort.Slice(nq, func(i, j int) bool {
+		return nq[i].GetObjectValue().GetStrVal() < nq[j].GetObjectValue().GetStrVal()
+	})
+	sort.Slice(nq, func(i, j int) bool {
+		return nq[i].Predicate < nq[j].Predicate
+	})
 
 	fastNQ, err := FastParse([]byte(json), SetNquads)
 	require.NoError(t, err)
-	_, _ = nq, fastNQ
+	sort.Slice(fastNQ, func(i, j int) bool {
+		return fastNQ[i].GetObjectValue().GetStrVal() < fastNQ[j].GetObjectValue().GetStrVal()
+	})
+	sort.Slice(fastNQ, func(i, j int) bool {
+		return fastNQ[i].Predicate < fastNQ[j].Predicate
+	})
+
+	aliceUid := nq[0].Subject
+	bobUid := nq[2].Subject
+	schoolUid := nq[3].Subject
+
+	tests := []struct {
+		subject     string
+		predicate   string
+		objectId    string
+		objectValue *pb.Value
+	}{
+		{aliceUid, "following", bobUid, nil},
+		{aliceUid, "name", "", &pb.Value{Val: &pb.Value_StrVal{StrVal: "Alice"}}},
+		{bobUid, "name", "", &pb.Value{Val: &pb.Value_StrVal{StrVal: "Bob"}}},
+		{schoolUid, "name", "", &pb.Value{Val: &pb.Value_StrVal{StrVal: "Crown Public School"}}},
+		{aliceUid, "school", schoolUid, nil},
+	}
+
+	for i, test := range tests {
+		require.Equal(t, test.subject, nq[i].Subject)
+		require.Equal(t, test.predicate, nq[i].Predicate)
+		require.Equal(t, test.objectId, nq[i].ObjectId)
+		require.Equal(t, test.objectValue, nq[i].ObjectValue)
+	}
+
+	aliceUid = fastNQ[0].Subject
+	bobUid = fastNQ[2].Subject
+	schoolUid = fastNQ[3].Subject
+
+	tests = []struct {
+		subject     string
+		predicate   string
+		objectId    string
+		objectValue *pb.Value
+	}{
+		{aliceUid, "following", bobUid, nil},
+		{aliceUid, "name", "", &pb.Value{Val: &pb.Value_StrVal{StrVal: "Alice"}}},
+		{bobUid, "name", "", &pb.Value{Val: &pb.Value_StrVal{StrVal: "Bob"}}},
+		{schoolUid, "name", "", &pb.Value{Val: &pb.Value_StrVal{StrVal: "Crown Public School"}}},
+		{aliceUid, "school", schoolUid, nil},
+	}
+
+	for i, test := range tests {
+		require.Equal(t, test.subject, fastNQ[i].Subject)
+		require.Equal(t, test.predicate, fastNQ[i].Predicate)
+		require.Equal(t, test.objectId, fastNQ[i].ObjectId)
+		require.Equal(t, test.objectValue, fastNQ[i].ObjectValue)
+	}
 }
 
 func TestNquadsFromJson_BlankNodes(t *testing.T) {
-	json := `{"uid":"_:alice","name":"Alice","following":[{"name":"Bob"}],"school":[{"uid":"_:school","name":"Crown Public School"}]}`
+	json := `{"uid":"_:alice","name":"Alice","following":[{"uid":"_:bob","name":"Bob"}],"school":[{"uid":"_:school","name":"Crown Public School"}]}`
 
-	nq, err := Parse([]byte(json), SetNquads)
-	require.NoError(t, err)
+	// nq, err := Parse([]byte(json), SetNquads)
+	// require.NoError(t, err)
 
-	fastNQ, err := FastParse([]byte(json), SetNquads)
-	require.NoError(t, err)
-	_, _ = nq, fastNQ
+	// fastNQ, err := FastParse([]byte(json), SetNquads)
+	// require.NoError(t, err)
+
+	exp := &Experiment{
+		t:    t,
+		json: []byte(json),
+		expected: []pb.NQuad{
+			{
+				Subject:   "_:alice",
+				Predicate: "following",
+				ObjectId:  "_:bob",
+			},
+			{
+				Subject:     "_:alice",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "Alice"}},
+			},
+			{
+				Subject:   "_:alice",
+				Predicate: "school",
+				ObjectId:  "_:school",
+			},
+			{
+				Subject:     "_:bob",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "Bob"}},
+			},
+			{
+				Subject:     "_:school",
+				Predicate:   "name",
+				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: "Crown Public School"}},
+			},
+		},
+	}
+	exp.verify()
 }
 
 func TestNquadsDeleteEdges(t *testing.T) {
@@ -476,11 +773,11 @@ func TestNquadsFromJsonDeleteStar(t *testing.T) {
 	fastNQ, err := FastParse([]byte(json), DeleteNquads)
 	require.NoError(t, err)
 
-	expected := &api.NQuad{
+	expected := &pb.NQuad{
 		Subject:   "1000",
 		Predicate: "name",
-		ObjectValue: &api.Value{
-			Val: &api.Value_DefaultVal{
+		ObjectValue: &pb.Value{
+			Val: &pb.Value_DefaultVal{
 				DefaultVal: "_STAR_ALL",
 			},
 		},
@@ -498,34 +795,10 @@ func TestValInUpsert(t *testing.T) {
 	fastNQ, err := FastParse([]byte(json), SetNquads)
 	require.NoError(t, err)
 
-	expected := &api.NQuad{
+	expected := &pb.NQuad{
 		Subject:   "1000",
 		Predicate: "name",
 		ObjectId:  "val(name)",
-	}
-
-	require.Equal(t, expected, nq[0])
-	require.Equal(t, expected, fastNQ[0])
-}
-
-func TestNquadsFromJsonDeleteStarLang(t *testing.T) {
-	json := `{"uid":1000,"name@es": null}`
-
-	nq, err := Parse([]byte(json), DeleteNquads)
-	require.NoError(t, err)
-
-	fastNQ, err := FastParse([]byte(json), DeleteNquads)
-	require.NoError(t, err)
-
-	expected := &api.NQuad{
-		Subject:   "1000",
-		Predicate: "name",
-		ObjectValue: &api.Value{
-			Val: &api.Value_DefaultVal{
-				DefaultVal: "_STAR_ALL",
-			},
-		},
-		Lang: "es",
 	}
 
 	require.Equal(t, expected, nq[0])
@@ -542,25 +815,6 @@ func TestSetNquadNilValue(t *testing.T) {
 	fastNQ, err := FastParse([]byte(json), SetNquads)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(fastNQ))
-}
-
-// See PR #7737 to understand why this test exists.
-func TestNquadsFromJsonEmptyFacet(t *testing.T) {
-	json := `{"uid":1000,"doesnt|exist":null}`
-
-	// fast
-	buf := NewNQuadBuffer(-1)
-	require.Nil(t, buf.FastParseJSON([]byte(json), DeleteNquads))
-	buf.Flush()
-	// needs to be empty, otherwise node gets deleted
-	require.Equal(t, 0, len(<-buf.Ch()))
-
-	// old
-	buf = NewNQuadBuffer(-1)
-	require.Nil(t, buf.ParseJSON([]byte(json), DeleteNquads))
-	buf.Flush()
-	// needs to be empty, otherwise node gets deleted
-	require.Equal(t, 0, len(<-buf.Ch()))
 }
 
 func BenchmarkNoFacets(b *testing.B) {
