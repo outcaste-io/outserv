@@ -122,7 +122,7 @@ var opts options
 
 const (
 	zeroBasePort  int = 5080 // HTTP=6080
-	alphaBasePort int = 7080 // HTTP=8080, GRPC=9080
+	alphaBasePort int = 7080 // HTTP=8080
 )
 
 func name(prefix string, idx int) string {
@@ -160,7 +160,7 @@ func getHost(host string) string {
 	return host
 }
 
-func initService(basename string, idx, grpcPort int) service {
+func initService(basename string, idx, httpPort int) service {
 	var svc service
 	containerPrefix := basename
 	if opts.ContainerPrefix != "" {
@@ -176,13 +176,12 @@ func initService(basename string, idx, grpcPort int) service {
 	svc.Labels = map[string]string{"cluster": "test"}
 
 	svc.Ports = []string{
-		toPort(grpcPort),
-		toPort(grpcPort + 1000), // http port
+		toPort(httpPort),
 	}
 
 	// If hostname is specified then expose the internal grpc port (7080) of alpha.
 	if basename == "alpha" && opts.Hostname != "" {
-		svc.Ports = append(svc.Ports, toPort(grpcPort-1000))
+		svc.Ports = append(svc.Ports, toPort(httpPort-1000))
 	}
 	if opts.LocalBin {
 		svc.Volumes = append(svc.Volumes, volume{
@@ -233,8 +232,8 @@ func initService(basename string, idx, grpcPort int) service {
 func getAlpha(idx int, raft string, customFlags string) service {
 	basename := "alpha"
 	internalPort := alphaBasePort + opts.PortOffset + getOffset(idx)
-	grpcPort := internalPort + 1000
-	svc := initService(basename, idx, grpcPort)
+	httpPort := internalPort + 1000
+	svc := initService(basename, idx, httpPort)
 
 	if opts.TmpFS {
 		svc.TmpFS = append(svc.TmpFS, fmt.Sprintf("/data/%s/w", svc.name))
