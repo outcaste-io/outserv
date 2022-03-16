@@ -360,6 +360,8 @@ func getRequest(w http.ResponseWriter, r *http.Request) (*schema.Request, error)
 				return nil, errors.Wrap(err, "map form field could not be decoded")
 			}
 
+			variables := make(map[string][][]byte)
+
 			for key, paths := range uploadsMap {
 				if len(paths) == 0 {
 					return nil, errors.Wrapf(err, "invalid empty operations paths list for key %s", key)
@@ -378,8 +380,21 @@ func getRequest(w http.ResponseWriter, r *http.Request) (*schema.Request, error)
 				if len(pathParts) < 1 {
 					return nil, errors.Wrapf(err, "failed to get variable name from path with key %s", key)
 				}
-				varName := pathParts[1]
-				gqlReq.Variables[varName] = content
+
+				var varName string
+				if pathParts[0] != "variables" {
+					varName = pathParts[2]
+				} else {
+					varName = pathParts[1]
+				}
+				if variables[varName] == nil {
+					variables[varName] = [][]byte{}
+				}
+				variables[varName] = append(variables[varName], content)
+			}
+
+			for key := range variables {
+				gqlReq.Variables[key] = variables[key]
 			}
 		default:
 			// https://graphql.org/learn/serving-over-http/#post-request says:
