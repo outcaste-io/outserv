@@ -126,6 +126,9 @@ func stream(cmd *cobra.Command, args []string) error {
 		f, err := os.OpenFile(so.outFile, os.O_RDWR|os.O_CREATE, 0666)
 		y.Check(err)
 		_, err = stream.Backup(f, 0)
+		if err != nil {
+			return y.Wrapf(err, "cannot backup DB at %s", so.outFile)
+		}
 	}
 	fmt.Println("Done.")
 	return err
