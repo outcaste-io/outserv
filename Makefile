@@ -13,7 +13,7 @@ SUBDIRS = outserv
 
 ###############
 
-.PHONY: $(SUBDIRS) all oss version install install_oss oss_install uninstall test help image
+.PHONY: $(SUBDIRS) all oss version install install_oss oss_install uninstall test help image tools
 all: $(SUBDIRS)
 
 $(SUBDIRS):
@@ -42,6 +42,9 @@ uninstall:
 test:
 	@echo Running ./test.sh
 	./test.sh
+
+tools:
+	go install github.com/outcaste-io/outserv/compose
 
 image:
 	docker build -f contrib/Dockerfile --target final -t outcaste/outserv:$(subst /,-,${BUILD_BRANCH}) .
