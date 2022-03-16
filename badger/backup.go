@@ -249,7 +249,7 @@ func (db *DB) Load(r io.Reader, maxPendingWrites int) error {
 	for {
 		var sz uint64
 		err := binary.Read(br, binary.LittleEndian, &sz)
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		} else if err != nil {
 			return err

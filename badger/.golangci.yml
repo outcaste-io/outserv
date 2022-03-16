@@ -9,6 +9,7 @@ linters:
   disable-all: true
   enable:
     - errcheck
+    - errorlint
     - ineffassign
     - gas
     - gofmt

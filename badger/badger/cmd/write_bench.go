@@ -19,6 +19,7 @@ package cmd
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -152,7 +153,7 @@ func writeRandom(db *badger.DB, num uint64) error {
 			e.WithTTL(ttlPeriod)
 		}
 		err := batch.SetEntryAt(e, 1)
-		for err == badger.ErrBlockedWrites {
+		for errors.Is(err, badger.ErrBlockedWrites) {
 			time.Sleep(time.Second)
 			batch = db.NewManagedWriteBatch()
 			err = batch.SetEntryAt(e, 1)
@@ -448,7 +449,7 @@ func dropAll(c *z.Closer, db *badger.DB) {
 		case <-t.C:
 			fmt.Println("[DropAll] Started")
 			err := db.DropAll()
-			for err == badger.ErrBlockedWrites {
+			for errors.Is(err, badger.ErrBlockedWrites) {
 				err = db.DropAll()
 				time.Sleep(time.Millisecond * 300)
 			}

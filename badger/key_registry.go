@@ -176,7 +176,7 @@ func (kri *keyRegistryIterator) next() (*pb.DataKey, error) {
 	// Read crc buf and data length.
 	if _, err = kri.fp.Read(kri.lenCrcBuf[:]); err != nil {
 		// EOF means end of the iteration.
-		if err != io.EOF {
+		if !errors.Is(err, io.EOF) {
 			return nil, y.Wrapf(err, "While reading crc in keyRegistryIterator.next")
 		}
 		return nil, err
@@ -186,7 +186,7 @@ func (kri *keyRegistryIterator) next() (*pb.DataKey, error) {
 	data := make([]byte, l)
 	if _, err = kri.fp.Read(data); err != nil {
 		// EOF means end of the iteration.
-		if err != io.EOF {
+		if !errors.Is(err, io.EOF) {
 			return nil, y.Wrapf(err, "While reading protobuf in keyRegistryIterator.next")
 		}
 		return nil, err
@@ -232,7 +232,7 @@ func readKeyRegistry(fp *os.File, opt KeyRegistryOptions) (*KeyRegistry, error) 
 		dk, err = itr.next()
 	}
 	// We read all the key. So, Ignoring this error.
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		err = nil
 	}
 	return kr, err

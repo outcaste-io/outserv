@@ -258,7 +258,7 @@ func findFirstInvalidTxn(db *badger.DB, lowTs, highTs uint64) uint64 {
 	if highTs-lowTs < 1 {
 		log.Printf("Checking at lowTs: %d\n", lowTs)
 		err := checkAt(lowTs)
-		if err == errFailure {
+		if errors.Is(err, errFailure) {
 			fmt.Printf("Violation at ts: %d\n", lowTs)
 			return lowTs
 		} else if err != nil {
@@ -273,7 +273,7 @@ func findFirstInvalidTxn(db *badger.DB, lowTs, highTs uint64) uint64 {
 	log.Println()
 	log.Printf("Checking. low=%d. high=%d. mid=%d\n", lowTs, highTs, midTs)
 	err := checkAt(midTs)
-	if err == badger.ErrKeyNotFound || err == nil {
+	if errors.Is(err, badger.ErrKeyNotFound) || err == nil {
 		// If no failure, move to higher ts.
 		return findFirstInvalidTxn(db, midTs+1, highTs)
 	}
@@ -285,7 +285,7 @@ func compareTwo(db *badger.DB, before, after uint64) {
 	fmt.Printf("Comparing @ts=%d with @ts=%d\n", before, after)
 	txn := db.NewTransactionAt(before, false)
 	prev, err := seekTotal(txn)
-	if err == errFailure {
+	if errors.Is(err, errFailure) {
 		// pass
 	} else {
 		y.Check(err)
@@ -294,7 +294,7 @@ func compareTwo(db *badger.DB, before, after uint64) {
 
 	txn = db.NewTransactionAt(after, false)
 	now, err := seekTotal(txn)
-	if err == errFailure {
+	if errors.Is(err, errFailure) {
 		// pass
 	} else {
 		y.Check(err)

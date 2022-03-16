@@ -28,6 +28,7 @@ import (
 
 	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/ristretto/z"
+	"github.com/pkg/errors"
 
 	"github.com/stretchr/testify/require"
 )
@@ -888,7 +889,7 @@ func TestConflict(t *testing.T) {
 		defer txn.Discard()
 
 		_, err := txn.Get(key)
-		if err == ErrKeyNotFound {
+		if errors.Is(err, ErrKeyNotFound) {
 			// Unset the error.
 			err = nil
 			require.NoError(t, txn.Set(key, []byte("AA")))

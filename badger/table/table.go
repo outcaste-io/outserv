@@ -272,7 +272,7 @@ func CreateTable(fname string, builder *Builder) (*Table, error) {
 
 func newFile(fname string, sz int) (*z.MmapFile, error) {
 	mf, err := z.OpenMmapFile(fname, os.O_CREATE|os.O_RDWR|os.O_EXCL, sz)
-	if err == z.NewFile {
+	if errors.Is(err, z.NewFile) {
 		// Expected.
 	} else if err != nil {
 		return nil, y.Wrapf(err, "while creating table: %s", fname)

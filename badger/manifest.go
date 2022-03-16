@@ -399,7 +399,7 @@ func ReplayManifestFile(fp *os.File, extMagic uint16) (Manifest, int64, error) {
 		var lenCrcBuf [8]byte
 		_, err := io.ReadFull(&r, lenCrcBuf[:])
 		if err != nil {
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 				break
 			}
 			return Manifest{}, 0, err
@@ -413,7 +413,7 @@ func ReplayManifestFile(fp *os.File, extMagic uint16) (Manifest, int64, error) {
 		}
 		var buf = make([]byte, length)
 		if _, err := io.ReadFull(&r, buf); err != nil {
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 				break
 			}
 			return Manifest{}, 0, err

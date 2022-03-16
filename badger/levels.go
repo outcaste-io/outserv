@@ -464,10 +464,10 @@ func (s *levelsController) runCompactor(id int, lc *z.Closer) {
 
 	run := func(p compactionPriority) bool {
 		err := s.doCompact(id, p)
-		switch err {
-		case nil:
+		switch {
+		case err == nil:
 			return true
-		case errFillTables:
+		case errors.Is(err, errFillTables):
 			// pass
 		default:
 			s.kv.opt.Warningf("While running doCompact: %v\n", err)
