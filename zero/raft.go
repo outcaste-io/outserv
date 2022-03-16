@@ -226,9 +226,12 @@ func (n *node) applyProposal(e raftpb.Entry) error {
 		dst.MaxUID += uint64(p.NumUids)
 	case p.NumNsids > 0:
 		dst.MaxNsID += uint64(p.NumNsids)
-	case p.CoreHours > 0.0:
-		dst.CoreHours += p.CoreHours
-		dst.CoreHours = math.Round(dst.CoreHours*1000.0) / 1000.0
+	case p.CpuHours > 0.0:
+		dst.CpuHours += p.CpuHours
+		dst.CpuHours = math.Round(dst.CpuHours*1000.0) / 1000.0
+	}
+	if p.LastCharged > 0 {
+		dst.LastCharged = p.LastCharged
 	}
 
 	// Now assign the new state back.

@@ -189,17 +189,29 @@ func (n *node) periodicallyProposeUsage(closer *z.Closer) {
 		if err != nil {
 			return errors.Wrapf(err, "while getting latest membership state")
 		}
-		if st.CoreHours < 100.0/billing.USDPerCoreHour {
-			// Not enough core hours to charge for.
+
+		lastCharged := time.Unix(st.LastCharged, 0)
+		if time.Since(lastCharged) < 10*24*time.Hour {
+			// We charged 10 days ago. No need to do anything.
 			return nil
 		}
 
-		coreHours := st.CoreHours
+		now := time.Now()
+		if now.Day() != 1 && now.Day() != 15 {
+			// Charge only on the 1st and 15th of the month.
+			return nil
+		}
+		if st.CpuHours < 20.0/billing.USDPerCpuHour {
+			// Charge for at least $20.
+			return nil
+		}
+
+		cpuHours := st.CpuHours
 		for i := 0; i < 60; i++ {
 			if !n.amLeader() {
 				return nil
 			}
-			err = billing.Charge(coreHours)
+			err = billing.Charge(cpuHours)
 			if err == nil {
 				break
 			} else {
@@ -216,7 +228,8 @@ func (n *node) periodicallyProposeUsage(closer *z.Closer) {
 		// charged for it, so we must account for it.
 		err = x.RetryUntilSuccess(60, time.Minute, func() error {
 			_, err := ProposeAndWait(closer.Ctx(), &pb.ZeroProposal{
-				CoreHours: -coreHours,
+				CpuHours:    -cpuHours,
+				LastCharged: time.Now().Unix(),
 			})
 			return err
 		})
@@ -227,15 +240,15 @@ func (n *node) periodicallyProposeUsage(closer *z.Closer) {
 	for {
 		select {
 		case <-tick.C: // Every 15 mins.
-			coreHours := billing.CoreHours()
+			cpuHours := billing.CPUHours()
 			err := x.RetryUntilSuccess(16, time.Minute, func() error {
 				_, err := ProposeAndWait(closer.Ctx(), &pb.ZeroProposal{
-					CoreHours: coreHours,
+					CpuHours: cpuHours,
 				})
 				return err
 			})
 			x.Check(err)
-			billing.AccountedFor(coreHours)
+			billing.AccountedFor(cpuHours)
 
 			// See if we need to charge for the usage.
 			if err := charge(); err != nil {
