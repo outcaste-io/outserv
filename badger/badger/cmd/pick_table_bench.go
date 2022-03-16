@@ -85,7 +85,7 @@ func BenchmarkPickTables(b *testing.B) {
 	if len(pickOpts.cpuprofile) > 0 {
 		f, err := os.Create(pickOpts.cpuprofile)
 		y.Check(err)
-		pprof.StartCPUProfile(f)
+		y.Check(pprof.StartCPUProfile(f))
 		defer pprof.StopCPUProfile()
 	}
 	b.ResetTimer()

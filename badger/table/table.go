@@ -403,7 +403,7 @@ func (t *Table) initBiggestAndSmallest() error {
 			checksum := &pb.Checksum{}
 			readPos -= checksumLen
 			buf = t.readNoFail(readPos, checksumLen)
-			proto.Unmarshal(buf, checksum)
+			y.Check(proto.Unmarshal(buf, checksum))
 			fmt.Fprintf(&debugBuf, "checksum: %+v ", checksum)
 
 			// Read index size from the footer.

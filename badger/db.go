@@ -1887,7 +1887,9 @@ func (db *DB) DropPrefixNonBlocking(prefixes ...[]byte) error {
 	db.opt.Infof("Non-blocking DropPrefix called for %s", prefixes)
 
 	cbuf := z.NewBuffer(int(db.opt.MemTableSize), "DropPrefixNonBlocking")
-	defer cbuf.Release()
+	defer func() {
+		_ = cbuf.Release()
+	}()
 
 	var wg sync.WaitGroup
 	handover := func(force bool) error {
@@ -2137,7 +2139,10 @@ func (db *DB) Subscribe(ctx context.Context, cb func(kv *KVList) error, matches 
 	}
 
 	c := z.NewCloser(1)
-	s := db.pub.newSubscriber(c, matches)
+	s, err := db.pub.newSubscriber(c, matches)
+	if err != nil {
+		return y.Wrapf(err, "error adding subscriber")
+	}
 	slurp := func(batch *pb.KVList) error {
 		for {
 			select {
