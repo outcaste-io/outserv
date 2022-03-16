@@ -10,7 +10,8 @@ WORKDIR /go/outserv
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 COPY . .
-RUN go build -o /outserv ./outserv
+RUN apt-get update && apt-get install -y --no-install-recommends make gcc tar bzip2 && rm -rf /var/lib/apt/lists/*
+RUN make install
 
 FROM ubuntu:20.04 as final
 LABEL maintainer="Dgraph Labs <contact@dgraph.io>"
@@ -28,7 +29,7 @@ RUN apt-get update && \
   apt-get install -y nodejs && \
   rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /outserv /usr/local/bin/outserv
+COPY --from=builder /go/bin/outserv /usr/local/bin/outserv
 
 EXPOSE 8080
 EXPOSE 9080
