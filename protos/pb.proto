@@ -126,6 +126,8 @@ message ZeroProposal {
 
   string cid = 6;  // Used as unique identifier for the cluster.
   DeleteNsRequest delete_ns = 7;  // Used to delete namespace.
+  double cpu_hours = 8; // Tracks CPU hours used by the cluster.
+  int64 last_charged = 9; // When did we last charge, in unix epoch seconds.
 }
 
 // MembershipState is used to pack together the current membership state of all
@@ -141,6 +143,8 @@ message MembershipState {
   uint64 maxUID = 6;
   uint64 maxNsID = 7;
   string cid = 8;  // Used to uniquely identify the Dgraph cluster.
+  double cpu_hours = 9; // Tracks CPU hours used by the cluster.
+  int64 last_charged = 10; // When did we last charge, in unix epoch seconds.
 }
 
 message HealthInfo {
