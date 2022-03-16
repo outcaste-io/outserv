@@ -7,14 +7,16 @@
 # docker build --target builder -t outcaste/outserv:latest .
 FROM golang:1.17.7-bullseye AS builder
 WORKDIR /go/outserv
+RUN apt-get update && apt-get install -y --no-install-recommends make gcc tar bzip2 && rm -rf /var/lib/apt/lists/*
+COPY ./outserv/Makefile /tmp/Makefile
+RUN make -C /tmp jemalloc
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 COPY . .
-RUN apt-get update && apt-get install -y --no-install-recommends make gcc tar bzip2 && rm -rf /var/lib/apt/lists/*
 RUN make install
 
 FROM ubuntu:20.04 as final
-LABEL maintainer="Dgraph Labs <contact@dgraph.io>"
+LABEL maintainer="Outcaste, Inc. <team@outcaste.io>"
 
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
@@ -32,7 +34,6 @@ RUN apt-get update && \
 COPY --from=builder /go/bin/outserv /usr/local/bin/outserv
 
 EXPOSE 8080
-EXPOSE 9080
 
 RUN mkdir /outserv
 WORKDIR /outserv
