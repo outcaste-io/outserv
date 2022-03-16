@@ -6,13 +6,14 @@ This is the monetization module mentioned in the Smart License.
 
 The current pricing model for this software is based on Logical CPU usage. We
 define a logical CPU as any schedulable entity. So every core/thread in a
-multicore/thread processor is a logical CPU. The usage tracked should be
-similar to what `htop` (in Linux) would show for the process.
+multicore/thread processor is a logical CPU (henceforth just referred to as
+CPU). The usage tracked should be similar to what `htop` (in Linux) would show
+for the process.
 
 The pricing is set based on cpu-hours used across the entire Outserv cluster.
 Similar to kilowatt-hour, one cpu-hour is equal to one CPU usage sustained for
-one hour. **The current pricing is set to 3¢ US (3 pennies) per cpu-hour.** Every server
-would use a minimum of 1 cpu-hour every hour.
+one hour. **The current pricing is set to 3¢ US (3 pennies) per cpu-hour.**
+Every server would use a minimum of 1 cpu-hour every hour.
 
 ## Usage Tracking
 
