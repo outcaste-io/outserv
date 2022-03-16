@@ -829,7 +829,9 @@ func (vlog *valueLog) write(reqs []*request) error {
 		endOffset := atomic.AddUint32(&vlog.writableLogOffset, n)
 		// Increase the file size if we cannot accommodate this entry.
 		if int(endOffset) >= len(curlf.Data) {
-			curlf.Truncate(int64(endOffset))
+			if err := curlf.Truncate(int64(endOffset)); err != nil {
+				return y.Wrapf(err, "error increasing file size")
+			}
 		}
 
 		start := int(endOffset - n)
