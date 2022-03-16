@@ -12,7 +12,7 @@ process.
 
 The pricing is set based on core-hours used across the entire Outserv cluster.
 Similar to kilowatt-hour, one core-hour is equal to one core usage sustained for
-one hour. **The current pricing is set to 3 USD cents/core-hour.** Every server
+one hour. **The current pricing is set to 3¢ US (3 pennies) per core-hour.** Every server
 would use a minimum of 1 core-hour every hour.
 
 ## Usage Tracking
