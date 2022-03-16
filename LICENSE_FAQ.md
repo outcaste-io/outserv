@@ -14,7 +14,7 @@ Smart License follows an open pricing model. The pricing and the charging
 mechanism for the software are baked into the software itself, in a module we
 call the monetization module.
 
-You can read the source code of the module [here](/billing/README.md).
+You can read the source code of the module [here](/billing).
 
 ### 3. Is Smart License open source?
 
