@@ -9,7 +9,6 @@ services:
       cluster: test
     ports:
     - "8080"
-    - "9080"
     command: outserv alpha --my=alpha1:7080 --logtostderr -v=2 --expose_trace=true
       --raft "idx=1; group=1" --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.0.0.0/8;"
       '--limit="shared-instance=true;"'

@@ -9,7 +9,6 @@ services:
       cluster: test
     ports:
     - "8080"
-    - "9080"
     volumes:
     - type: bind
       source: ../../tlstest/mtls_internal/tls

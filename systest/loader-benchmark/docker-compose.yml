@@ -9,7 +9,6 @@ services:
       cluster: test
     ports:
     - 8180:8180
-    - 9180:9180
     volumes:
     - type: volume
       source: data
