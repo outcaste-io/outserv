@@ -29,11 +29,11 @@ import (
 
 	"github.com/pkg/errors"
 
+	humanize "github.com/dustin/go-humanize"
 	"github.com/outcaste-io/badger/v3"
 	"github.com/outcaste-io/badger/v3/options"
 	"github.com/outcaste-io/badger/v3/table"
 	"github.com/outcaste-io/badger/v3/y"
-	humanize "github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
 )
 

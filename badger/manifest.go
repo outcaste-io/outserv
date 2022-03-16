@@ -28,10 +28,10 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/outcaste-io/badger/v3/options"
 	"github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/badger/v3/y"
-	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 )
 

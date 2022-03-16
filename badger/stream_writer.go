@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"sync"
 
+	humanize "github.com/dustin/go-humanize"
+	"github.com/golang/protobuf/proto"
 	"github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/badger/v3/table"
 	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/ristretto/z"
-	humanize "github.com/dustin/go-humanize"
-	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 )
 

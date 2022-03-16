@@ -31,6 +31,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	humanize "github.com/dustin/go-humanize"
 	"github.com/outcaste-io/badger/v3/options"
 	"github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/badger/v3/skl"
@@ -38,7 +39,6 @@ import (
 	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/ristretto"
 	"github.com/outcaste-io/ristretto/z"
-	humanize "github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
 )
 

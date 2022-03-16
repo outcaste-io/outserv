@@ -28,8 +28,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/outcaste-io/badger/v3/y"
 	humanize "github.com/dustin/go-humanize"
+	"github.com/outcaste-io/badger/v3/y"
 	"github.com/stretchr/testify/require"
 )
 

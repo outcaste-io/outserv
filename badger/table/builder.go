@@ -24,10 +24,10 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"github.com/outcaste-io/badger/v3/fb"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/snappy"
 	fbs "github.com/google/flatbuffers/go"
+	"github.com/outcaste-io/badger/v3/fb"
 	"github.com/pkg/errors"
 
 	"github.com/outcaste-io/badger/v3/options"

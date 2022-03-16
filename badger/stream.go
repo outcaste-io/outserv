@@ -24,11 +24,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	humanize "github.com/dustin/go-humanize"
 	"github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/badger/v3/table"
 	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/ristretto/z"
-	humanize "github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
 )
 

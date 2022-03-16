@@ -23,10 +23,10 @@ import (
 	"encoding/binary"
 	"io"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/ristretto/z"
-	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 )
 
