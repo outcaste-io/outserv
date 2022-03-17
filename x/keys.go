@@ -1,18 +1,5 @@
-/*
- * Copyright 2016-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2016-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package x
 
@@ -44,7 +31,6 @@ const (
 	// order of data doesn't change keys of same attributes are located together.
 	DefaultPrefix = byte(0x00)
 	ByteSchema    = byte(0x01)
-	ByteType      = byte(0x02)
 	// ByteSplit signals that the key stores an individual part of a multi-part list.
 	ByteSplit = byte(0x04)
 	// ByteUnused is a constant to specify keys which need to be discarded.
@@ -176,18 +162,6 @@ func generateKey(typeByte byte, attr string, extra int) ([]byte, int) {
 // next len(attr) bytes: value of attr
 func SchemaKey(attr string) []byte {
 	key, _ := generateKey(ByteSchema, attr, 0)
-	return key
-}
-
-// TypeKey returns type key for given type name. Type keys are stored separately
-// with a unique prefix, since we need to iterate over all type keys.
-// The structure of a type key is as follows:
-//
-// byte 0: key type prefix (set to ByteType)
-// byte 1-2: length of typeName
-// next len(attr) bytes: value of attr (the type name)
-func TypeKey(attr string) []byte {
-	key, _ := generateKey(ByteType, attr, 0)
 	return key
 }
 
@@ -329,11 +303,6 @@ func (p ParsedKey) IsSchema() bool {
 	return p.bytePrefix == ByteSchema
 }
 
-// IsType returns whether the key is a type key.
-func (p ParsedKey) IsType() bool {
-	return p.bytePrefix == ByteType
-}
-
 // IsOfType checks whether the key is of the given type.
 func (p ParsedKey) IsOfType(typ byte) bool {
 	switch typ {
@@ -364,13 +333,6 @@ func (p ParsedKey) SkipPredicate() []byte {
 func (p ParsedKey) SkipSchema() []byte {
 	var buf [1]byte
 	buf[0] = ByteSchema + 1
-	return buf[:]
-}
-
-// SkipType returns the first key after all the type keys.
-func (p ParsedKey) SkipType() []byte {
-	var buf [1]byte
-	buf[0] = ByteType + 1
 	return buf[:]
 }
 
@@ -411,13 +373,6 @@ func (p ParsedKey) CountPrefix(reverse bool) []byte {
 func SchemaPrefix() []byte {
 	var buf [1]byte
 	buf[0] = ByteSchema
-	return buf[:]
-}
-
-// TypePrefix returns the prefix for Schema keys.
-func TypePrefix() []byte {
-	var buf [1]byte
-	buf[0] = ByteType
 	return buf[:]
 }
 
@@ -483,7 +438,7 @@ func Parse(key []byte) (ParsedKey, error) {
 	k = k[sz:]
 
 	switch p.bytePrefix {
-	case ByteSchema, ByteType:
+	case ByteSchema:
 		return p, nil
 	default:
 	}

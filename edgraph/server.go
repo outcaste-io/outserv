@@ -209,6 +209,7 @@ func UpdateGQLSchema(ctx context.Context, gqlSchema,
 	}
 	// The schema could be empty if it only has custom types/queries/mutations.
 	if dgraphSchema != "" {
+		glog.Infof("Dgraph schema is:\n%s\n", dgraphSchema)
 		op := &pb.Operation{Schema: dgraphSchema}
 		if err = validateAlterOperation(ctx, op); err != nil {
 			return nil, err
@@ -223,7 +224,6 @@ func UpdateGQLSchema(ctx context.Context, gqlSchema,
 		StartTs:       posting.ReadTimestamp(),
 		GraphqlSchema: gqlSchema,
 		DgraphPreds:   parsedDgraphSchema.Preds,
-		DgraphTypes:   parsedDgraphSchema.Types,
 		Op:            pb.UpdateGraphQLSchemaRequest_SCHEMA,
 	})
 }
@@ -338,30 +338,6 @@ func parseSchemaFromAlterOperation(ctx context.Context, op *pb.Operation) (*sche
 			return nil, errors.Errorf("Can't alter predicate `%s` as it is prefixed with `dgraph.`"+
 				" which is reserved as the namespace for dgraph's internal types/predicates.",
 				x.ParseAttr(update.Predicate))
-		}
-	}
-
-	types := make(map[string]struct{})
-
-	for _, typ := range result.Types {
-		if _, ok := types[typ.TypeName]; ok {
-			return nil, errors.Errorf("type %s defined multiple times", x.ParseAttr(typ.TypeName))
-		}
-		types[typ.TypeName] = struct{}{}
-
-		// Pre-defined types cannot be altered but let the update go through
-		// if the update is equal to the existing one.
-		if schema.IsPreDefTypeChanged(typ) {
-			return nil, errors.Errorf("type %s is pre-defined and is not allowed to be modified",
-				x.ParseAttr(typ.TypeName))
-		}
-
-		// Users are not allowed to create types in reserved namespace. But, there are pre-defined
-		// types for which the update should go through if the update is equal to the existing one.
-		if x.IsReservedType(typ.TypeName) && !x.IsPreDefinedType(typ.TypeName) {
-			return nil, errors.Errorf("Can't alter type `%s` as it is prefixed with `dgraph.` "+
-				"which is reserved as the namespace for dgraph's internal types/predicates.",
-				x.ParseAttr(typ.TypeName))
 		}
 	}
 
@@ -531,24 +507,6 @@ func (s *Server) Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, erro
 		return empty, err
 	}
 
-	if op.DropOp == pb.Operation_TYPE {
-		if op.DropValue == "" {
-			return empty, errors.Errorf("If DropOp is set to TYPE, DropValue must not be empty")
-		}
-
-		// Pre-defined types cannot be dropped.
-		dropPred := x.NamespaceAttr(namespace, op.DropValue)
-		if x.IsPreDefinedType(dropPred) {
-			return empty, errors.Errorf("type %s is pre-defined and is not allowed to be dropped",
-				op.DropValue)
-		}
-
-		m.DropOp = pb.Mutations_TYPE
-		m.DropValue = dropPred
-		_, err := query.ApplyMutations(ctx, m)
-		return empty, err
-	}
-
 	// it is a schema update
 	result, err := parseSchemaFromAlterOperation(ctx, op)
 	if err == errIndexingInProgress {
@@ -565,7 +523,6 @@ func (s *Server) Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, erro
 	glog.Infof("Got schema: %+v\n", result)
 	// TODO: Maybe add some checks about the schema.
 	m.Schema = result.Preds
-	m.Types = result.Types
 	for i := 0; i < 3; i++ {
 		_, err = query.ApplyMutations(ctx, m)
 		if err != nil && strings.Contains(err.Error(), "Please retry operation") {
@@ -610,12 +567,8 @@ func validateDQLSchemaForGraphQL(ctx context.Context,
 
 	// create a mapping for the GraphQL reserved predicates and types
 	gqlReservedPreds := make(map[string]*pb.SchemaUpdate)
-	gqlReservedTypes := make(map[string]*pb.TypeUpdate)
 	for _, pred := range gqlReservedDgSch.Preds {
 		gqlReservedPreds[pred.Predicate] = pred
-	}
-	for _, typ := range gqlReservedDgSch.Types {
-		gqlReservedTypes[typ.TypeName] = typ
 	}
 
 	// now validate the DQL schema to check that it doesn't break the existing GraphQL schema
@@ -685,33 +638,6 @@ func validateDQLSchemaForGraphQL(ctx context.Context,
 			return errors.Errorf("can't alter predicate %s as it is used by the GraphQL API, "+
 				"and is missing @upsert that is expected by the GraphQL API.",
 				x.ParseAttr(gqlPred.Predicate))
-		}
-	}
-
-	// Step-2: validate types
-	for _, dqlType := range dqlSch.Types {
-		gqlType := gqlReservedTypes[dqlType.TypeName]
-		if gqlType == nil {
-			continue // if the type isn't used by GraphQL, no need to validate it.
-		}
-
-		// create a mapping of all the fields in the dqlType
-		dqlFields := make(map[string]bool)
-		for _, f := range dqlType.Fields {
-			dqlFields[f.Predicate] = true
-		}
-
-		// check that all the fields of the gqlType must be present in the dqlType
-		var missingFields []string
-		for _, f := range gqlType.Fields {
-			if !dqlFields[f.Predicate] {
-				missingFields = append(missingFields, x.ParseAttr(f.Predicate))
-			}
-		}
-		if len(missingFields) > 0 {
-			return errors.Errorf("can't alter type %s as it is used by the GraphQL API, "+
-				"and is missing fields: [%s] that are expected by the GraphQL API.",
-				x.ParseAttr(gqlType.TypeName), strings.Join(missingFields, ","))
 		}
 	}
 
@@ -1475,23 +1401,17 @@ func processQuery(ctx context.Context, qc *queryContext) (*pb.Response, error) {
 		return resp, errors.Wrap(err, "")
 	}
 
-	if len(er.SchemaNode) > 0 || len(er.Types) > 0 {
+	if len(er.SchemaNode) > 0 {
 		if err = authorizeSchemaQuery(ctx, &er); err != nil {
 			return resp, err
 		}
 		sort.Slice(er.SchemaNode, func(i, j int) bool {
 			return er.SchemaNode[i].Predicate < er.SchemaNode[j].Predicate
 		})
-		sort.Slice(er.Types, func(i, j int) bool {
-			return er.Types[i].TypeName < er.Types[j].TypeName
-		})
 
 		respMap := make(map[string]interface{})
 		if len(er.SchemaNode) > 0 {
 			respMap["schema"] = er.SchemaNode
-		}
-		if len(er.Types) > 0 {
-			respMap["types"] = formatTypes(er.Types)
 		}
 		resp.Json, err = json.Marshal(respMap)
 	} else {
@@ -1826,27 +1746,6 @@ func validatePredName(name string) error {
 			name[:80])
 	}
 	return nil
-}
-
-// formatTypes takes a list of TypeUpdates and converts them in to a list of
-// maps in a format that is human-readable to be marshaled into JSON.
-func formatTypes(typeList []*pb.TypeUpdate) []map[string]interface{} {
-	var res []map[string]interface{}
-	for _, typ := range typeList {
-		typeMap := make(map[string]interface{})
-		typeMap["name"] = typ.TypeName
-		fields := make([]map[string]string, len(typ.Fields))
-
-		for i, field := range typ.Fields {
-			m := make(map[string]string, 1)
-			m["name"] = field.Predicate
-			fields[i] = m
-		}
-		typeMap["fields"] = fields
-
-		res = append(res, typeMap)
-	}
-	return res
 }
 
 func isDropAll(op *pb.Operation) bool {

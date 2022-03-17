@@ -5,7 +5,6 @@ package posting
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -258,21 +257,4 @@ func (lc *LocalCache) UpdateDeltasAndDiscardLists() {
 		// TODO: Find another way to reuse postings via postingPool.
 	}
 	lc.plists = make(map[string]*List)
-}
-
-func (lc *LocalCache) fillPreds(ctx *pb.TxnContext, gid uint32) {
-	lc.RLock()
-	defer lc.RUnlock()
-	for key := range lc.deltas {
-		pk, err := x.Parse([]byte(key))
-		x.Check(err)
-		if len(pk.Attr) == 0 {
-			continue
-		}
-		// Also send the group id that the predicate was being served by. This is useful when
-		// checking if Zero should allow a commit during a predicate move.
-		predKey := fmt.Sprintf("%d-%s", gid, pk.Attr)
-		ctx.Preds = append(ctx.Preds, predKey)
-	}
-	ctx.Preds = x.Unique(ctx.Preds)
 }

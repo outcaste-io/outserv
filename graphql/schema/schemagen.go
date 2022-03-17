@@ -494,6 +494,9 @@ func getDgraphDirPredArg(def *ast.FieldDefinition) *ast.Argument {
 }
 
 // genDgSchema generates Dgraph schema from a valid graphql schema.
+//
+// TODO: This function can just directly spit out the pb.SchemaUpdates list
+// instead of creating the schema in string.
 func genDgSchema(gqlSch *ast.Schema, definitions []string,
 	providesFieldsMap map[string]map[string]bool) string {
 	var typeStrings []string
@@ -696,14 +699,12 @@ func genDgSchema(gqlSch *ast.Schema, definitions []string,
 	for _, typ := range dgTypes {
 		// fieldAdded keeps track of whether a field has been added to typeDef
 		fieldAdded := make(map[string]bool, len(typ.fields))
-		var typeDef, preds strings.Builder
-		fmt.Fprintf(&typeDef, "type %s {\n", typ.name)
+		var preds strings.Builder
 		for _, fld := range typ.fields {
 			f, ok := dgPreds[fld.name]
 			if !ok || fieldAdded[fld.name] {
 				continue
 			}
-			fmt.Fprintf(&typeDef, "  %s\n", fld.name)
 			fieldAdded[fld.name] = true
 			if !fld.inherited && !predWritten[fld.name] {
 				indexStr := ""
@@ -724,11 +725,7 @@ func genDgSchema(gqlSch *ast.Schema, definitions []string,
 				predWritten[fld.name] = true
 			}
 		}
-		fmt.Fprintf(&typeDef, "}\n")
-		typeStrings = append(
-			typeStrings,
-			fmt.Sprintf("%s%s", typeDef.String(), preds.String()),
-		)
+		typeStrings = append(typeStrings, preds.String())
 	}
 
 	return strings.Join(typeStrings, "")
