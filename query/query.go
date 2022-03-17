@@ -23,6 +23,7 @@ import (
 	"github.com/outcaste-io/outserv/codec"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
@@ -2513,20 +2514,8 @@ func getNodeTypes(ctx context.Context, sg *SubGraph) ([]string, error) {
 
 // getPredicatesFromTypes returns the list of preds contained in the given types.
 func getPredicatesFromTypes(namespace uint64, typeNames []string) []string {
-	var preds []string
-	panic("TODO: Implement getPredicatesFromTypes")
-
-	// for _, typeName := range typeNames {
-	// 	// typeDef, ok := schema.State().GetType(x.NamespaceAttr(namespace, typeName))
-	// 	// if !ok {
-	// 	// 	continue
-	// 	// }
-
-	// 	// for _, field := range typeDef.Fields {
-	// 	// 	preds = append(preds, field.Predicate)
-	// 	// }
-	// }
-	return preds
+	// TODO: Namespace needs to figured out.
+	return schema.State().PredicatesFor(typeNames...)
 }
 
 // filterUidPredicates takes a list of predicates and returns a list of the predicates

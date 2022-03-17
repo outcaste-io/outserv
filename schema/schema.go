@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 
 	"github.com/golang/glog"
@@ -242,6 +243,31 @@ func (s *state) Predicates() []string {
 	var out []string
 	for k := range s.predicate {
 		out = append(out, k)
+	}
+	return out
+}
+
+func (s *state) PredicatesFor(typeName ...string) []string {
+	if s == nil {
+		return nil
+	}
+
+	types := make(map[string]struct{})
+	for _, tn := range typeName {
+		types[tn] = struct{}{}
+	}
+
+	s.RLock()
+	defer s.RUnlock()
+
+	// All predicates are of form: <typename>.<fieldname> . So, we can just
+	// split the predicate names by dot and check if the type name matches.
+	var out []string
+	for k := range s.predicate {
+		tn := strings.SplitN(k, ".", 2)[0]
+		if _, has := types[tn]; has {
+			out = append(out, k)
+		}
 	}
 	return out
 }
