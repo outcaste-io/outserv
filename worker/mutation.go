@@ -290,7 +290,7 @@ func updateSchema(s *pb.SchemaUpdate, ts uint64) error {
 	return txn.CommitAt(ts, nil)
 }
 
-func createSchema(attr string, typ types.TypeID, hint pb.Metadata_HintType, ts uint64) error {
+func createSchema(attr string, typ types.TypeID, ts uint64) error {
 	ctx := schema.GetWriteContext(context.Background())
 
 	// Don't overwrite schema blindly, acl's might have been set even though
@@ -304,14 +304,6 @@ func createSchema(attr string, typ types.TypeID, hint pb.Metadata_HintType, ts u
 		// all predicates of type UidID were implicitly considered lists.
 		if typ == types.UidID {
 			s.List = true
-		}
-
-		switch hint {
-		case pb.Metadata_SINGLE:
-			s.List = false
-		case pb.Metadata_LIST:
-			s.List = true
-		default:
 		}
 	}
 	if err := checkSchema(&s); err != nil {
@@ -548,7 +540,6 @@ func populateMutationMap(src *pb.Mutations) (map[uint32]*pb.Mutations, error) {
 			mm[gid] = mu
 		}
 		mu.Edges = append(mu.Edges, edge)
-		mu.Metadata = src.Metadata
 	}
 
 	for _, schema := range src.Schema {

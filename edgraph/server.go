@@ -688,25 +688,8 @@ func (s *Server) doMutate(ctx context.Context, qc *queryContext, resp *pb.Respon
 	if err != nil {
 		return err
 	}
-	ns, err := x.ExtractNamespace(ctx)
-	if err != nil {
-		return errors.Wrapf(err, "While doing mutations:")
-	}
-	predHints := make(map[string]pb.Metadata_HintType)
-	for _, gmu := range qc.gmuList {
-		for pred, hint := range gmu.Metadata.GetPredHints() {
-			pred = x.NamespaceAttr(ns, pred)
-			if oldHint := predHints[pred]; oldHint == pb.Metadata_LIST {
-				continue
-			}
-			predHints[pred] = hint
-		}
-	}
 	m := &pb.Mutations{
 		Edges: edges,
-		Metadata: &pb.Metadata{
-			PredHints: predHints,
-		},
 	}
 
 	qc.span.Annotatef(nil, "Applying mutations: %+v", m)
@@ -1633,16 +1616,15 @@ func parseMutationObject(mu *pb.Mutation, qc *queryContext) (*gql.Mutation, erro
 	res := &gql.Mutation{Cond: mu.Cond}
 
 	if len(mu.SetJson) > 0 {
-		nqs, md, err := chunker.ParseJSON(mu.SetJson, chunker.SetNquads)
+		nqs, err := chunker.ParseJSON(mu.SetJson, chunker.SetNquads)
 		if err != nil {
 			return nil, err
 		}
 		res.Set = append(res.Set, nqs...)
-		res.Metadata = md
 	}
 	if len(mu.DeleteJson) > 0 {
 		// The metadata is not currently needed for delete operations so it can be safely ignored.
-		nqs, _, err := chunker.ParseJSON(mu.DeleteJson, chunker.DeleteNquads)
+		nqs, err := chunker.ParseJSON(mu.DeleteJson, chunker.DeleteNquads)
 		if err != nil {
 			return nil, err
 		}

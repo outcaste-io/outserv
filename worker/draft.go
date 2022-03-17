@@ -519,11 +519,7 @@ func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr erro
 	// schema deduction is done by JSON chunker.
 	for attr, storageType := range schemaMap {
 		if _, err := schema.State().TypeOf(attr); err != nil {
-			hint := pb.Metadata_DEFAULT
-			if mutHint, ok := prop.GetMutations().GetMetadata().GetPredHints()[attr]; ok {
-				hint = mutHint
-			}
-			if err := createSchema(attr, storageType, hint, prop.CommitTs); err != nil {
+			if err := createSchema(attr, storageType, prop.CommitTs); err != nil {
 				return err
 			}
 		}
