@@ -20,8 +20,8 @@ import (
 	"math"
 	"sync"
 
-	"github.com/outcaste-io/outserv/x"
 	"github.com/golang/glog"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	"go.etcd.io/etcd/raft"
 	"go.etcd.io/etcd/raft/raftpb"

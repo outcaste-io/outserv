@@ -22,9 +22,9 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/minio/minio-go/v6"
 	"github.com/outcaste-io/outserv/chunker"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/minio/minio-go/v6"
 )
 
 type remoteFiles struct {

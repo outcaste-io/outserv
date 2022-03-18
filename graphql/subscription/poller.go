@@ -27,11 +27,11 @@ import (
 
 	"github.com/dgrijalva/jwt-go/v4"
 
+	"github.com/dgryski/go-farm"
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/dgryski/go-farm"
-	"github.com/golang/glog"
 )
 
 // Poller is used to poll user subscription query.

@@ -31,9 +31,9 @@ import (
 
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/outcaste-io/outserv/graphql/e2e/common"
 	"github.com/outcaste-io/outserv/testutil"
-	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 )
 

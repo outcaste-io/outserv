@@ -21,9 +21,9 @@ import (
 
 	"github.com/outcaste-io/outserv/graphql/schema"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/outcaste-io/outserv/graphql/test"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 )
 

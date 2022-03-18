@@ -19,8 +19,8 @@ package types
 import (
 	"encoding/json"
 
-	"github.com/outcaste-io/outserv/x"
 	"github.com/golang/geo/s2"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	geom "github.com/twpayne/go-geom"
 	"github.com/twpayne/go-geom/encoding/geojson"
