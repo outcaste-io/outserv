@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/outserv/billing"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/ee"
 	"github.com/outcaste-io/outserv/ee/audit"
@@ -51,7 +52,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	_ "google.golang.org/grpc/encoding/gzip" // grpc compression
 
-	_ "github.com/dgraph-io/gqlparser/v2/validator/rules" // make gql validator init() all rules
+	_ "github.com/outcaste-io/gqlparser/v2/validator/rules" // make gql validator init() all rules
 )
 
 var (
@@ -941,8 +942,9 @@ func run() {
 		glog.Errorf("Grpc serve returned with error: %+v", err)
 	}()
 
-	updaters := z.NewCloser(3)
+	updaters := z.NewCloser(4)
 	go func() {
+		billing.Run(updaters)
 		zero.Run(updaters, bindall)
 
 		worker.StartRaftNodes(worker.State.WALstore, bindall)

@@ -78,6 +78,7 @@ func expandEdges(ctx context.Context, m *pb.Mutations) ([]*pb.DirectedEdge, erro
 			if err != nil {
 				return nil, err
 			}
+			// TODO: Implement getPredicatesFromTypes
 			preds = append(preds, getPredicatesFromTypes(namespace, types)...)
 			preds = append(preds, x.StarAllPredicates(namespace)...)
 			// AllowedPreds are used only with ACL. Do not delete all predicates but

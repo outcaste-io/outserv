@@ -8,9 +8,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dgraph-io/gqlparser/v2/ast"
-	"github.com/dgraph-io/gqlparser/v2/parser"
-	"github.com/dgraph-io/gqlparser/v2/validator"
+	"github.com/outcaste-io/gqlparser/v2/ast"
+	"github.com/outcaste-io/gqlparser/v2/parser"
+	"github.com/outcaste-io/gqlparser/v2/validator"
 )
 
 // A Request represents a GraphQL request.  It makes no guarantees that the

@@ -16,8 +16,6 @@ require (
 	github.com/Shopify/sarama v1.27.2
 	github.com/blevesearch/bleve v1.0.13
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd
-	github.com/dgraph-io/gqlgen v0.13.2
-	github.com/dgraph-io/gqlparser/v2 v2.2.2
 	github.com/dgraph-io/graphql-transport-ws v0.0.0-20210511143556-2cef522f1f15
 	github.com/dgraph-io/simdjson-go v0.3.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -35,7 +33,7 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/golang/snappy v0.0.4
 	github.com/google/codesearch v1.0.0
-	github.com/google/go-cmp v0.5.5
+	github.com/google/go-cmp v0.5.7
 	github.com/google/uuid v1.1.5
 	github.com/gorilla/websocket v1.4.2
 	github.com/graph-gophers/graphql-go v0.0.0-20201113091052-beb923fada29
@@ -43,6 +41,8 @@ require (
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/outcaste-io/badger/v3 v3.0.0-20220210203236-1b1148a36313
 	github.com/outcaste-io/dgo/v210 v210.0.0-20220225180226-43bd1b427e86
+	github.com/outcaste-io/gqlgen v0.13.3
+	github.com/outcaste-io/gqlparser/v2 v2.2.3
 	github.com/outcaste-io/ristretto v0.2.0
 	github.com/outcaste-io/sroar v0.0.0-20220207092908-fa5c189ea338
 	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
@@ -50,7 +50,8 @@ require (
 	github.com/pkg/profile v1.2.1
 	github.com/prometheus/client_golang v1.0.0
 	github.com/prometheus/common v0.6.0 // indirect
-	github.com/sergi/go-diff v1.1.0
+	github.com/sergi/go-diff v1.2.0
+	github.com/shirou/gopsutil/v3 v3.22.2
 	github.com/soheilhy/cmux v0.1.4
 	github.com/spf13/cast v1.3.0
 	github.com/spf13/cobra v0.0.5
@@ -67,7 +68,7 @@ require (
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210816183151-1e6c022a8912
+	golang.org/x/sys v0.0.0-20220111092808-5a964db01320
 	golang.org/x/text v0.3.6
 	golang.org/x/tools v0.1.6-0.20210802203754-9b21a8868e16
 	google.golang.org/api v0.46.0

@@ -20,9 +20,9 @@ import (
 	"math"
 	"sync"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/badger/v3"
 	"github.com/outcaste-io/badger/v3/pb"
-	"github.com/golang/glog"
 )
 
 // TxnWriter is in charge or writing transactions to badger.

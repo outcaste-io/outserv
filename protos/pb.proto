@@ -38,8 +38,6 @@ message SrcFunction {
 }
 
 message Query {
-  reserved 2; // It was used for language list for attribute
-
   string attr = 1;
   fixed64 after_uid = 3;      // Only return UIDs greater than this.
   bool do_count = 4;          // Are we just getting lengths?
@@ -71,7 +69,6 @@ message ValueList {
 }
 
 message Result {
-  reserved 6; // It was used for LangList
   repeated List uid_matrix = 1;
   repeated ValueList value_matrix = 2;
   repeated uint32 counts = 3;
@@ -80,7 +77,6 @@ message Result {
 }
 
 message Order {
-  reserved 3; // It was used for langs
   string attr = 1;
   bool desc = 2;
 }
@@ -130,6 +126,8 @@ message ZeroProposal {
 
   string cid = 6;  // Used as unique identifier for the cluster.
   DeleteNsRequest delete_ns = 7;  // Used to delete namespace.
+  double cpu_hours = 8; // Tracks CPU hours used by the cluster.
+  int64 last_charged = 9; // When did we last charge, in unix epoch seconds.
 }
 
 // MembershipState is used to pack together the current membership state of all
@@ -145,6 +143,8 @@ message MembershipState {
   uint64 maxUID = 6;
   uint64 maxNsID = 7;
   string cid = 8;  // Used to uniquely identify the Dgraph cluster.
+  double cpu_hours = 9; // Tracks CPU hours used by the cluster.
+  int64 last_charged = 10; // When did we last charge, in unix epoch seconds.
 }
 
 message HealthInfo {
@@ -175,8 +175,6 @@ message Tablet {
 }
 
 message DirectedEdge {
-  reserved 6;                      // This was used for label.
-  reserved 7;                      // This was used for lang.
   fixed64 entity = 1;              // Subject or source node / UID.
   string attr = 2;                 // Attribute or predicate. Labels the edge.
   bytes value = 3;                 // Edge points to a value.
@@ -195,36 +193,13 @@ message Mutations {
   uint32 group_id = 1;
   repeated DirectedEdge edges = 3;
   repeated SchemaUpdate schema = 4;
-  repeated TypeUpdate types = 6;
   enum DropOp {
     NONE = 0;
     ALL = 1;
     DATA = 2;
-    TYPE = 3;
   }
   DropOp drop_op = 7;
   string drop_value = 8;
-
-  Metadata metadata = 9;
-}
-
-message Metadata {
-  // HintType represents a hint that will be passed along the mutation and used
-  // to add the predicate to the schema if it's not already there.
-  enum HintType {
-    // DEFAULT means no hint is provided and Dgraph will follow the default
-    // behavior.
-    DEFAULT = 0;
-    // SINGLE signals that the predicate should be created as a single type (e.g
-    // string, uid).
-    SINGLE = 1;
-    // LIST signals that the predicate should be created as a list (e.g
-    // [string], [uid]).
-    LIST = 2;
-  }
-
-  // Map of predicates to their hints.
-  map<string, HintType> pred_hints = 1;
 }
 
 message Snapshot {
@@ -279,14 +254,10 @@ message KVS {
   // Predicates is the list of predicates known by the leader at the time of the
   // snapshot.
   repeated string predicates = 3;
-  // Types is the list of types known by the leader at the time of the snapshot.
-  repeated string types = 4;
 }
 
 // Posting messages.
 message Posting {
-  reserved 5; // This was used for lang tag.
-  reserved 6;  // This was used for label.
   fixed64 uid = 1;
   bytes value = 2;
   enum ValType {
@@ -304,7 +275,6 @@ message Posting {
   }
   ValType val_type = 3;
   enum PostingType {
-    reserved 2; // This was used for lang value.
     REF = 0;         // UID
     VALUE = 1;       // simple, plain value
   }
@@ -350,8 +320,6 @@ message SchemaRequest {
 }
 
 message SchemaNode {
-  reserved 9; // This was used for lang.
-
   string predicate = 1;
   string type = 2;
   bool index = 3;
@@ -360,7 +328,6 @@ message SchemaNode {
   bool count = 6;
   bool list = 7;
   bool upsert = 8;
-  bool no_conflict = 10;
 }
 
 message SchemaResult {
@@ -368,7 +335,6 @@ message SchemaResult {
 }
 
 message SchemaUpdate {
-  reserved 9; // This was used for lang.
   string predicate = 1;
   Posting.ValType value_type = 2;
   enum Directive {
@@ -381,26 +347,10 @@ message SchemaUpdate {
   repeated string tokenizer = 4;
   bool count = 5;
   bool list = 6;
-  bool upsert = 8;
-
-  // Fields required for type system.
-  bool non_nullable = 10;
-  bool non_nullable_list = 11;
-
-  // If value_type is OBJECT, then this represents an object type with a custom
-  // name. This field stores said name.
-  string object_type_name = 12;
-
-  bool no_conflict = 13;
+  bool upsert = 7;
 
   // Deleted field:
-  reserved 7;
   reserved "explicit";
-}
-
-message TypeUpdate {
-  string type_name = 1;
-  repeated SchemaUpdate fields = 2;
 }
 
 message MapHeader {
@@ -435,8 +385,6 @@ message TxnContext {
   uint64 start_ts = 1;
   uint64 commit_ts = 2;
   bool aborted = 3;
-  repeated string keys = 4;  // List of keys to be used for conflict detection.
-  repeated string preds = 5; // List of predicates involved in this transaction.
   string hash = 6;
 }
 
@@ -504,7 +452,6 @@ message Operation {
     ALL = 1;
     DATA = 2;
     ATTR = 3;
-    TYPE = 4;
   }
   DropOp drop_op = 4;
 
@@ -660,19 +607,6 @@ message Status {
   string msg = 2;
 }
 
-message DropOperation {
-  enum DropOp {
-    ALL = 0;
-    DATA = 1;
-    ATTR = 2;
-    NS = 3;
-  }
-  DropOp drop_op = 1;
-  // When drop_op is ATTR, drop_value will be the name of the ATTR; empty
-  // otherwise.
-  string drop_value = 2;
-}
-
 message ExportRequest {
   uint32 group_id = 1;  // Group id to back up.
   uint64 read_ts = 2;
@@ -705,7 +639,6 @@ message UpdateGraphQLSchemaRequest {
   uint64 start_ts = 1;
   string graphql_schema = 2;
   repeated SchemaUpdate dgraph_preds = 3;
-  repeated TypeUpdate dgraph_types = 4;
   string lambda_script = 5;
   Op op = 6;
 }
@@ -718,7 +651,6 @@ message UpdateGraphQLSchemaResponse {
 message BulkMeta {
   int64 edge_count = 1;
   map<string, SchemaUpdate> schema_map = 2;
-  repeated TypeUpdate types = 3;
 }
 
 message DeleteNsRequest {

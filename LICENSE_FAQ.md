@@ -14,10 +14,7 @@ Smart License follows an open pricing model. The pricing and the charging
 mechanism for the software are baked into the software itself, in a module we
 call the monetization module.
 
-We are currently using a pricing model based on the number of cores used by the
-program. The current charging method is via blockchain. In the future, we could
-consider adding alternate ways of payment. You can read the source code of the
-module [here](TODO: add link).
+You can read the source code of the module [here](/billing).
 
 ### 3. Is Smart License open source?
 
@@ -123,3 +120,13 @@ functionality in the software that is protected by the license key.*
 *SLv1: The software contains a module that allows the licensor to monetize your use of
 the software. You may not move, change, disable, or circumvent this functionality
 in the software.*
+
+### 9. Can I apply Smart License to my project?
+
+Yes. We think more developers should be using Smart License to make a living out
+of their hard work, while also staying as close to open source as possible.
+That's the motto behind the "open ethos" concept.
+
+The best application for Smart License is standalone servers. It can also be
+applied to heavy-weight libraries, where the developer believes a payment for
+usage is justified.

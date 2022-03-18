@@ -152,23 +152,6 @@ func deleteStalePreds(ctx context.Context, kvs *pb.KVS, ts uint64) error {
 		}
 	}
 
-	// Look for types present in the receiver but not in the list sent by the leader.
-	// These types were deleted in between snapshots and need to be deleted from the
-	// receiver to keep the schema in sync.
-	currTypes := schema.State().Types()
-	snapshotTypes := make(map[string]struct{})
-	for _, typ := range kvs.Types {
-		snapshotTypes[typ] = struct{}{}
-	}
-	for _, typ := range currTypes {
-		if _, ok := snapshotTypes[typ]; !ok {
-			if err := schema.State().DeleteType(typ, ts); err != nil {
-				return errors.Wrapf(err, "cannot delete removed type %s after streaming snapshot",
-					typ)
-			}
-		}
-	}
-
 	return nil
 }
 
@@ -212,7 +195,6 @@ func doStreamSnapshot(snap *pb.Snapshot, out pb.Worker_StreamSnapshotServer) err
 	// Get the list of all the predicate and types at the time of the snapshot so that the receiver
 	// can delete predicates
 	predicates := schema.State().Predicates()
-	types := schema.State().Types()
 
 	if err := stream.Orchestrate(out.Context()); err != nil {
 		return err
@@ -222,7 +204,6 @@ func doStreamSnapshot(snap *pb.Snapshot, out pb.Worker_StreamSnapshotServer) err
 	done := &pb.KVS{
 		Done:       true,
 		Predicates: predicates,
-		Types:      types,
 	}
 	if err := out.Send(done); err != nil {
 		return err

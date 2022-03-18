@@ -2495,6 +2495,7 @@ func isUidFnWithoutVar(f *gql.Function) bool {
 }
 
 func getNodeTypes(ctx context.Context, sg *SubGraph) ([]string, error) {
+	panic("TODO: Implement getNodeTypes")
 	temp := &SubGraph{
 		Attr:    "dgraph.type",
 		SrcUIDs: codec.ToList(sg.DestMap),
@@ -2513,19 +2514,8 @@ func getNodeTypes(ctx context.Context, sg *SubGraph) ([]string, error) {
 
 // getPredicatesFromTypes returns the list of preds contained in the given types.
 func getPredicatesFromTypes(namespace uint64, typeNames []string) []string {
-	var preds []string
-
-	for _, typeName := range typeNames {
-		typeDef, ok := schema.State().GetType(x.NamespaceAttr(namespace, typeName))
-		if !ok {
-			continue
-		}
-
-		for _, field := range typeDef.Fields {
-			preds = append(preds, field.Predicate)
-		}
-	}
-	return preds
+	// TODO: Namespace needs to figured out.
+	return schema.State().PredicatesFor(typeNames...)
 }
 
 // filterUidPredicates takes a list of predicates and returns a list of the predicates
@@ -2741,7 +2731,6 @@ func (req *Request) ProcessQuery(ctx context.Context) (err error) {
 type ExecutionResult struct {
 	Subgraphs  []*SubGraph
 	SchemaNode []*pb.SchemaNode
-	Types      []*pb.TypeUpdate
 	Metrics    map[string]uint64
 }
 
@@ -2771,43 +2760,15 @@ func (req *Request) Process(ctx context.Context) (er ExecutionResult, err error)
 		}
 		typeNames := x.NamespaceAttrList(namespace, req.GqlQuery.Schema.Types)
 		req.GqlQuery.Schema.Types = typeNames
-		if er.Types, err = worker.GetTypes(ctx, req.GqlQuery.Schema); err != nil {
-			return er, errors.Wrapf(err, "while fetching types")
-		}
 	}
 
 	if !x.IsGalaxyOperation(ctx) {
 		// Filter the schema nodes for the given namespace.
 		er.SchemaNode = filterSchemaNodeForNamespace(namespace, er.SchemaNode)
-		// Filter the types for the given namespace.
-		er.Types = filterTypesForNamespace(namespace, er.Types)
 	}
 	req.Latency.Processing += time.Since(schemaProcessingStart)
 
 	return er, nil
-}
-
-// filterTypesForNamespace filters types for the given namespace.
-func filterTypesForNamespace(namespace uint64, types []*pb.TypeUpdate) []*pb.TypeUpdate {
-	out := []*pb.TypeUpdate{}
-	for _, update := range types {
-		// Type name doesn't have reverse.
-		typeNamespace, typeName := x.ParseNamespaceAttr(update.TypeName)
-		if typeNamespace != namespace {
-			continue
-		}
-		update.TypeName = typeName
-		fields := []*pb.SchemaUpdate{}
-		// Convert field name for the current namespace.
-		for _, field := range update.Fields {
-			_, fieldName := x.ParseNamespaceAttr(field.Predicate)
-			field.Predicate = fieldName
-			fields = append(fields, field)
-		}
-		update.Fields = fields
-		out = append(out, update)
-	}
-	return out
 }
 
 // filterSchemaNodeForNamespace filters schema nodes for the given namespace.

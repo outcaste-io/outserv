@@ -24,11 +24,11 @@ import (
 
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/outcaste-io/gqlparser/v2/gqlerror"
+	_ "github.com/outcaste-io/gqlparser/v2/validator/rules"
 	dschema "github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/dgraph-io/gqlparser/v2/gqlerror"
-	_ "github.com/dgraph-io/gqlparser/v2/validator/rules"
-	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )

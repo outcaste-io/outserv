@@ -26,10 +26,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/outcaste-io/outserv/x"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/golang/glog"
+	"github.com/outcaste-io/outserv/x"
 	"golang.org/x/net/context"
 )
 

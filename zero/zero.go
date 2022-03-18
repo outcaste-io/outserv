@@ -10,9 +10,11 @@ import (
 	"net"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/glog"
+	"github.com/outcaste-io/outserv/billing"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/raftwal"
@@ -173,6 +175,92 @@ func LatestMembershipState(ctx context.Context) (*pb.MembershipState, error) {
 	return ms, nil
 }
 
+func (n *node) periodicallyProposeUsage(closer *z.Closer) {
+	defer closer.Done()
+
+	tick := time.NewTicker(15 * billing.Minute)
+	defer tick.Stop()
+
+	charge := func() error {
+		if !n.amLeader() {
+			return nil
+		}
+		st, err := LatestMembershipState(closer.Ctx())
+		if err != nil {
+			return errors.Wrapf(err, "while getting latest membership state")
+		}
+
+		lastCharged := time.Unix(st.LastCharged, 0)
+		if time.Since(lastCharged) < 10*24*time.Hour {
+			// We charged 10 days ago. No need to do anything.
+			return nil
+		}
+
+		now := time.Now()
+		if now.Day() != 1 && now.Day() != 15 {
+			// Charge only on the 1st and 15th of the month.
+			return nil
+		}
+		if st.CpuHours < 20.0/billing.USDPerCpuHour {
+			// Charge for at least $20.
+			return nil
+		}
+
+		cpuHours := st.CpuHours
+		for i := 0; i < 60; i++ {
+			if !n.amLeader() {
+				return nil
+			}
+			err = billing.Charge(cpuHours)
+			if err == nil {
+				break
+			} else {
+				glog.Errorf("While charging for usage: %v", err)
+			}
+			time.Sleep(30 * time.Second)
+		}
+		if err != nil {
+			return fmt.Errorf("Unable to charge for usage: %v", err)
+		}
+
+		// We successfully charged for the usage. Reduce the core hours. Note
+		// that we should no longer check if the node is a leader or not. We
+		// charged for it, so we must account for it.
+		err = x.RetryUntilSuccess(60, time.Minute, func() error {
+			_, err := ProposeAndWait(closer.Ctx(), &pb.ZeroProposal{
+				CpuHours:    -cpuHours,
+				LastCharged: time.Now().Unix(),
+			})
+			return err
+		})
+		x.Checkf(err, "Usage was charged for. But, unable to account for it.")
+		return nil
+	}
+
+	for {
+		select {
+		case <-tick.C: // Every 15 mins.
+			cpuHours := billing.CPUHours()
+			err := x.RetryUntilSuccess(16, time.Minute, func() error {
+				_, err := ProposeAndWait(closer.Ctx(), &pb.ZeroProposal{
+					CpuHours: cpuHours,
+				})
+				return err
+			})
+			x.Check(err)
+			billing.AccountedFor(cpuHours)
+
+			// See if we need to charge for the usage.
+			if err := charge(); err != nil {
+				glog.Errorf("Charge failed: %v\n", err)
+			}
+
+		case <-closer.HasBeenClosed():
+			return
+		}
+	}
+}
+
 func Run(closer *z.Closer, bindall bool) {
 	glog.Infof("Starting Zero...")
 
@@ -197,7 +285,7 @@ func Run(closer *z.Closer, bindall bool) {
 	cn := conn.NewNode(&rc, store, x.WorkerConfig.TLSClientConfig)
 	conn.UpdateNode(rc.WhoIs, cn)
 
-	nodeCloser := z.NewCloser(1)
+	nodeCloser := z.NewCloser(2)
 	go func() {
 		defer closer.Done()
 		<-closer.HasBeenClosed()
@@ -216,6 +304,7 @@ func Run(closer *z.Closer, bindall bool) {
 		ctx:    nodeCloser.Ctx(),
 		state:  NewState(),
 	}
+	go inode.periodicallyProposeUsage(nodeCloser)
 	x.Check(inode.initAndStartNode())
 }
 

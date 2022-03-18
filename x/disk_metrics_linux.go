@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package x
@@ -9,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/outcaste-io/ristretto/z"
 	"github.com/golang/glog"
+	"github.com/outcaste-io/ristretto/z"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/tag"
 )

@@ -24,8 +24,8 @@ import (
 
 	"github.com/outcaste-io/outserv/x"
 
-	"github.com/dgraph-io/gqlparser/v2/ast"
 	"github.com/google/go-cmp/cmp"
+	"github.com/outcaste-io/gqlparser/v2/ast"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
