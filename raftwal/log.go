@@ -28,12 +28,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/badger/v3"
 	"github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"go.etcd.io/etcd/raft/raftpb"
 )

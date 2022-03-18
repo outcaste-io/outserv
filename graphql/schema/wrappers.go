@@ -15,16 +15,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgraph-io/gqlparser/v2/parser"
 	"github.com/golang/glog"
+	"github.com/outcaste-io/gqlparser/v2/parser"
 	"github.com/outcaste-io/outserv/graphql/authorization"
 
-	"github.com/dgraph-io/gqlparser/v2/ast"
+	"github.com/outcaste-io/gqlparser/v2/ast"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
 
-// Wrap the github.com/dgraph-io/gqlparser/ast defintions so that the bulk of the GraphQL
+// Wrap the github.com/outcaste-io/gqlparser/ast defintions so that the bulk of the GraphQL
 // algorithm and interface is dependent on behaviours we expect from a GraphQL schema
 // and validation, but not dependent the exact structure in the gqlparser.
 //
@@ -804,7 +804,7 @@ func lambdaOnMutateMappings(s *ast.Schema) map[string]bool {
 	return result
 }
 
-// AsSchema wraps a github.com/dgraph-io/gqlparser/ast.Schema.
+// AsSchema wraps a github.com/outcaste-io/gqlparser/ast.Schema.
 func AsSchema(s *ast.Schema, ns uint64) (*Schema, error) {
 	customDirs, lambdaDirs := customAndLambdaMappings(s, ns)
 	dgraphPredicate := dgraphMapping(s)

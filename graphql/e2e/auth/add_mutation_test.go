@@ -20,9 +20,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/outcaste-io/outserv/graphql/e2e/common"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/outcaste-io/outserv/graphql/e2e/common"
 	"github.com/stretchr/testify/require"
 )
 

@@ -8,9 +8,9 @@ import (
 	"errors"
 	"strconv"
 
-	"github.com/dgraph-io/gqlgen/graphql"
-	"github.com/dgraph-io/gqlgen/graphql/introspection"
-	"github.com/dgraph-io/gqlparser/v2/ast"
+	"github.com/outcaste-io/gqlgen/graphql"
+	"github.com/outcaste-io/gqlgen/graphql/introspection"
+	"github.com/outcaste-io/gqlparser/v2/ast"
 	"github.com/outcaste-io/outserv/x"
 )
 

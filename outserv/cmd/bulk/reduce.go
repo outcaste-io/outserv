@@ -34,6 +34,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/dustin/go-humanize"
+	"github.com/golang/glog"
+	"github.com/golang/snappy"
 	"github.com/outcaste-io/badger/v3"
 	bo "github.com/outcaste-io/badger/v3/options"
 	bpb "github.com/outcaste-io/badger/v3/pb"
@@ -44,9 +47,6 @@ import (
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
 	"github.com/outcaste-io/sroar"
-	"github.com/dustin/go-humanize"
-	"github.com/golang/glog"
-	"github.com/golang/snappy"
 )
 
 type reducer struct {

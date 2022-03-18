@@ -17,8 +17,8 @@
 package query
 
 import (
-	"github.com/outcaste-io/outserv/types"
 	"github.com/golang/glog"
+	"github.com/outcaste-io/outserv/types"
 	"github.com/pkg/errors"
 )
 

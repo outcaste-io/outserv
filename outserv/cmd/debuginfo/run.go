@@ -22,8 +22,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/outcaste-io/outserv/x"
 	"github.com/golang/glog"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/spf13/cobra"
 )
 

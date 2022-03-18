@@ -52,7 +52,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	_ "google.golang.org/grpc/encoding/gzip" // grpc compression
 
-	_ "github.com/dgraph-io/gqlparser/v2/validator/rules" // make gql validator init() all rules
+	_ "github.com/outcaste-io/gqlparser/v2/validator/rules" // make gql validator init() all rules
 )
 
 var (
