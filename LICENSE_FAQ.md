@@ -60,10 +60,11 @@ software, which includes modifications, redistributions and commercialization,
 without discrimination.
 
 We think Open Source has taken hits recently with many open source companies
-moving away from it to use non-open source licenses (SSPL, Elastic License,
+moving away from it to use non-open-source licenses (SSPL, Elastic License,
 various community licenses) to eliminate competing SaaS offerings. Smart License
-provides an alternative solution which doesn't discriminate against
-commercialization of the software by anyone.
+provides an alternative solution which doesn't forbid commercialization of the
+software by anyone. We think software commercialization is NOT a zero-sum game,
+the more participants in the economy, the better for end-users and everyone can win.
 
 There have been many instances where the software becomes popular, but the
 developers behind the software are left high and dry, unable to balance their
@@ -153,9 +154,9 @@ option for most developers.
     on-premises deployments.
 
 The second and the most widely used revenue stream is to provide a cloud-hosted
-    solution. To maximize the revenue there and eliminate competing cloud
-    services, the license is usually changed to a non-open-source license which
-    disallows others from building similar services.
+    solution. To maximize the revenue there and eliminate competing SaaS
+    offerings, the license is usually changed to a non-open-source license which
+    explicitly disallows others from building similar services.
 
 We think none of these options are particularly attractive in a world where
 users are increasingly willing to pay for the software, as long as the pricing
