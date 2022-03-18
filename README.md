@@ -78,7 +78,7 @@ Frequently asked questions about the license are addressed in
 [LICENSE_FAQ.md](LICENSE_FAQ.md).
 
 The monetization model mentioned in the Smart License is explained
-[here](/billing/README.md).
+[here](/billing).
 
 Certain portions of this project are licensed by contributors or others
 under the terms of open source licenses such as the Apache License v2.0.
