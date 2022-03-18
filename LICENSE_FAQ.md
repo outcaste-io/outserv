@@ -51,7 +51,7 @@ incomplete documentation but which can be upgraded upon payment. Code under
 Smart License is expected to be provided with full functionality with no
 upgrades beyond the enforced monetization.
 
-### 9. What is Smart License software?
+### 9. What is Smart License?
 
 **Smart License is a very liberal commercial license.** The only main limitation
 Smart License adds is to ensure a source of income for the developing entity.
@@ -80,18 +80,16 @@ longevity of the software which is the best outcome for everyone.
 
 Smart License 1.0 is modeled after [Elastic License
 2.0](https://www.elastic.co/licensing/elastic-license) but differs in the
-limitations it imposes.
-
-Elastic License 2.0 has this limitation, that Smart License 1.0 does NOT have:
+limitations it imposes. Elastic License 2.0 has this limitation, that Smart
+License 1.0 does NOT have:
 
 *ELv2: You may not provide the software to third parties as a hosted or managed
 service, where the service provides users with access to any substantial set of
 the features or functionality of the software.*
 
-As mentioned above, we encourage managed service
-providers to make this software as widely available as possible.
-
-Elastic License 2.0 has this limitation, which Smart License 1.0 has modified:
+As mentioned above, we encourage managed service providers to make this software
+as widely available as possible. Elastic License 2.0 has this limitation, which
+Smart License 1.0 has modified:
 
 *ELv2: You may not move, change, disable, or circumvent the license key
 functionality in the software, and you may not remove or obscure any
