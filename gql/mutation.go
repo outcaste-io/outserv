@@ -18,7 +18,6 @@ var (
 
 // Mutation stores the strings corresponding to set and delete operations.
 type Mutation struct {
-	Cond         string
 	Set          []*pb.NQuad
 	Del          []*pb.NQuad
 	AllowedPreds []string

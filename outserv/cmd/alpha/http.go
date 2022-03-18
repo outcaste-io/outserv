@@ -338,12 +338,6 @@ func mutationHandler(w http.ResponseWriter, r *http.Request) {
 				empty = false
 				mu.DeleteJson = delJSON.bs
 			}
-			if condText, ok := jsMap["cond"]; ok && condText != nil {
-				mu.Cond, err = strconv.Unquote(string(condText.bs))
-				if err != nil {
-					return nil, err
-				}
-			}
 
 			if empty {
 				return nil, nil

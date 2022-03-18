@@ -92,12 +92,8 @@ func (urw *updateGroupRewriter) Rewrite(
 
 			mutSet = append(mutSet, &pb.Mutation{
 				SetJson: nonExistentJson,
-				Cond: fmt.Sprintf(`@if(gt(len(%s),0) AND eq(len(%s),0))`, resolve.MutationQueryVar,
-					variable),
 			}, &pb.Mutation{
 				SetJson: existsJson,
-				Cond: fmt.Sprintf(`@if(gt(len(%s),0) AND gt(len(%s),0))`, resolve.MutationQueryVar,
-					variable),
 			})
 		}
 	}
@@ -126,8 +122,6 @@ func (urw *updateGroupRewriter) Rewrite(
 
 			mutDel = append(mutDel, &pb.Mutation{
 				DeleteJson: deleteJson,
-				Cond: fmt.Sprintf(`@if(gt(len(%s),0) AND gt(len(%s),0))`, resolve.MutationQueryVar,
-					variable),
 			})
 		}
 		if len(errs) != 0 {

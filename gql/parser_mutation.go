@@ -25,10 +25,6 @@ func ParseMutation(mutation string) (req *pb.Request, err error) {
 
 	item := it.Item()
 	switch item.Typ {
-	case itemUpsertBlock:
-		if req, err = parseUpsertBlock(it); err != nil {
-			return nil, err
-		}
 	case itemLeftCurl:
 		mu, err := parseMutationBlock(it)
 		if err != nil {
@@ -45,99 +41,6 @@ func ParseMutation(mutation string) (req *pb.Request, err error) {
 	}
 
 	return req, nil
-}
-
-// parseUpsertBlock parses the upsert block
-func parseUpsertBlock(it *lex.ItemIterator) (*pb.Request, error) {
-	var req *pb.Request
-	var queryText, condText string
-	var queryFound bool
-
-	// ===>upsert<=== {...}
-	if !it.Next() {
-		return nil, it.Errorf("Unexpected end of upsert block")
-	}
-
-	// upsert ===>{<=== ....}
-	item := it.Item()
-	if item.Typ != itemLeftCurl {
-		return nil, it.Errorf("Expected { at the start of block. Got: [%s]", item.Val)
-	}
-
-	for it.Next() {
-		item = it.Item()
-		switch {
-		// upsert {... ===>}<===
-		case item.Typ == itemRightCurl:
-			switch {
-			case req == nil:
-				return nil, it.Errorf("Empty mutation block")
-			case !queryFound:
-				return nil, it.Errorf("Query op not found in upsert block")
-			default:
-				req.Query = queryText
-				return req, nil
-			}
-
-		// upsert { mutation{...} ===>query<==={...}}
-		case item.Typ == itemUpsertBlockOp && item.Val == "query":
-			if queryFound {
-				return nil, it.Errorf("Multiple query ops inside upsert block")
-			}
-			queryFound = true
-			if !it.Next() {
-				return nil, it.Errorf("Unexpected end of upsert block")
-			}
-			item = it.Item()
-			if item.Typ != itemUpsertBlockOpContent {
-				return nil, it.Errorf("Expecting brace, found '%s'", item.Val)
-			}
-			queryText += item.Val
-
-		// upsert { ===>mutation<=== {...} query{...}}
-		case item.Typ == itemUpsertBlockOp && item.Val == "mutation":
-			if !it.Next() {
-				return nil, it.Errorf("Unexpected end of upsert block")
-			}
-
-			// upsert { mutation ===>@if(...)<=== {....} query{...}}
-			item = it.Item()
-			if item.Typ == itemUpsertBlockOpContent {
-				condText = item.Val
-				if !it.Next() {
-					return nil, it.Errorf("Unexpected end of upsert block")
-				}
-			}
-
-			// upsert @if(...) ===>{<=== ....}
-			mu, err := parseMutationBlock(it)
-			if err != nil {
-				return nil, err
-			}
-			mu.Cond = condText
-			if req == nil {
-				req = &pb.Request{Mutations: []*pb.Mutation{mu}}
-			} else {
-				req.Mutations = append(req.Mutations, mu)
-			}
-
-		// upsert { mutation{...} ===>fragment<==={...}}
-		case item.Typ == itemUpsertBlockOp && item.Val == "fragment":
-			if !it.Next() {
-				return nil, it.Errorf("Unexpected end of upsert block")
-			}
-			item = it.Item()
-			if item.Typ != itemUpsertBlockOpContent {
-				return nil, it.Errorf("Expecting brace, found '%s'", item.Val)
-			}
-			queryText += "fragment" + item.Val
-
-		default:
-			return nil, it.Errorf("Unexpected token in upsert block [%s]", item.Val)
-		}
-	}
-
-	return nil, it.Errorf("Invalid upsert block")
 }
 
 // parseMutationBlock parses the mutation block

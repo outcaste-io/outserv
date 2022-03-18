@@ -706,51 +706,6 @@ func (s *Server) doMutate(ctx context.Context, qc *queryContext, resp *pb.Respon
 	return err
 }
 
-// buildUpsertQuery modifies the query to evaluate the
-// @if condition defined in Conditional Upsert.
-func buildUpsertQuery(qc *queryContext) string {
-	if qc.req.Query == "" || len(qc.gmuList) == 0 {
-		return qc.req.Query
-	}
-
-	qc.condVars = make([]string, len(qc.req.Mutations))
-
-	var b strings.Builder
-	x.Check2(b.WriteString(strings.TrimSuffix(qc.req.Query, "}")))
-
-	for i, gmu := range qc.gmuList {
-		isCondUpsert := strings.TrimSpace(gmu.Cond) != ""
-		if isCondUpsert {
-			qc.condVars[i] = "__dgraph__" + strconv.Itoa(i)
-			qc.uidRes[qc.condVars[i]] = nil
-			// @if in upsert is same as @filter in the query
-			cond := strings.Replace(gmu.Cond, "@if", "@filter", 1)
-
-			// Add dummy query to evaluate the @if directive, ok to use uid(0) because
-			// dgraph doesn't check for existence of UIDs until we query for other predicates.
-			// Here, we are only querying for uid predicate in the dummy query.
-			//
-			// For example if - mu.Query = {
-			//      me(...) {...}
-			//   }
-			//
-			// Then, upsertQuery = {
-			//      me(...) {...}
-			//      __dgraph_0__ as var(func: uid(0)) @filter(...)
-			//   }
-			//
-			// The variable __dgraph_0__ will -
-			//      * be empty if the condition is true
-			//      * have 1 UID (the 0 UID) if the condition is false
-			x.Check2(b.WriteString(qc.condVars[i] + ` as var(func: uid(0)) ` + cond + `
-			 `))
-		}
-	}
-	x.Check2(b.WriteString(`}`))
-
-	return b.String()
-}
-
 // updateMutations updates the mutation and replaces uid(var) and val(var) with
 // their values or a blank node, in case of an upsert.
 // We use the values stored in qc.uidRes and qc.valRes to update the mutation.
@@ -1487,15 +1442,7 @@ func parseRequest(qc *queryContext) error {
 
 		qc.uidRes = make(map[string][]string)
 		qc.valRes = make(map[string]map[uint64]types.Val)
-		upsertQuery = buildUpsertQuery(qc)
 		needVars = findMutationVars(qc)
-		if upsertQuery == "" {
-			if len(needVars) > 0 {
-				return errors.Errorf("variables %v not defined", needVars)
-			}
-
-			return nil
-		}
 	}
 
 	// parsing the updated query
@@ -1613,7 +1560,7 @@ func hasPoormansAuth(ctx context.Context) error {
 // gql.Mutation.Set field. Similarly the 3 fields pb.Mutation#DeleteJson, pb.Mutation#DelNquads
 // and pb.Mutation#Del are merged into the gql.Mutation#Del field.
 func parseMutationObject(mu *pb.Mutation, qc *queryContext) (*gql.Mutation, error) {
-	res := &gql.Mutation{Cond: mu.Cond}
+	res := &gql.Mutation{}
 
 	if len(mu.SetJson) > 0 {
 		nqs, err := chunker.ParseJSON(mu.SetJson, chunker.SetNquads)

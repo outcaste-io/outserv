@@ -95,65 +95,9 @@ func lexNameBlock(l *lex.Lexer) lex.StateFn {
 	// The caller already checked isNameBegin, and absorbed one rune.
 	l.AcceptRun(isNameSuffix)
 	switch word := l.Input[l.Start:l.Pos]; word {
-	case "upsert":
-		l.Emit(itemUpsertBlock)
-		return lexUpsertBlock
 	default:
 		return l.Errorf("Invalid block: [%s]", word)
 	}
-}
-
-// lexUpsertBlock lexes the upsert block
-func lexUpsertBlock(l *lex.Lexer) lex.StateFn {
-	l.Mode = lexUpsertBlock
-	for {
-		switch r := l.Next(); {
-		case r == rightCurl:
-			l.BlockDepth--
-			l.Emit(itemRightCurl)
-			if l.BlockDepth == 0 {
-				return lexTopLevel
-			}
-		case r == leftCurl:
-			l.BlockDepth++
-			l.Emit(itemLeftCurl)
-		case isSpace(r) || lex.IsEndOfLine(r):
-			l.Ignore()
-		case isNameBegin(r):
-			return lexNameUpsertOp
-		case r == '#':
-			return lexComment
-		case r == lex.EOF:
-			return l.Errorf("Unclosed upsert block")
-		default:
-			return l.Errorf("Unrecognized character in upsert block: %#U", r)
-		}
-	}
-}
-
-// lexNameUpsertOp parses the operation names inside upsert block
-func lexNameUpsertOp(l *lex.Lexer) lex.StateFn {
-	// The caller already checked isNameBegin, and absorbed one rune.
-	l.AcceptRun(isNameSuffix)
-	word := l.Input[l.Start:l.Pos]
-	switch word {
-	case "query":
-		l.Emit(itemUpsertBlockOp)
-		return lexBlockContent
-	case "mutation":
-		l.Emit(itemUpsertBlockOp)
-		return lexInsideMutation
-	case "fragment":
-		l.Emit(itemUpsertBlockOp)
-		return lexBlockContent
-	default:
-		return l.Errorf("Invalid operation type: %s", word)
-	}
-}
-
-// lexBlockContent lexes and absorbs the text inside a block (covered by braces).
-func lexBlockContent(l *lex.Lexer) lex.StateFn {
-	return lexContent(l, leftCurl, rightCurl, lexUpsertBlock)
 }
 
 // lexIfContent lexes the whole of @if directive in a mutation block (covered by small brackets)
@@ -369,7 +313,7 @@ func lexTopLevel(l *lex.Lexer) lex.StateFn {
 	// Upsert block right now. BlockDepth tells us nesting of blocks. Currently, only
 	// the Upsert block has nested mutation/query/fragment blocks.
 	if l.BlockDepth != 0 {
-		return lexUpsertBlock
+		panic("BlockDepth should be zero. We don't support upsert block.")
 	}
 
 	l.Mode = lexTopLevel

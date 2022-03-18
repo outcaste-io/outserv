@@ -1222,11 +1222,6 @@ func mutationFromFragment(
 		return nil, nil
 	}
 
-	var conditions string
-	if len(frag.conditions) > 0 {
-		conditions = fmt.Sprintf("@if(%s)", strings.Join(frag.conditions, " AND "))
-	}
-
 	set, err := setBuilder(frag)
 	if err != nil {
 		return nil, schema.AsGQLErrors(err)
@@ -1240,7 +1235,6 @@ func mutationFromFragment(
 	return &pb.Mutation{
 		SetJson:    set,
 		DeleteJson: del,
-		Cond:       conditions,
 	}, nil
 
 }
