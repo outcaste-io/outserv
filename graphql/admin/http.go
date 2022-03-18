@@ -342,10 +342,10 @@ func getRequest(w http.ResponseWriter, r *http.Request) (*schema.Request, error)
 			}
 			gqlReq.Query = string(bytes)
 		case "multipart/form-data":
-			r.Body = http.MaxBytesReader(w, r.Body, x.Config.MaxUploadSize)
-			if err = r.ParseMultipartForm(x.Config.UploadMemoryLimit); err != nil {
+			r.Body = http.MaxBytesReader(w, r.Body, x.Config.MaxUploadSizeMb*1000)
+			if err = r.ParseMultipartForm(4 * x.Config.MaxUploadSizeMb * 1000); err != nil {
 				if strings.Contains(err.Error(), "request body too large") {
-					return nil, errors.Wrap(err, "failed to parse multipart form, request body too large")
+					return nil, errors.Wrap(err, "failed to parse, request body too large")
 				}
 				return nil, errors.Wrap(err, "failed to parse multipart form")
 			}
@@ -361,10 +361,9 @@ func getRequest(w http.ResponseWriter, r *http.Request) (*schema.Request, error)
 			}
 
 			variables := make(map[string][][]byte)
-
 			for key, paths := range uploadsMap {
 				if len(paths) == 0 {
-					return nil, errors.Wrapf(err, "invalid empty operations paths list for key %s", key)
+					return nil, errors.Wrapf(err, "empty operations paths list for key %s", key)
 				}
 				file, _, err := r.FormFile(key)
 				if err != nil {
@@ -374,23 +373,26 @@ func getRequest(w http.ResponseWriter, r *http.Request) (*schema.Request, error)
 
 				content, err := ioutil.ReadAll(file)
 				if err != nil {
-					return nil, errors.Wrapf(err, "failed to read data from form file with key %s", key)
-				}
-				pathParts := strings.Split(paths[0], ".")
-				if len(pathParts) < 1 {
-					return nil, errors.Wrapf(err, "failed to get variable name from path with key %s", key)
+					return nil, errors.Wrapf(err, "failed to read data with key %s", key)
 				}
 
-				var varName string
-				if pathParts[0] != "variables" {
-					varName = pathParts[2]
-				} else {
-					varName = pathParts[1]
+				for _, path := range paths {
+					if !strings.HasPrefix(path, "variables.") {
+						return nil, errors.Wrapf(err, "invalid path in map for key %s", key)
+					}
+
+					parts := strings.Split(path, ".")
+					if len(parts) < 2 {
+						return nil, errors.Wrapf(err, "failed to get variable name from path "+
+							"with key %s", key)
+					}
+
+					varName := parts[1]
+					if variables[varName] == nil {
+						variables[varName] = [][]byte{}
+					}
+					variables[varName] = append(variables[varName], content)
 				}
-				if variables[varName] == nil {
-					variables[varName] = [][]byte{}
-				}
-				variables[varName] = append(variables[varName], content)
 			}
 
 			for key := range variables {
@@ -401,7 +403,8 @@ func getRequest(w http.ResponseWriter, r *http.Request) (*schema.Request, error)
 			// "A standard GraphQL POST request should use the application/json
 			// content type ..."
 			return nil, errors.New(
-				"Unrecognised Content-Type.  Please use application/json or application/graphql for GraphQL requests")
+				"Unrecognised Content-Type.  Please use application/json, application/graphql or " +
+					"multipart/form-data for GraphQL requests")
 		}
 	default:
 		return nil,

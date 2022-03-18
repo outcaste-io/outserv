@@ -205,8 +205,8 @@ func init() {
 			"for minio, aws, etc.").
 		Flag("max-splits", "How many splits can a single key have, before it is forbidden. "+
 			"Also known as Jupiter key.").
-		Flag("upload-max-size", "What is the maximum upload size that can be uploaded with a multi-part file upload.").
-		Flag("upload-memory-limit", "What is the maximum memory consumption when uploading a multi-part file.").
+		Flag("max-upload-size-mb", "What is the maximum upload size that can be uploaded with "+
+			"a multi-part file upload.").
 		String())
 
 	flag.String("graphql", worker.GraphQLDefaults, z.NewSuperFlagHelp(worker.GraphQLDefaults).
@@ -812,8 +812,7 @@ func run() {
 	x.Config.QueryTimeout = x.Config.Limit.GetDuration("query-timeout")
 	x.Config.MaxRetries = x.Config.Limit.GetInt64("max-retries")
 	x.Config.SharedInstance = x.Config.Limit.GetBool("shared-instance")
-	x.Config.MaxUploadSize = x.Config.Limit.GetInt64("upload-max-size")
-	x.Config.UploadMemoryLimit = x.Config.Limit.GetInt64("upload-memory-limit")
+	x.Config.MaxUploadSizeMb = x.Config.Limit.GetInt64("max-upload-size-mb")
 
 	graphql := z.NewSuperFlag(Alpha.Conf.GetString("graphql")).MergeAndCheckDefault(
 		worker.GraphQLDefaults)
