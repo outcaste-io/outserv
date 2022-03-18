@@ -110,8 +110,9 @@ this software as broadly available as possible for end-users.
 
 No. If you fork the codebase and make modifications, those changes can stay
 private. You have no obligation to make that public. You can even commercialize
-this fork by charging for the software, linking it to proprietary code, or
-creating proprietary services around the fork.
+this fork by charging for the software (at a higher price than what you're
+paying), linking it to your proprietary code, or creating proprietary services
+around the fork.
 
 However, the fork must continue to abide by the limitations of the Smart
 License, which includes keeping the monetization module, licensing, copyright,
