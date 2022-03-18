@@ -83,21 +83,21 @@ Smart License 1.0 is modeled after [Elastic License
 limitations it imposes. Elastic License 2.0 has this limitation, that Smart
 License 1.0 does NOT have:
 
-> *ELv2: You may not provide the software to third parties as a hosted or managed
+> ELv2: You may not provide the software to third parties as a hosted or managed
   service, where the service provides users with access to any substantial set of
-  the features or functionality of the software.*
+  the features or functionality of the software.
 
 As mentioned above, we encourage managed service providers to make this software
 as widely available as possible. Elastic License 2.0 has this limitation, which
 Smart License 1.0 has modified:
 
-> *ELv2: You may not move, change, disable, or circumvent the license key
+> ELv2: You may not move, change, disable, or circumvent the license key
   functionality in the software, and you may not remove or obscure any
-  functionality in the software that is protected by the license key.*
+  functionality in the software that is protected by the license key.
 
-> *SLv1: The software contains a module that allows the licensor to monetize your use of
+> SLv1: The software contains a module that allows the licensor to monetize your use of
   the software. You may not move, change, disable, or circumvent this functionality
-  in the software.*
+  in the software.
 
 ### 11. Can I provide a managed service using a project under Smart License?
 
