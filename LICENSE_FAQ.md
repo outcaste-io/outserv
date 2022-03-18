@@ -165,8 +165,7 @@ model is open and fair to all.
 *With Smart License, we aim to hit the nail on its head.* Make the software charge
 for its usage with an open pricing model baked into the code itself, available
 and visible to everyone. And provide as much freedom as possible for others to
-use, modify or build commercial services around the software, under our motto of
-open ethos.
+use, modify or build commercial services around the software.
 
 **TL;DR: A software under Smart License provides a direct income stream to the
 developer so they can focus on the software while eliminating the rift between
@@ -177,8 +176,7 @@ building commercial services.**
 ### 15. Can I apply Smart License to my project?
 
 Yes. We think more developers should be using Smart License to make a living out
-of their hard work, while also staying as close to open source as possible.
-That's the motto behind the "open ethos" concept.
+of their hard work.
 
 The best application for Smart License is standalone servers. It can also be
 applied to heavy-weight libraries, where the developer believes a payment for
