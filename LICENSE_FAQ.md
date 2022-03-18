@@ -60,10 +60,10 @@ software, which includes modifications, redistributions and commercialization,
 without discrimination.
 
 We think Open Source has taken hits recently with many open source companies
-moving away from it to use non-open source licenses (SSPL, EL, various community
-licenses) to eliminate competing SaaS offerings. Smart License provides an
-alternative solution which doesn't discriminate against commercialization of the
-software by anyone.
+moving away from it to use non-open source licenses (SSPL, Elastic License,
+various community licenses) to eliminate competing SaaS offerings. Smart License
+provides an alternative solution which doesn't discriminate against
+commercialization of the software by anyone.
 
 There have been many instances where the software becomes popular, but the
 developers behind the software are left high and dry, unable to balance their
