@@ -38,7 +38,7 @@ No. EULAs do not allow users to change or distribute code.
 
 ### 7. Is Smart License Freeware?
 
-Not quite. Freeware is software that is distributed at no monetary cost to the
+No. Freeware is software that is distributed at no monetary cost to the
 end user. The source code is typically not made available. Smart License is the
 opposite of freeware, where the source code is freely available to modify, but
 comes at a monetary cost.
