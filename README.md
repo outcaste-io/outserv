@@ -73,8 +73,8 @@ following questions:
 ## License
 
 **This project, as a whole, is licensed under the terms of the Smart License
-v1.0.** A copy of the Smart license is available in [LICENSE.md](LICENSE.md)
-file.  Frequently asked questions about the license are addressed in
+v1.0.** A copy of the Smart license is available in [LICENSE.md](LICENSE.md).
+Frequently asked questions about the license are addressed in
 [LICENSE_FAQ.md](LICENSE_FAQ.md).
 
 The monetization model mentioned in the Smart License is explained
