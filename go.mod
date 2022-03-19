@@ -7,7 +7,6 @@ require (
 	contrib.go.opencensus.io/exporter/jaeger v0.1.0
 	contrib.go.opencensus.io/exporter/prometheus v0.1.0
 	github.com/Azure/azure-storage-blob-go v0.13.0
-	github.com/DATA-DOG/go-sqlmock v1.3.3 // indirect
 	github.com/DataDog/datadog-go v0.0.0-20190425163447-40bafcb5f6c1 // indirect
 	github.com/DataDog/opencensus-go-exporter-datadog v0.0.0-20190503082300-0f32ad59ab08
 	github.com/Masterminds/semver/v3 v3.1.0
@@ -24,7 +23,7 @@ require (
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/docker v1.13.1
 	github.com/dustin/go-humanize v1.0.0
-	github.com/fsnotify/fsnotify v1.4.9 // indirect
+	github.com/ethereum/go-ethereum v1.10.16
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/geo v0.0.0-20190916061304-5b978397cfec
@@ -36,9 +35,8 @@ require (
 	github.com/google/go-cmp v0.5.7
 	github.com/google/uuid v1.1.5
 	github.com/gorilla/websocket v1.4.2
-	github.com/graph-gophers/graphql-go v0.0.0-20201113091052-beb923fada29
+	github.com/graph-gophers/graphql-go v1.3.0
 	github.com/minio/minio-go/v6 v6.0.55
-	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/outcaste-io/badger/v3 v3.0.0-20220210203236-1b1148a36313
 	github.com/outcaste-io/dgo/v210 v210.0.0-20220225180226-43bd1b427e86
 	github.com/outcaste-io/gqlgen v0.13.3
@@ -49,7 +47,6 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/profile v1.2.1
 	github.com/prometheus/client_golang v1.0.0
-	github.com/prometheus/common v0.6.0 // indirect
 	github.com/sergi/go-diff v1.2.0
 	github.com/shirou/gopsutil/v3 v3.22.2
 	github.com/soheilhy/cmux v0.1.4
@@ -76,7 +73,6 @@ require (
 	google.golang.org/grpc v1.37.1
 	google.golang.org/grpc/examples v0.0.0-20210518002758-2713b77e8526 // indirect
 	gopkg.in/DataDog/dd-trace-go.v1 v1.13.1 // indirect
-	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/square/go-jose.v2 v2.3.1
 	gopkg.in/yaml.v2 v2.4.0
 	honnef.co/go/tools v0.2.0 // indirect

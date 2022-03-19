@@ -3,10 +3,13 @@
 package billing
 
 import (
+	"context"
+	"math/big"
 	"os"
 	"sync/atomic"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
@@ -27,8 +30,16 @@ func minOne(a float64) float64 {
 
 var microCpuHour int64
 
-const USDPerCpuHour = 0.03 // 3 cents per cpu-hour.
-const Minute = time.Minute // Using this indirection for debugging.
+const (
+	USDPerCpuHour = 0.03        // 3 cents per cpu-hour.
+	Minute        = time.Minute // Using this indirection for debugging.
+
+	gasLimit    = 100000 // A random number for now
+	ethEndpoint = "https://rinkeby.infura.io"
+)
+
+// Using random address for now.
+var outServAddress = common.HexToAddress("0x0481e1f15Fb6d0699e7F35Cb171370Ee6cD1995c")
 
 func CPUHours() float64 {
 	mch := atomic.LoadInt64(&microCpuHour)
@@ -74,10 +85,24 @@ func trackCPU(closer *z.Closer) {
 	}
 }
 
+func usdToWei(usd float64) *big.Int {
+	// TODO: How do we convert USD to ETH?
+	// For now, using the current conversion rate.
+	return big.NewInt(int64(339070746292280.0 * usd))
+}
+
 // Charge returns the amount charged for in dollars, and error if any.
 func Charge(cpuHours float64) error {
-	// TODO: Fill out this function to charge
 	usd := cpuHours * USDPerCpuHour
+
+	// TODO: What should be the gas limit and which chain we'll be using to transact?
+	payDetails := &payInfo{
+		wei:           usdToWei(usd),
+		gasLimit:      gasLimit,
+		destAddress:   outServAddress,
+		chainEndpoint: ethEndpoint,
+	}
+	wallet.Pay(context.Background(), payDetails)
 	glog.Infof("Charged $%.3f for %.3f CPU hours\n", usd, cpuHours)
 	return nil
 }
