@@ -33,37 +33,7 @@ var (
 	errMultipleAccounts = errors.New("Multiple eth account found")
 )
 
-// - On start we should create an account if it doesn't exist.
-// - Only the leader should create the account and propose it to the followers, otherwise each node
-// will end up having its own account.
-
-// Initialize keystore.
-// Create an account if it doesn't exist.
-func InitWallet(keyStoreDir, passphrase string) error {
-	ks := keystore.NewKeyStore(keyStoreDir, keystore.StandardScryptN, keystore.StandardScryptP)
-	accs := ks.Accounts()
-	if len(accs) > 1 {
-		// Should not reach here.
-		return errMultipleAccounts
-	}
-
-	wallet = &ethWallet{
-		ks:     ks,
-		secret: passphrase,
-	}
-
-	// Found an existing account.
-	if len(accs) == 1 {
-		wallet.account = accs[0]
-		return nil
-	}
-
-	// No account found, create one and set to wallet.
-	acc, err := ks.NewAccount(passphrase)
-	if err != nil {
-		return err
-	}
-	wallet.account = acc
+func InitWallet(keystore, password string) error {
 	return nil
 }
 

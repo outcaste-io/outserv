@@ -23,6 +23,7 @@ import (
 	"github.com/outcaste-io/outserv/outserv/cmd/decrypt"
 	"github.com/outcaste-io/outserv/outserv/cmd/migrate"
 	"github.com/outcaste-io/outserv/outserv/cmd/version"
+	"github.com/outcaste-io/outserv/outserv/cmd/wallet"
 	"github.com/outcaste-io/outserv/x"
 
 	"github.com/pkg/errors"
@@ -68,7 +69,7 @@ var subcommands = []*x.SubCommand{
 	// TODO: Consider if we need live loader.
 	&cert.Cert,
 	&alpha.Alpha, &version.Version, &debug.Debug, &migrate.Migrate,
-	&debuginfo.DebugInfo, &decrypt.Decrypt,
+	&debuginfo.DebugInfo, &decrypt.Decrypt, &wallet.Wallet,
 }
 
 func initCmds() {
