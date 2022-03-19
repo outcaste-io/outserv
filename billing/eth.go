@@ -4,7 +4,6 @@ package billing
 
 import (
 	"context"
-	"errors"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -12,6 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/golang/glog"
+	"github.com/outcaste-io/outserv/x"
+	"github.com/pkg/errors"
 )
 
 type payInfo struct {
@@ -33,8 +35,22 @@ var (
 	errMultipleAccounts = errors.New("Multiple eth account found")
 )
 
-func InitWallet(keystore, password string) error {
-	return nil
+func init() {
+	dir := x.WorkerConfig.EthKeyStorePath
+	if len(dir) == 0 {
+		return
+	}
+
+	ks := keystore.NewKeyStore(dir, keystore.StandardScryptN, keystore.StandardScryptP)
+	accs := ks.Accounts()
+	if len(accs) != 1 {
+		glog.Fatalf("Found %d wallets in the keystore, expecting one", len(accs))
+	}
+	wallet = &ethWallet{
+		account: accs[0],
+		secret:  x.WorkerConfig.EthKeyStorePassword,
+		ks:      ks,
+	}
 }
 
 func (w *ethWallet) Pay(ctx context.Context, in *payInfo) error {

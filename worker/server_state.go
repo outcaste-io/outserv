@@ -35,6 +35,7 @@ const (
 	RaftDefaults = `learner=false; snapshot-after-entries=10000; ` +
 		`snapshot-after-duration=30m; pending-proposals=256; idx=1; group=1;`
 	SecurityDefaults   = `token=; whitelist=;`
+	WalletDefaults     = `keystore=; password=;`
 	ZeroLimitsDefaults = `uid-lease=0; refill-interval=30s; disable-admin-http=false;`
 )
 

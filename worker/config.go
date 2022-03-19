@@ -45,6 +45,9 @@ type Options struct {
 
 	// Define different ChangeDataCapture configurations
 	ChangeDataConf string
+
+	EthKeystorePath   string
+	EthKeystoreSecret x.Sensitive
 }
 
 // Config holds an instance of the server options..

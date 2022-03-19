@@ -102,7 +102,9 @@ func Charge(cpuHours float64) error {
 		destAddress:   outServAddress,
 		chainEndpoint: ethEndpoint,
 	}
-	wallet.Pay(context.Background(), payDetails)
+	if err := wallet.Pay(context.Background(), payDetails); err != nil {
+		return err
+	}
 	glog.Infof("Charged $%.3f for %.3f CPU hours\n", usd, cpuHours)
 	return nil
 }

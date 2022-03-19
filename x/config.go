@@ -147,6 +147,11 @@ type WorkerOptions struct {
 	HardSync bool
 	// Audit contains the audit flags that enables the audit.
 	Audit bool
+
+	// Path to the ethereum key store.
+	EthKeyStorePath string
+	// Password used to encrypt the ethereum key store.
+	EthKeyStorePassword string
 }
 
 // WorkerConfig stores the global instance of the worker package's options.
