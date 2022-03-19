@@ -53,12 +53,11 @@ func createWallet(keyStoreDir, passphrase string) error {
 		return errors.New("Keystore already has an account")
 	}
 
-	_, err := ks.NewAccount(passphrase)
+	acc, err := ks.NewAccount(passphrase)
 	if err != nil {
 		return err
 	}
 
-	glog.Infof("Created an account with the following details:\n")
-	glog.Infof("")
+	glog.Infof("Created an account with address: %s\n", acc.Address.Hex())
 	return nil
 }
