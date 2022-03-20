@@ -17,6 +17,7 @@ import (
 )
 
 func Run(closer *z.Closer) {
+	initWallet()
 	go trackCPU(closer)
 }
 

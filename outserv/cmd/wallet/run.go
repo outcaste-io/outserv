@@ -10,6 +10,7 @@ import (
 	"github.com/outcaste-io/outserv/x"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
@@ -37,13 +38,22 @@ func init() {
 }
 
 func run(conf *viper.Viper) error {
-	pass := conf.GetString("password")
+	passPhrase := conf.GetString("password")
 	dir := conf.GetString("dir")
 
-	if len(pass) == 0 {
-		logger.Fatalf("Wallet secret cannot be empty")
+	if len(passPhrase) == 0 {
+		for {
+			pass := readPassword("Please enter passphrase of the wallet.")
+			passVerify := readPassword("Please re-enter passphrase of the wallet.")
+			if pass != passVerify {
+				glog.Info("Passphrase didn't match. Please retry...")
+				continue
+			}
+			passPhrase = pass
+			break
+		}
 	}
-	return createWallet(dir, pass)
+	return createWallet(dir, passPhrase)
 }
 
 func createWallet(keyStoreDir, passphrase string) error {
@@ -60,4 +70,13 @@ func createWallet(keyStoreDir, passphrase string) error {
 
 	glog.Infof("Created an account with address: %s\n", acc.Address.Hex())
 	return nil
+}
+
+func readPassword(prompt string) string {
+	glog.Info(prompt)
+	p, err := terminal.ReadPassword(int(os.Stdin.Fd()))
+	if err != nil {
+		glog.Fatalf("Failed to get passphrase for wallet, %v", err)
+	}
+	return string(p)
 }

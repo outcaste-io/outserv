@@ -272,7 +272,7 @@ func init() {
 			"The audit log max size in MB after which it will be rolled over.").
 		String())
 
-	flag.String("wallet", worker.WalletDefaults, z.NewSuperFlagHelp(worker.WalletDefaults).
+	flag.String("wallet", billing.WalletDefaults, z.NewSuperFlagHelp(billing.WalletDefaults).
 		Head("Wallet options").
 		Flag("keystore", "Path of the ethereum wallet keystore.").
 		Flag("password", "Password used to encrypt the keystore.").
@@ -771,7 +771,10 @@ func run() {
 	}
 
 	walletFlag := z.NewSuperFlag(Alpha.Conf.GetString("wallet")).MergeAndCheckDefault(
-		worker.WalletDefaults)
+		billing.WalletDefaults)
+
+	billing.EthKeyStorePath = walletFlag.GetPath("keystore")
+	billing.EthKeyStorePassword = walletFlag.GetString("password")
 
 	worker.SetConfiguration(&opts)
 
@@ -798,8 +801,6 @@ func run() {
 		HmacSecret:          opts.HmacSecret,
 		Audit:               opts.Audit != nil,
 		Badger:              bopts,
-		EthKeyStorePath:     walletFlag.GetPath("keystore"),
-		EthKeyStorePassword: walletFlag.GetString("password"),
 	}
 	x.WorkerConfig.Parse(Alpha.Conf)
 

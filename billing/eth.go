@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/golang/glog"
-	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
 
@@ -33,24 +32,31 @@ type ethWallet struct {
 var (
 	wallet              *ethWallet
 	errMultipleAccounts = errors.New("Multiple eth account found")
+
+	EthKeyStorePath     string
+	EthKeyStorePassword string
 )
 
-func init() {
-	dir := x.WorkerConfig.EthKeyStorePath
-	if len(dir) == 0 {
+const WalletDefaults = `keystore=; password=;`
+
+func initWallet() {
+	if len(EthKeyStorePath) == 0 {
+		glog.Infof("Cannot initialize wallet because no key store is provided.")
 		return
 	}
 
-	ks := keystore.NewKeyStore(dir, keystore.StandardScryptN, keystore.StandardScryptP)
+	ks := keystore.NewKeyStore(EthKeyStorePath, keystore.StandardScryptN, keystore.StandardScryptP)
 	accs := ks.Accounts()
+
 	if len(accs) != 1 {
 		glog.Fatalf("Found %d wallets in the keystore, expecting one", len(accs))
 	}
 	wallet = &ethWallet{
 		account: accs[0],
-		secret:  x.WorkerConfig.EthKeyStorePassword,
+		secret:  EthKeyStorePassword,
 		ks:      ks,
 	}
+	glog.Infof("Wallet is successfully initialized with keystore: %v", EthKeyStorePath)
 }
 
 func (w *ethWallet) Pay(ctx context.Context, in *payInfo) error {
@@ -60,16 +66,16 @@ func (w *ethWallet) Pay(ctx context.Context, in *payInfo) error {
 
 	client, err := ethclient.Dial(in.chainEndpoint)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Failed to establish connection.")
 	}
 	nonce, err := client.PendingNonceAt(ctx, w.account.Address)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Failed to get pending nonce.")
 	}
 
 	gasPrice, err := client.SuggestGasPrice(ctx)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Failed to get gas price")
 	}
 
 	var data []byte
@@ -77,11 +83,11 @@ func (w *ethWallet) Pay(ctx context.Context, in *payInfo) error {
 
 	chainID, err := client.NetworkID(ctx)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Failed to get chainID")
 	}
 	signedTx, err := w.ks.SignTxWithPassphrase(w.account, w.secret, tx, chainID)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Failed to sign the transaction.")
 	}
 	return client.SendTransaction(ctx, signedTx)
 }
