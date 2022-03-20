@@ -121,6 +121,11 @@ For example: "1985-04-12T23:20:50.52Z" represents 20 minutes and 50.52 seconds a
 """
 scalar DateTime
 
+"""
+File Upload
+"""
+scalar Upload
+
 input IntRange{
 	min: Int!
 	max: Int!
@@ -551,6 +556,7 @@ var inbuiltTypeToDgraph = map[string]string{
 	"String":       "string",
 	"DateTime":     "dateTime",
 	"Password":     "password",
+	"Upload":       "upload",
 	"Point":        "geo",
 	"Polygon":      "geo",
 	"MultiPolygon": "geo",

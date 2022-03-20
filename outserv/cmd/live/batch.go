@@ -181,7 +181,7 @@ func getTypeVal(val *api.Value) (types.Val, error) {
 	p := gql.TypeValFrom(val)
 	//Convert value to bytes
 
-	if p.Tid == types.GeoID || p.Tid == types.DateTimeID {
+	if p.Tid == types.GeoID || p.Tid == types.DateTimeID || p.Tid == types.UploadID {
 		// Already in bytes format
 		p.Value = p.Value.([]byte)
 		return p, nil
