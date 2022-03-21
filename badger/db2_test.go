@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"github.com/outcaste-io/badger/v3/options"
+	"github.com/pkg/errors"
 
 	"github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/badger/v3/table"
@@ -614,7 +615,7 @@ func TestL0GCBug(t *testing.T) {
 		if err == nil {
 			success++
 		}
-		if err != nil && err != ErrNoRewrite {
+		if err != nil && !errors.Is(err, ErrNoRewrite) {
 			t.Fatalf(err.Error())
 		}
 	}
@@ -787,7 +788,7 @@ func TestDropAllDropPrefix(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			err := db.DropPrefix([]byte("000"))
-			for err == ErrBlockedWrites {
+			for errors.Is(err, ErrBlockedWrites) {
 				err = db.DropPrefix([]byte("000"))
 				time.Sleep(time.Millisecond * 500)
 			}
@@ -796,7 +797,7 @@ func TestDropAllDropPrefix(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			err := db.DropPrefix([]byte("111"))
-			for err == ErrBlockedWrites {
+			for errors.Is(err, ErrBlockedWrites) {
 				err = db.DropPrefix([]byte("111"))
 				time.Sleep(time.Millisecond * 500)
 			}
@@ -806,7 +807,7 @@ func TestDropAllDropPrefix(t *testing.T) {
 			time.Sleep(time.Millisecond) // Let drop prefix run first.
 			defer wg.Done()
 			err := db.DropAll()
-			for err == ErrBlockedWrites {
+			for errors.Is(err, ErrBlockedWrites) {
 				err = db.DropAll()
 				time.Sleep(time.Millisecond * 300)
 			}

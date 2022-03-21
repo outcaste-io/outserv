@@ -33,6 +33,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
 	"github.com/outcaste-io/badger/v3/options"
@@ -476,7 +477,7 @@ func BenchmarkDbGrowth(b *testing.B) {
 				key := make([]byte, 8)
 				binary.BigEndian.PutUint64(key[:], uint64(i))
 				err := txn.Delete(key)
-				if err == ErrTxnTooBig {
+				if errors.Is(err, ErrTxnTooBig) {
 					require.NoError(b, txn.Commit())
 					txn = db.NewTransaction(true)
 				} else {
@@ -489,7 +490,7 @@ func BenchmarkDbGrowth(b *testing.B) {
 			key := make([]byte, 8)
 			binary.BigEndian.PutUint64(key[:], uint64(i))
 			err := txn.SetEntry(NewEntry(key, value))
-			if err == ErrTxnTooBig {
+			if errors.Is(err, ErrTxnTooBig) {
 				require.NoError(b, txn.Commit())
 				txn = db.NewTransaction(true)
 			} else {
@@ -500,7 +501,7 @@ func BenchmarkDbGrowth(b *testing.B) {
 		require.NoError(b, db.Flatten(1))
 		for {
 			err = db.RunValueLogGC(discardRatio)
-			if err == ErrNoRewrite {
+			if errors.Is(err, ErrNoRewrite) {
 				break
 			} else {
 				require.NoError(b, err)
@@ -1696,7 +1697,7 @@ func TestReadOnly(t *testing.T) {
 	opts.ReadOnly = true
 	_, err = Open(opts)
 	require.Error(t, err)
-	if err == ErrWindowsNotSupported {
+	if errors.Is(err, ErrWindowsNotSupported) {
 		require.NoError(t, db.Close())
 		return
 	}

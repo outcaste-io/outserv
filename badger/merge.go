@@ -107,7 +107,7 @@ func (op *MergeOperator) compact() error {
 	op.Lock()
 	defer op.Unlock()
 	val, version, err := op.iterateAndMerge()
-	if err == ErrKeyNotFound || err == errNoMerge {
+	if errors.Is(err, ErrKeyNotFound) || errors.Is(err, errNoMerge) {
 		return nil
 	} else if err != nil {
 		return err
@@ -168,7 +168,7 @@ func (op *MergeOperator) Get() ([]byte, error) {
 		existing, _, err = op.iterateAndMerge()
 		return err
 	})
-	if err == errNoMerge {
+	if errors.Is(err, errNoMerge) {
 		return existing, nil
 	}
 	return existing, err

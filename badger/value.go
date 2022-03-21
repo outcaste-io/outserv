@@ -142,7 +142,7 @@ func (r *safeRead) Entry(reader io.Reader) (*Entry, error) {
 	e.hlen = hlen
 	buf := make([]byte, h.klen+h.vlen)
 	if _, err := io.ReadFull(tee, buf[:]); err != nil {
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			err = errTruncate
 		}
 		return nil, err
@@ -156,7 +156,7 @@ func (r *safeRead) Entry(reader io.Reader) (*Entry, error) {
 	e.Value = buf[h.klen:]
 	var crcBuf [crc32.Size]byte
 	if _, err := io.ReadFull(reader, crcBuf[:]); err != nil {
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			err = errTruncate
 		}
 		return nil, err
@@ -326,7 +326,7 @@ func (vlog *valueLog) rewrite(f *logFile) error {
 			end = len(wb)
 		}
 		if err := vlog.db.batchSet(wb[i:end]); err != nil {
-			if err == ErrTxnTooBig {
+			if errors.Is(err, ErrTxnTooBig) {
 				// Decrease the batch size to half.
 				batchSize = batchSize / 2
 				continue
@@ -518,7 +518,7 @@ func (vlog *valueLog) createVlogFile() (*logFile, error) {
 		opt:      vlog.opt,
 	}
 	err := lf.open(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 2*vlog.opt.ValueLogFileSize)
-	if err != z.NewFile && err != nil {
+	if !errors.Is(err, z.NewFile) && err != nil {
 		return nil, err
 	}
 
@@ -537,7 +537,7 @@ func (vlog *valueLog) createVlogFile() (*logFile, error) {
 }
 
 func errFile(err error, path string, msg string) error {
-	return fmt.Errorf("%s. Path=%s. Error=%v", msg, path, err)
+	return fmt.Errorf("%s. Path=%s. Error=%w", msg, path, err)
 }
 
 // init initializes the value log struct. This initialization needs to happen
@@ -829,7 +829,9 @@ func (vlog *valueLog) write(reqs []*request) error {
 		endOffset := atomic.AddUint32(&vlog.writableLogOffset, n)
 		// Increase the file size if we cannot accommodate this entry.
 		if int(endOffset) >= len(curlf.Data) {
-			curlf.Truncate(int64(endOffset))
+			if err := curlf.Truncate(int64(endOffset)); err != nil {
+				return y.Wrapf(err, "error increasing file size")
+			}
 		}
 
 		start := int(endOffset - n)

@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/outcaste-io/badger/v3/pb"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -173,7 +174,7 @@ func TestBackupRestore2(t *testing.T) {
 			k := append(key1, i)
 			item, err := tx.Get(k)
 			if err != nil {
-				if err == ErrKeyNotFound {
+				if errors.Is(err, ErrKeyNotFound) {
 					return fmt.Errorf("Key %q has been not found, but was set\n", k)
 				}
 				return err
@@ -223,7 +224,7 @@ func TestBackupRestore2(t *testing.T) {
 			k := append(key1, i)
 			item, err := tx.Get(k)
 			if err != nil {
-				if err == ErrKeyNotFound {
+				if errors.Is(err, ErrKeyNotFound) {
 					return fmt.Errorf("Key %q has been not found, but was set\n", k)
 				}
 				return err
@@ -293,7 +294,7 @@ func TestBackup(t *testing.T) {
 					return err
 				}
 				if idx > N || !bytes.Equal(entries[idx].Key, item.Key()) {
-					return fmt.Errorf("%s: %s", string(item.Key()), ErrKeyNotFound)
+					return fmt.Errorf("%s: %w", string(item.Key()), ErrKeyNotFound)
 				}
 				count++
 			}
@@ -373,7 +374,7 @@ func TestBackupRestore3(t *testing.T) {
 				return err
 			}
 			if idx > N || !bytes.Equal(entries[idx].Key, item.Key()) {
-				return fmt.Errorf("%s: %s", string(item.Key()), ErrKeyNotFound)
+				return fmt.Errorf("%s: %w", string(item.Key()), ErrKeyNotFound)
 			}
 			count++
 		}

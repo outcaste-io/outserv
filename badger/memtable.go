@@ -128,7 +128,7 @@ func (db *DB) openMemTable(fid, flags int) (*memTable, error) {
 		opt:      db.opt,
 	}
 	lerr := mt.wal.open(filepath, flags, 2*db.opt.MemTableSize)
-	if lerr != z.NewFile && lerr != nil {
+	if !errors.Is(lerr, z.NewFile) && lerr != nil {
 		return nil, y.Wrapf(lerr, "While opening memtable: %s", filepath)
 	}
 
@@ -140,7 +140,7 @@ func (db *DB) openMemTable(fid, flags int) (*memTable, error) {
 		}
 	}
 
-	if lerr == z.NewFile {
+	if errors.Is(lerr, z.NewFile) {
 		return mt, lerr
 	}
 	err := mt.UpdateSkipList()
@@ -151,7 +151,7 @@ var errExpectingNewFile = errors.New("Expecting to create a new file, but found 
 
 func (db *DB) newMemTable() (*memTable, error) {
 	mt, err := db.openMemTable(db.nextMemFid, os.O_CREATE|os.O_RDWR)
-	if err == z.NewFile {
+	if errors.Is(err, z.NewFile) {
 		db.nextMemFid++
 		return mt, nil
 	}
@@ -476,9 +476,9 @@ loop:
 		// We have not reached the end of the file but the entry we read is
 		// zero. This happens because we have truncated the file and
 		// zero'ed it out.
-		case err == io.EOF:
+		case errors.Is(err, io.EOF):
 			break loop
-		case err == io.ErrUnexpectedEOF || err == errTruncate:
+		case errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, errTruncate):
 			break loop
 		case err != nil:
 			return 0, err
@@ -519,7 +519,7 @@ loop:
 			for i, e := range entries {
 				vp := vptrs[i]
 				if err := fn(*e, vp); err != nil {
-					if err == errStop {
+					if errors.Is(err, errStop) {
 						break
 					}
 					return 0, errFile(err, lf.path, "Iteration function")
@@ -537,7 +537,7 @@ loop:
 			validEndOffset = read.recordOffset
 
 			if err := fn(*e, vp); err != nil {
-				if err == errStop {
+				if errors.Is(err, errStop) {
 					break
 				}
 				return 0, errFile(err, lf.path, "Iteration function")
@@ -556,7 +556,7 @@ func (lf *logFile) open(path string, flags int, fsize int64) error {
 	mf, ferr := z.OpenMmapFile(path, flags, int(fsize))
 	lf.MmapFile = mf
 
-	if ferr == z.NewFile {
+	if errors.Is(ferr, z.NewFile) {
 		if err := lf.bootstrap(); err != nil {
 			os.Remove(path)
 			return err

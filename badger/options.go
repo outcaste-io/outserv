@@ -349,8 +349,8 @@ func (opt Options) FromSuperFlag(superflag string) Options {
 	inputFlag := z.NewSuperFlag(superflag)
 	if inputFlag.Has("compression") {
 		ctype, clevel, err := parseCompression(flags.GetString("compression"))
-		switch err {
-		case nil:
+		switch {
+		case err == nil:
 			opt.Compression = ctype
 			opt.ZSTDCompressionLevel = clevel
 		default:

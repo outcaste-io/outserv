@@ -143,7 +143,7 @@ func (wb *WriteBatch) SetEntryAt(e *Entry, ts uint64) error {
 
 // Should be called with lock acquired.
 func (wb *WriteBatch) handleEntry(e *Entry) error {
-	if err := wb.txn.SetEntry(e); err != ErrTxnTooBig {
+	if err := wb.txn.SetEntry(e); !errors.Is(err, ErrTxnTooBig) {
 		return err
 	}
 	// Txn has reached it's zenith. Commit now.
@@ -183,7 +183,7 @@ func (wb *WriteBatch) Delete(k []byte) error {
 	wb.Lock()
 	defer wb.Unlock()
 
-	if err := wb.txn.Delete(k); err != ErrTxnTooBig {
+	if err := wb.txn.Delete(k); !errors.Is(err, ErrTxnTooBig) {
 		return err
 	}
 	if err := wb.commit(); err != nil {

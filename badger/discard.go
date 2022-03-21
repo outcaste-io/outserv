@@ -25,6 +25,7 @@ import (
 
 	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/ristretto/z"
+	"github.com/pkg/errors"
 )
 
 // discardStats keeps track of the amount of data that could be discarded for
@@ -48,7 +49,7 @@ func InitDiscardStats(opt Options) (*discardStats, error) {
 		MmapFile: mf,
 		opt:      opt,
 	}
-	if err == z.NewFile {
+	if errors.Is(err, z.NewFile) {
 		// We don't need to zero out the entire 1GB.
 		lf.zeroOut()
 

@@ -24,6 +24,7 @@ import (
 
 	"github.com/outcaste-io/badger/v3/fb"
 	"github.com/outcaste-io/badger/v3/y"
+	"github.com/pkg/errors"
 )
 
 type blockIterator struct {
@@ -292,7 +293,7 @@ func (itr *Iterator) seekFrom(key []byte, whence int) {
 	//    element of block[idx].
 	// 2) Some element in block[idx-1] is >= key. We should go to that element.
 	itr.seekHelper(idx-1, key)
-	if itr.err == io.EOF {
+	if errors.Is(itr.err, io.EOF) {
 		// Case 1. Need to visit block[idx].
 		if idx == itr.t.offsetsLength() {
 			// If idx == len(itr.t.blockIndex), then input key is greater than ANY element of table.

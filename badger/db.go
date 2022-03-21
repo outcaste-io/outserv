@@ -31,6 +31,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	humanize "github.com/dustin/go-humanize"
 	"github.com/outcaste-io/badger/v3/options"
 	"github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/badger/v3/skl"
@@ -38,7 +39,6 @@ import (
 	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/ristretto"
 	"github.com/outcaste-io/ristretto/z"
-	humanize "github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
 )
 
@@ -607,11 +607,11 @@ func (db *DB) close() (err error) {
 	// We don't need to care about cstatus since no parallel compaction is running.
 	if db.opt.CompactL0OnClose {
 		err := db.lc.doCompact(173, compactionPriority{level: 0, score: 1.73})
-		switch err {
-		case errFillTables:
+		switch {
+		case errors.Is(err, errFillTables):
 			// This error only means that there might be enough tables to do a compaction. So, we
 			// should not report it to the end user to avoid confusing them.
-		case nil:
+		case err == nil:
 			db.opt.Debugf("Force compaction on level 0 done")
 		default:
 			db.opt.Warningf("While forcing compaction on level 0: %v", err)
@@ -829,7 +829,7 @@ func (db *DB) writeRequests(reqs []*request) error {
 		count += len(b.Entries)
 		var i uint64
 		var err error
-		for err = db.ensureRoomForWrite(); err == errNoRoom; err = db.ensureRoomForWrite() {
+		for err = db.ensureRoomForWrite(); errors.Is(err, errNoRoom); err = db.ensureRoomForWrite() {
 			i++
 			if i%100 == 0 {
 				db.opt.Debugf("Making room for writes")
@@ -1433,7 +1433,7 @@ func (seq *Sequence) updateLease() error {
 	return seq.db.Update(func(txn *Txn) error {
 		item, err := txn.Get(seq.key)
 		switch {
-		case err == ErrKeyNotFound:
+		case errors.Is(err, ErrKeyNotFound):
 			seq.next = 0
 		case err != nil:
 			return err
@@ -1887,7 +1887,9 @@ func (db *DB) DropPrefixNonBlocking(prefixes ...[]byte) error {
 	db.opt.Infof("Non-blocking DropPrefix called for %s", prefixes)
 
 	cbuf := z.NewBuffer(int(db.opt.MemTableSize), "DropPrefixNonBlocking")
-	defer cbuf.Release()
+	defer func() {
+		_ = cbuf.Release()
+	}()
 
 	var wg sync.WaitGroup
 	handover := func(force bool) error {
@@ -2137,7 +2139,10 @@ func (db *DB) Subscribe(ctx context.Context, cb func(kv *KVList) error, matches 
 	}
 
 	c := z.NewCloser(1)
-	s := db.pub.newSubscriber(c, matches)
+	s, err := db.pub.newSubscriber(c, matches)
+	if err != nil {
+		return y.Wrapf(err, "error adding subscriber")
+	}
 	slurp := func(batch *pb.KVList) error {
 		for {
 			select {

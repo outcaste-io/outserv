@@ -225,13 +225,13 @@ func getSampleKeys(db *badger.DB, sampleSize int) ([][]byte, error) {
 			}
 			return nil
 		})
-		if err == errStop || err == nil {
+		if errors.Is(err, errStop) || err == nil {
 			return nil
 		}
 		return err
 	}
 
-	if err := stream.Orchestrate(ctx); err != nil && err != context.Canceled {
+	if err := stream.Orchestrate(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		return nil, err
 	}
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -90,7 +91,7 @@ func (s *testSuite) read(db *badger.DB) error {
 		s.Unlock()
 		return nil
 	})
-	if err == badger.ErrKeyNotFound {
+	if errors.Is(err, badger.ErrKeyNotFound) {
 		return nil
 	}
 	return err

@@ -105,7 +105,7 @@ func stream(cmd *cobra.Command, args []string) error {
 			defer f.Close()
 
 			_, err = f.Readdirnames(1)
-			if err != io.EOF {
+			if !errors.Is(err, io.EOF) {
 				return errors.Errorf(
 					"cannot run stream tool on non-empty output directory %s", so.outDir)
 			}
@@ -126,6 +126,9 @@ func stream(cmd *cobra.Command, args []string) error {
 		f, err := os.OpenFile(so.outFile, os.O_RDWR|os.O_CREATE, 0666)
 		y.Check(err)
 		_, err = stream.Backup(f, 0)
+		if err != nil {
+			return y.Wrapf(err, "cannot backup DB at %s", so.outFile)
+		}
 	}
 	fmt.Println("Done.")
 	return err
