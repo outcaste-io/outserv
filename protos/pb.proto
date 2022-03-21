@@ -279,6 +279,7 @@ message Posting {
     VALUE = 1;       // simple, plain value
   }
   PostingType posting_type = 4;
+  repeated int64 indices = 5 [packed=true];
 
   // TODO: op is only used temporarily. See if we can remove it from here.
   uint32 op = 12;
@@ -294,6 +295,8 @@ message PostingList {
   repeated uint64 splits = 4;
 
   bytes bitmap = 5;  // Roaring Bitmap encoded uint64s.
+
+  int64 list_size = 6;
 }
 
 message Function {

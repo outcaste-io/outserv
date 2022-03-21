@@ -531,10 +531,26 @@ func retrieveValuesAndFacets(args funcArgs, pl *posting.List,
 	var vals []types.Val
 
 	err := facetsFilterValuePostingList(args, pl, listType, func(p *pb.Posting) {
-		vals = append(vals, types.Val{
-			Tid:   types.TypeID(p.ValType),
-			Value: p.Value,
-		})
+		if listType {
+			for _, index := range p.Indices {
+				nval := types.Val{
+					Tid:   types.TypeID(p.ValType),
+					Value: p.Value,
+				}
+
+				if len(vals) > int(index) {
+					vals = append(vals[:index+1], vals[index:]...)
+					vals[index] = nval
+				} else {
+					vals = append(vals, nval)
+				}
+			}
+		} else {
+			vals = append(vals, types.Val{
+				Tid:   types.TypeID(p.ValType),
+				Value: p.Value,
+			})
+		}
 	})
 	if err != nil {
 		return nil, err

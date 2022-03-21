@@ -404,11 +404,21 @@ func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.DirectedEdge) uint64 {
 func (l *List) addMutationInternal(ctx context.Context, txn *Txn, t *pb.DirectedEdge) error {
 	l.AssertLock()
 
-	mpost := NewPosting(t)
-	mpost.StartTs = txn.StartTs
-	if mpost.PostingType != pb.Posting_REF {
-		t.ValueId = fingerprintEdge(t)
-		mpost.Uid = t.ValueId
+	var mpost *pb.Posting
+
+	if schema.State().IsList(t.Attr) {
+		// does this already exist? if yes, add index instead of creating a new posting
+		if found, currPost, _ := l.findPosting(txn.StartTs, fingerprintEdge(t)); found {
+			mpost = currPost
+		} else {
+			mpost = NewPosting(t)
+			mpost.StartTs = txn.StartTs
+		}
+		mpost.Indices = append(mpost.Indices, l.plist.ListSize)
+		l.plist.ListSize++
+	} else {
+		mpost = NewPosting(t)
+		mpost.StartTs = txn.StartTs
 	}
 
 	// Check whether this mutation is an update for a predicate of type uid.
