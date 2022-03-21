@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -304,6 +305,8 @@ func (xidMetadata *xidMetadata) isDuplicateXid(atTopLevel bool, xidVar string,
 func (arw *AddRewriter) RewriteQueries(
 	ctx context.Context,
 	m *schema.Field) ([]*gql.GraphQuery, []string, error) {
+
+	glog.Infof("AddRewriter: called this one")
 
 	arw.VarGen = NewVariableGenerator()
 	arw.XidMetadata = NewXidMetadata()
@@ -1414,7 +1417,7 @@ func rewriteObject(
 		for _, xid := range xids {
 			var xidString string
 			if xidVal, ok := obj[xid.Name()]; ok && xidVal != nil {
-				xidString, _ = extractVal(xidVal, xid.Name(), xid.Type().Name())
+				xidString, _ = extractVal(xidVal, xid)
 				variable = varGen.Next(typ, xid.Name(), xidString, false)
 				existenceError := x.GqlErrorf("multiple nodes found for given xid values," +
 					" updation not possible")
@@ -1838,7 +1841,7 @@ func existenceQueries(
 	if len(xids) != 0 {
 		for _, xid := range xids {
 			if xidVal, ok := obj[xid.Name()]; ok && xidVal != nil {
-				xidString, err = extractVal(xidVal, xid.Name(), xid.Type().Name())
+				xidString, err = extractVal(xidVal, xid)
 				if err != nil {
 					return nil, nil, append(retErrors, err)
 				}
@@ -2415,52 +2418,52 @@ func copyTypeMap(from, to map[string]*schema.Type) {
 	}
 }
 
-func extractVal(xidVal interface{}, xidName, typeName string) (string, error) {
-	switch typeName {
-	case "Int":
-		switch xVal := xidVal.(type) {
-		case json.Number:
-			val, err := xVal.Int64()
-			if err != nil {
-				return "", err
-			}
-			return strconv.FormatInt(val, 10), nil
-		case int64:
-			return strconv.FormatInt(xVal, 10), nil
-		default:
-			return "", fmt.Errorf("encountered an XID %s with %s that isn't "+
-				"a Int but data type in schema is Int", xidName, typeName)
-		}
-	case "Int64":
-		switch xVal := xidVal.(type) {
-		case json.Number:
-			val, err := xVal.Int64()
-			if err != nil {
-				return "", err
-			}
-			return strconv.FormatInt(val, 10), nil
-		case int64:
-			return strconv.FormatInt(xVal, 10), nil
-		// If the xid field is of type Int64, both String and Int forms are allowed.
-		case string:
-			return xVal, nil
-		default:
-			return "", fmt.Errorf("encountered an XID %s with %s that isn't "+
-				"a Int64 but data type in schema is Int64", xidName, typeName)
-		}
-		// "ID" is given as input for the @extended type mutation.
-	case "String", "ID":
-		xidString, ok := xidVal.(string)
-		if !ok {
-			return "", fmt.Errorf("encountered an XID %s with %s that isn't "+
-				"a String", xidName, typeName)
-		}
-		return xidString, nil
-	default:
-		return "", fmt.Errorf("encountered an XID %s with %s that isn't"+
-			"allowed as Xid", xidName, typeName)
-	}
-}
+// func extractVal(xidVal interface{}, xidName, typeName string) (string, error) {
+// 	switch typeName {
+// 	case "Int":
+// 		switch xVal := xidVal.(type) {
+// 		case json.Number:
+// 			val, err := xVal.Int64()
+// 			if err != nil {
+// 				return "", err
+// 			}
+// 			return strconv.FormatInt(val, 10), nil
+// 		case int64:
+// 			return strconv.FormatInt(xVal, 10), nil
+// 		default:
+// 			return "", fmt.Errorf("encountered an XID %s with %s that isn't "+
+// 				"a Int but data type in schema is Int", xidName, typeName)
+// 		}
+// 	case "Int64":
+// 		switch xVal := xidVal.(type) {
+// 		case json.Number:
+// 			val, err := xVal.Int64()
+// 			if err != nil {
+// 				return "", err
+// 			}
+// 			return strconv.FormatInt(val, 10), nil
+// 		case int64:
+// 			return strconv.FormatInt(xVal, 10), nil
+// 		// If the xid field is of type Int64, both String and Int forms are allowed.
+// 		case string:
+// 			return xVal, nil
+// 		default:
+// 			return "", fmt.Errorf("encountered an XID %s with %s that isn't "+
+// 				"a Int64 but data type in schema is Int64", xidName, typeName)
+// 		}
+// 		// "ID" is given as input for the @extended type mutation.
+// 	case "String", "ID":
+// 		xidString, ok := xidVal.(string)
+// 		if !ok {
+// 			return "", fmt.Errorf("encountered an XID %s with %s that isn't "+
+// 				"a String", xidName, typeName)
+// 		}
+// 		return xidString, nil
+// 	default:
+// 		return "", fmt.Errorf("encountered an XID %s with %s that isn't"+
+// 			"allowed as Xid", xidName, typeName)
+// 	}
+// }
 
 // This function will return interface type and variable for existence query on interface,
 // if given xid is inherited from interface, otherwise it will return nil and empty string
@@ -2482,7 +2485,7 @@ func gotMultipleExistingNodes(xids []*schema.FieldDefinition, obj map[string]int
 	var existenceNodeUid string
 	for _, xid := range xids {
 		if xidVal, ok := obj[xid.Name()]; ok && xidVal != nil {
-			xidString, _ := extractVal(xidVal, xid.Name(), xid.Type().Name())
+			xidString, _ := extractVal(xidVal, xid)
 			variable := varGen.Next(typ, xid.Name(), xidString, false)
 			if uid, ok := idExistence[variable]; ok {
 				if existenceNodeUid == "" {

@@ -833,6 +833,8 @@ func newGraph(ctx context.Context, gq *gql.GraphQuery) (*SubGraph, error) {
 		}
 		sg.Filters = append(sg.Filters, sgf)
 	}
+
+	// TODO: Remove this.
 	if gq.FacetsFilter != nil {
 		facetsFilter, err := toFacetsFilter(gq.FacetsFilter)
 		if err != nil {
@@ -2725,6 +2727,69 @@ func (req *Request) ProcessQuery(ctx context.Context) (err error) {
 		req.Subgraphs = append(req.Subgraphs, shortestSg...)
 	}
 	return nil
+}
+
+func UidsForXid(ctx context.Context, pred, value string) *sroar.Bitmap {
+	glog.Infof("UidsForXid pred: %s value: %s\n", pred, value)
+	x.AssertTrue(len(pred) > 0)
+	x.AssertTrue(len(value) > 0)
+
+	queryStr := fmt.Sprintf(`{q(func: eq(%s, %s)) { uid }}`, pred, value)
+	glog.Infof("Query: %s\n", queryStr)
+	res, err := gql.Parse(gql.Request{Str: queryStr})
+	x.Check(err)
+
+	x.AssertTrue(len(res.Query) == 1)
+	qr := res.Query[0]
+	qr.DebugPrint("UidsForXid")
+
+	// glog.Infof("after parsing: %+v\n", res.Query[0])
+
+	// query := &gql.GraphQuery{
+	// 	Attr: pred,
+	// 	Func: &gql.Function{
+	// 		Name: "eq",
+	// 		Args: []gql.Arg{
+	// 			{Value: pred},
+	// 			// TODO: Deal with quoting values.
+	// 			{Value: value},
+	// 		},
+	// 	},
+	// }
+	// glog.Infof("GQL: %+v\n", query)
+	ctx = x.AttachNamespace(ctx, 0)
+	sg, err := ToSubGraph(ctx, res.Query[0])
+	x.Check(err)
+
+	// sg := &SubGraph{
+	// 	Attr:   pred,
+	// 	ReadTs: posting.ReadTimestamp(),
+	// 	SrcFunc: &Function{
+	// 		Name: "eq",
+	// 		Args: []gql.Arg{
+	// 			{Value: pred},
+	// 			{Value: value},
+	// 		},
+	// 	},
+	// }
+	errCh := make(chan error, 1)
+	ProcessGraph(ctx, sg, nil, errCh)
+	err = <-errCh
+	glog.Infof("Processed SubGraph with error: %+v\n", err)
+
+	for i, ch := range sg.Children {
+		bm := ch.DestMap
+		arr := bm.ToArray()
+		glog.Infof("Got Result for child: %d: %+v\n", i, arr)
+	}
+
+	bm := sg.DestMap
+	// TODO: Remove this later.
+	arr := bm.ToArray()
+	glog.Infof("Got Result: %+v\n", arr)
+
+	return bm
+
 }
 
 // ExecutionResult holds the result of running a query.

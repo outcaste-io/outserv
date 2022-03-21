@@ -7,18 +7,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"sort"
 	"strconv"
 
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
-	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/pkg/errors"
-	otrace "go.opencensus.io/trace"
 )
 
 const touchedUidsKey = "_total"
@@ -166,27 +162,27 @@ type dgraphResolver struct {
 	executor         DgraphExecutor
 }
 
-func (mr *dgraphResolver) Resolve(ctx context.Context, m *schema.Field) (*Resolved, bool) {
-	span := otrace.FromContext(ctx)
-	stop := x.SpanTimer(span, "resolveMutation")
-	defer stop()
-	if span != nil {
-		span.Annotatef(nil, "mutation alias: [%s] type: [%s]", m.Alias(), m.MutationType())
-	}
+// func (mr *dgraphResolver) Resolve(ctx context.Context, m *schema.Field) (*Resolved, bool) {
+// 	span := otrace.FromContext(ctx)
+// 	stop := x.SpanTimer(span, "resolveMutation")
+// 	defer stop()
+// 	if span != nil {
+// 		span.Annotatef(nil, "mutation alias: [%s] type: [%s]", m.Alias(), m.MutationType())
+// 	}
 
-	resolverTrace := &schema.ResolverTrace{
-		Path:       []interface{}{m.ResponseName()},
-		ParentType: "Mutation",
-		FieldName:  m.ResponseName(),
-		ReturnType: m.Type().String(),
-	}
-	timer := newtimer(ctx, &resolverTrace.OffsetDuration)
-	timer.Start()
-	defer timer.Stop()
+// 	resolverTrace := &schema.ResolverTrace{
+// 		Path:       []interface{}{m.ResponseName()},
+// 		ParentType: "Mutation",
+// 		FieldName:  m.ResponseName(),
+// 		ReturnType: m.Type().String(),
+// 	}
+// 	timer := newtimer(ctx, &resolverTrace.OffsetDuration)
+// 	timer.Start()
+// 	defer timer.Stop()
 
-	resolved, success := mr.rewriteAndExecute(ctx, m)
-	return resolved, success
-}
+// 	resolved, success := mr.rewriteAndExecute(ctx, m)
+// 	return resolved, success
+// }
 
 func getNumUids(m *schema.Field, a map[string]string, r map[string]interface{}) int {
 	switch m.MutationType() {
@@ -198,6 +194,7 @@ func getNumUids(m *schema.Field, a map[string]string, r map[string]interface{}) 
 	}
 }
 
+/*
 func (mr *dgraphResolver) rewriteAndExecute(
 	ctx context.Context,
 	mutation *schema.Field) (*Resolved, bool) {
@@ -486,6 +483,7 @@ func (mr *dgraphResolver) rewriteAndExecute(
 		Extensions: ext,
 	}, resolverSucceeded
 }
+*/
 
 // completeMutationResult takes in the result returned for the query field of mutation and builds
 // the JSON required for data field in GraphQL response.

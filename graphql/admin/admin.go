@@ -196,6 +196,8 @@ func NewServers(withIntrospection bool, globalEpoch map[uint64]*uint64,
 	mainServer := NewServer()
 	mainServer.Set(x.GalaxyNamespace, e, resolvers)
 
+	// TODO: We should just have one MutationRewriter. Not 3 different
+	// rewriters.
 	fns := &resolve.ResolverFns{
 		Qrw: resolve.NewQueryRewriter(),
 		Arw: resolve.NewAddRewriter,
