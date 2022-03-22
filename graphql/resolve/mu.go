@@ -12,9 +12,7 @@ import (
 	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/protos/pb"
-	"github.com/outcaste-io/outserv/query"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/outcaste-io/sroar"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
 )
@@ -98,7 +96,7 @@ func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		// we can find the right ID for this object.
 
 		// var queries []*gql.GraphQuery
-		var bms []*sroar.Bitmap
+		var uids []string
 		for _, xid := range xids {
 			xidVal := obj[xid.Name()]
 			if xidVal == nil {
@@ -110,8 +108,13 @@ func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			}
 
 			glog.Infof("Converted xid value to string: %q -> %q   %q %q\n", xid.Name(), xidString, xid.DgraphPredicate(), xid.DgraphAlias())
-			bm := query.UidsForXid(context.TODO(), xid.DgraphAlias(), xidString)
-			bms = append(bms, bm)
+			uids, err = UidsForXid(ctx, xid.DgraphAlias(), xidString)
+			if err != nil {
+				glog.Errorf("While executing UidsForXid: %v. Ignoring...\n", err)
+				uids = []string{}
+			}
+			glog.Infof("Got uids: %+v\n", uids)
+			// bms = append(bms, bm)
 
 			// query := &gql.GraphQuery{
 			// 	Attr: "result1",
@@ -124,14 +127,14 @@ func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			// 	},
 			// }
 		}
-		bm := sroar.FastAnd(bms...)
-		uids := bm.ToArray()
 		if len(uids) > 1 {
 			return nil, fmt.Errorf("Found %d UIDs for %s", len(uids), xids)
 		}
 		if len(uids) == 1 {
 			obj["uid"] = uids[0]
 			glog.Infof("Rewrote to %+v\n", obj)
+		} else {
+			obj["uid"] = "_:test"
 		}
 
 		for i, f := range fields {
@@ -142,8 +145,7 @@ func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			}
 		}
 		// No uids found. Add.
-		obj["uid"] = "_:test"
-		glog.Infof("Adding object: %+v\n", obj)
+		glog.Infof("Setting object: %+v\n", obj)
 
 		data, err := json.Marshal(obj)
 		x.Check(err)
@@ -154,11 +156,52 @@ func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		if err != nil {
 			return nil, err
 		}
-		uid := resp.Uids["test"]
+		var uid string
+		if len(uids) == 1 {
+			uid = uids[0]
+		} else {
+			uid = resp.Uids["test"]
+		}
 		glog.Infof("Got UID: %s\n", uid)
 		resultUids = append(resultUids, uid)
 	}
 	return convertIDsWithErr(resultUids)
+}
+
+func UidsForXid(ctx context.Context, pred, value string) ([]string, error) {
+	q := fmt.Sprintf(`{q(func: eq(%s, %q)) { uid }}`, pred, value)
+	glog.Infof("Query: %s\n", q)
+
+	resp, err := edgraph.Query(ctx, &pb.Request{Query: q})
+	// resp, err := (&DgraphEx{}).Execute(ctx, &pb.Request{Query: q}, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	glog.Infof("Got response: %s\n", resp.Json)
+
+	m := make(map[string]json.RawMessage)
+	if err := json.Unmarshal(resp.Json, &m); err != nil {
+		return nil, errors.Wrapf(err, "while unmarshal")
+	}
+	val := m["q"]
+	if val == nil || len(val) == 0 {
+		return nil, nil
+	}
+
+	type U struct {
+		Uid string `json:"uid"`
+	}
+	var uids []U
+	if err := json.Unmarshal(val, &uids); err != nil {
+		return nil, errors.Wrapf(err, "while unmarshal of uids")
+	}
+	var res []string
+	for _, u := range uids {
+		res = append(res, u.Uid)
+	}
+	glog.Infof("Parsed uids: %+v\n", res)
+	return res, nil
 }
 
 func (mr *dgraphResolver) rewriteAndExecute(
