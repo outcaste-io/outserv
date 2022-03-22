@@ -427,12 +427,12 @@ func ValidateAndConvert(edge *pb.DirectedEdge, su *pb.SchemaUpdate) error {
 		return nil
 
 	case !schemaType.IsScalar() && storageType.IsScalar():
-		return errors.Errorf("Input for predicate %q of type uid is scalar. Edge: %v",
-			x.ParseAttr(edge.Attr), edge)
+		return errors.Errorf("Schema type: %q and Storage type: %q don't match for pred: %q edge: %v",
+			schemaType.Name(), storageType.Name(), x.ParseAttr(edge.Attr), edge)
 
 	case schemaType.IsScalar() && !storageType.IsScalar():
-		return errors.Errorf("Input for predicate %q of type scalar is uid. Edge: %v",
-			x.ParseAttr(edge.Attr), edge)
+		return errors.Errorf("Schema type: %q and Storage type: %q don't match for pred: %q edge: %v",
+			schemaType.Name(), storageType.Name(), x.ParseAttr(edge.Attr), edge)
 
 	// The suggested storage type matches the schema, OK!
 	case storageType == schemaType && schemaType != types.DefaultID:
