@@ -24,15 +24,15 @@ type ResetPasswordInput struct {
 	Namespace uint64
 }
 
-func (s *Server) CreateNamespace(ctx context.Context, passwd string) (uint64, error) {
+func CreateNamespace(ctx context.Context, passwd string) (uint64, error) {
 	return 0, nil
 }
 
-func (s *Server) DeleteNamespace(ctx context.Context, namespace uint64) error {
+func DeleteNamespace(ctx context.Context, namespace uint64) error {
 	return nil
 }
 
-func (s *Server) ResetPassword(ctx context.Context, ns *ResetPasswordInput) error {
+func ResetPassword(ctx context.Context, ns *ResetPasswordInput) error {
 	return nil
 }
 

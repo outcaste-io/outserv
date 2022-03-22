@@ -100,7 +100,7 @@ func (dg *DgraphEx) Execute(ctx context.Context, req *pb.Request,
 	}
 
 	ctx = context.WithValue(ctx, edgraph.IsGraphql, true)
-	resp, err := (&edgraph.Server{}).QueryGraphQL(ctx, req, field)
+	resp, err := edgraph.QueryGraphQL(ctx, req, field)
 	if !x.IsGqlErrorList(err) {
 		err = schema.GQLWrapf(err, "Dgraph execution failed")
 	}

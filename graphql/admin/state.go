@@ -34,7 +34,7 @@ type clusterGroup struct {
 }
 
 func resolveState(ctx context.Context, q *schema.Field) *resolve.Resolved {
-	resp, err := (&edgraph.Server{}).State(ctx)
+	resp, err := edgraph.State(ctx)
 	if err != nil {
 		return resolve.EmptyResult(q, errors.Errorf("%s: %s", x.Error, err.Error()))
 	}

@@ -7,7 +7,11 @@ import (
 	"strconv"
 
 	"github.com/golang/glog"
+	"github.com/outcaste-io/outserv/edgraph"
+	"github.com/outcaste-io/outserv/gql"
+	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/query"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/sroar"
@@ -59,19 +63,21 @@ func extractVal(xidVal interface{}, xid *schema.FieldDefinition) (string, error)
 	}
 }
 
-func rewriteQueries(ctx context.Context, m *schema.Field) error {
+func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	glog.Infof("mutatedType: %s\n", m.MutatedType())
 
 	// Parsing input
 	val, _ := m.ArgValue(schema.InputArgName).([]interface{})
 
+	// Just consider the first one for now.
+	var resultUids []string
 	for _, i := range val {
 		obj := i.(map[string]interface{})
 		typ := m.MutatedType()
 		glog.Infof("mutatedType: %+v obj: %+v\n", typ, obj)
 		fields := typ.Fields()
 		for i, f := range fields {
-			glog.Infof("field %d: %s %+v", i, f.Name(), f)
+			glog.Infof("field %d: %q %+v", i, f.Name(), f)
 		}
 
 		id := typ.IDField()
@@ -96,11 +102,11 @@ func rewriteQueries(ctx context.Context, m *schema.Field) error {
 		for _, xid := range xids {
 			xidVal := obj[xid.Name()]
 			if xidVal == nil {
-				return fmt.Errorf("XID %s can't be nil for obj: %+v\n", xid.Name(), obj)
+				return nil, fmt.Errorf("XID %s can't be nil for obj: %+v\n", xid.Name(), obj)
 			}
 			xidString, err := extractVal(xidVal, xid)
 			if err != nil {
-				return errors.Wrapf(err, "while extractVal")
+				return nil, errors.Wrapf(err, "while extractVal")
 			}
 
 			glog.Infof("Converted xid value to string: %q -> %q   %q %q\n", xid.Name(), xidString, xid.DgraphPredicate(), xid.DgraphAlias())
@@ -121,15 +127,38 @@ func rewriteQueries(ctx context.Context, m *schema.Field) error {
 		bm := sroar.FastAnd(bms...)
 		uids := bm.ToArray()
 		if len(uids) > 1 {
-			return fmt.Errorf("Found %d UIDs for %s", len(uids), xids)
+			return nil, fmt.Errorf("Found %d UIDs for %s", len(uids), xids)
 		}
 		if len(uids) == 1 {
 			obj["uid"] = uids[0]
 			glog.Infof("Rewrote to %+v\n", obj)
 		}
-		// No uids found. Upsert.
+
+		for i, f := range fields {
+			if val, has := obj[f.Name()]; has {
+				obj[f.DgraphAlias()] = val
+				delete(obj, f.Name())
+				glog.Infof("Replacing %d %q -> %q\n", i, f.Name(), f.DgraphAlias())
+			}
+		}
+		// No uids found. Add.
+		obj["uid"] = "_:test"
+		glog.Infof("Adding object: %+v\n", obj)
+
+		data, err := json.Marshal(obj)
+		x.Check(err)
+		mu := &pb.Mutation{SetJson: data}
+
+		resp, err := edgraph.Query(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}})
+		glog.Infof("Got error from query: %v resp: %+v\n", err, resp)
+		if err != nil {
+			return nil, err
+		}
+		uid := resp.Uids["test"]
+		glog.Infof("Got UID: %s\n", uid)
+		resultUids = append(resultUids, uid)
 	}
-	return nil
+	return convertIDsWithErr(resultUids)
 }
 
 func (mr *dgraphResolver) rewriteAndExecute(
@@ -151,10 +180,40 @@ func (mr *dgraphResolver) rewriteAndExecute(
 	}
 	_ = emptyResult(nil)
 
-	err := rewriteQueries(ctx, mutation)
+	uids, err := rewriteQueries(ctx, mutation)
 	if err != nil {
-		glog.Error(err)
+		glog.Errorf("Error from rewriteQueries: %v", err)
+		return nil, false
 	}
+	glog.Infof("Got uids: %+v\n", uids)
 
-	return nil, false
+	glog.Infof("Query field: %+v\n", mutation.QueryField())
+
+	field := mutation.QueryField()
+	dgQuery := []*gql.GraphQuery{{
+		Attr: field.DgraphAlias(),
+	}}
+	dgQuery[0].Func = &gql.Function{
+		Name: "uid",
+		UID:  uids,
+	}
+	addArgumentsToField(dgQuery[0], field)
+	glog.Infof("Got dgQuery[0]: %+v\n", dgQuery)
+	dgQuery[0].DebugPrint("mu  ")
+
+	dgQuery = append(dgQuery, addSelectionSetFrom(dgQuery[0], field, nil)...)
+
+	q := dgraph.AsString(dgQuery)
+	glog.Infof("Query: %s\n", q)
+
+	resp, err := (&DgraphEx{}).Execute(ctx, &pb.Request{Query: q}, field)
+	glog.Infof("Got error: %+v\n", err)
+	glog.Infof("Response: %+v\n", resp)
+
+	res := &Resolved{
+		Data:  completeMutationResult(mutation, resp.Json, len(uids)),
+		Field: mutation,
+		Err:   schema.PrependPath(nil, mutation.ResponseName()),
+	}
+	return res, resolverSucceeded
 }

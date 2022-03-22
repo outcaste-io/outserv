@@ -19,7 +19,7 @@ func resolveResetPassword(ctx context.Context, m *schema.Field) (*resolve.Resolv
 	if err != nil {
 		glog.Error("Failed to parse the reset password input")
 	}
-	if err = (&edgraph.Server{}).ResetPassword(ctx, inp); err != nil {
+	if err = edgraph.ResetPassword(ctx, inp); err != nil {
 		return resolve.EmptyResult(m, err), false
 	}
 

@@ -7,14 +7,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strconv"
 
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
+	"github.com/pkg/errors"
 )
 
 const touchedUidsKey = "_total"
@@ -194,8 +197,7 @@ func getNumUids(m *schema.Field, a map[string]string, r map[string]interface{}) 
 	}
 }
 
-/*
-func (mr *dgraphResolver) rewriteAndExecute(
+func (mr *dgraphResolver) rewriteAndExecute_XXX(
 	ctx context.Context,
 	mutation *schema.Field) (*Resolved, bool) {
 	var mutResp, qryResp *pb.Response
@@ -483,7 +485,6 @@ func (mr *dgraphResolver) rewriteAndExecute(
 		Extensions: ext,
 	}, resolverSucceeded
 }
-*/
 
 // completeMutationResult takes in the result returned for the query field of mutation and builds
 // the JSON required for data field in GraphQL response.
