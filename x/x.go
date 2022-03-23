@@ -1197,7 +1197,7 @@ func FromHex(s string) uint64 {
 }
 
 func ToHexString(i uint64) string {
-	return strconv.FormatUint(i, 16)
+	return "0x" + strconv.FormatUint(i, 16)
 }
 
 // TODO: Fix this all up.

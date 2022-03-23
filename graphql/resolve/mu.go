@@ -187,7 +187,7 @@ func runUpsert(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	return resultUids, nil
 }
 
-func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
+func getUidsFromFilter(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	typ := m.MutatedType()
 	glog.Infof("m.Name: %q type: %q\n", m.Name(), typ.Name())
 
@@ -229,31 +229,43 @@ func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	glog.Infof("Parsed data: %+v\n", data)
 	glog.Infof("Found uids: %+v\n", data[m.Name()])
 
-	// TODO(mrjn): Deal with reverse edges.
-
 	var uids []uint64
-	mu := &pb.Mutation{}
 	for _, u := range data[m.Name()] {
 		uid := u.Uid
 		uids = append(uids, x.FromHex(uid))
+	}
+	return uids, nil
+}
+
+func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
+	uids, err := getUidsFromFilter(ctx, m)
+	if err != nil {
+		return nil, errors.Wrapf(err, "getUidsFromFilter")
+	}
+
+	// TODO(mrjn): Deal with reverse edges.
+
+	mu := &pb.Mutation{}
+	for _, uid := range uids {
+		uidHex := x.ToHexString(uid)
 		for _, field := range m.MutatedType().Fields() {
 			mu.Del = append(mu.Del, &pb.NQuad{
-				Subject:     uid,
+				Subject:     uidHex,
 				Predicate:   field.DgraphAlias(),
 				ObjectValue: &pb.Value{&pb.Value_DefaultVal{x.Star}},
 			})
 		}
 		mu.Del = append(mu.Del, &pb.NQuad{
-			Subject:     uid,
+			Subject:     uidHex,
 			Predicate:   "dgraph.type",
-			ObjectValue: &pb.Value{&pb.Value_StrVal{typ.DgraphName()}},
+			ObjectValue: &pb.Value{&pb.Value_StrVal{m.MutatedType().DgraphName()}},
 		})
 	}
 	glog.Infof("got mutation: %+v\n", mu)
 	req := &pb.Request{}
 	req.Mutations = append(req.Mutations, mu)
 
-	resp, err = edgraph.Query(ctx, req)
+	resp, err := edgraph.Query(ctx, req)
 	if err != nil {
 		return nil, errors.Wrapf(err, "while executing deletions")
 	}
@@ -262,7 +274,64 @@ func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 }
 
 func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
-	return nil, fmt.Errorf("Update is not handled yet")
+	uids, err := getUidsFromFilter(ctx, m)
+	if err != nil {
+		return nil, errors.Wrapf(err, "getUidsFromFilter")
+	}
+
+	inp := m.ArgValue(schema.InputArgName).(map[string]interface{})
+	setObj, hasSet := inp["set"].(map[string]interface{})
+	delObj, hasDel := inp["remove"].(map[string]interface{})
+
+	glog.Infof("Got uids: %+v set: %+v del: %+v\n", uids, setObj, delObj)
+
+	// TODO(mrjn): Ensure that the update does not violate the @id uniqueness
+	// constraint.
+	typ := m.MutatedType()
+
+	dgName := func(field string) string {
+		return typ.Name() + "." + field
+	}
+
+	var setJson, delJson []map[string]interface{}
+	if hasSet {
+		for _, uid := range uids {
+			m := make(map[string]interface{})
+			m["uid"] = x.ToHexString(uid)
+			for key, val := range setObj {
+				m[dgName(key)] = val
+			}
+			setJson = append(setJson, m)
+		}
+	}
+	if hasDel {
+		for _, uid := range uids {
+			m := make(map[string]interface{})
+			m["uid"] = x.ToHexString(uid)
+			for key, val := range delObj {
+				m[dgName(key)] = val
+			}
+			delJson = append(delJson, m)
+		}
+	}
+	mu := &pb.Mutation{}
+	if len(setJson) > 0 {
+		mu.SetJson, err = json.Marshal(setJson)
+		x.Check(err)
+	}
+	if len(delJson) > 0 {
+		mu.DeleteJson, err = json.Marshal(delJson)
+		x.Check(err)
+	}
+
+	glog.Infof("Got mutation: set: %q del: %q\n", mu.SetJson, mu.DeleteJson)
+
+	resp, err := edgraph.Query(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}})
+	if err != nil {
+		return nil, errors.Wrapf(err, "while executing updates")
+	}
+	glog.Infof("Got response: %+v\n", resp)
+	return uids, nil
 }
 
 func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
