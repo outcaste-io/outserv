@@ -101,7 +101,7 @@ func Convert(from Val, toID TypeID) (Val, error) {
 				val := &big.Int{}
 				val, ok := val.SetString(vc, 10)
 				if !ok {
-					return to, errors.New("Could not convert to bigint")
+					return to, errors.New("Non-numeric string")
 				}
 				*res = val
 			case FloatID:
@@ -176,9 +176,25 @@ func Convert(from Val, toID TypeID) (Val, error) {
 		}
 	case BigIntID:
 		{
+			vc := &big.Int{}
+			vc = vc.SetBytes(data)
 			switch toID {
-			case BinaryID:
+			case BigIntID, BinaryID:
 				*res = data
+			case IntID:
+				// We are ignoring here, wether the value will fit into a int64
+				*res = vc.Int64()
+			case FloatID:
+				f := &big.Float{}
+				f.SetInt(vc)
+				// We are ignoring here, wether the value will fit into a float64
+				*res, _ = f.Float64()
+			case BoolID:
+				*res = vc.Int64() != 0
+			case StringID, DefaultID:
+				*res = vc.String()
+			case DateTimeID:
+				*res = time.Unix(vc.Int64(), 0).UTC()
 			default:
 				return to, cantConvert(fromID, toID)
 			}
@@ -247,6 +263,11 @@ func Convert(from Val, toID TypeID) (Val, error) {
 				if vc {
 					*res = float64(1)
 				}
+			case BigIntID:
+				*res = big.NewInt(0)
+				if vc {
+					*res = big.NewInt(1)
+				}
 			case StringID, DefaultID:
 				*res = strconv.FormatBool(vc)
 			default:
@@ -278,6 +299,8 @@ func Convert(from Val, toID TypeID) (Val, error) {
 				*res = t.Unix()
 			case FloatID:
 				*res = float64(t.UnixNano()) / float64(nanoSecondsInSec)
+			case BigIntID:
+				*res = big.NewInt(t.Unix())
 			default:
 				return to, cantConvert(fromID, toID)
 			}
@@ -348,7 +371,7 @@ func Marshal(from Val, to *Val) error {
 		switch toID {
 		case StringID, DefaultID:
 			*res = string(vc)
-		case BinaryID:
+		case BinaryID, BigIntID:
 			*res = vc
 		default:
 			return cantConvert(fromID, toID)
@@ -380,6 +403,8 @@ func Marshal(from Val, to *Val) error {
 		switch toID {
 		case BinaryID:
 			*res = vc.Bytes()
+		case StringID:
+			*res = vc.String()
 		}
 	case FloatID:
 		vc := val.(float64)
@@ -524,6 +549,12 @@ func ObjectValue(id TypeID, value interface{}) (*pb.Value, error) {
 			return def, errors.Errorf("Expected value of type password. Got : %v", value)
 		}
 		return &pb.Value{Val: &pb.Value_PasswordVal{PasswordVal: v}}, nil
+	case BigIntID:
+		b, err := toBinary(id, value)
+		if err != nil {
+			return def, err
+		}
+		return &pb.Value{Val: &pb.Value_BigintVal{BigintVal: b}}, nil
 	default:
 		return def, errors.Errorf("ObjectValue not available for: %v", id)
 	}

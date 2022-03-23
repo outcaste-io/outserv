@@ -56,7 +56,7 @@ const (
 	PasswordID = TypeID(pb.Posting_PASSWORD)
 	// StringID represents the string type.
 	StringID = TypeID(pb.Posting_STRING)
-	// StringID represents the string type.
+	// BigInt represents the big int type.
 	BigIntID = TypeID(pb.Posting_BIGINT)
 	// UndefinedID represents the undefined type.
 	UndefinedID = TypeID(100)
