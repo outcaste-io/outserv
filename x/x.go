@@ -1196,6 +1196,10 @@ func FromHex(s string) uint64 {
 	return u
 }
 
+func ToHexString(i uint64) string {
+	return strconv.FormatUint(i, 16)
+}
+
 // TODO: Fix this all up.
 // RootTemplate defines the help template for dgraph command.
 var RootTemplate string = `Dgraph is a horizontally scalable and distributed graph database,

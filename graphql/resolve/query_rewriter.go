@@ -1976,6 +1976,10 @@ func addFilter(q *gql.GraphQuery, typ *schema.Type, filter map[string]interface{
 		q.Filter = buildFilter(typ, filter)
 	}
 	if filterAtRoot {
+		// TODO: Remove this type filter later.
+		// But, if the user passes a wrong UID, which is not of the same type,
+		// we need some way to ensure that we won't end up deleting a different
+		// object. So, we need some sort of a type safety check.
 		addTypeFilter(q, typ)
 	}
 	return true

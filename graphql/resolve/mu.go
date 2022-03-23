@@ -16,6 +16,7 @@ import (
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
+	"github.com/outcaste-io/sroar"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
 )
@@ -64,31 +65,35 @@ func extractVal(xidVal interface{}, xid *schema.FieldDefinition) (string, error)
 	}
 }
 
-func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
-	glog.Infof("mutatedType: %s\n", m.MutatedType())
-
+func runUpsert(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	// Parsing input
-	val, _ := m.ArgValue(schema.InputArgName).([]interface{})
+	val, ok := m.ArgValue(schema.InputArgName).([]interface{})
+	x.AssertTrue(ok)
+
+	upsert := false
+	upsertVal := m.ArgValue(schema.UpsertArgName)
+	if upsertVal != nil {
+		upsert = upsertVal.(bool)
+	}
 
 	// Just consider the first one for now.
 	var resultUids []uint64
 	for _, i := range val {
+		// TODO: Refactor this so we deal with each val in a nested func.
 		obj := i.(map[string]interface{})
 		typ := m.MutatedType()
 		glog.Infof("mutatedType: %+v obj: %+v\n", typ, obj)
 		fields := typ.Fields()
-		for i, f := range fields {
-			glog.Infof("field %d: %q %+v", i, f.Name(), f)
-		}
 
 		id := typ.IDField()
-		glog.Infof("ID Name: %s full: %+v\n", id.Name(), id)
-
-		if idVal := obj[id.Name()]; idVal != nil {
-			glog.Infof("Found ID field: %s %+v\n", id.Name(), idVal)
-			// If we found the ID field, then we can just send the mutations.
-			//
-			// TODO: Add logic to check something, not sure what.
+		if id != nil {
+			glog.Infof("ID Name: %s full: %+v\n", id.Name(), id)
+			if idVal := obj[id.Name()]; idVal != nil {
+				glog.Infof("Found ID field: %s %+v\n", id.Name(), idVal)
+				// If we found the ID field, then we can just send the mutations.
+				//
+				// TODO: Add logic to check something, not sure what.
+			}
 		}
 
 		xids := typ.XIDFields()
@@ -99,7 +104,7 @@ func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		// we can find the right ID for this object.
 
 		// var queries []*gql.GraphQuery
-		var uids []uint64
+		var bms []*sroar.Bitmap
 		for _, xid := range xids {
 			xidVal := obj[xid.Name()]
 			if xidVal == nil {
@@ -110,34 +115,44 @@ func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 				return nil, errors.Wrapf(err, "while extractVal")
 			}
 
-			glog.Infof("Converted xid value to string: %q -> %q   %q %q\n", xid.Name(), xidString, xid.DgraphPredicate(), xid.DgraphAlias())
-			uids, err = UidsForXid(ctx, xid.DgraphAlias(), xidString)
-			if err != nil {
-				glog.Errorf("While executing UidsForXid: %v. Ignoring...\n", err)
-				uids = []uint64{}
-			}
-			glog.Infof("Got uids: %+v\n", uids)
-			// bms = append(bms, bm)
+			glog.Infof("Converted xid value to string: %q -> %q   %q %q\n",
+				xid.Name(), xidString, xid.DgraphPredicate(), xid.DgraphAlias())
 
-			// query := &gql.GraphQuery{
-			// 	Attr: "result1",
-			// 	Func: &gql.Function{
-			// 		Name: "eq",
-			// 		Args: []gql.Arg{
-			// 			{Value: typ.DgraphPredicate(xid.DgraphPredicate()},
-			// 			{Value: schema.MaybeQuoteArg("eq", xidString)},
-			// 		},
-			// 	},
-			// }
+			// TODO: Check if we can pass UIDs to this to filter quickly.
+			bm, err := UidsForXid(ctx, xid.DgraphAlias(), xidString)
+			if err != nil {
+				// TODO: Gotta wrap up errors to ensure GraphQL compliance.
+				return nil, err
+			}
+			glog.Infof("Cardinality of xid %s is %d\n", xid.Name(), bm.GetCardinality())
+			bms = append(bms, bm)
+			if bm.GetCardinality() == 0 {
+				// No need to proceed, if we couldn't find any
+				break
+			}
 		}
-		if len(uids) > 1 {
-			return nil, fmt.Errorf("Found %d UIDs for %v", len(uids), xids)
+		bm := sroar.FastAnd(bms...)
+		if num := bm.GetCardinality(); num > 1 {
+			return nil, fmt.Errorf("Found %d UIDs for %v", num, xids)
 		}
+
+		uids := bm.ToArray()
+		// If we found an entry and upsert flag is set to false, we should not
+		// update the entry.
 		if len(uids) == 1 {
 			obj["uid"] = "0x" + strconv.FormatUint(uids[0], 16)
 			glog.Infof("Rewrote to %+v\n", obj)
+			if !upsert {
+				// We won't add a new object here, because an object already
+				// exists. And we should not be updating this object because
+				// upsert is false. Just return the list of UIDS found.
+				resultUids = append(resultUids, uids[0])
+				continue
+			}
 		} else {
 			obj["uid"] = "_:test"
+			// TODO: We should overhaul this type system later.
+			obj["dgraph.type"] = typ.DgraphName()
 		}
 
 		for i, f := range fields {
@@ -154,6 +169,7 @@ func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		x.Check(err)
 		mu := &pb.Mutation{SetJson: data}
 
+		// TODO: Batch all this up.
 		resp, err := edgraph.Query(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}})
 		glog.Infof("Got error from query: %v resp: %+v\n", err, resp)
 		if err != nil {
@@ -171,7 +187,100 @@ func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	return resultUids, nil
 }
 
-func UidsForXid(ctx context.Context, pred, value string) ([]uint64, error) {
+func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
+	typ := m.MutatedType()
+	glog.Infof("m.Name: %q type: %q\n", m.Name(), typ.Name())
+
+	dgQuery := []*gql.GraphQuery{{
+		Attr: m.Name(),
+	}}
+	dgQuery[0].Children = append(dgQuery[0].Children, &gql.GraphQuery{
+		Attr: "uid",
+	})
+
+	filter := extractMutationFilter(m)
+	ids := idFilter(filter, typ.IDField())
+	if ids != nil {
+		addUIDFunc(dgQuery[0], ids)
+	} else {
+		addTypeFunc(dgQuery[0], m.MutatedType().DgraphName())
+	}
+
+	_ = addFilter(dgQuery[0], m.MutatedType(), filter)
+
+	q := dgraph.AsString(dgQuery)
+	glog.Infof("Got Query: %s\n", q)
+
+	resp, err := edgraph.Query(ctx, &pb.Request{Query: q})
+	glog.Infof("Got error: %v. Resp: %s\n", err, resp.GetJson())
+	if err != nil {
+		return nil, errors.Wrapf(err, "while querying")
+	}
+
+	type U struct {
+		Uid string `json:"uid"`
+	}
+
+	data := make(map[string][]U)
+	if err := json.Unmarshal(resp.GetJson(), &data); err != nil {
+		// Unable to find any UIDs.
+		return nil, nil
+	}
+	glog.Infof("Parsed data: %+v\n", data)
+	glog.Infof("Found uids: %+v\n", data[m.Name()])
+
+	// TODO(mrjn): Deal with reverse edges.
+
+	var uids []uint64
+	mu := &pb.Mutation{}
+	for _, u := range data[m.Name()] {
+		uid := u.Uid
+		uids = append(uids, x.FromHex(uid))
+		for _, field := range m.MutatedType().Fields() {
+			mu.Del = append(mu.Del, &pb.NQuad{
+				Subject:     uid,
+				Predicate:   field.DgraphAlias(),
+				ObjectValue: &pb.Value{&pb.Value_DefaultVal{x.Star}},
+			})
+		}
+		mu.Del = append(mu.Del, &pb.NQuad{
+			Subject:     uid,
+			Predicate:   "dgraph.type",
+			ObjectValue: &pb.Value{&pb.Value_StrVal{typ.DgraphName()}},
+		})
+	}
+	glog.Infof("got mutation: %+v\n", mu)
+	req := &pb.Request{}
+	req.Mutations = append(req.Mutations, mu)
+
+	resp, err = edgraph.Query(ctx, req)
+	if err != nil {
+		return nil, errors.Wrapf(err, "while executing deletions")
+	}
+	glog.Infof("Got response: %+v\n", resp)
+	return uids, nil
+}
+
+func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
+	return nil, fmt.Errorf("Update is not handled yet")
+}
+
+func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
+	glog.Infof("mutatedType: %s Mutation Type: %s\n", m.MutatedType(), m.MutationType())
+
+	switch m.MutationType() {
+	case schema.AddMutation:
+		return runUpsert(ctx, m)
+	case schema.DeleteMutation:
+		return runDelete(ctx, m)
+	case schema.UpdateMutation:
+		return runUpdate(ctx, m)
+	default:
+		return nil, fmt.Errorf("Invalid mutation type: %s\n", m.MutationType())
+	}
+}
+
+func UidsForXid(ctx context.Context, pred, value string) (*sroar.Bitmap, error) {
 	q := &pb.Query{
 		ReadTs: posting.ReadTimestamp(),
 		Attr:   x.NamespaceAttr(0, pred),
@@ -188,12 +297,9 @@ func UidsForXid(ctx context.Context, pred, value string) ([]uint64, error) {
 	glog.Infof("Result uidmatrix length: %d", len(result.UidMatrix))
 	if len(result.UidMatrix) == 0 {
 		// No result found
-		return nil, nil
+		return sroar.NewBitmap(), nil
 	}
-	bm := codec.MatrixToBitmap(result.UidMatrix)
-	uids := bm.ToArray()
-	glog.Infof("Found uids: %+v\n", uids)
-	return uids, nil
+	return codec.FromList(result.UidMatrix[0]), nil
 }
 
 func (mr *dgraphResolver) rewriteAndExecute(

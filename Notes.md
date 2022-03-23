@@ -5,3 +5,7 @@
   ts + 1.
 
 [ ] Ensure that Zero snapshots and Alpha snapshots work.
+
+### Type System
+
+Use type level UIDs.
