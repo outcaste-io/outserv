@@ -34,7 +34,6 @@ var (
 type GraphQuery struct {
 	UID        []uint64
 	Attr       string
-	Langs      []string
 	Alias      string
 	IsCount    bool
 	IsInternal bool
@@ -56,10 +55,7 @@ type GraphQuery struct {
 	ShortestPathArgs ShortestPathArgs
 	Cascade          []string
 	IgnoreReflex     bool
-	FacetsFilter     *FilterTree
 	GroupbyAttrs     []GroupByAttr
-	FacetVar         map[string]string
-	FacetsOrder      []*FacetOrder
 
 	// Used for ACL enabled queries to curtail results to only accessible params
 	AllowedPreds []string
@@ -95,12 +91,6 @@ type ShortestPathArgs struct {
 type GroupByAttr struct {
 	Attr  string
 	Alias string
-}
-
-// FacetOrder stores ordering for single facet key.
-type FacetOrder struct {
-	Key  string
-	Desc bool // true if ordering should be decending by this facet.
 }
 
 // pair denotes the key value pair that is part of the GraphQL query root in parenthesis.
@@ -391,11 +381,6 @@ func substituteVariables(gq *GraphQuery, vmap varMap) error {
 	}
 	if gq.Filter != nil {
 		if err := substituteVariablesFilter(gq.Filter, vmap); err != nil {
-			return err
-		}
-	}
-	if gq.FacetsFilter != nil {
-		if err := substituteVariablesFilter(gq.FacetsFilter, vmap); err != nil {
 			return err
 		}
 	}
@@ -709,11 +694,6 @@ func checkDependency(vl []*Vars) error {
 func (gq *GraphQuery) collectVars(v *Vars) {
 	if gq.Var != "" {
 		v.Defines = append(v.Defines, gq.Var)
-	}
-	if gq.FacetVar != nil {
-		for _, va := range gq.FacetVar {
-			v.Defines = append(v.Defines, va)
-		}
 	}
 	for _, va := range gq.NeedsVar {
 		v.Needs = append(v.Needs, va.Name)
@@ -1357,19 +1337,6 @@ loop:
 		}
 
 		p.Val = collectName(it, val+item.Val)
-
-		// Get language list, if present
-		items, err := it.Peek(1)
-		if err == nil && items[0].Typ == itemAt {
-			it.Next() // consume '@'
-			it.Next() // move forward
-			langs, err := parseLanguageList(it)
-			if err != nil {
-				return nil, err
-			}
-			p.Val = p.Val + "@" + strings.Join(langs, ":")
-		}
-
 		result = append(result, p)
 	}
 	return result, nil
@@ -2330,40 +2297,6 @@ func parseDirective(it *lex.ItemIterator, curp *GraphQuery) error {
 	return nil
 }
 
-func parseLanguageList(it *lex.ItemIterator) ([]string, error) {
-	item := it.Item()
-	var langs []string
-	for ; item.Typ == itemName || item.Typ == itemPeriod || item.Typ == itemStar; item = it.Item() {
-		langs = append(langs, item.Val)
-		it.Next()
-		if it.Item().Typ == itemColon {
-			it.Next()
-		} else {
-			break
-		}
-	}
-	if it.Item().Typ == itemPeriod {
-		peekIt, err := it.Peek(1)
-		if err != nil {
-			return nil, err
-		}
-		if peekIt[0].Typ == itemPeriod {
-			return nil, it.Errorf("Expected only one dot(.) while parsing language list.")
-		}
-	}
-	it.Prev()
-
-	for _, lang := range langs {
-		if lang == string(star) && len(langs) > 1 {
-			return nil, errors.Errorf(
-				"If * is used, no other languages are allowed in the language list. Found %v",
-				langs)
-		}
-	}
-
-	return langs, nil
-}
-
 func validKeyAtRoot(k string) bool {
 	switch k {
 	case "func", "orderasc", "orderdesc", "first", "offset", "after", "random":
@@ -2588,16 +2521,6 @@ loop:
 						return nil, it.Errorf("Expected val(). Got %s() with order.", val)
 					}
 				}
-				if err == nil && items[0].Typ == itemAt {
-					it.Next() // consume '@'
-					it.Next() // move forward
-					langs, err := parseLanguageList(it)
-					if err != nil {
-						return nil, err
-					}
-					val = val + "@" + strings.Join(langs, ":")
-				}
-
 			}
 
 			// TODO - Allow only order by one of variable/predicate for now.
@@ -2782,15 +2705,6 @@ func godeep(it *lex.ItemIterator, gq *GraphQuery) error {
 				if gq.IsGroupby {
 					item = it.Item()
 					attr := collectName(it, item.Val)
-					// Get language list, if present
-					items, err := it.Peek(1)
-					if err == nil && items[0].Typ == itemAt {
-						it.Next() // consume '@'
-						it.Next() // move forward
-						if child.Langs, err = parseLanguageList(it); err != nil {
-							return err
-						}
-					}
 					child.Attr = attr
 					child.IsInternal = false
 				} else {
@@ -3002,10 +2916,6 @@ func godeep(it *lex.ItemIterator, gq *GraphQuery) error {
 		case itemLeftCurl:
 			if curp == nil {
 				return it.Errorf("Query syntax invalid.")
-			}
-			if len(curp.Langs) > 0 {
-				return it.Errorf("Cannot have children for attr: %s with lang tags: %v", curp.Attr,
-					curp.Langs)
 			}
 			if err := godeep(it, curp); err != nil {
 				return err
