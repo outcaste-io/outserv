@@ -30,6 +30,11 @@ const graphqlAdminSchema = `
 	scalar DateTime
 
 	"""
+	BigInt implementation
+	"""
+	scalar BigInt
+
+	"""
 	Data about the GraphQL schema being served by Dgraph.
 	"""
 	type GQLSchema @dgraph(type: "dgraph.graphql") {

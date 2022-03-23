@@ -21,10 +21,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/outcaste-io/outserv/x"
 	"github.com/dgraph-io/gqlparser/v2/ast"
 	"github.com/dgraph-io/gqlparser/v2/gqlerror"
 	"github.com/dgraph-io/gqlparser/v2/parser"
+	"github.com/outcaste-io/outserv/x"
 )
 
 const (
@@ -114,6 +114,11 @@ The Int64 scalar type represents a signed 64‐bit numeric non‐fractional valu
 Int64 can represent values in range [-(2^63),(2^63 - 1)].
 """
 scalar Int64
+
+"""
+The BigInt scalar type represents numeric non-fractional values of varying size (arbitrary-precision arithmetic).
+"""
+scalar BigInt
 
 """
 The DateTime scalar type represents date and time as a string in RFC3339 format.
@@ -547,6 +552,7 @@ var inbuiltTypeToDgraph = map[string]string{
 	"Boolean":      "bool",
 	"Int":          "int",
 	"Int64":        "int",
+	"BigInt":       "bigint",
 	"Float":        "float",
 	"String":       "string",
 	"DateTime":     "dateTime",

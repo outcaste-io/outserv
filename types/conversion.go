@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"math"
+	"math/big"
 	"strconv"
 	"time"
 	"unsafe"
@@ -77,6 +78,9 @@ func Convert(from Val, toID TypeID) (Val, error) {
 				*res = w
 			case PasswordID:
 				*res = string(data)
+			case BigIntID:
+				var b big.Int
+				*res = b.SetBytes(data)
 			default:
 				return to, cantConvert(fromID, toID)
 			}
@@ -91,6 +95,13 @@ func Convert(from Val, toID TypeID) (Val, error) {
 				val, err := strconv.ParseInt(vc, 10, 64)
 				if err != nil {
 					return to, err
+				}
+				*res = val
+			case BigIntID:
+				val := &big.Int{}
+				val, ok := val.SetString(vc, 10)
+				if !ok {
+					return to, errors.New("Could not convert to bigint")
 				}
 				*res = val
 			case FloatID:
@@ -147,6 +158,10 @@ func Convert(from Val, toID TypeID) (Val, error) {
 				var bs [8]byte
 				binary.LittleEndian.PutUint64(bs[:], uint64(vc))
 				*res = bs[:]
+			case BigIntID:
+				i := &big.Int{}
+				i.SetInt64(vc)
+				*res = i
 			case FloatID:
 				*res = float64(vc)
 			case BoolID:
@@ -155,6 +170,15 @@ func Convert(from Val, toID TypeID) (Val, error) {
 				*res = strconv.FormatInt(vc, 10)
 			case DateTimeID:
 				*res = time.Unix(vc, 0).UTC()
+			default:
+				return to, cantConvert(fromID, toID)
+			}
+		}
+	case BigIntID:
+		{
+			switch toID {
+			case BinaryID:
+				*res = data
 			default:
 				return to, cantConvert(fromID, toID)
 			}
@@ -179,6 +203,11 @@ func Convert(from Val, toID TypeID) (Val, error) {
 					return to, errors.Errorf("Float out of int64 range")
 				}
 				*res = int64(vc)
+			case BigIntID:
+				f := &big.Float{}
+				f = f.SetFloat64(vc)
+				i, _ := f.Int(nil)
+				*res = i
 			case BoolID:
 				*res = vc != 0
 			case StringID, DefaultID:
@@ -345,6 +374,12 @@ func Marshal(from Val, to *Val) error {
 			*res = bs[:]
 		default:
 			return cantConvert(fromID, toID)
+		}
+	case BigIntID:
+		vc := val.(*big.Int)
+		switch toID {
+		case BinaryID:
+			*res = vc.Bytes()
 		}
 	case FloatID:
 		vc := val.(float64)
@@ -523,6 +558,9 @@ func (v Val) MarshalJSON() ([]byte, error) {
 		return json.Marshal(v.Safe().(string))
 	case PasswordID:
 		return json.Marshal(v.Value.(string))
+	case BigIntID:
+		i := v.Value.(big.Int)
+		return i.MarshalJSON()
 	}
 	return nil, errors.Errorf("Invalid type for MarshalJSON: %v", v.Tid)
 }

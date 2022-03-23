@@ -24,11 +24,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/outcaste-io/outserv/x"
 	"github.com/dgraph-io/gqlparser/v2/ast"
 	"github.com/dgraph-io/gqlparser/v2/gqlerror"
 	"github.com/dgraph-io/gqlparser/v2/parser"
 	"github.com/dgraph-io/gqlparser/v2/validator"
+	"github.com/outcaste-io/outserv/x"
 )
 
 func init() {
@@ -265,6 +265,7 @@ func typeNameValidation(schema *ast.SchemaDocument) gqlerror.List {
 	forbiddenTypeNames := map[string]bool{
 		// The static types that we define in schemaExtras
 		"Int64":                true,
+		"BigInt":               true,
 		"DateTime":             true,
 		"DgraphIndex":          true,
 		"AuthRule":             true,

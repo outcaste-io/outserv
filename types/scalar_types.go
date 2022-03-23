@@ -17,6 +17,7 @@
 package types
 
 import (
+	"math/big"
 	"time"
 
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -55,6 +56,8 @@ const (
 	PasswordID = TypeID(pb.Posting_PASSWORD)
 	// StringID represents the string type.
 	StringID = TypeID(pb.Posting_STRING)
+	// StringID represents the string type.
+	BigIntID = TypeID(pb.Posting_BIGINT)
 	// UndefinedID represents the undefined type.
 	UndefinedID = TypeID(100)
 )
@@ -70,6 +73,7 @@ var typeNameMap = map[string]TypeID{
 	"uid":      UidID,
 	"string":   StringID,
 	"password": PasswordID,
+	"bigint":   BigIntID,
 }
 
 // TypeID represents the type of the data.
@@ -103,6 +107,8 @@ func (t TypeID) Name() string {
 		return "string"
 	case PasswordID:
 		return "password"
+	case BigIntID:
+		return "bigint"
 	}
 	return ""
 }
@@ -186,6 +192,10 @@ func ValueForType(id TypeID) Val {
 	case PasswordID:
 		var p string
 		return Val{PasswordID, p}
+
+	case BigIntID:
+		var i big.Int
+		return Val{BigIntID, &i}
 
 	default:
 		return Val{}

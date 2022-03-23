@@ -306,6 +306,7 @@ message Posting {
     PASSWORD = 8;
     STRING = 9;
     OBJECT = 10;
+    BIGINT = 11;
   }
   ValType val_type = 3;
   enum PostingType {
@@ -562,6 +563,7 @@ message Value {
     bytes datetime_val = 9;
     string password_val = 10;
     uint64 uid_val=11;
+    bytes bigint_val=12;
   }
 }
 
