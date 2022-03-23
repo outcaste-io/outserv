@@ -1,18 +1,5 @@
-/*
- * Copyright 2016-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2016-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package schema
 
@@ -27,7 +14,6 @@ import (
 	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/x"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 )
 
@@ -73,8 +59,6 @@ func parseDirective(it *lex.ItemIterator, schema *pb.SchemaUpdate, t types.TypeI
 		schema.Count = true
 	case "upsert":
 		schema.Upsert = true
-	case "noconflict":
-		schema.NoConflict = true
 	case "lang":
 		if t != types.StringID || schema.List {
 			return next.Errorf("@lang directive can only be specified for string type."+
@@ -298,117 +282,6 @@ func resolveTokenizers(updates []*pb.SchemaUpdate) error {
 	return nil
 }
 
-func parseTypeDeclaration(it *lex.ItemIterator, ns uint64) (*pb.TypeUpdate, error) {
-	// Iterator is currently on the token corresponding to the keyword type.
-	if it.Item().Typ != itemText || it.Item().Val != "type" {
-		return nil, it.Item().Errorf("Expected type keyword. Got %v", it.Item().Val)
-	}
-
-	it.Next()
-	if it.Item().Typ != itemText {
-		return nil, it.Item().Errorf("Expected type name. Got %v", it.Item().Val)
-	}
-	typeUpdate := &pb.TypeUpdate{TypeName: x.NamespaceAttr(ns, it.Item().Val)}
-
-	it.Next()
-	if it.Item().Typ != itemLeftCurl {
-		return nil, it.Item().Errorf("Expected {. Got %v", it.Item().Val)
-	}
-
-	var fields []*pb.SchemaUpdate
-	for it.Next() {
-		item := it.Item()
-
-		switch item.Typ {
-		case itemRightCurl:
-			it.Next()
-			if it.Item().Typ != itemNewLine && it.Item().Typ != lex.ItemEOF {
-				return nil, it.Item().Errorf(
-					"Expected new line or EOF after type declaration. Got %v", it.Item())
-			}
-			it.Prev()
-
-			fieldSet := make(map[string]struct{})
-			for _, field := range fields {
-				if _, ok := fieldSet[field.GetPredicate()]; ok {
-					return nil, it.Item().Errorf("Duplicate fields with name: %s",
-						x.ParseAttr(field.GetPredicate()))
-				}
-
-				fieldSet[field.GetPredicate()] = struct{}{}
-			}
-
-			typeUpdate.Fields = fields
-			return typeUpdate, nil
-		case itemText:
-			field, err := parseTypeField(it, typeUpdate.TypeName, ns)
-			if err != nil {
-				return nil, err
-			}
-			fields = append(fields, field)
-		case itemNewLine:
-			// Ignore empty lines.
-		default:
-			return nil, it.Item().Errorf("Unexpected token. Got %v", it.Item().Val)
-		}
-	}
-	return nil, errors.Errorf("Shouldn't reach here.")
-}
-
-func parseTypeField(it *lex.ItemIterator, typeName string, ns uint64) (*pb.SchemaUpdate, error) {
-	field := &pb.SchemaUpdate{Predicate: x.NamespaceAttr(ns, it.Item().Val)}
-	var list bool
-	it.Next()
-
-	// Simplified type definitions only require the field name. If a new line is found,
-	// proceed to the next field in the type.
-	if it.Item().Typ == itemNewLine {
-		return field, nil
-	}
-
-	// For the sake of backwards-compatibility, process type definitions in the old format,
-	// but ignore the information after the colon.
-	if it.Item().Typ != itemColon {
-		return nil, it.Item().Errorf("Missing colon in type declaration. Got %v", it.Item().Val)
-	}
-
-	it.Next()
-	if it.Item().Typ == itemLeftSquare {
-		list = true
-		it.Next()
-	}
-
-	if it.Item().Typ != itemText {
-		return nil, it.Item().Errorf("Missing field type in type declaration. Got %v",
-			it.Item().Val)
-	}
-
-	it.Next()
-	if it.Item().Typ == itemExclamationMark {
-		it.Next()
-	}
-
-	if list {
-		if it.Item().Typ != itemRightSquare {
-			return nil, it.Item().Errorf("Expected matching square bracket. Got %v", it.Item().Val)
-		}
-		it.Next()
-
-		if it.Item().Typ == itemExclamationMark {
-			it.Next()
-		}
-	}
-
-	if it.Item().Typ != itemNewLine {
-		return nil, it.Item().Errorf("Expected new line after field declaration. Got %v",
-			it.Item().Val)
-	}
-
-	glog.Warningf("Type declaration for type %s includes deprecated information about field type "+
-		"for field %s which will be ignored.", typeName, x.ParseAttr(field.Predicate))
-	return field, nil
-}
-
 func parseNamespace(it *lex.ItemIterator) (uint64, error) {
 	nextItems, err := it.Peek(2)
 	if err != nil {
@@ -433,27 +306,6 @@ func parseNamespace(it *lex.ItemIterator) (uint64, error) {
 // ParsedSchema represents the parsed schema and type updates.
 type ParsedSchema struct {
 	Preds []*pb.SchemaUpdate
-	Types []*pb.TypeUpdate
-}
-
-func isTypeDeclaration(item lex.Item, it *lex.ItemIterator) bool {
-	if item.Val != "type" {
-		return false
-	}
-
-	nextItems, err := it.Peek(2)
-	switch {
-	case err != nil || len(nextItems) != 2:
-		return false
-
-	case nextItems[0].Typ != itemText:
-		return false
-
-	case nextItems[1].Typ != itemLeftCurl:
-		return false
-	}
-
-	return true
 }
 
 // parse parses a schema string and returns the schema representation for it.
@@ -476,16 +328,7 @@ func parse(s string, namespace uint64) (*ParsedSchema, error) {
 		return nil, err
 	}
 
-	parseTypeOrSchema := func(item lex.Item, it *lex.ItemIterator, ns uint64) error {
-		if isTypeDeclaration(item, it) {
-			typeUpdate, err := parseTypeDeclaration(it, ns)
-			if err != nil {
-				return err
-			}
-			result.Types = append(result.Types, typeUpdate)
-			return nil
-		}
-
+	parseSchema := func(item lex.Item, it *lex.ItemIterator, ns uint64) error {
 		schema, err := parseScalarPair(it, item.Val, ns)
 		if err != nil {
 			return err
@@ -511,7 +354,7 @@ func parse(s string, namespace uint64) (*ParsedSchema, error) {
 			if namespace != math.MaxUint64 {
 				ns = uint64(namespace)
 			}
-			if err := parseTypeOrSchema(item, it, ns); err != nil {
+			if err := parseSchema(item, it, ns); err != nil {
 				return nil, err
 			}
 
@@ -527,7 +370,7 @@ func parse(s string, namespace uint64) (*ParsedSchema, error) {
 			}
 			// We have already called next in parseNamespace.
 			item := it.Item()
-			if err := parseTypeOrSchema(item, it, ns); err != nil {
+			if err := parseSchema(item, it, ns); err != nil {
 				return nil, err
 			}
 

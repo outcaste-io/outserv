@@ -22,10 +22,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/ee"
 	"github.com/outcaste-io/outserv/ee/enc"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
 

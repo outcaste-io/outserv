@@ -24,8 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/outcaste-io/outserv/x"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/stretchr/testify/require"
 )
 

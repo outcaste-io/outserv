@@ -259,10 +259,9 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 
 	// perform dgraph schema alter, if required. As the schema could be empty if it only has custom
 	// types/queries/mutations.
-	if len(req.DgraphPreds) != 0 && len(req.DgraphTypes) != 0 {
+	if len(req.DgraphPreds) != 0 {
 		if _, err = MutateOverNetwork(ctx, &pb.Mutations{
 			Schema: req.DgraphPreds,
-			Types:  req.DgraphTypes,
 		}); err != nil {
 			return nil, errors.Wrap(err, ErrGraphQLSchemaAlterFailed)
 		}

@@ -1,10 +1,11 @@
+//go:build !linux
 // +build !linux
 
 package x
 
 import (
-	"github.com/outcaste-io/ristretto/z"
 	"github.com/golang/glog"
+	"github.com/outcaste-io/ristretto/z"
 )
 
 func MonitorDiskMetrics(_ string, _ string, lc *z.Closer) {

@@ -241,7 +241,7 @@ func (gh *GqlHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx = x.AttachJWTNamespace(ctx)
 
 	var res *schema.Response
-	gqlReq, err := getRequest(r)
+	gqlReq, err := getRequest(w, r)
 
 	if err != nil {
 		WriteErrorResponse(w, r, err)
@@ -288,7 +288,7 @@ func (gz gzreadCloser) Close() error {
 	return gz.Closer.Close()
 }
 
-func getRequest(r *http.Request) (*schema.Request, error) {
+func getRequest(w http.ResponseWriter, r *http.Request) (*schema.Request, error) {
 	gqlReq := &schema.Request{}
 
 	if r.Header.Get("Content-Encoding") == "gzip" {
@@ -341,12 +341,70 @@ func getRequest(r *http.Request) (*schema.Request, error) {
 				return nil, errors.Wrap(err, "Could not read GraphQL request body")
 			}
 			gqlReq.Query = string(bytes)
+		case "multipart/form-data":
+			r.Body = http.MaxBytesReader(w, r.Body, x.Config.MaxUploadSizeMb*1000)
+			if err = r.ParseMultipartForm(4 * x.Config.MaxUploadSizeMb * 1000); err != nil {
+				if strings.Contains(err.Error(), "request body too large") {
+					return nil, errors.Wrap(err, "failed to parse, request body too large")
+				}
+				return nil, errors.Wrap(err, "failed to parse multipart form")
+			}
+			defer r.Body.Close()
+
+			if err = json.Unmarshal([]byte(r.Form.Get("operations")), gqlReq); err != nil {
+				return nil, errors.Wrap(err, "operations form field could not be decoded")
+			}
+
+			uploadsMap := map[string][]string{}
+			if err = json.Unmarshal([]byte(r.Form.Get("map")), &uploadsMap); err != nil {
+				return nil, errors.Wrap(err, "map form field could not be decoded")
+			}
+
+			variables := make(map[string][][]byte)
+			for key, paths := range uploadsMap {
+				if len(paths) == 0 {
+					return nil, errors.Wrapf(err, "empty operations paths list for key %s", key)
+				}
+				file, _, err := r.FormFile(key)
+				if err != nil {
+					return nil, errors.Wrapf(err, "failed to get key %s from form", key)
+				}
+				defer file.Close()
+
+				content, err := ioutil.ReadAll(file)
+				if err != nil {
+					return nil, errors.Wrapf(err, "failed to read data with key %s", key)
+				}
+
+				for _, path := range paths {
+					if !strings.HasPrefix(path, "variables.") {
+						return nil, errors.Wrapf(err, "invalid path in map for key %s", key)
+					}
+
+					parts := strings.Split(path, ".")
+					if len(parts) < 2 {
+						return nil, errors.Wrapf(err, "failed to get variable name from path "+
+							"with key %s", key)
+					}
+
+					varName := parts[1]
+					if variables[varName] == nil {
+						variables[varName] = [][]byte{}
+					}
+					variables[varName] = append(variables[varName], content)
+				}
+			}
+
+			for key := range variables {
+				gqlReq.Variables[key] = variables[key]
+			}
 		default:
 			// https://graphql.org/learn/serving-over-http/#post-request says:
 			// "A standard GraphQL POST request should use the application/json
 			// content type ..."
 			return nil, errors.New(
-				"Unrecognised Content-Type.  Please use application/json or application/graphql for GraphQL requests")
+				"Unrecognised Content-Type.  Please use application/json, application/graphql or " +
+					"multipart/form-data for GraphQL requests")
 		}
 	default:
 		return nil,

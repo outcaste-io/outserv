@@ -178,7 +178,7 @@ func CompleteValue(
 	switch val := val.(type) {
 	case map[string]interface{}:
 		switch field.Type().Name() {
-		case "String", "ID", "Boolean", "Float", "Int", "Int64", "BigInt", "DateTime":
+		case "String", "ID", "Boolean", "Float", "Int", "Int64", "BigInt", "DateTime", "Upload":
 			return nil, x.GqlErrorList{field.GqlErrorf(path, ErrExpectedScalar)}
 		}
 		enumValues := field.EnumValues()
@@ -485,6 +485,13 @@ func coerceScalar(val interface{}, field *Field, path []interface{}) (interface{
 			} else {
 				return nil, valueCoercionError(v)
 			}
+		default:
+			return nil, valueCoercionError(v)
+		}
+	case "Upload":
+		switch v := val.(type) {
+		case string:
+			val = ([]byte)(v)
 		default:
 			return nil, valueCoercionError(v)
 		}

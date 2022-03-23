@@ -20,9 +20,9 @@ import (
 	"os"
 	"testing"
 
+	"github.com/dgrijalva/jwt-go/v4"
 	"github.com/outcaste-io/outserv/graphql/e2e/common"
 	"github.com/outcaste-io/outserv/testutil"
-	"github.com/dgrijalva/jwt-go/v4"
 	"github.com/stretchr/testify/require"
 )
 

@@ -16,8 +16,6 @@ require (
 	github.com/Shopify/sarama v1.27.2
 	github.com/blevesearch/bleve v1.0.13
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd
-	github.com/dgraph-io/gqlgen v0.13.2
-	github.com/dgraph-io/gqlparser/v2 v2.2.2
 	github.com/dgraph-io/graphql-transport-ws v0.0.0-20210511143556-2cef522f1f15
 	github.com/dgraph-io/simdjson-go v0.3.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -43,6 +41,8 @@ require (
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/outcaste-io/badger/v3 v3.0.0-20220210203236-1b1148a36313
 	github.com/outcaste-io/dgo/v210 v210.0.0-20220225180226-43bd1b427e86
+	github.com/outcaste-io/gqlgen v0.13.3
+	github.com/outcaste-io/gqlparser/v2 v2.2.3
 	github.com/outcaste-io/ristretto v0.2.0
 	github.com/outcaste-io/sroar v0.0.0-20220207092908-fa5c189ea338
 	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
@@ -50,7 +50,7 @@ require (
 	github.com/pkg/profile v1.2.1
 	github.com/prometheus/client_golang v1.0.0
 	github.com/prometheus/common v0.6.0 // indirect
-	github.com/sergi/go-diff v1.1.0
+	github.com/sergi/go-diff v1.2.0
 	github.com/shirou/gopsutil/v3 v3.22.2
 	github.com/soheilhy/cmux v0.1.4
 	github.com/spf13/cast v1.3.0

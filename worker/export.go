@@ -172,22 +172,6 @@ func toSchema(attr string, update *pb.SchemaUpdate) *bpb.KV {
 	}
 }
 
-func toType(attr string, update pb.TypeUpdate) *bpb.KV {
-	var buf bytes.Buffer
-	ns, attr := x.ParseNamespaceAttr(attr)
-	x.Check2(buf.WriteString(fmt.Sprintf("[%#x] type <%s> {\n", ns, attr)))
-	for _, field := range update.Fields {
-		x.Check2(buf.WriteString(fieldToString(field)))
-	}
-
-	x.Check2(buf.WriteString("}\n"))
-
-	return &bpb.KV{
-		Value:   buf.Bytes(),
-		Version: 3, // Type value
-	}
-}
-
 func fieldToString(update *pb.SchemaUpdate) string {
 	var builder strings.Builder
 	predicate := x.ParseAttr(update.Predicate)
@@ -600,13 +584,6 @@ func exportInternal(ctx context.Context, in *pb.ExportRequest, db *badger.DB,
 					glog.Errorf("Unable to export schema: %+v. Err=%v\n", pk, err)
 					continue
 				}
-			case x.ByteType:
-				kv, err = TypeExportKv(pk.Attr, val)
-				if err != nil {
-					// Let's not propagate this error. We just log this and continue onwards.
-					glog.Errorf("Unable to export type: %+v. Err=%v\n", pk, err)
-					continue
-				}
 			default:
 				glog.Fatalf("Unhandled byte prefix: %v", prefix)
 			}
@@ -641,9 +618,6 @@ func exportInternal(ctx context.Context, in *pb.ExportRequest, db *badger.DB,
 	if err := writePrefix(x.ByteSchema); err != nil {
 		return nil, err
 	}
-	if err := writePrefix(x.ByteType); err != nil {
-		return nil, err
-	}
 
 	// Finish up export.
 	if err := writers.Close(); err != nil {
@@ -670,14 +644,6 @@ func SchemaExportKv(attr string, val []byte, skipZero bool) (*bpb.KV, error) {
 		return nil, err
 	}
 	return toSchema(attr, &update), nil
-}
-
-func TypeExportKv(attr string, val []byte) (*bpb.KV, error) {
-	var update pb.TypeUpdate
-	if err := update.Unmarshal(val); err != nil {
-		return nil, err
-	}
-	return toType(attr, update), nil
 }
 
 // Export request is used to trigger exports for the request list of groups.

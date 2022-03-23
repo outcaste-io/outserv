@@ -24,11 +24,11 @@ import (
 	"net/http"
 	"testing"
 
+	_ "github.com/outcaste-io/gqlparser/v2/validator/rules" // make gql validator init() all rules
 	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/graphql/test"
 	"github.com/outcaste-io/outserv/testutil"
-	_ "github.com/dgraph-io/gqlparser/v2/validator/rules" // make gql validator init() all rules
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
