@@ -6,21 +6,16 @@ package alpha
 import (
 	"bytes"
 	"context"
-	"embed"
 	"fmt"
 	"log"
 	"math"
 	"net"
 	"net/http"
 	_ "net/http/pprof" // http profile
-	"net/url"
 	"os"
-	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -68,10 +63,6 @@ var (
 	adminServer *admin.GqlHandler
 	initDone    uint32
 )
-
-// Embed the Javascript Lambda Server's code to launch lambda server later on.
-//go:embed dist/*
-var jsLambda embed.FS
 
 func init() {
 	Alpha.Cmd = &cobra.Command{
@@ -225,17 +216,6 @@ func init() {
 
 	flag.String("lambda", worker.LambdaDefaults, z.NewSuperFlagHelp(worker.LambdaDefaults).
 		Head("Lambda options").
-		Flag("url",
-			"The URL of a lambda server that implements custom GraphQL Javascript resolvers."+
-				" This should be used only when using custom lambda server."+
-				" Use num subflag to launch official lambda server."+
-				" This flag if set, overrides the other lambda flags.").
-		Flag("num",
-			"Number of JS lambda servers to be launched by alpha.").
-		Flag("port",
-			"The starting port at which the lambda server listens.").
-		Flag("restart-after",
-			"Restarts the lambda server after given duration of unresponsiveness").
 		String())
 
 	flag.String("cdc", worker.CDCDefaults, z.NewSuperFlagHelp(worker.CDCDefaults).
@@ -445,138 +425,6 @@ func setupListener(addr string, port int) (net.Listener, error) {
 	return net.Listen("tcp", fmt.Sprintf("%s:%d", addr, port))
 }
 
-func setupLambdaServer(closer *z.Closer) {
-	// If --lambda url is set, then don't launch the lambda servers from dgraph.
-	if len(x.Config.Lambda.Url) > 0 {
-		return
-	}
-
-	num := int(x.Config.Lambda.Num)
-	port := int(x.Config.Lambda.Port)
-	if num == 0 {
-		return
-	}
-
-	tmpDir := x.WorkerConfig.Dir.Tmp
-
-	// Copy over all the embedded files to actual files.
-	dir := "dist"
-	files, err := jsLambda.ReadDir(dir)
-	x.Check(err)
-	for _, file := range files {
-		// The separator for embedded files is forward-slash even on Windows.
-		data, err := jsLambda.ReadFile(dir + "/" + file.Name())
-		x.Check(err)
-		filename := filepath.Join(tmpDir, file.Name())
-		file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-		x.Check(err)
-		_, err = file.Write(data)
-		x.Check(err)
-		x.Check(file.Close())
-	}
-
-	type lambda struct {
-		sync.Mutex
-		cmd        *exec.Cmd
-		active     bool
-		lastActive int64
-
-		health string
-		port   int
-	}
-
-	lambdas := make([]*lambda, 0, num)
-	for i := 0; i < num; i++ {
-		lambdas = append(lambdas, &lambda{
-			port:   port + i,
-			health: fmt.Sprintf("http://127.0.0.1:%d/health", port+i),
-		})
-	}
-
-	// Entry point of the script is index.js.
-	filename := filepath.Join(tmpDir, "index.js")
-	dgraphUrl := fmt.Sprintf("http://127.0.0.1:%d", httpPort())
-
-	// TODO: If node is not installed, we should not run any lambda servers.
-	glog.Infoln("Setting up lambda servers")
-	for i := range lambdas {
-		go func(i int) {
-			for {
-				select {
-				case <-closer.HasBeenClosed():
-					return
-				default:
-					time.Sleep(2 * time.Second)
-					cmd := exec.CommandContext(closer.Ctx(), "node", filename)
-					cmd.SysProcAttr = childProcessConfig()
-					cmd.Env = append(cmd.Env, fmt.Sprintf("PORT=%d", lambdas[i].port))
-					cmd.Env = append(cmd.Env, fmt.Sprintf("DGRAPH_URL="+dgraphUrl))
-					cmd.Stdout = os.Stdout
-					cmd.Stderr = os.Stderr
-
-					lambdas[i].Lock()
-					lambdas[i].cmd = cmd
-					lambdas[i].lastActive = time.Now().UnixNano()
-					glog.Infof("Running node command: %+v", cmd)
-					if err := cmd.Start(); err != nil {
-						glog.Errorf("Failed to start lambda server at port: %d. Got err: %+v",
-							lambdas[i].port, err)
-						lambdas[i].Unlock()
-						continue
-					}
-					lambdas[i].active = true
-					lambdas[i].Unlock()
-					if err := cmd.Wait(); err != nil {
-						glog.Errorf("Lambda server at port: %d stopped with error: %v",
-							lambdas[i].port, err)
-					}
-				}
-			}
-		}(i)
-	}
-
-	client := http.Client{Timeout: 1 * time.Second}
-	healthCheck := func(l *lambda) {
-		l.Lock()
-		defer l.Unlock()
-
-		if !l.active {
-			return
-		}
-
-		timestamp := time.Now().UnixNano()
-		resp, err := client.Get(l.health)
-		if err != nil || resp.StatusCode != 200 {
-			if time.Duration(timestamp-l.lastActive) > x.Config.Lambda.RestartAfter {
-				glog.Warningf("Lambda Server at port: %d not responding."+
-					" Killed it with err: %v", l.port, l.cmd.Process.Kill())
-				l.active = false
-			}
-			return
-		}
-
-		resp.Body.Close()
-		l.lastActive = timestamp
-	}
-
-	// Monitor the lambda servers. If the server is unresponsive for more than restart-after time,
-	// restart it.
-	go func() {
-		ticker := time.NewTicker(2 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-closer.HasBeenClosed():
-				return
-			case <-ticker.C:
-				for _, l := range lambdas {
-					healthCheck(l)
-				}
-			}
-		}
-	}()
-}
-
 func setupServer(closer *z.Closer) {
 	laddr := "localhost"
 	if bindall {
@@ -670,8 +518,10 @@ func setupServer(closer *z.Closer) {
 	baseMux.Handle("/", http.HandlerFunc(homeHandler))
 	baseMux.Handle("/ui/keywords", http.HandlerFunc(keywordHandler))
 
-	// Initialize the lambda server
-	setupLambdaServer(x.ServerCloser)
+	// TODO: Here the old lambda server started
+	// Since lambda should become a go routine, we do not need to start it
+	// right at the beginning, would be ok to start when it's needed
+
 	// Initialize the servers.
 	x.ServerCloser.AddRunning(2)
 	go x.StartListenHttpAndHttps(httpListener, tlsCfg, x.ServerCloser)
@@ -823,26 +673,11 @@ func run() {
 		Extensions:    graphql.GetBool("extensions"),
 		PollInterval:  graphql.GetDuration("poll-interval"),
 	}
-	lambda := z.NewSuperFlag(Alpha.Conf.GetString("lambda")).MergeAndCheckDefault(
+	// TODO: Lambda options if needed
+	/*lambda := z.NewSuperFlag(Alpha.Conf.GetString("lambda")).MergeAndCheckDefault(
 		worker.LambdaDefaults)
 	x.Config.Lambda = x.LambdaOptions{
-		Url:          lambda.GetString("url"),
-		Num:          lambda.GetUint32("num"),
-		Port:         lambda.GetUint32("port"),
-		RestartAfter: lambda.GetDuration("restart-after"),
-	}
-	if x.Config.Lambda.Url != "" {
-		graphqlLambdaUrl, err := url.Parse(x.Config.Lambda.Url)
-		if err != nil {
-			glog.Errorf("unable to parse --lambda url: %v", err)
-			return
-		}
-		if !graphqlLambdaUrl.IsAbs() {
-			glog.Errorf("expecting --lambda url to be an absolute URL, got: %s",
-				graphqlLambdaUrl.String())
-			return
-		}
-	}
+	}*/
 	edgraph.Init()
 
 	x.PrintVersion()
