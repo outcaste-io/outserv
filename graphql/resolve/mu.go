@@ -7,11 +7,14 @@ import (
 	"strconv"
 
 	"github.com/golang/glog"
+	"github.com/outcaste-io/outserv/codec"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
@@ -68,7 +71,7 @@ func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	val, _ := m.ArgValue(schema.InputArgName).([]interface{})
 
 	// Just consider the first one for now.
-	var resultUids []string
+	var resultUids []uint64
 	for _, i := range val {
 		obj := i.(map[string]interface{})
 		typ := m.MutatedType()
@@ -96,7 +99,7 @@ func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		// we can find the right ID for this object.
 
 		// var queries []*gql.GraphQuery
-		var uids []string
+		var uids []uint64
 		for _, xid := range xids {
 			xidVal := obj[xid.Name()]
 			if xidVal == nil {
@@ -111,7 +114,7 @@ func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			uids, err = UidsForXid(ctx, xid.DgraphAlias(), xidString)
 			if err != nil {
 				glog.Errorf("While executing UidsForXid: %v. Ignoring...\n", err)
-				uids = []string{}
+				uids = []uint64{}
 			}
 			glog.Infof("Got uids: %+v\n", uids)
 			// bms = append(bms, bm)
@@ -128,10 +131,10 @@ func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			// }
 		}
 		if len(uids) > 1 {
-			return nil, fmt.Errorf("Found %d UIDs for %s", len(uids), xids)
+			return nil, fmt.Errorf("Found %d UIDs for %v", len(uids), xids)
 		}
 		if len(uids) == 1 {
-			obj["uid"] = uids[0]
+			obj["uid"] = "0x" + strconv.FormatUint(uids[0], 16)
 			glog.Infof("Rewrote to %+v\n", obj)
 		} else {
 			obj["uid"] = "_:test"
@@ -156,52 +159,41 @@ func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		if err != nil {
 			return nil, err
 		}
-		var uid string
+		var uid uint64
 		if len(uids) == 1 {
 			uid = uids[0]
 		} else {
-			uid = resp.Uids["test"]
+			uid = x.FromHex(resp.Uids["test"])
 		}
-		glog.Infof("Got UID: %s\n", uid)
+		glog.Infof("Got UID: %#x\n", uid)
 		resultUids = append(resultUids, uid)
 	}
-	return convertIDsWithErr(resultUids)
+	return resultUids, nil
 }
 
-func UidsForXid(ctx context.Context, pred, value string) ([]string, error) {
-	q := fmt.Sprintf(`{q(func: eq(%s, %q)) { uid }}`, pred, value)
-	glog.Infof("Query: %s\n", q)
-
-	resp, err := edgraph.Query(ctx, &pb.Request{Query: q})
-	// resp, err := (&DgraphEx{}).Execute(ctx, &pb.Request{Query: q}, nil)
+func UidsForXid(ctx context.Context, pred, value string) ([]uint64, error) {
+	q := &pb.Query{
+		ReadTs: posting.ReadTimestamp(),
+		Attr:   x.NamespaceAttr(0, pred),
+		SrcFunc: &pb.SrcFunction{
+			Name: "eq",
+			Args: []string{value},
+		},
+		First: 3,
+	}
+	result, err := worker.ProcessTaskOverNetwork(ctx, q)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "while calling ProcessTaskOverNetwork")
 	}
-
-	glog.Infof("Got response: %s\n", resp.Json)
-
-	m := make(map[string]json.RawMessage)
-	if err := json.Unmarshal(resp.Json, &m); err != nil {
-		return nil, errors.Wrapf(err, "while unmarshal")
-	}
-	val := m["q"]
-	if val == nil || len(val) == 0 {
+	glog.Infof("Result uidmatrix length: %d", len(result.UidMatrix))
+	if len(result.UidMatrix) == 0 {
+		// No result found
 		return nil, nil
 	}
-
-	type U struct {
-		Uid string `json:"uid"`
-	}
-	var uids []U
-	if err := json.Unmarshal(val, &uids); err != nil {
-		return nil, errors.Wrapf(err, "while unmarshal of uids")
-	}
-	var res []string
-	for _, u := range uids {
-		res = append(res, u.Uid)
-	}
-	glog.Infof("Parsed uids: %+v\n", res)
-	return res, nil
+	bm := codec.MatrixToBitmap(result.UidMatrix)
+	uids := bm.ToArray()
+	glog.Infof("Found uids: %+v\n", uids)
+	return uids, nil
 }
 
 func (mr *dgraphResolver) rewriteAndExecute(

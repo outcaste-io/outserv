@@ -897,6 +897,7 @@ func createTaskQuery(ctx context.Context, sg *SubGraph) (*pb.Query, error) {
 			}
 		}
 	}
+	glog.Infof("SrcFunc: %+v\n", srcFunc)
 
 	// first is to limit how many results we want.
 	first, offset := calculatePaginationParams(sg)
@@ -913,6 +914,7 @@ func createTaskQuery(ctx context.Context, sg *SubGraph) (*pb.Query, error) {
 		First:     first,
 		Offset:    offset,
 	}
+	glog.Infof("pb.Query: %+v\n", out)
 
 	// Use the orderedUIDs if present, it will only be present for the shortest path case.
 	if sg.OrderedUIDs != nil {
