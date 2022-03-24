@@ -813,6 +813,7 @@ func TestPenultimateMemCorruption(t *testing.T) {
 	require.Zero(t, len(db0.imm))
 	db0.imm = append(db0.imm, db0.mt)
 	db0.mt, err = db0.newMemTable()
+	require.NoError(t, err)
 
 	h.writeRange(3, 7) // 00002.mem
 
@@ -1266,6 +1267,7 @@ func TestFirstVlogFile(t *testing.T) {
 
 	opt := DefaultOptions(dir)
 	db, err := Open(opt)
+	require.NoError(t, err)
 	defer db.Close()
 
 	fids := db.vlog.sortedFids()
