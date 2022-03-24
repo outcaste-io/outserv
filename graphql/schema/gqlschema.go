@@ -147,6 +147,11 @@ input Int64Range{
 	max: Int64!
 }
 
+input BigIntRange{
+	min: BigInt!
+	max: BigInt!
+}
+
 input DateTimeRange{
 	min: DateTime!
 	max: DateTime!
@@ -355,6 +360,16 @@ input Int64Filter {
 	between: Int64Range
 }
 
+input BigIntFilter {
+	eq: BigInt
+	in: [BigInt]
+	le: BigInt
+	lt: BigInt
+	ge: BigInt
+	gt: BigInt
+	between: BigIntRange
+}
+
 input FloatFilter {
 	eq: Float
 	in: [Float]
@@ -461,6 +476,7 @@ var numUids = &ast.FieldDefinition{
 var supportedSearches = map[string]searchTypeIndex{
 	"int":          {"Int", "int"},
 	"int64":        {"Int64", "int"},
+	"bigint":       {"BigInt", "bigint"},
 	"float":        {"Float", "float"},
 	"bool":         {"Boolean", "bool"},
 	"hash":         {"String", "hash"},
@@ -484,6 +500,7 @@ var defaultSearches = map[string]string{
 	"Boolean":      "bool",
 	"Int":          "int",
 	"Int64":        "int64",
+	"BigInt":       "bigint",
 	"Float":        "float",
 	"String":       "term",
 	"DateTime":     "year",
@@ -536,6 +553,7 @@ var builtInFilters = map[string]string{
 	"bool":         "Boolean",
 	"int":          "IntFilter",
 	"int64":        "Int64Filter",
+	"bigint":       "BigIntFilter",
 	"float":        "FloatFilter",
 	"year":         "DateTimeFilter",
 	"month":        "DateTimeFilter",

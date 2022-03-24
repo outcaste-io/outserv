@@ -19,6 +19,7 @@ package schema
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"strconv"
 
 	"github.com/outcaste-io/gqlparser/v2/ast"
@@ -29,7 +30,7 @@ import (
 
 var allowedFilters = []string{"StringHashFilter", "StringExactFilter", "StringFullTextFilter",
 	"StringRegExpFilter", "StringTermFilter", "DateTimeFilter", "FloatFilter", "Int64Filter", "IntFilter", "PointGeoFilter",
-	"ContainsFilter", "IntersectsFilter", "PolygonGeoFilter"}
+	"ContainsFilter", "IntersectsFilter", "PolygonGeoFilter", "BigIntFilter"}
 
 func listInputCoercion(observers *validator.Events, addError validator.AddErrFunc) {
 	observers.OnValue(func(walker *validator.Walker, value *ast.Value) {
@@ -173,6 +174,20 @@ func intRangeCheck(observers *validator.Events, addError validator.AddErrFunc) {
 				value.Kind = ast.StringValue
 			} else {
 				addError(validator.Message("Type mismatched for Value `%s`, expected: Int64, got: '%s'", value.Raw,
+					valueKindToString(value.Kind)), validator.At(value.Position))
+			}
+		case "BigInt":
+			if value.Kind == ast.IntValue || value.Kind == ast.StringValue {
+				i := &big.Int{}
+				_, ok := i.SetString(value.Raw, 0)
+				if !ok {
+					addError(validator.Message("Value could not be parsed"), validator.At(value.Position))
+				}
+				// UInt64 values parsed from query text would be propagated as strings internally
+				value.Kind = ast.StringValue
+			} else {
+				addError(validator.Message("Type mismatched for Value `%s`, expected: BigInt, "+
+					"got: '%s'", value.Raw,
 					valueKindToString(value.Kind)), validator.At(value.Position))
 			}
 		case "UInt64":

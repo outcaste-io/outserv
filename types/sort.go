@@ -72,7 +72,7 @@ func (s byValue) Less(i, j int) bool {
 // IsSortable returns true, if tid is sortable. Otherwise it returns false.
 func IsSortable(tid TypeID) bool {
 	switch tid {
-	case DateTimeID, IntID, FloatID, StringID, DefaultID:
+	case DateTimeID, IntID, BigIntID, FloatID, StringID, DefaultID:
 		return true
 	default:
 		return false

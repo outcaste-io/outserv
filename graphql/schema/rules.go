@@ -275,6 +275,7 @@ func typeNameValidation(schema *ast.SchemaDocument) gqlerror.List {
 		"CustomHTTP":           true,
 		"IntFilter":            true,
 		"Int64Filter":          true,
+		"BigIntFilter":         true,
 		"FloatFilter":          true,
 		"DateTimeFilter":       true,
 		"StringTermFilter":     true,
