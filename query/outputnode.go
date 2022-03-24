@@ -673,7 +673,7 @@ func valToBytes(v types.Val) ([]byte, error) {
 	case types.PasswordID:
 		return []byte(fmt.Sprintf("%q", v.Value.(string))), nil
 	case types.BigIntID:
-		i := v.Value.(*big.Int)
+		i := v.Value.(big.Int)
 		v, err := i.MarshalJSON()
 		if err != nil {
 			return nil, err
