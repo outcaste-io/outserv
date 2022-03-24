@@ -186,12 +186,12 @@ func Convert(from Val, toID TypeID) (Val, error) {
 			case BigIntID, BinaryID:
 				*res = *vc
 			case IntID:
-				// We are ignoring here, wether the value will fit into a int64
+				// We are ignoring here, whether the value will fit into a int64
 				*res = vc.Int64()
 			case FloatID:
 				f := &big.Float{}
 				f.SetInt(vc)
-				// We are ignoring here, wether the value will fit into a float64
+				// We are ignoring here, whether the value will fit into a float64
 				*res, _ = f.Float64()
 			case BoolID:
 				*res = vc.Int64() != 0
