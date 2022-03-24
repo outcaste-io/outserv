@@ -203,6 +203,7 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 			},
 		},
 	}
+	glog.Infof("Sending GraphQL schema updates: %+v\n", m)
 
 	// mutate the GraphQL schema. As it is a reserved predicate, and we are in group 1,
 	// so this call is gonna come back to all the group 1 servers only
@@ -211,6 +212,7 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 		return nil, err
 	}
 
+	glog.Infof("Now applying Dgraph Schema Updates: %+v\n", req.DgraphPreds)
 	// perform dgraph schema alter, if required. As the schema could be empty if it only has custom
 	// types/queries/mutations.
 	if len(req.DgraphPreds) != 0 {

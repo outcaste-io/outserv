@@ -216,13 +216,15 @@ func UpdateGQLSchema(ctx context.Context, gqlSchema,
 		}
 	}
 
-	return worker.UpdateGQLSchemaOverNetwork(ctx, &pb.UpdateGraphQLSchemaRequest{
+	resp, err := worker.UpdateGQLSchemaOverNetwork(ctx, &pb.UpdateGraphQLSchemaRequest{
 		// TODO: Understand this better and see what timestamp should be set.
 		StartTs:       posting.ReadTimestamp(),
 		GraphqlSchema: gqlSchema,
 		DgraphPreds:   parsedDgraphSchema.Preds,
 		Op:            pb.UpdateGraphQLSchemaRequest_SCHEMA,
 	})
+	glog.Infof("UpdateGQLSchemaOverNetwork returned with error: %v\n", err)
+	return resp, err
 }
 
 // UpdateLambdaScript updates the Lambda Script using the given inputs.

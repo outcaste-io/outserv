@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/codec"
@@ -65,6 +66,45 @@ func extractVal(xidVal interface{}, xid *schema.FieldDefinition) (string, error)
 	}
 }
 
+func UidsFromManyXids(ctx context.Context, obj map[string]interface{},
+	typ *schema.Type, useDgraphNames bool) ([]uint64, error) {
+
+	var bms []*sroar.Bitmap
+	for _, xid := range typ.XIDFields() {
+		var xidVal interface{}
+		if useDgraphNames {
+			xidVal = obj[xid.DgraphAlias()]
+		} else {
+			xidVal = obj[xid.Name()]
+		}
+		if xidVal == nil {
+			return nil, fmt.Errorf("XID %s can't be nil for obj: %+v\n", xid.Name(), obj)
+		}
+		xidString, err := extractVal(xidVal, xid)
+		if err != nil {
+			return nil, errors.Wrapf(err, "while extractVal")
+		}
+
+		glog.Infof("Converted xid value to string: %q -> %q   %q %q\n",
+			xid.Name(), xidString, xid.DgraphPredicate(), xid.DgraphAlias())
+
+		// TODO: Check if we can pass UIDs to this to filter quickly.
+		bm, err := UidsForXid(ctx, xid.DgraphAlias(), xidString)
+		if err != nil {
+			// TODO: Gotta wrap up errors to ensure GraphQL compliance.
+			return nil, err
+		}
+		glog.Infof("Cardinality of xid %s is %d\n", xid.Name(), bm.GetCardinality())
+		bms = append(bms, bm)
+		if bm.GetCardinality() == 0 {
+			// No need to proceed, if we couldn't find any
+			break
+		}
+	}
+	bm := sroar.FastAnd(bms...)
+	return bm.ToArray(), nil
+}
+
 func runUpsert(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	// Parsing input
 	val, ok := m.ArgValue(schema.InputArgName).([]interface{})
@@ -103,40 +143,13 @@ func runUpsert(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		// I think all the XID fields should be present for us to ensure that
 		// we can find the right ID for this object.
 
-		// var queries []*gql.GraphQuery
-		var bms []*sroar.Bitmap
-		for _, xid := range xids {
-			xidVal := obj[xid.Name()]
-			if xidVal == nil {
-				return nil, fmt.Errorf("XID %s can't be nil for obj: %+v\n", xid.Name(), obj)
-			}
-			xidString, err := extractVal(xidVal, xid)
-			if err != nil {
-				return nil, errors.Wrapf(err, "while extractVal")
-			}
-
-			glog.Infof("Converted xid value to string: %q -> %q   %q %q\n",
-				xid.Name(), xidString, xid.DgraphPredicate(), xid.DgraphAlias())
-
-			// TODO: Check if we can pass UIDs to this to filter quickly.
-			bm, err := UidsForXid(ctx, xid.DgraphAlias(), xidString)
-			if err != nil {
-				// TODO: Gotta wrap up errors to ensure GraphQL compliance.
-				return nil, err
-			}
-			glog.Infof("Cardinality of xid %s is %d\n", xid.Name(), bm.GetCardinality())
-			bms = append(bms, bm)
-			if bm.GetCardinality() == 0 {
-				// No need to proceed, if we couldn't find any
-				break
-			}
+		uids, err := UidsFromManyXids(ctx, obj, typ, false)
+		if err != nil {
+			return nil, errors.Wrapf(err, "UidsFromManyXids")
 		}
-		bm := sroar.FastAnd(bms...)
-		if num := bm.GetCardinality(); num > 1 {
-			return nil, fmt.Errorf("Found %d UIDs for %v", num, xids)
+		if len(uids) > 1 {
+			return nil, fmt.Errorf("Found %d UIDs for %v", len(uids), xids)
 		}
-
-		uids := bm.ToArray()
 		// If we found an entry and upsert flag is set to false, we should not
 		// update the entry.
 		if len(uids) == 1 {
@@ -273,6 +286,27 @@ func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	return uids, nil
 }
 
+func getObject(ctx context.Context, uid string, fields ...string) (map[string]interface{}, error) {
+	q := fmt.Sprintf(`{q(func: uid(%s)) { %s }}`, uid, strings.Join(fields[:], ", "))
+	resp, err := edgraph.Query(ctx, &pb.Request{Query: q})
+	if err != nil {
+		return nil, errors.Wrapf(err, "while requesting for object")
+	}
+
+	glog.Infof("Got response: %s\n", resp.Json)
+	var out map[string][]map[string]interface{}
+	if err := json.Unmarshal(resp.Json, &out); err != nil {
+		// This means we couldn't find the object. Ignore.
+		return nil, nil
+	}
+	list, has := out["q"]
+	if !has || len(list) == 0 {
+		return nil, nil
+	}
+	x.AssertTrue(len(list) == 1) // Can't be more than 1.
+	return list[0], nil
+}
+
 func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	uids, err := getUidsFromFilter(ctx, m)
 	if err != nil {
@@ -293,25 +327,94 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		return typ.Name() + "." + field
 	}
 
+	var xidList []string
+	xidMap := make(map[string]*schema.FieldDefinition)
+	for _, xidField := range typ.XIDFields() {
+		xidMap[dgName(xidField.Name())] = xidField
+		xidList = append(xidList, dgName(xidField.Name()))
+	}
+
+	checkIfDuplicateExists := func(dst map[string]interface{}) error {
+		u, has := dst["uid"]
+		x.AssertTrue(has)
+		uid := u.(string)
+
+		var needToCheck bool
+		for key := range dst {
+			if _, has := xidMap[key]; has {
+				// We're updating an XID for this object. So, we need to check
+				// for duplicates.
+				needToCheck = true
+				glog.Infof("Found that we're updating an XID: %s for %s\n", key, uid)
+			}
+		}
+		if !needToCheck {
+			glog.Infof("No need to check for duplicate for %s\n", uid)
+			return nil
+		}
+		src, err := getObject(ctx, uid, xidList...)
+		if err != nil {
+			return errors.Wrapf(err, "while getting object %s", uid)
+		}
+		x.AssertTrue(src != nil)
+		for key, val := range dst {
+			src[key] = val
+		}
+		glog.Infof("Updated object after applying patch: %+v\n", src)
+		uids, err := UidsFromManyXids(ctx, src, typ, true)
+		if err != nil {
+			return errors.Wrapf(err, "UidsFromManyXids")
+		}
+		glog.Infof("Got UIDs: %+v\n", uids)
+		if len(uids) == 0 {
+			// No duplicates found.
+			return nil
+		}
+		if uid == x.ToHexString(uids[0]) {
+			// This UID shouldn't be the one with the given updated XIDs if they
+			// were changed. Irrespective, no duplicate entries exist, so we're
+			// good.
+			return nil
+		}
+
+		var xids []string
+		for _, x := range typ.XIDFields() {
+			xids = append(xids, x.Name())
+		}
+		return fmt.Errorf("Duplicate entries exist for these unique ids: %v", xids)
+	}
+
+	// We need to ensure that we're not modifying an object which would violate
+	// the XID uniqueness constraints.
+	//
+	// Step 1. Get the object XIDs.
+	// Step 2. Apply the set patch to the object.
+	// Step 3. Check if there is another UID for this set of XIDs.
+	// Step 4. If so, reject the update for this UID.
 	var setJson, delJson []map[string]interface{}
 	if hasSet {
 		for _, uid := range uids {
-			m := make(map[string]interface{})
-			m["uid"] = x.ToHexString(uid)
+			dst := make(map[string]interface{})
+			dst["uid"] = x.ToHexString(uid)
 			for key, val := range setObj {
-				m[dgName(key)] = val
+				dst[dgName(key)] = val
 			}
-			setJson = append(setJson, m)
+			if err := checkIfDuplicateExists(dst); err != nil {
+				// TODO(mrjn): We should just skip this one. And continue onto
+				// the next UID -- the GraphQL way.
+				return uids, err
+			}
+			setJson = append(setJson, dst)
 		}
 	}
 	if hasDel {
 		for _, uid := range uids {
-			m := make(map[string]interface{})
-			m["uid"] = x.ToHexString(uid)
+			dst := make(map[string]interface{})
+			dst["uid"] = x.ToHexString(uid)
 			for key, val := range delObj {
-				m[dgName(key)] = val
+				dst[dgName(key)] = val
 			}
-			delJson = append(delJson, m)
+			delJson = append(delJson, dst)
 		}
 	}
 	mu := &pb.Mutation{}
@@ -390,40 +493,51 @@ func (mr *dgraphResolver) rewriteAndExecute(
 	}
 	_ = emptyResult(nil)
 
+	calculateResponse := func(uids []uint64) (*pb.Response, error) {
+		glog.Infof("Got uids: %+v\n", uids)
+		glog.Infof("Query field: %+v\n", mutation.QueryField())
+
+		field := mutation.QueryField()
+		dgQuery := []*gql.GraphQuery{{
+			Attr: field.DgraphAlias(),
+		}}
+		dgQuery[0].Func = &gql.Function{
+			Name: "uid",
+			UID:  uids,
+		}
+		addArgumentsToField(dgQuery[0], field)
+		glog.Infof("Got dgQuery[0]: %+v\n", dgQuery)
+		dgQuery[0].DebugPrint("mu  ")
+
+		dgQuery = append(dgQuery, addSelectionSetFrom(dgQuery[0], field, nil)...)
+
+		q := dgraph.AsString(dgQuery)
+		glog.Infof("Query: %s\n", q)
+
+		resp, err := (&DgraphEx{}).Execute(ctx, &pb.Request{Query: q}, field)
+		glog.Infof("Got error: %+v\n", err)
+		glog.Infof("Response: %+v\n", resp)
+		return resp, err
+	}
+
 	uids, err := rewriteQueries(ctx, mutation)
-	if err != nil {
-		glog.Errorf("Error from rewriteQueries: %v", err)
-		return nil, false
+	var resp *pb.Response
+	var err2 error
+	if len(uids) > 0 {
+		resp, err2 = calculateResponse(uids)
 	}
-	glog.Infof("Got uids: %+v\n", uids)
-
-	glog.Infof("Query field: %+v\n", mutation.QueryField())
-
-	field := mutation.QueryField()
-	dgQuery := []*gql.GraphQuery{{
-		Attr: field.DgraphAlias(),
-	}}
-	dgQuery[0].Func = &gql.Function{
-		Name: "uid",
-		UID:  uids,
+	res := &Resolved{Field: mutation}
+	if resp != nil && len(resp.Json) > 0 {
+		res.Data = completeMutationResult(mutation, resp.Json, len(uids))
+	} else {
+		res.Data = mutation.NullResponse()
 	}
-	addArgumentsToField(dgQuery[0], field)
-	glog.Infof("Got dgQuery[0]: %+v\n", dgQuery)
-	dgQuery[0].DebugPrint("mu  ")
-
-	dgQuery = append(dgQuery, addSelectionSetFrom(dgQuery[0], field, nil)...)
-
-	q := dgraph.AsString(dgQuery)
-	glog.Infof("Query: %s\n", q)
-
-	resp, err := (&DgraphEx{}).Execute(ctx, &pb.Request{Query: q}, field)
-	glog.Infof("Got error: %+v\n", err)
-	glog.Infof("Response: %+v\n", resp)
-
-	res := &Resolved{
-		Data:  completeMutationResult(mutation, resp.Json, len(uids)),
-		Field: mutation,
-		Err:   schema.PrependPath(nil, mutation.ResponseName()),
+	if err == nil && err2 != nil {
+		res.Err = schema.PrependPath(err2, mutation.ResponseName())
+	} else {
+		res.Err = schema.PrependPath(err, mutation.ResponseName())
 	}
-	return res, resolverSucceeded
+
+	success := err == nil && err2 == nil
+	return res, success
 }
