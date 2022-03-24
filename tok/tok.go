@@ -242,7 +242,7 @@ func (t BigIntTokenizer) Tokens(v interface{}) ([]string, error) {
 
 func (t BigIntTokenizer) Identifier() byte { return IdentBigInt }
 func (t BigIntTokenizer) IsSortable() bool { return true }
-func (t BigIntTokenizer) IsLossy() bool    { return true }
+func (t BigIntTokenizer) IsLossy() bool    { return false }
 
 // FloatTokenizer generates tokens from floating-point data.
 type FloatTokenizer struct{}
