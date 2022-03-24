@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/codec"
@@ -97,14 +98,127 @@ func UidsFromManyXids(ctx context.Context, obj map[string]interface{},
 		glog.Infof("Cardinality of xid %s is %d\n", xid.Name(), bm.GetCardinality())
 		bms = append(bms, bm)
 		if bm.GetCardinality() == 0 {
-			// No need to proceed, if we couldn't find any
-			break
+			// No need to proceed, if we couldn't find any.
+			return nil, nil
 		}
 	}
 	bm := sroar.FastAnd(bms...)
 	return bm.ToArray(), nil
 }
 
+type Object map[string]interface{}
+
+var objCounter uint64
+
+func gatherObjects(ctx context.Context, src Object, typ *schema.Type, upsert bool) ([]Object, error) {
+	// TODO: Refactor this so we deal with each val in a nested func.
+	glog.Infof("mutatedType: %+v obj: %+v\n", typ, src)
+	fields := typ.Fields()
+
+	var res []Object
+	var dst Object
+	for i, f := range fields {
+		val, has := src[f.Name()]
+		if !has {
+			continue
+		}
+
+		dst[f.DgraphAlias()] = val
+		glog.Infof("Replacing %d %q -> %q\n", i, f.Name(), f.DgraphAlias())
+		if f.Type().IsInbuiltOrEnumType() {
+			continue
+		}
+
+		glog.Infof("--> got a field which is not inbuilt type: %s %s %+v\n", f.Name(), f.Type().Name(), val)
+		switch val.(type) {
+		case []Object:
+			v := val.([]map[string]interface{})
+			for _, elem := range v {
+				objs, err := gatherObjects(ctx, elem, f.Type(), upsert)
+				if err != nil {
+					return nil, errors.Wrapf(err, "while nesting into %s", f.Name())
+				}
+				res = append(res, objs...)
+			}
+		case Object:
+			v := val.(map[string]interface{})
+			objs, err := gatherObjects(ctx, v, f.Type(), upsert)
+			if err != nil {
+				return nil, errors.Wrapf(err, "while nesting into %s", f.Name())
+			}
+			res = append(res, objs...)
+		default:
+			panic(fmt.Sprintf("Unhandled type of val: %+v", val))
+		}
+	}
+
+	// TODO: Why should an ID be present for an upsert? ID only gets
+	// assigned via Dgraph UID, doesn't it?
+	var idVal uint64
+	if id := typ.IDField(); id != nil {
+		glog.Infof("ID Name: %s\n", id.Name())
+		if val := src[id.Name()]; val != nil {
+			glog.Infof("Found ID field: %s %+v\n", id.Name(), val)
+			valStr, err := extractVal(val, id)
+			if err != nil {
+				return nil, errors.Wrapf(err, "while converting ID to string for %s", id.Name())
+			}
+			idVal = x.FromHex(valStr)
+		}
+	}
+
+	xids := typ.XIDFields()
+	for _, x := range xids {
+		glog.Infof("Found XID field: %s %+v\n", x.Name(), x)
+	}
+	// I think all the XID fields should be present for us to ensure that
+	// we can find the right ID for this object.
+
+	uids, err := UidsFromManyXids(ctx, src, typ, false)
+	if err != nil {
+		return nil, errors.Wrapf(err, "UidsFromManyXids")
+	}
+
+	updateObject := true
+	switch {
+	case len(uids) > 1:
+		return nil, fmt.Errorf("Found %d UIDs for %v", len(uids), xids)
+	case len(uids) == 0:
+		// No object with the given XIDs exists. This is an insert.
+		if idVal > 0 {
+			// use the idVal that we parsed before.
+			dst["uid"] = x.ToHexString(idVal)
+		} else {
+			// We need a counter with this variable to allow multiple such
+			// objects.
+			dst["uid"] = fmt.Sprintf("_:%s-%d", typ.Name(), atomic.AddUint64(&objCounter, 1))
+		}
+		// TODO: We should overhaul this type system later.
+		dst["dgraph.type"] = typ.DgraphName()
+	default:
+		// len(uids) == 1
+		if idVal > 0 && idVal != uids[0] {
+			// We found an idVal, but it doesn't match the UID found via
+			// XIDs. This is strange.
+			return nil, errors.Wrapf(err,
+				"ID provided: %#x doesn't match ID found: %#x", idVal, uids[0])
+		}
+		// idVal if present matches with uids[0]
+		dst["uid"] = x.ToHexString(uids[0])
+		if !upsert {
+			// We won't add a new object here, because an object already
+			// exists. And we should not be updating this object because
+			// upsert is false. Just return the list of UIDS found.
+			updateObject = false
+		}
+	}
+
+	glog.Infof("Rewrote to %+v\n", dst)
+	if updateObject {
+		res = append(res, dst)
+	}
+	return res, nil
+}
 func runUpsert(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	// Parsing input
 	val, ok := m.ArgValue(schema.InputArgName).([]interface{})
@@ -116,87 +230,47 @@ func runUpsert(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		upsert = upsertVal.(bool)
 	}
 
+	typ := m.MutatedType()
 	// Just consider the first one for now.
-	var resultUids []uint64
+	var res []Object
 	for _, i := range val {
-		// TODO: Refactor this so we deal with each val in a nested func.
 		obj := i.(map[string]interface{})
-		typ := m.MutatedType()
-		glog.Infof("mutatedType: %+v obj: %+v\n", typ, obj)
-		fields := typ.Fields()
-
-		id := typ.IDField()
-		if id != nil {
-			glog.Infof("ID Name: %s full: %+v\n", id.Name(), id)
-			if idVal := obj[id.Name()]; idVal != nil {
-				glog.Infof("Found ID field: %s %+v\n", id.Name(), idVal)
-				// If we found the ID field, then we can just send the mutations.
-				//
-				// TODO: Add logic to check something, not sure what.
-			}
-		}
-
-		xids := typ.XIDFields()
-		for _, x := range xids {
-			glog.Infof("Found XID field: %s %+v\n", x.Name(), x)
-		}
-		// I think all the XID fields should be present for us to ensure that
-		// we can find the right ID for this object.
-
-		uids, err := UidsFromManyXids(ctx, obj, typ, false)
+		objs, err := gatherObjects(ctx, obj, typ, upsert)
 		if err != nil {
-			return nil, errors.Wrapf(err, "UidsFromManyXids")
+			return nil, errors.Wrapf(err, "while gathering objects")
 		}
-		if len(uids) > 1 {
-			return nil, fmt.Errorf("Found %d UIDs for %v", len(uids), xids)
-		}
-		// If we found an entry and upsert flag is set to false, we should not
-		// update the entry.
-		if len(uids) == 1 {
-			obj["uid"] = "0x" + strconv.FormatUint(uids[0], 16)
-			glog.Infof("Rewrote to %+v\n", obj)
-			if !upsert {
-				// We won't add a new object here, because an object already
-				// exists. And we should not be updating this object because
-				// upsert is false. Just return the list of UIDS found.
-				resultUids = append(resultUids, uids[0])
-				continue
-			}
-		} else {
-			obj["uid"] = "_:test"
-			// TODO: We should overhaul this type system later.
-			obj["dgraph.type"] = typ.DgraphName()
-		}
-
-		for i, f := range fields {
-			if val, has := obj[f.Name()]; has {
-				obj[f.DgraphAlias()] = val
-				delete(obj, f.Name())
-				glog.Infof("Replacing %d %q -> %q\n", i, f.Name(), f.DgraphAlias())
-			}
-		}
-		// No uids found. Add.
-		glog.Infof("Setting object: %+v\n", obj)
-
-		data, err := json.Marshal(obj)
-		x.Check(err)
-		mu := &pb.Mutation{SetJson: data}
-
-		// TODO: Batch all this up.
-		resp, err := edgraph.Query(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}})
-		glog.Infof("Got error from query: %v resp: %+v\n", err, resp)
-		if err != nil {
-			return nil, err
-		}
-		var uid uint64
-		if len(uids) == 1 {
-			uid = uids[0]
-		} else {
-			uid = x.FromHex(resp.Uids["test"])
-		}
-		glog.Infof("Got UID: %#x\n", uid)
-		resultUids = append(resultUids, uid)
+		res = append(res, objs...)
 	}
+
+	var resultUids []uint64
+	for _, obj := range res {
+		uid := obj["uid"]
+		x.AssertTrue(uid != nil)
+		uidStr := uid.(string)
+		if strings.HasPrefix(uidStr, "_:") {
+			continue
+		}
+		resultUids = append(resultUids, x.FromHex(uidStr))
+	}
+	data, err := json.Marshal(res)
+	x.Check(err)
+
+	glog.Infof("Data to be mutated: %s\n", data)
+	mu := &pb.Mutation{SetJson: data}
+
+	// TODO: Batch all this up.
+	resp, err := edgraph.Query(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}})
+	glog.Infof("Got error from query: %v resp: %+v\n", err, resp)
+	if err != nil {
+		return nil, err
+	}
+
+	for key, uid := range resp.Uids {
+		if strings.HasPrefix(key, typ.Name()+"-") {
+			resultUids = append(resultUids, x.FromHex(uid))
+		}
+	}
+	glog.Infof("Got resultUids: %+v\n", resultUids)
 	return resultUids, nil
 }
 
@@ -509,7 +583,7 @@ func (mr *dgraphResolver) rewriteAndExecute(
 		glog.Infof("Got dgQuery[0]: %+v\n", dgQuery)
 		dgQuery[0].DebugPrint("mu  ")
 
-		dgQuery = append(dgQuery, addSelectionSetFrom(dgQuery[0], field, nil)...)
+		dgQuery = append(dgQuery, addSelectionSetFrom(dgQuery[0], field)...)
 
 		q := dgraph.AsString(dgQuery)
 		glog.Infof("Query: %s\n", q)
