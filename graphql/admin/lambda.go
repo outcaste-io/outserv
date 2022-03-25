@@ -5,20 +5,17 @@ package admin
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/lambda"
 	"github.com/outcaste-io/outserv/query"
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
+	"github.com/pkg/errors"
 )
-
-type updateLambdaInput struct {
-	Set worker.LambdaScript `json:"set,omitempty"`
-}
 
 func resolveUpdateLambda(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool) {
 	glog.Info("Got updateLambdaScript request")
@@ -28,7 +25,7 @@ func resolveUpdateLambda(ctx context.Context, m *schema.Field) (*resolve.Resolve
 		return resolve.EmptyResult(m, err), false
 	}
 
-	resp, err := edgraph.UpdateLambdaScript(ctx, input.Set.Script)
+	resp, err := edgraph.UpdateLambdaScript(ctx, input.Script)
 	if err != nil {
 		return resolve.EmptyResult(m, err), false
 	}
@@ -39,7 +36,8 @@ func resolveUpdateLambda(ctx context.Context, m *schema.Field) (*resolve.Resolve
 			m.Name(): map[string]interface{}{
 				"lambdaScript": map[string]interface{}{
 					"id":     query.UidToHex(resp.Uid),
-					"script": input.Set.Script,
+					"script": input.Script,
+					"hash":   resp.Hash,
 				}}},
 		nil), true
 }
@@ -66,14 +64,28 @@ func resolveGetLambda(ctx context.Context, q *schema.Field) *resolve.Resolved {
 	return resolve.DataResult(q, data, nil)
 }
 
-func getLambdaInput(m *schema.Field) (*updateLambdaInput, error) {
+func getLambdaInput(m *schema.Field) (*lambda.LambdaScript, error) {
 	inputArg := m.ArgValue(schema.InputArgName)
-	inputByts, err := json.Marshal(inputArg)
-	if err != nil {
-		return nil, schema.GQLWrapf(err, "couldn't get input argument")
+
+	// Not using json, because we need the raw binaries, not base64 encoded
+	i, ok := inputArg.(map[string]interface{})
+	if !ok {
+		return nil, errors.New("invalid input")
+	}
+	v, ok := i["set"].(map[string]interface{})
+	if !ok {
+		return nil, errors.New("invalid input for set")
+	}
+	b, ok := v["script"].([][]byte)
+	if !ok {
+		return nil, errors.New("invalid input for script")
+	}
+	if len(b) == 0 {
+		return nil, errors.New("invalid input for script data")
 	}
 
-	var input updateLambdaInput
-	err = json.Unmarshal(inputByts, &input)
-	return &input, schema.GQLWrapf(err, "couldn't get input argument")
+	lambdaScript := &lambda.LambdaScript{
+		Script: b[0],
+	}
+	return lambdaScript, nil
 }

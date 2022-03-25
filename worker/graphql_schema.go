@@ -5,6 +5,8 @@ package worker
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/base64"
 	"encoding/json"
 	"sort"
 	"sync"
@@ -16,6 +18,7 @@ import (
 
 	"github.com/outcaste-io/outserv/codec"
 	"github.com/outcaste-io/outserv/conn"
+	"github.com/outcaste-io/outserv/lambda"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/x"
@@ -23,20 +26,30 @@ import (
 	"github.com/pkg/errors"
 )
 
+// TODO(schartey/lambda): Move lambda in another file
 const (
 	errGraphQLSchemaCommitFailed = "error occurred updating GraphQL schema, please retry"
 	ErrGraphQLSchemaAlterFailed  = "succeeded in saving GraphQL schema but failed to alter Dgraph schema - " +
 		"GraphQL layer may exhibit unexpected behaviour, reapplying the old GraphQL schema may prevent any issues"
 
-	GqlSchemaPred    = "dgraph.graphql.schema"
-	gqlSchemaXidPred = "dgraph.graphql.xid"
-	gqlSchemaXidVal  = "dgraph.graphql.schema"
+	GqlSchemaPred      = "dgraph.graphql.schema"
+	gqlSchemaXidPred   = "dgraph.graphql.xid"
+	gqlSchemaXidVal    = "dgraph.graphql.schema"
+	LambdaScriptPred   = "dgraph.graphql.lambda.script"
+	LambdaHashPred     = "dgraph.graphql.lambda.hash"
+	LambdaXidPred      = "dgraph.graphql.lambda.xid"
+	lambdaScriptXidVal = "dgraph.graphql.lambda.script"
+	lambdaHashXidVal   = "dgraph.graphql.lambda.hash"
 )
 
 var (
 	schemaLock                                  sync.Mutex
 	errUpdatingGraphQLSchemaOnNonGroupOneLeader = errors.New(
 		"while updating GraphQL schema: this server isn't group-1 leader, please retry")
+	errUpdatingLambdaScriptOnNonGroupOneLeader = errors.New(
+		"while updating lambda script: this server isn't group-1 leader, please retry")
+	errUpdatingLambdaScriptNoChanges = errors.New(
+		"while updating lambda script: no changes to apply")
 	ErrMultipleGraphQLSchemaNodes = errors.New("found multiple nodes for GraphQL schema")
 	gqlSchemaStore                *GQLSchemaStore
 )
@@ -109,6 +122,28 @@ func UpdateGQLSchemaOverNetwork(ctx context.Context, req *pb.UpdateGraphQLSchema
 	return c.UpdateGraphQLSchema(ctx, req)
 }
 
+// UpdateLambdaScriptOverNetwork sends the request to the group one leader for execution.
+func UpdateLambdaScriptOverNetwork(ctx context.Context, req *pb.UpdateLambdaScriptRequest) (*pb.
+	UpdateLambdaScriptResponse, error) {
+	if isGroupOneLeader() {
+		return (&grpcWorker{}).UpdateLambdaScript(ctx, req)
+	}
+
+	pl := groups().Leader(1)
+	if pl == nil {
+		return nil, conn.ErrNoConnection
+	}
+	con := pl.Get()
+	c := pb.NewWorkerClient(con)
+
+	// pass on the incoming metadata to the group-1 leader
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		ctx = metadata.NewOutgoingContext(ctx, md)
+	}
+
+	return c.UpdateLambdaScript(ctx, req)
+}
+
 func ParseAsSchemaAndScript(b []byte) (string, string) {
 	var data x.GQL
 	if err := json.Unmarshal(b, &data); err != nil {
@@ -119,10 +154,21 @@ func ParseAsSchemaAndScript(b []byte) (string, string) {
 	return data.Schema, data.Script
 }
 
+func ParseLambdaScript(b []byte) (*lambda.LambdaScript, error) {
+	var script *lambda.LambdaScript
+	if err := json.Unmarshal(b, &script); err != nil {
+		glog.Warningf("Cannot unmarshal existing LambdaScript into new format. Got err: %+v.", err)
+		return nil, err
+	}
+	return script, nil
+}
+
+// TODO(schartey/lambda): Split this from UpdateLambda
 // UpdateGraphQLSchema updates the GraphQL schema node with the new GraphQL schema,
 // and then alters the dgraph schema. All this is done only on group one leader.
 func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 	req *pb.UpdateGraphQLSchemaRequest) (*pb.UpdateGraphQLSchemaResponse, error) {
+
 	if !isGroupOneLeader() {
 		return nil, errUpdatingGraphQLSchemaOnNonGroupOneLeader
 	}
@@ -198,19 +244,12 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 		}
 		if len(res.GetValueMatrix()) == 0 || len(res.ValueMatrix[0].GetValues()) == 0 {
 			return nil,
-				errors.Errorf("Schema node was found but the corresponding schema does not exist")
+				errors.Errorf("Lambda node was found but the corresponding lambda does not exist")
 		}
 		gql.Schema, gql.Script = ParseAsSchemaAndScript(res.ValueMatrix[0].Values[0].Val)
 	}
 
-	switch req.Op {
-	case pb.UpdateGraphQLSchemaRequest_SCHEMA:
-		gql.Schema = req.GraphqlSchema
-	case pb.UpdateGraphQLSchemaRequest_SCRIPT:
-		gql.Script = req.LambdaScript
-	default:
-		panic("GraphQL update operation should be either SCHEMA or SCRIPT")
-	}
+	gql.Schema = req.GraphqlSchema
 	val, err := json.Marshal(gql)
 	if err != nil {
 		return nil, err
@@ -273,6 +312,206 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 
 	// return the uid of the GraphQL schema node
 	return &pb.UpdateGraphQLSchemaResponse{Uid: schemaNodeUid}, nil
+}
+
+func (w *grpcWorker) UpdateLambdaScript(ctx context.Context,
+	req *pb.UpdateLambdaScriptRequest) (*pb.UpdateLambdaScriptResponse, error) {
+
+	// TODO(schartey/lambda)
+	if !isGroupOneLeader() {
+		return nil, errUpdatingLambdaScriptOnNonGroupOneLeader
+	}
+
+	ctx = x.AttachJWTNamespace(ctx)
+	namespace, err := x.ExtractNamespace(ctx)
+	if err != nil {
+		return nil, errors.Wrapf(err, "While updating gql schema")
+	}
+
+	waitStart := time.Now()
+
+	// lock here so that only one request is served at a time by group 1 leader
+	schemaLock.Lock()
+	defer schemaLock.Unlock()
+
+	waitDuration := time.Since(waitStart)
+	if waitDuration > 500*time.Millisecond {
+		glog.Warningf("LambdaScript update for namespace %d waited for %s as another lambda"+
+			" update was in progress.", namespace, waitDuration.String())
+	}
+
+	h := sha1.New()
+	h.Write(req.LambdaScript)
+	hash := base64.URLEncoding.EncodeToString(h.Sum(nil))
+
+	// query the LambdaScript node uid
+	res, err := ProcessTaskOverNetwork(ctx, &pb.Query{
+		Attr:    x.NamespaceAttr(namespace, LambdaScriptPred),
+		SrcFunc: &pb.SrcFunction{Name: "has"},
+		ReadTs:  req.StartTs,
+		// there can only be one LambdaScript node,
+		// so querying two just to detect if this condition is ever violated
+		First: 2,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO(schartey/lambda): Can't use a simple dql query, because we would create a cyclic dependency
+	// find if we need to create the node or can use the uid from existing node
+	creatingNode := false
+	var lambdaNodeUid uint64
+	uidMtrxLen := len(res.GetUidMatrix())
+	c := codec.ListCardinality(res.GetUidMatrix()[0])
+	if uidMtrxLen == 0 || (uidMtrxLen == 1 && c == 0) {
+		// if there was no schema node earlier, then need to assign a new uid for the node
+		res, err := zero.AssignUids(ctx, 1)
+		if err != nil {
+			return nil, err
+		}
+		creatingNode = true
+		lambdaNodeUid = res.StartId
+	} else if uidMtrxLen == 1 && c == 1 {
+		// if there was already a schema node, then just use the uid from that node
+		lambdaNodeUid = codec.GetUids(res.GetUidMatrix()[0])[0]
+	} else {
+		// there seems to be multiple nodes for GraphQL schema,Ideally we should never reach here
+		// But if by any bug we reach here then return the schema node which is added last
+		uidList := codec.GetUids(res.GetUidMatrix()[0])
+		sort.Slice(uidList, func(i, j int) bool {
+			return uidList[i] < uidList[j]
+		})
+		glog.Errorf("Multiple lambda node found, using the last one")
+		lambdaNodeUid = uidList[len(uidList)-1]
+	}
+
+	lambdaScript := &lambda.LambdaScript{}
+	if !creatingNode {
+		// Fetch the current graphql schema and script using the schema node uid.
+		res, err := ProcessTaskOverNetwork(ctx, &pb.Query{
+			Attr:      x.NamespaceAttr(namespace, LambdaScriptPred),
+			UidList:   &pb.List{SortedUids: []uint64{lambdaNodeUid}},
+			ExpandAll: true,
+			ReadTs:    req.StartTs,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if len(res.GetValueMatrix()) == 0 || len(res.ValueMatrix[0].GetValues()) == 0 {
+			return nil,
+				errors.Errorf("Lambda node was found but the corresponding script does not exist")
+		}
+
+		lambdaScript.Script = res.ValueMatrix[0].Values[0].Val
+		if err != nil {
+			return nil, errors.Wrap(err, "Could not parse lambda script")
+		}
+
+		res, err = ProcessTaskOverNetwork(ctx, &pb.Query{
+			Attr:      x.NamespaceAttr(namespace, LambdaHashPred),
+			UidList:   &pb.List{SortedUids: []uint64{lambdaNodeUid}},
+			ExpandAll: true,
+			ReadTs:    req.StartTs,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if len(res.GetValueMatrix()) == 0 || len(res.ValueMatrix[0].GetValues()) == 0 {
+			return nil,
+				errors.Errorf("Lambda node was found but the corresponding hash does not exist")
+		}
+
+		lambdaScript.Hash = string(res.ValueMatrix[0].Values[0].Val)
+		if err != nil {
+			return nil, errors.Wrap(err, "Could not parse lambda script")
+		}
+
+		if lambdaScript.Hash == string(hash) {
+			return nil, errUpdatingLambdaScriptNoChanges
+		}
+	}
+
+	lambdaScript.Script = req.LambdaScript
+	lambdaScript.Hash = string(hash)
+
+	// prepare GraphQL schema mutation
+	m := &pb.Mutations{
+		Edges: []*pb.DirectedEdge{
+			{
+				Entity:    lambdaNodeUid,
+				Attr:      x.NamespaceAttr(namespace, LambdaScriptPred),
+				Value:     lambdaScript.Script,
+				ValueType: pb.Posting_BINARY,
+				Op:        pb.DirectedEdge_SET,
+			},
+			{
+				Entity:    lambdaNodeUid,
+				Attr:      x.NamespaceAttr(namespace, LambdaHashPred),
+				Value:     []byte(lambdaScript.Hash),
+				ValueType: pb.Posting_STRING,
+				Op:        pb.DirectedEdge_SET,
+			},
+			{
+				// if this server is no more the Group-1 leader and is mutating the GraphQL
+				// schema node, also if concurrently another schema update is requested which is
+				// being performed at the actual Group-1 leader, then mutating the xid with the
+				// same value will cause one of the mutations to abort, because of the upsert
+				// directive on xid. So, this way we make sure that even in this rare case there can
+				// only be one server which is able to successfully update the GraphQL schema.
+				Entity:    lambdaNodeUid,
+				Attr:      x.NamespaceAttr(namespace, LambdaXidPred),
+				Value:     []byte(lambdaScriptXidVal),
+				ValueType: pb.Posting_BINARY,
+				Op:        pb.DirectedEdge_SET,
+			},
+			{
+				// if this server is no more the Group-1 leader and is mutating the GraphQL
+				// schema node, also if concurrently another schema update is requested which is
+				// being performed at the actual Group-1 leader, then mutating the xid with the
+				// same value will cause one of the mutations to abort, because of the upsert
+				// directive on xid. So, this way we make sure that even in this rare case there can
+				// only be one server which is able to successfully update the GraphQL schema.
+				Entity:    lambdaNodeUid,
+				Attr:      x.NamespaceAttr(namespace, LambdaXidPred),
+				Value:     []byte(lambdaHashXidVal),
+				ValueType: pb.Posting_STRING,
+				Op:        pb.DirectedEdge_SET,
+			},
+		},
+	}
+	if creatingNode {
+		m.Edges = append(m.Edges, &pb.DirectedEdge{
+			Entity:    lambdaNodeUid,
+			Attr:      x.NamespaceAttr(namespace, "dgraph.type"),
+			Value:     []byte("dgraph.graphql.lambda"),
+			ValueType: pb.Posting_STRING,
+			Op:        pb.DirectedEdge_SET,
+		})
+	}
+	// mutate the GraphQL schema. As it is a reserved predicate, and we are in group 1,
+	// so this call is gonna come back to all the group 1 servers only
+	_, err = MutateOverNetwork(ctx, m)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO(schartey/lambda): remove should not be needed
+	// perform dgraph schema alter, if required. As the schema could be empty if it only has custom
+	// types/queries/mutations.
+	/*if len(req.DgraphPreds) != 0 {
+		if _, err = MutateOverNetwork(ctx, &pb.Mutations{
+			Schema: req.DgraphPreds,
+		}); err != nil {
+			return nil, errors.Wrap(err, ErrGraphQLSchemaAlterFailed)
+		}
+		// busy waiting for indexing to finish
+		if err = WaitForIndexing(ctx, true); err != nil {
+			return nil, err
+		}
+	}*/
+
+	// return the uid of the GraphQL schema node
+	return &pb.UpdateLambdaScriptResponse{Uid: lambdaNodeUid, Hash: hash}, nil
 }
 
 // WaitForIndexing does a busy wait for indexing to finish or the context to error out,

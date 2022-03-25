@@ -17,6 +17,7 @@ import (
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/lambda"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/query"
 	"github.com/outcaste-io/outserv/worker"
@@ -241,6 +242,7 @@ func newAdminResolver(
 	// Remove uid from the key, to get the correct prefix
 	prefix = prefix[:len(prefix)-8]
 	// Listen for graphql schema changes in group 1.
+
 	go worker.SubscribeForUpdates([][]byte{prefix}, x.IgnoreBytes, func(kvs *badgerpb.KVList) {
 
 		kv := x.KvWithMaxVersion(kvs, [][]byte{prefix})
@@ -269,29 +271,19 @@ func newAdminResolver(
 		ns, _ := x.ParseNamespaceAttr(pk.Attr)
 
 		var data x.GQL
-		data.Schema, data.Script = worker.ParseAsSchemaAndScript(pl.Postings[0].Value)
+		data.Schema, _ = worker.ParseAsSchemaAndScript(pl.Postings[0].Value)
 
 		newSchema := &worker.GqlSchema{
 			ID:      query.UidToHex(pk.Uid),
 			Version: kv.GetVersion(),
 			Schema:  data.Schema,
 		}
-		newScript := &worker.LambdaScript{
-			ID:     query.UidToHex(pk.Uid),
-			Script: data.Script,
-		}
 
-		var currentScript string
-		if script, ok := worker.Lambda().GetCurrent(ns); ok {
-			currentScript = script.Script
-		}
 		server.mux.RLock()
 		currentSchema, ok := server.gqlSchemas.GetCurrent(ns)
 		if ok {
 			schemaNotChanged := newSchema.Schema == currentSchema.Schema
-			scriptNotChanged := newScript.Script == currentScript
-			if newSchema.Version <= currentSchema.Version ||
-				(schemaNotChanged && scriptNotChanged) {
+			if newSchema.Version <= currentSchema.Version {
 				glog.Infof("namespace: %d. Skipping GraphQL schema update. "+
 					"newSchema.Version: %d, oldSchema.Version: %d, schemaChanged: %v.",
 					ns, newSchema.Version, currentSchema.Version, !schemaNotChanged)
@@ -318,8 +310,6 @@ func newAdminResolver(
 		// if the schema hasn't been loaded yet, then we don't need to load it here
 		currentSchema, ok = server.gqlSchemas.GetCurrent(ns)
 		if !(ok && currentSchema.Loaded) {
-			// this just set schema in admin server, so that next invalid badger subscription update gets rejected upfront
-			worker.Lambda().Set(ns, newScript)
 			server.gqlSchemas.Set(ns, newSchema)
 			glog.Infof("namespace: %d. Skipping in-memory GraphQL schema update, "+
 				"it will be lazy-loaded later.", ns)
@@ -330,13 +320,33 @@ func newAdminResolver(
 		newSchema.Loaded = true
 		server.gqlSchemas.Set(ns, newSchema)
 		server.resetSchema(ns, gqlSchema)
-		// Update the lambda script
-		worker.Lambda().Set(ns, newScript)
 
 		glog.Infof("namespace: %d. Successfully updated GraphQL schema. "+
 			"Serving New GraphQL API.", ns)
 	}, 1, closer)
 
+	// Subscribe for lambda updates
+	lambdaScriptPrefix := x.DataKey(x.GalaxyAttr(worker.LambdaScriptPred), 0)
+	lambdaHashPrefix := x.DataKey(x.GalaxyAttr(worker.LambdaHashPred), 0)
+	// Remove uid from the key, to get the correct prefix
+	lambdaScriptPrefix = lambdaScriptPrefix[:len(lambdaScriptPrefix)-8]
+	lambdaHashPrefix = lambdaHashPrefix[:len(lambdaHashPrefix)-8]
+	// Listen for lambda changes in group 1.
+
+	// We should somehow combine the prefixes
+	go SubscribeForUpdates([][]byte{lambdaScriptPrefix, lambdaHashPrefix}, x.IgnoreBytes,
+		func(uid uint64, prefix []byte, val []byte, err error) {
+			if err == nil {
+				glog.Infof("Updating Lambda from subscription.")
+				glog.Error(uid)
+				glog.Error(val)
+				lambda.GetLambda().LoadScript(&lambda.LambdaScript{Script: val})
+			} else {
+				glog.Errorf("Subscription failed: %s", err)
+			}
+		}, 1, closer)
+
+	// Why are the subscriptions not in initServer?
 	go server.initServer()
 
 	return server.resolver
@@ -474,9 +484,22 @@ func (as *adminServer) initServer() {
 		as.incrementSchemaUpdateCounter(x.GalaxyNamespace)
 		as.resetSchema(x.GalaxyNamespace, generatedSchema)
 
-		glog.Infof("namespace: %d. Successfully loaded GraphQL schema.  Serving GraphQL API.",
+		glog.Infof("namespace: %d. Successfully loaded GraphQL schema.",
 			x.GalaxyNamespace)
 
+		// if we have a lambda script, startup lambda
+		script, err := edgraph.GetLambdaScript(x.GalaxyNamespace)
+		if err != nil {
+			glog.Info("could not load lambda script: %s", err)
+		} else {
+			glog.Info("Loading lambda script")
+			glog.Error(script)
+			if err := lambda.GetLambda().LoadScript(script); err != nil {
+				glog.Infof("could not update lambda script: %s", err)
+			}
+		}
+
+		glog.Info("Serving GraphQL API.")
 		break
 	}
 }
@@ -668,15 +691,19 @@ func lazyLoadScript(namespace uint64) error {
 		return nil
 	}
 	// Otherwise, fetch it from disk.
-	uid, script, err := edgraph.GetLambdaScript(namespace)
+	script, err := edgraph.GetLambdaScript(namespace)
 	if err != nil {
 		glog.Errorf("namespace: %d. Error reading Lambda Script: %s.", namespace, err)
-		return errors.Wrap(err, "failed to lazy-load Lambda Script")
+	} else {
+		if script == nil {
+			glog.Errorf("namespace: %d. No lambda script stored: %s.", namespace, err)
+		} else {
+			if err := lambda.GetLambda().LoadScript(script); err != nil {
+				glog.Errorf("namespace: %d. Error loading Lambda Script: %s.", namespace, err)
+			}
+			glog.Infof("namespace: %d. Successfully lazy-loaded GraphQL schema.", namespace)
+		}
 	}
-	worker.Lambda().Set(namespace, &worker.LambdaScript{
-		ID:     uid,
-		Script: script,
-	})
 	return nil
 }
 

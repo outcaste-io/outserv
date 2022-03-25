@@ -353,6 +353,25 @@ message SchemaUpdate {
   reserved "explicit";
 }
 
+message LambdaUpdate {
+  string predicate = 1;
+  Posting.ValType value_type = 2;
+  enum Directive {
+    NONE = 0;
+    INDEX = 1;
+    REVERSE = 2;
+    DELETE = 3;
+  }
+  Directive directive = 3;
+  repeated string tokenizer = 4;
+  bool count = 5;
+  bool list = 6;
+  bool upsert = 7;
+
+  // Deleted field:
+  reserved "explicit";
+}
+
 message MapHeader {
   repeated bytes partition_keys = 1;
 }
@@ -540,6 +559,7 @@ service Worker {
   rpc MovePredicate(MovePredicatePayload) returns (Payload) {}
   rpc Subscribe(SubscriptionRequest) returns (stream badgerpb3.KVList) {}
   rpc UpdateGraphQLSchema(UpdateGraphQLSchemaRequest) returns (UpdateGraphQLSchemaResponse) {}
+  rpc UpdateLambdaScript(UpdateLambdaScriptRequest) returns (UpdateLambdaScriptResponse) {}
   rpc DeleteNamespace(DeleteNsRequest) returns (Status) {}
   rpc TaskStatus(TaskStatusRequest) returns (TaskStatusResponse) {}
 }
@@ -632,19 +652,23 @@ message ExportResponse {
 }
 
 message UpdateGraphQLSchemaRequest {
-  enum Op {
-    SCHEMA = 0;
-    SCRIPT = 1;
-  }
   uint64 start_ts = 1;
   string graphql_schema = 2;
   repeated SchemaUpdate dgraph_preds = 3;
-  string lambda_script = 5;
-  Op op = 6;
 }
 
 message UpdateGraphQLSchemaResponse {
   uint64 uid = 1;
+}
+
+message UpdateLambdaScriptRequest {
+  uint64 start_ts = 1;
+  bytes lambda_script = 2;
+}
+
+message UpdateLambdaScriptResponse {
+  uint64 uid = 1;
+  string hash = 2;
 }
 
 // BulkMeta stores metadata from the map phase of the bulk loader.

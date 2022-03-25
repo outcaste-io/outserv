@@ -34,6 +34,7 @@ import (
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/gql"
 	gqlSchema "github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/lambda"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/query"
@@ -93,6 +94,14 @@ type existingGQLSchemaQryResp struct {
 	ExistingGQLSchema []graphQLSchemaNode `json:"ExistingGQLSchema"`
 }
 
+type existingLambdaQryResp struct {
+	ExistingLambdaScript []struct {
+		Uid    string `json:"uid"`
+		Script []byte `json:"dgraph.graphql.lambda.script"`
+		Hash   string `json:"dgraph.graphql.lambda.hash"`
+	} `json:"ExistingLambdaScript"`
+}
+
 // PeriodicallyPostTelemetry periodically reports telemetry data for alpha.
 func PeriodicallyPostTelemetry() {
 	glog.V(2).Infof("Starting telemetry data collection for alpha...")
@@ -124,12 +133,40 @@ func PeriodicallyPostTelemetry() {
 	}
 }
 
-func GetLambdaScript(namespace uint64) (uid, script string, err error) {
-	uid, gql, err := getGQLSchema(namespace)
+func GetLambdaScript(namespace uint64) (lambdaScript *lambda.LambdaScript, err error) {
+	ctx := context.WithValue(context.Background(), Authorize, false)
+	ctx = x.AttachNamespace(ctx, namespace)
+	resp, err := (&Server{}).Query(ctx,
+		&pb.Request{
+			Query: `
+			query {
+			  ExistingLambdaScript(func: has(dgraph.graphql.lambda.script)) {
+				uid
+				dgraph.graphql.lambda.script
+				dgraph.graphql.lambda.hash
+			  }
+			}`})
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
-	return uid, gql.Script, nil
+
+	var result existingLambdaQryResp
+	if err := json.Unmarshal(resp.GetJson(), &result); err != nil {
+		return nil, errors.Wrap(err, "Couldn't unmarshal response from Dgraph query")
+	}
+
+	res := result.ExistingLambdaScript
+	if len(res) == 0 {
+		// no script has been stored yet in Dgraph
+		return nil, errors.New("Could not find lambda script")
+	}
+	// we found an existing Lambda script
+	lambdaScript = &lambda.LambdaScript{
+		ID:     res[0].Uid,
+		Script: res[0].Script,
+		Hash:   res[0].Hash,
+	}
+	return lambdaScript, nil
 }
 
 func GetGQLSchema(namespace uint64) (uid, graphQLSchema string, err error) {
@@ -224,23 +261,21 @@ func UpdateGQLSchema(ctx context.Context, gqlSchema,
 		StartTs:       posting.ReadTimestamp(),
 		GraphqlSchema: gqlSchema,
 		DgraphPreds:   parsedDgraphSchema.Preds,
-		Op:            pb.UpdateGraphQLSchemaRequest_SCHEMA,
 	})
 }
 
 // UpdateLambdaScript updates the Lambda Script using the given inputs.
 // It sends an update request to the worker, which is executed only on Group-1 leader.
 func UpdateLambdaScript(
-	ctx context.Context, script string) (*pb.UpdateGraphQLSchemaResponse, error) {
+	ctx context.Context, script []byte) (*pb.UpdateLambdaScriptResponse, error) {
 	if !x.WorkerConfig.AclEnabled {
 		ctx = x.AttachNamespace(ctx, x.GalaxyNamespace)
 	}
 
-	return worker.UpdateGQLSchemaOverNetwork(ctx, &pb.UpdateGraphQLSchemaRequest{
+	return worker.UpdateLambdaScriptOverNetwork(ctx, &pb.UpdateLambdaScriptRequest{
 		// TODO: Understand this better and see what timestamp should be set.
 		StartTs:      posting.ReadTimestamp(),
 		LambdaScript: script,
-		Op:           pb.UpdateGraphQLSchemaRequest_SCRIPT,
 	})
 }
 
@@ -427,6 +462,7 @@ func (s *Server) Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, erro
 		return empty, err
 	}
 
+	// TODO(schartey/lambda): Handle LambdaScript "caching" differently
 	if op.DropOp == pb.Operation_DATA {
 		if len(op.DropValue) > 0 {
 			return empty, errors.Errorf("If DropOp is set to DATA, DropValue must be empty")
@@ -437,7 +473,7 @@ func (s *Server) Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, erro
 		if err != nil {
 			return empty, err
 		}
-		_, lambdaScript, err := GetLambdaScript(namespace)
+		lambdaScript, err := GetLambdaScript(namespace)
 		if err != nil {
 			return empty, err
 		}
@@ -459,7 +495,7 @@ func (s *Server) Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, erro
 		if _, err := UpdateGQLSchema(ctx, graphQLSchema, ""); err != nil {
 			return empty, errors.Wrap(err, "While updating gql schema ")
 		}
-		if _, err := UpdateLambdaScript(ctx, lambdaScript); err != nil {
+		if _, err := UpdateLambdaScript(ctx, lambdaScript.Script); err != nil {
 			return empty, errors.Wrap(err, "While updating lambda script ")
 		}
 		// recreate the admin account after a drop data operation

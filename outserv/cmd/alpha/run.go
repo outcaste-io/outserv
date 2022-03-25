@@ -214,9 +214,9 @@ func init() {
 			"The polling interval for GraphQL subscription.").
 		String())
 
-	flag.String("lambda", worker.LambdaDefaults, z.NewSuperFlagHelp(worker.LambdaDefaults).
-		Head("Lambda options").
-		String())
+	/*flag.String("lambda", worker.LambdaDefaults, z.NewSuperFlagHelp(worker.LambdaDefaults).
+	Head("Lambda options").
+	String())*/
 
 	flag.String("cdc", worker.CDCDefaults, z.NewSuperFlagHelp(worker.CDCDefaults).
 		Head("Change Data Capture options").

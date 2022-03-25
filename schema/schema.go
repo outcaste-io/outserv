@@ -517,6 +517,18 @@ func initialSchemaInternal(namespace uint64, all bool) []*pb.SchemaUpdate {
 			Tokenizer: []string{"exact"},
 			Upsert:    true,
 		}, &pb.SchemaUpdate{
+			Predicate: "dgraph.graphql.lambda.script",
+			ValueType: pb.Posting_BINARY,
+		}, &pb.SchemaUpdate{
+			Predicate: "dgraph.graphql.lambda.hash",
+			ValueType: pb.Posting_STRING,
+		}, &pb.SchemaUpdate{
+			Predicate: "dgraph.graphql.lambda.xid",
+			ValueType: pb.Posting_STRING,
+			Directive: pb.SchemaUpdate_INDEX,
+			Tokenizer: []string{"exact"},
+			Upsert:    true,
+		}, &pb.SchemaUpdate{
 			Predicate: "dgraph.graphql.p_query",
 			ValueType: pb.Posting_STRING,
 			Directive: pb.SchemaUpdate_INDEX,

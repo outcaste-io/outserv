@@ -478,6 +478,8 @@ func coerceScalar(val interface{}, field *Field, path []interface{}) (interface{
 		}
 	case "Upload":
 		switch v := val.(type) {
+		case []byte:
+			val = ([]byte)(v)
 		case string:
 			val = ([]byte)(v)
 		default:

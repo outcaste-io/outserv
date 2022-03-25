@@ -55,11 +55,12 @@ const graphqlAdminSchema = `
 	"""
 	Data about the Lambda script served by Dgraph.
 	"""
-	type LambdaScript @dgraph(type: "dgraph.graphql") {
+	type LambdaScript @dgraph(type: "dgraph.graphql.lambda") {
 		"""
-		Input script (base64 encoded)
+		Input script (multi-part binary)
 		"""
-		script: String! @dgraph(pred: "dgraph.graphql.schema")
+		script: Upload! @dgraph(pred: "dgraph.graphql.lambda.script")
+		hash: String! @dgraph(pred: "dgraph.graphql.lambda.hash")
 	}
 
 	"""
@@ -199,7 +200,7 @@ const graphqlAdminSchema = `
 	}
 
 	input ScriptPatch {
-		script: String!
+		script: Upload!
 	}
 
 	input ExportInput {

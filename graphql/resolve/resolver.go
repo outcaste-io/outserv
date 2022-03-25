@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/lambda"
 )
 
 type resolveCtxKey string
@@ -643,6 +644,8 @@ func (hr *httpResolver) rewriteAndExecute(ctx context.Context, field *schema.Fie
 		return EmptyResult(field, err)
 	}
 
+	// TODO: Call wasm lambda
+	lambda.GetLambda().Execute()
 	// If this is a lambda field, it will always have a body template.
 	// Just convert that into a lambda template.
 	if field.HasLambdaDirective() {
