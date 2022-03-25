@@ -123,37 +123,42 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type, upsert boo
 			continue
 		}
 
-		dst[f.DgraphAlias()] = val
-		glog.Infof("Replacing %d %q -> %q\n", i, f.Name(), f.DgraphAlias())
 		if f.Type().IsInbuiltOrEnumType() {
+			dst[f.DgraphAlias()] = val
+			glog.Infof("Replacing %d %q -> %q\n", i, f.Name(), f.DgraphAlias())
 			continue
 		}
 
-		glog.Infof("--> got a field which is not inbuilt type: %s %s %+v\n", f.Name(), f.Type().Name(), val)
 		if vlist, ok := val.([]interface{}); ok {
+			var all []Object
 			for _, elem := range vlist {
 				e := elem.(map[string]interface{})
 				objs, err := gatherObjects(ctx, e, f.Type(), upsert)
 				if err != nil {
 					return nil, errors.Wrapf(err, "while nesting into %s", f.Name())
 				}
-				res = append(res, objs...)
+				// dst[f.DgraphAlias()] = justTheUids(objs)
+				// res = append(res, objs...)
+				all = append(all, objs...)
 			}
+			glog.Infof("got objects: %+v\n", all)
+			dst[f.DgraphAlias()] = all
 
 		} else if vmap, ok := val.(map[string]interface{}); ok {
 			objs, err := gatherObjects(ctx, vmap, f.Type(), upsert)
 			if err != nil {
 				return nil, errors.Wrapf(err, "while nesting into %s", f.Name())
 			}
-			res = append(res, objs...)
+			glog.Infof("got objects: %+v\n", objs)
+			// dst[f.DgraphAlias()] = justTheUids(objs)
+			// res = append(res, objs...)
+			dst[f.DgraphAlias()] = objs
 
 		} else {
 			panic(fmt.Sprintf("Unhandled type of val: %+v type: %T", val, val))
 		}
 	}
 
-	// TODO: Why should an ID be present for an upsert? ID only gets
-	// assigned via Dgraph UID, doesn't it?
 	var idVal uint64
 	if id := typ.IDField(); id != nil {
 		glog.Infof("ID Name: %s\n", id.Name())
@@ -171,9 +176,9 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type, upsert boo
 	for _, x := range xids {
 		glog.Infof("Found XID field: %s %+v\n", x.Name(), x)
 	}
+
 	// I think all the XID fields should be present for us to ensure that
 	// we can find the right ID for this object.
-
 	uids, err := UidsFromManyXids(ctx, src, typ, false)
 	if err != nil {
 		return nil, errors.Wrapf(err, "UidsFromManyXids")
@@ -255,7 +260,10 @@ func runUpsert(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	data, err := json.Marshal(res)
 	x.Check(err)
 
-	glog.Infof("Data to be mutated: %s\n", data)
+	data2, err := json.MarshalIndent(res, "  ", "  ")
+	x.Check(err)
+
+	glog.Infof("----> Data to be mutated: %s\n", data2)
 	mu := &pb.Mutation{SetJson: data}
 
 	// TODO: Batch all this up.
@@ -270,7 +278,7 @@ func runUpsert(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			resultUids = append(resultUids, x.FromHex(uid))
 		}
 	}
-	glog.Infof("Got resultUids: %+v\n", resultUids)
+	glog.Infof("Got resultUids: %#x\n", resultUids)
 	return resultUids, nil
 }
 
@@ -391,7 +399,7 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	setObj, hasSet := inp["set"].(map[string]interface{})
 	delObj, hasDel := inp["remove"].(map[string]interface{})
 
-	glog.Infof("Got uids: %+v set: %+v del: %+v\n", uids, setObj, delObj)
+	glog.Infof("Got uids: %#x set: %+v del: %+v\n", uids, setObj, delObj)
 
 	// TODO(mrjn): Ensure that the update does not violate the @id uniqueness
 	// constraint.
@@ -439,7 +447,7 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		if err != nil {
 			return errors.Wrapf(err, "UidsFromManyXids")
 		}
-		glog.Infof("Got UIDs: %+v\n", uids)
+		glog.Infof("Got UIDs: %#x\n", uids)
 		if len(uids) == 0 {
 			// No duplicates found.
 			return nil
@@ -568,9 +576,6 @@ func (mr *dgraphResolver) rewriteAndExecute(
 	_ = emptyResult(nil)
 
 	calculateResponse := func(uids []uint64) (*pb.Response, error) {
-		glog.Infof("Got uids: %+v\n", uids)
-		glog.Infof("Query field: %+v\n", mutation.QueryField())
-
 		field := mutation.QueryField()
 		dgQuery := []*gql.GraphQuery{{
 			Attr: field.DgraphAlias(),
