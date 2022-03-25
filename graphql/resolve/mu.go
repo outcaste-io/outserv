@@ -116,7 +116,7 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type, upsert boo
 	fields := typ.Fields()
 
 	var res []Object
-	var dst Object
+	dst := make(map[string]interface{})
 	for i, f := range fields {
 		val, has := src[f.Name()]
 		if !has {
@@ -130,25 +130,25 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type, upsert boo
 		}
 
 		glog.Infof("--> got a field which is not inbuilt type: %s %s %+v\n", f.Name(), f.Type().Name(), val)
-		switch val.(type) {
-		case []Object:
-			v := val.([]map[string]interface{})
-			for _, elem := range v {
-				objs, err := gatherObjects(ctx, elem, f.Type(), upsert)
+		if vlist, ok := val.([]interface{}); ok {
+			for _, elem := range vlist {
+				e := elem.(map[string]interface{})
+				objs, err := gatherObjects(ctx, e, f.Type(), upsert)
 				if err != nil {
 					return nil, errors.Wrapf(err, "while nesting into %s", f.Name())
 				}
 				res = append(res, objs...)
 			}
-		case Object:
-			v := val.(map[string]interface{})
-			objs, err := gatherObjects(ctx, v, f.Type(), upsert)
+
+		} else if vmap, ok := val.(map[string]interface{}); ok {
+			objs, err := gatherObjects(ctx, vmap, f.Type(), upsert)
 			if err != nil {
 				return nil, errors.Wrapf(err, "while nesting into %s", f.Name())
 			}
 			res = append(res, objs...)
-		default:
-			panic(fmt.Sprintf("Unhandled type of val: %+v", val))
+
+		} else {
+			panic(fmt.Sprintf("Unhandled type of val: %+v type: %T", val, val))
 		}
 	}
 
