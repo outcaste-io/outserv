@@ -15,10 +15,15 @@ RUN apt-get update && \
     iputils-ping \
     jq \
     less \
+    libxkbcommon-dev \
+    libtinfo5 \
     sysstat && \
   curl -fsSL https://deb.nodesource.com/setup_14.x | bash - && \
   apt-get install -y nodejs && \
   rm -rf /var/lib/apt/lists/*
+
+RUN curl https://get.wasmer.io -sSfL | WASMER_DIR=/usr/local sh
+
 
 ADD linux /usr/local/bin
 
