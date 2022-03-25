@@ -4,6 +4,7 @@
 package types
 
 import (
+	"math/big"
 	"sort"
 	"time"
 
@@ -111,7 +112,7 @@ func Less(a, b Val) (bool, error) {
 	}
 	typ := a.Tid
 	switch typ {
-	case DateTimeID, UidID, IntID, FloatID, StringID, DefaultID:
+	case DateTimeID, UidID, IntID, BigIntID, FloatID, StringID, DefaultID:
 		// Don't do anything, we can sort values of this type.
 	default:
 		return false, errors.Errorf("Compare not supported for type: %v", a.Tid)
@@ -130,6 +131,10 @@ func less(a, b Val, cl *collate.Collator) bool {
 		return (a.Value.(int64)) < (b.Value.(int64))
 	case FloatID:
 		return (a.Value.(float64)) < (b.Value.(float64))
+	case BigIntID:
+		av := a.Value.(big.Int)
+		bv := b.Value.(big.Int)
+		return av.Cmp(&bv) < 0
 	case UidID:
 		return (a.Value.(uint64) < b.Value.(uint64))
 	case StringID, DefaultID:
@@ -144,20 +149,51 @@ func less(a, b Val, cl *collate.Collator) bool {
 
 func mismatchedLess(a, b Val) bool {
 	x.AssertTrue(a.Tid != b.Tid)
-	if (a.Tid != IntID && a.Tid != FloatID) || (b.Tid != IntID && b.Tid != FloatID) {
-		// Non-float/int are sorted arbitrarily by type.
-		return a.Tid < b.Tid
-	}
 
-	// Floats and ints can be sorted together in a sensible way. The approach
+	// Floats, ints, bigints can be sorted together in a sensible way. The approach
 	// here isn't 100% correct, and will be wrong when dealing with ints and
 	// floats close to each other and greater in magnitude than 1<<53 (the
 	// point at which consecutive floats are more than 1 apart).
-	if a.Tid == FloatID {
-		return a.Value.(float64) < float64(b.Value.(int64))
+	switch a.Tid {
+	case FloatID:
+		av := a.Value.(float64)
+		switch b.Tid {
+		case IntID:
+			return av < float64(b.Value.(int64))
+		case BigIntID:
+			af := &big.Float{}
+			bf := big.NewFloat(av)
+			bv := b.Value.(big.Int)
+			bf = bf.SetInt(&bv)
+			return af.Cmp(bf) < 0
+		}
+	case IntID:
+		av := a.Value.(int64)
+		switch b.Tid {
+		case FloatID:
+			return float64(av) < b.Value.(float64)
+		case BigIntID:
+			ai := big.NewInt(av)
+			bi := b.Value.(big.Int)
+			return ai.Cmp(&bi) < 0
+		}
+	case BigIntID:
+		av := a.Value.(big.Int)
+		switch b.Tid {
+		case FloatID:
+			af := &big.Float{}
+			af = af.SetInt(&av)
+			aff, _ := af.Float64()
+			return aff < b.Value.(float64)
+		case BigIntID:
+			ai := a.Value.(big.Int)
+			bi := b.Value.(big.Int)
+			return ai.Cmp(&bi) < 0
+		}
 	}
-	x.AssertTrue(b.Tid == FloatID)
-	return float64(a.Value.(int64)) < b.Value.(float64)
+
+	// Non-float/int are sorted arbitrarily by type.
+	return a.Tid < b.Tid
 }
 
 // Equal returns true if a is equal to b.
@@ -188,6 +224,10 @@ func equal(a, b Val) bool {
 		aVal, aOk := a.Value.(int64)
 		bVal, bOk := b.Value.(int64)
 		return aOk && bOk && aVal == bVal
+	case BigIntID:
+		av, aOk := a.Value.(big.Int)
+		bv, bOk := b.Value.(big.Int)
+		return aOk && bOk && av.Cmp(&bv) == 0
 	case FloatID:
 		aVal, aOk := a.Value.(float64)
 		bVal, bOk := b.Value.(float64)

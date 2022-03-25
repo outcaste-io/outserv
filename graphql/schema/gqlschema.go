@@ -529,6 +529,7 @@ var filtersCollisions = map[string][]string{
 var orderable = map[string]bool{
 	"Int":      true,
 	"Int64":    true,
+	"BigInt":   true,
 	"Float":    true,
 	"String":   true,
 	"DateTime": true,
@@ -536,9 +537,10 @@ var orderable = map[string]bool{
 
 // GraphQL types that can be summed. Types that have a well defined addition function.
 var summable = map[string]bool{
-	"Int":   true,
-	"Int64": true,
-	"Float": true,
+	"Int":    true,
+	"Int64":  true,
+	"BigInt": true,
+	"Float":  true,
 }
 
 var enumDirectives = map[string]bool{
@@ -1682,7 +1684,7 @@ func isOrderable(fld *ast.FieldDefinition, defn *ast.Definition,
 	return isKeyField(fld, defn) || providesTypeMap[fld.Name]
 }
 
-// Returns true if the field is of type which can be summed. Eg: int, int64, float
+// Returns true if the field is of type which can be summed. Eg: int, int64, bigint, float
 func isSummable(fld *ast.FieldDefinition, defn *ast.Definition, providesTypeMap map[string]bool) bool {
 	if externalAndNonKeyField(fld, defn, providesTypeMap) {
 		return false

@@ -19,6 +19,7 @@ package query
 import (
 	"bytes"
 	"math"
+	"math/big"
 	"time"
 
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -557,6 +558,10 @@ func (ag *aggregator) Apply(val types.Val) {
 			va.Value = va.Value.(int64) + vb.Value.(int64)
 		case va.Tid == types.FloatID && vb.Tid == types.FloatID:
 			va.Value = va.Value.(float64) + vb.Value.(float64)
+		case va.Tid == types.BigIntID && vb.Tid == types.BigIntID:
+			a := va.Value.(big.Int)
+			b := vb.Value.(big.Int)
+			va.Value = *a.Add(&a, &b)
 		}
 		// Skipping the else case since that means the pair cannot be summed.
 		res = va
@@ -593,6 +598,15 @@ func (ag *aggregator) divideByCount() {
 		v = float64(ag.result.Value.(int64))
 	case types.FloatID:
 		v = ag.result.Value.(float64)
+	case types.BigIntID:
+		vi := ag.result.Value.(big.Int)
+		vf := &big.Float{}
+		vf = vf.SetInt(&vi)
+		vq := big.NewFloat(float64(ag.count))
+
+		ag.result.Tid = types.FloatID
+		ag.result.Value, _ = vf.Quo(vf, vq).Float64()
+		return
 	}
 
 	ag.result.Tid = types.FloatID

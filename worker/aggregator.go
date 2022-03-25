@@ -25,12 +25,14 @@ func couldApplyAggregatorOn(agrtr string, typ types.TypeID) bool {
 	switch agrtr {
 	case "min", "max":
 		return (typ == types.IntID ||
+			typ == types.BigIntID ||
 			typ == types.FloatID ||
 			typ == types.DateTimeID ||
 			typ == types.StringID ||
 			typ == types.DefaultID)
 	case "sum", "avg":
 		return (typ == types.IntID ||
+			typ == types.BigIntID ||
 			typ == types.FloatID)
 	default:
 		return false
