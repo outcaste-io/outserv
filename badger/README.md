@@ -5,6 +5,7 @@
 Core Maintainers:
 - https://github.com/manishrjain
 - https://github.com/jarifibrahim
+- https://github.com/poonai
 
 BadgerDB is an embeddable, persistent and fast key-value (KV) database written
 in pure Go. It is the underlying database for [Dgraph](https://dgraph.io), a
