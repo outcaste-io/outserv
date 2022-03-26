@@ -12,6 +12,8 @@ import (
 )
 
 // A VariableGenerator generates unique variable names.
+// TODO(mrjn): Do we need this variable generator? Maybe remove after rewriting
+// query modules.
 type VariableGenerator struct {
 	counter       int
 	xidVarNameMap map[string]string

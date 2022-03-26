@@ -68,9 +68,6 @@ type ResolverFactory struct {
 // ResolverFns is a convenience struct for passing blocks of rewriters and executors.
 type ResolverFns struct {
 	Qrw QueryRewriter
-	Arw func() MutationRewriter
-	Urw func() MutationRewriter
-	Drw MutationRewriter
 	Ex  DgraphExecutor
 }
 
