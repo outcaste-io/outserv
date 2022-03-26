@@ -248,7 +248,6 @@ func (g *groupi) applyState(state *pb.MembershipState) {
 	g.Lock()
 	defer g.Unlock()
 
-	glog.Infof("Got membership state: %s\n", state.String())
 	if _, has := state.Members[myId]; !has {
 		// I'm not part of this cluster. I should crash myself.
 		glog.Fatalf("Unable to find myself [id:%d group:%d] in membership state: %+v. Goodbye!",

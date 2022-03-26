@@ -78,16 +78,12 @@ func UidsFromManyXids(ctx context.Context, obj map[string]interface{},
 			return nil, errors.Wrapf(err, "while extractVal")
 		}
 
-		glog.Infof("Converted xid value to string: %q -> %q   %q %q\n",
-			xid.Name(), xidString, xid.DgraphPredicate(), xid.DgraphAlias())
-
 		// TODO: Check if we can pass UIDs to this to filter quickly.
 		bm, err := UidsForXid(ctx, xid.DgraphAlias(), xidString)
 		if err != nil {
 			// TODO(mrjn): Wrap up errors to ensure GraphQL compliance.
 			return nil, err
 		}
-		glog.Infof("Cardinality of xid %s is %d\n", xid.Name(), bm.GetCardinality())
 		bms = append(bms, bm)
 		if bm.GetCardinality() == 0 {
 			// No need to proceed, if we couldn't find any.
@@ -241,23 +237,18 @@ func runUpsert(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	data, err := json.Marshal(res)
 	x.Check(err)
 
-	data2, err := json.MarshalIndent(res, "  ", "  ")
-	x.Check(err)
-
-	glog.Infof("----> Data to be mutated: %s\n", data2)
 	mu := &pb.Mutation{SetJson: data}
-
 	resp, err := edgraph.Query(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}})
 	if err != nil {
 		return nil, err
 	}
+	glog.V(2).Infof("Got response: %s\n", resp.Json)
 
 	for key, uid := range resp.Uids {
 		if strings.HasPrefix(key, typ.Name()+"-") {
 			resultUids = append(resultUids, x.FromHex(uid))
 		}
 	}
-	glog.Infof("Got resultUids: %#x\n", resultUids)
 	return resultUids, nil
 }
 
@@ -276,9 +267,6 @@ func extractMutationFilter(m *schema.Field) map[string]interface{} {
 }
 
 func getUidsFromFilter(ctx context.Context, m *schema.Field) ([]uint64, error) {
-	typ := m.MutatedType()
-	glog.Infof("m.Name: %q type: %q\n", m.Name(), typ.Name())
-
 	dgQuery := []*gql.GraphQuery{{
 		Attr: m.Name(),
 	}}
@@ -287,7 +275,7 @@ func getUidsFromFilter(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	})
 
 	filter := extractMutationFilter(m)
-	ids := idFilter(filter, typ.IDField())
+	ids := idFilter(filter, m.MutatedType().IDField())
 	if ids != nil {
 		addUIDFunc(dgQuery[0], ids)
 	} else {
@@ -297,10 +285,7 @@ func getUidsFromFilter(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	_ = addFilter(dgQuery[0], m.MutatedType(), filter)
 
 	q := dgraph.AsString(dgQuery)
-	glog.Infof("Got Query: %s\n", q)
-
 	resp, err := edgraph.Query(ctx, &pb.Request{Query: q})
-	glog.Infof("Got error: %v. Resp: %s\n", err, resp.GetJson())
 	if err != nil {
 		return nil, errors.Wrapf(err, "while querying")
 	}
@@ -314,8 +299,6 @@ func getUidsFromFilter(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		// Unable to find any UIDs.
 		return nil, nil
 	}
-	glog.Infof("Parsed data: %+v\n", data)
-	glog.Infof("Found uids: %+v\n", data[m.Name()])
 
 	var uids []uint64
 	for _, u := range data[m.Name()] {
@@ -349,7 +332,6 @@ func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			ObjectValue: &pb.Value{&pb.Value_StrVal{m.MutatedType().DgraphName()}},
 		})
 	}
-	glog.Infof("got mutation: %+v\n", mu)
 	req := &pb.Request{}
 	req.Mutations = append(req.Mutations, mu)
 
@@ -357,7 +339,7 @@ func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "while executing deletions")
 	}
-	glog.Infof("Got response: %+v\n", resp)
+	glog.V(2).Infof("Mutations: %+v\nGot response: %s\n", req.Mutations, resp.Json)
 	return uids, nil
 }
 
@@ -368,7 +350,6 @@ func getObject(ctx context.Context, uid string, fields ...string) (map[string]in
 		return nil, errors.Wrapf(err, "while requesting for object")
 	}
 
-	glog.Infof("Got response: %s\n", resp.Json)
 	var out map[string][]map[string]interface{}
 	if err := json.Unmarshal(resp.Json, &out); err != nil {
 		// This means we couldn't find the object. Ignore.
@@ -391,8 +372,6 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	inp := m.ArgValue(schema.InputArgName).(map[string]interface{})
 	setObj, hasSet := inp["set"].(map[string]interface{})
 	delObj, hasDel := inp["remove"].(map[string]interface{})
-
-	glog.Infof("Got uids: %#x set: %+v del: %+v\n", uids, setObj, delObj)
 
 	// TODO(mrjn): Ensure that the update does not violate the @id uniqueness
 	// constraint.
@@ -502,19 +481,15 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		x.Check(err)
 	}
 
-	glog.Infof("Got mutation: set: %q del: %q\n", mu.SetJson, mu.DeleteJson)
-
 	resp, err := edgraph.Query(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}})
 	if err != nil {
 		return nil, errors.Wrapf(err, "while executing updates")
 	}
-	glog.Infof("Got response: %+v\n", resp)
+	glog.V(2).Infof("Got response: %s\n", resp.Json)
 	return uids, nil
 }
 
 func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
-	glog.Infof("mutatedType: %s Mutation Type: %s\n", m.MutatedType(), m.MutationType())
-
 	switch m.MutationType() {
 	case schema.AddMutation:
 		return runUpsert(ctx, m)
@@ -541,7 +516,6 @@ func UidsForXid(ctx context.Context, pred, value string) (*sroar.Bitmap, error) 
 	if err != nil {
 		return nil, errors.Wrapf(err, "while calling ProcessTaskOverNetwork")
 	}
-	glog.Infof("Result uidmatrix length: %d", len(result.UidMatrix))
 	if len(result.UidMatrix) == 0 {
 		// No result found
 		return sroar.NewBitmap(), nil
@@ -613,8 +587,8 @@ func (mr *dgraphResolver) Resolve(ctx context.Context, m *schema.Field) (*Resolv
 		span.Annotatef(nil, "mutation alias: [%s] type: [%s]", m.Alias(), m.MutationType())
 	}
 
+	field := m.QueryField()
 	calculateResponse := func(uids []uint64) (*pb.Response, error) {
-		field := m.QueryField()
 		dgQuery := []*gql.GraphQuery{{
 			Attr: field.DgraphAlias(),
 		}}
@@ -623,17 +597,10 @@ func (mr *dgraphResolver) Resolve(ctx context.Context, m *schema.Field) (*Resolv
 			UID:  uids,
 		}
 		addArgumentsToField(dgQuery[0], field)
-		glog.Infof("Got dgQuery[0]: %+v\n", dgQuery)
-		dgQuery[0].DebugPrint("mu  ")
-
 		dgQuery = append(dgQuery, addSelectionSetFrom(dgQuery[0], field)...)
 
 		q := dgraph.AsString(dgQuery)
-		glog.Infof("Query: %s\n", q)
-
 		resp, err := (&DgraphEx{}).Execute(ctx, &pb.Request{Query: q}, field)
-		glog.Infof("Got error: %+v\n", err)
-		glog.Infof("Response: %+v\n", resp)
 		return resp, err
 	}
 

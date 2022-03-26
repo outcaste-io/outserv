@@ -14,3 +14,5 @@ Use type level UIDs.
 
 [x] Check that an update mutation won't cause duplicate XIDs.
 [x] Deal with nested objects and their upserts.
+[ ] NumUids in deletion operation doesn't return any value.
+[ ] Without upsert, we seem to be adding duplicate records.
