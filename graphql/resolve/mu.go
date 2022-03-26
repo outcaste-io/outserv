@@ -84,7 +84,7 @@ func UidsFromManyXids(ctx context.Context, obj map[string]interface{},
 		// TODO: Check if we can pass UIDs to this to filter quickly.
 		bm, err := UidsForXid(ctx, xid.DgraphAlias(), xidString)
 		if err != nil {
-			// TODO: Gotta wrap up errors to ensure GraphQL compliance.
+			// TODO(mrjn): Wrap up errors to ensure GraphQL compliance.
 			return nil, err
 		}
 		glog.Infof("Cardinality of xid %s is %d\n", xid.Name(), bm.GetCardinality())
@@ -102,14 +102,14 @@ type Object map[string]interface{}
 
 var objCounter uint64
 
-func gatherObjects(ctx context.Context, src Object, typ *schema.Type, upsert bool) ([]Object, error) {
-	// TODO: Refactor this so we deal with each val in a nested func.
-	glog.Infof("mutatedType: %+v obj: %+v\n", typ, src)
-	fields := typ.Fields()
+func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
+	upsert bool) ([]Object, error) {
 
 	var res []Object
+	fields := typ.Fields()
+
 	dst := make(map[string]interface{})
-	for i, f := range fields {
+	for _, f := range fields {
 		val, has := src[f.Name()]
 		if !has {
 			continue
@@ -117,7 +117,6 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type, upsert boo
 
 		if f.Type().IsInbuiltOrEnumType() {
 			dst[f.DgraphAlias()] = val
-			glog.Infof("Replacing %d %q -> %q\n", i, f.Name(), f.DgraphAlias())
 			continue
 		}
 
@@ -129,11 +128,8 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type, upsert boo
 				if err != nil {
 					return nil, errors.Wrapf(err, "while nesting into %s", f.Name())
 				}
-				// dst[f.DgraphAlias()] = justTheUids(objs)
-				// res = append(res, objs...)
 				all = append(all, objs...)
 			}
-			glog.Infof("got objects: %+v\n", all)
 			dst[f.DgraphAlias()] = all
 
 		} else if vmap, ok := val.(map[string]interface{}); ok {
@@ -141,9 +137,6 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type, upsert boo
 			if err != nil {
 				return nil, errors.Wrapf(err, "while nesting into %s", f.Name())
 			}
-			glog.Infof("got objects: %+v\n", objs)
-			// dst[f.DgraphAlias()] = justTheUids(objs)
-			// res = append(res, objs...)
 			dst[f.DgraphAlias()] = objs
 
 		} else {
@@ -153,9 +146,7 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type, upsert boo
 
 	var idVal uint64
 	if id := typ.IDField(); id != nil {
-		glog.Infof("ID Name: %s\n", id.Name())
 		if val := src[id.Name()]; val != nil {
-			glog.Infof("Found ID field: %s %+v\n", id.Name(), val)
 			valStr, err := extractVal(val, id)
 			if err != nil {
 				return nil, errors.Wrapf(err, "while converting ID to string for %s", id.Name())
@@ -164,13 +155,12 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type, upsert boo
 		}
 	}
 
-	xids := typ.XIDFields()
-	for _, x := range xids {
-		glog.Infof("Found XID field: %s %+v\n", x.Name(), x)
-	}
-
 	// I think all the XID fields should be present for us to ensure that
 	// we can find the right ID for this object.
+	//
+	// TODO(mrjn): Optimization for later. We should query all of them in a
+	// single call to make this more efficient. Or, run gatherObjects via
+	// goroutines.
 	uids, err := UidsFromManyXids(ctx, src, typ, false)
 	if err != nil {
 		return nil, errors.Wrapf(err, "UidsFromManyXids")
@@ -179,7 +169,7 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type, upsert boo
 	updateObject := true
 	switch {
 	case len(uids) > 1:
-		return nil, fmt.Errorf("Found %d UIDs for %v", len(uids), xids)
+		return nil, fmt.Errorf("Found %d UIDs", len(uids))
 	case len(uids) == 0:
 		// No object with the given XIDs exists. This is an insert.
 		if idVal > 0 {
@@ -190,7 +180,7 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type, upsert boo
 			// objects.
 			dst["uid"] = fmt.Sprintf("_:%s-%d", typ.Name(), atomic.AddUint64(&objCounter, 1))
 		}
-		// TODO: We should overhaul this type system later.
+		// TODO(mrjn): We should overhaul this type system later.
 		dst["dgraph.type"] = typ.DgraphName()
 	default:
 		// len(uids) == 1
@@ -210,7 +200,6 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type, upsert boo
 		}
 	}
 
-	glog.Infof("Rewrote to %+v\n", dst)
 	if updateObject {
 		res = append(res, dst)
 	}
@@ -258,9 +247,7 @@ func runUpsert(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	glog.Infof("----> Data to be mutated: %s\n", data2)
 	mu := &pb.Mutation{SetJson: data}
 
-	// TODO: Batch all this up.
 	resp, err := edgraph.Query(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}})
-	glog.Infof("Got error from query: %v resp: %+v\n", err, resp)
 	if err != nil {
 		return nil, err
 	}

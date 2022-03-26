@@ -849,7 +849,6 @@ func createTaskQuery(ctx context.Context, sg *SubGraph) (*pb.Query, error) {
 			}
 		}
 	}
-	glog.Infof("SrcFunc: %+v\n", srcFunc)
 
 	// first is to limit how many results we want.
 	first, offset := calculatePaginationParams(sg)
@@ -866,7 +865,6 @@ func createTaskQuery(ctx context.Context, sg *SubGraph) (*pb.Query, error) {
 		First:     first,
 		Offset:    offset,
 	}
-	glog.Infof("pb.Query: %+v\n", out)
 
 	// Use the orderedUIDs if present, it will only be present for the shortest path case.
 	if sg.OrderedUIDs != nil {
@@ -2012,10 +2010,8 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 
 			if result.IntersectDest {
 				sg.DestMap = codec.Intersect(result.UidMatrix)
-				glog.Infof("Intersecting for destmap %q %d", sg.Attr, sg.DestMap.GetCardinality())
 			} else {
 				sg.DestMap = codec.Merge(result.UidMatrix)
-				glog.Infof("Merging for destmap %q %d", sg.Attr, sg.DestMap.GetCardinality())
 			}
 
 			if parent == nil {
@@ -2684,72 +2680,6 @@ func (req *Request) ProcessQuery(ctx context.Context) (err error) {
 	}
 	return nil
 }
-
-// func UidsForXid(ctx context.Context, pred, value string) *sroar.Bitmap {
-// 	glog.Infof("UidsForXid pred: %s value: %s\n", pred, value)
-// 	x.AssertTrue(len(pred) > 0)
-// 	x.AssertTrue(len(value) > 0)
-
-// 	queryStr := fmt.Sprintf(`{q(func: eq(%s, %q)) { uid }}`, pred, value)
-// 	glog.Infof("Query: %s\n", queryStr)
-
-// 	res, err := gql.Parse(gql.Request{Str: queryStr})
-// 	x.Check(err)
-
-// 	x.AssertTrue(len(res.Query) == 1)
-// 	qr := res.Query[0]
-// 	qr.DebugPrint("UidsForXid")
-
-// 	// glog.Infof("after parsing: %+v\n", res.Query[0])
-
-// 	// query := &gql.GraphQuery{
-// 	// 	Attr: pred,
-// 	// 	Func: &gql.Function{
-// 	// 		Name: "eq",
-// 	// 		Args: []gql.Arg{
-// 	// 			{Value: pred},
-// 	// 			// TODO: Deal with quoting values.
-// 	// 			{Value: value},
-// 	// 		},
-// 	// 	},
-// 	// }
-// 	// glog.Infof("GQL: %+v\n", query)
-// 	ctx = x.AttachNamespace(ctx, 0)
-// 	sg, err := ToSubGraph(ctx, res.Query[0])
-// 	x.Check(err)
-// 	sg.DebugPrint("UidsForXid-SG")
-
-// 	// sg := &SubGraph{
-// 	// 	Attr:   pred,
-// 	// 	ReadTs: posting.ReadTimestamp(),
-// 	// 	SrcFunc: &Function{
-// 	// 		Name: "eq",
-// 	// 		Args: []gql.Arg{
-// 	// 			{Value: pred},
-// 	// 			{Value: value},
-// 	// 		},
-// 	// 	},
-// 	// }
-// 	errCh := make(chan error, 1)
-// 	ProcessGraph(ctx, sg, nil, errCh)
-// 	err = <-errCh
-// 	glog.Infof("Processed SubGraph with error: %+v\n", err)
-
-// 	for i, ch := range sg.Children {
-// 		bm := ch.DestMap
-// 		arr := bm.ToArray()
-// 		glog.Infof("Got Result for child: %d: %+v\n", i, arr)
-// 		x.AssertTrue(len(ch.Children) == 0)
-// 	}
-
-// 	bm := sg.DestMap
-// 	// TODO: Remove this later.
-// 	arr := bm.ToArray()
-// 	glog.Infof("Got Result: %+v\n", arr)
-
-// 	return bm
-
-// }
 
 // ExecutionResult holds the result of running a query.
 type ExecutionResult struct {

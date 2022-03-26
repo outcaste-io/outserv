@@ -467,7 +467,7 @@ func loadFromDB(loadType int) error {
 					s = pb.SchemaUpdate{Predicate: pk.Attr, ValueType: pb.Posting_DEFAULT}
 				}
 				x.Checkf(s.Unmarshal(val), "Error while loading schema from db")
-				glog.Infof("Setting state: %+v\n", s)
+				glog.Infof("Setting schema: %+v\n", s)
 				State().Set(pk.Attr, &s)
 				return nil
 			})
