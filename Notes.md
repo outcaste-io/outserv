@@ -12,6 +12,5 @@ Use type level UIDs.
 
 ### GraphQL Mutations
 
-[ ] Check that an update mutation won't cause duplicate XIDs.
-[ ] Deal with nested objects and their upserts.
-
+[x] Check that an update mutation won't cause duplicate XIDs.
+[x] Deal with nested objects and their upserts.

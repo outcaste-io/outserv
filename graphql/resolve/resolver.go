@@ -105,12 +105,6 @@ func (dg *DgraphEx) Execute(ctx context.Context, req *pb.Request,
 	return resp, err
 }
 
-// dgraphExecutor is an implementation of both QueryExecutor and MutationExecutor
-// that proxies query/mutation resolution through Query method in dgraph server.
-type dgraphExecutor struct {
-	dg *DgraphEx
-}
-
 // A Resolved is the result of resolving a single field - generally a query or mutation.
 type Resolved struct {
 	Data       []byte
@@ -130,12 +124,7 @@ func (cf CompletionFunc) Complete(ctx context.Context, resolved *Resolved) {
 
 // NewDgraphExecutor builds a DgraphExecutor for proxying requests through dgraph.
 func NewDgraphExecutor() DgraphExecutor {
-	return &dgraphExecutor{dg: &DgraphEx{}}
-}
-
-func (de *dgraphExecutor) Execute(ctx context.Context, req *pb.Request, field *schema.Field) (
-	*pb.Response, error) {
-	return de.dg.Execute(ctx, req, field)
+	return &DgraphEx{}
 }
 
 func (rf *ResolverFactory) WithQueryResolver(
