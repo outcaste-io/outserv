@@ -31,6 +31,7 @@ const (
 	// order of data doesn't change keys of same attributes are located together.
 	DefaultPrefix = byte(0x00)
 	ByteSchema    = byte(0x01)
+	ByteType      = byte(0x02)
 	// ByteSplit signals that the key stores an individual part of a multi-part list.
 	ByteSplit = byte(0x04)
 	// ByteUnused is a constant to specify keys which need to be discarded.
@@ -369,6 +370,11 @@ func (p ParsedKey) CountPrefix(reverse bool) []byte {
 	return buf
 }
 
+// IsType returns whether the key is a type key.
+func (p ParsedKey) IsType() bool {
+	return p.bytePrefix == ByteType
+}
+
 // SchemaPrefix returns the prefix for Schema keys.
 func SchemaPrefix() []byte {
 	var buf [1]byte
@@ -438,7 +444,7 @@ func Parse(key []byte) (ParsedKey, error) {
 	k = k[sz:]
 
 	switch p.bytePrefix {
-	case ByteSchema:
+	case ByteSchema, ByteType:
 		return p, nil
 	default:
 	}
@@ -662,4 +668,16 @@ func IsPreDefinedType(typ string) bool {
 // isReservedName returns true if the given name is prefixed with `dgraph.`
 func isReservedName(name string) bool {
 	return strings.HasPrefix(strings.ToLower(name), "dgraph.")
+}
+
+// TypeKey returns type key for given type name. Type keys are stored separately
+// with a unique prefix, since we need to iterate over all type keys.
+// The structure of a type key is as follows:
+//
+// byte 0: key type prefix (set to ByteType)
+// byte 1-2: length of typeName
+// next len(attr) bytes: value of attr (the type name)
+func TypeKey(attr string) []byte {
+	key, _ := generateKey(ByteType, attr, 0)
+	return key
 }
