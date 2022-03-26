@@ -1184,6 +1184,23 @@ func ToHex(i uint64) []byte {
 	return out
 }
 
+func FromHex(s string) uint64 {
+	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
+		s = s[2:]
+	}
+	// Base 16 is assumed.
+	u, err := strconv.ParseUint(s, 16, 64)
+	if err != nil {
+		glog.Infof("Unable to parse %s to hex\n", s)
+		Check(err)
+	}
+	return u
+}
+
+func ToHexString(i uint64) string {
+	return "0x" + strconv.FormatUint(i, 16)
+}
+
 // TODO: Fix this all up.
 // RootTemplate defines the help template for dgraph command.
 var RootTemplate string = `Dgraph is a horizontally scalable and distributed graph database,

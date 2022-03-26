@@ -31,6 +31,8 @@ var (
 
 // GraphQuery stores the parsed Query in a tree format. This gets converted to
 // pb.y used query.SubGraph before processing the query.
+//
+// TODO: Convert this to proto.
 type GraphQuery struct {
 	UID        []uint64
 	Attr       string

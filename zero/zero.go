@@ -52,7 +52,7 @@ func NewState() *State {
 		Leaders: make(map[uint32]uint64),
 	}
 	s.nextUint = make(map[pb.NumLeaseType]uint64)
-	s.nextUint[pb.Num_UID] = 1
+	s.nextUint[pb.Num_UID] = 16 // We keep the first 16 for special purposes.
 	s.nextUint[pb.Num_NS_ID] = 1
 	s.closer = z.NewCloser(2) // grpc and http
 

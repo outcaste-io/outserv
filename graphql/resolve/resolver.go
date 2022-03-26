@@ -68,9 +68,6 @@ type ResolverFactory struct {
 // ResolverFns is a convenience struct for passing blocks of rewriters and executors.
 type ResolverFns struct {
 	Qrw QueryRewriter
-	Arw func() MutationRewriter
-	Urw func() MutationRewriter
-	Drw MutationRewriter
 	Ex  DgraphExecutor
 }
 
@@ -100,18 +97,12 @@ func (dg *DgraphEx) Execute(ctx context.Context, req *pb.Request,
 	}
 
 	ctx = context.WithValue(ctx, edgraph.IsGraphql, true)
-	resp, err := (&edgraph.Server{}).QueryGraphQL(ctx, req, field)
+	resp, err := edgraph.QueryGraphQL(ctx, req, field)
 	if !x.IsGqlErrorList(err) {
 		err = schema.GQLWrapf(err, "Dgraph execution failed")
 	}
 
 	return resp, err
-}
-
-// dgraphExecutor is an implementation of both QueryExecutor and MutationExecutor
-// that proxies query/mutation resolution through Query method in dgraph server.
-type dgraphExecutor struct {
-	dg *DgraphEx
 }
 
 // A Resolved is the result of resolving a single field - generally a query or mutation.
@@ -133,12 +124,7 @@ func (cf CompletionFunc) Complete(ctx context.Context, resolved *Resolved) {
 
 // NewDgraphExecutor builds a DgraphExecutor for proxying requests through dgraph.
 func NewDgraphExecutor() DgraphExecutor {
-	return &dgraphExecutor{dg: &DgraphEx{}}
-}
-
-func (de *dgraphExecutor) Execute(ctx context.Context, req *pb.Request, field *schema.Field) (
-	*pb.Response, error) {
-	return de.dg.Execute(ctx, req, field)
+	return &DgraphEx{}
 }
 
 func (rf *ResolverFactory) WithQueryResolver(
@@ -214,19 +200,19 @@ func (rf *ResolverFactory) WithConventionResolvers(
 
 	for _, m := range s.Mutations(schema.AddMutation) {
 		rf.WithMutationResolver(m, func(m *schema.Field) MutationResolver {
-			return NewDgraphResolver(fns.Arw(), fns.Ex)
+			return NewDgraphResolver()
 		})
 	}
 
 	for _, m := range s.Mutations(schema.UpdateMutation) {
 		rf.WithMutationResolver(m, func(m *schema.Field) MutationResolver {
-			return NewDgraphResolver(fns.Urw(), fns.Ex)
+			return NewDgraphResolver()
 		})
 	}
 
 	for _, m := range s.Mutations(schema.DeleteMutation) {
 		rf.WithMutationResolver(m, func(m *schema.Field) MutationResolver {
-			return NewDgraphResolver(fns.Drw, fns.Ex)
+			return NewDgraphResolver()
 		})
 	}
 

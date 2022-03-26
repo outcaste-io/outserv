@@ -25,7 +25,7 @@ func resolveLogin(ctx context.Context, m *schema.Field) (*resolve.Resolved, bool
 	glog.Info("Got login request")
 
 	input := getLoginInput(m)
-	resp, err := (&edgraph.Server{}).Login(ctx, &pb.LoginRequest{
+	resp, err := edgraph.Login(ctx, &pb.LoginRequest{
 		Userid:       input.UserId,
 		Password:     input.Password,
 		Namespace:    input.Namespace,
