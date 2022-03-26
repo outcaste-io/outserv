@@ -1,6 +1,10 @@
+// Portions Copyright 2019 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
+
 package resolve
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -22,18 +26,6 @@ import (
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
 )
-
-func (mr *dgraphResolver) Resolve(ctx context.Context, m *schema.Field) (*Resolved, bool) {
-	span := otrace.FromContext(ctx)
-	stop := x.SpanTimer(span, "resolveMutation")
-	defer stop()
-	if span != nil {
-		span.Annotatef(nil, "mutation alias: [%s] type: [%s]", m.Alias(), m.MutationType())
-	}
-
-	resolved, success := mr.rewriteAndExecute(ctx, m)
-	return resolved, success
-}
 
 func extractVal(xidVal interface{}, xid *schema.FieldDefinition) (string, error) {
 	typeName := xid.Type().Name()
@@ -280,6 +272,20 @@ func runUpsert(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	}
 	glog.Infof("Got resultUids: %#x\n", resultUids)
 	return resultUids, nil
+}
+
+func extractMutationFilter(m *schema.Field) map[string]interface{} {
+	var filter map[string]interface{}
+	mutationType := m.MutationType()
+	if mutationType == schema.UpdateMutation {
+		input, ok := m.ArgValue("input").(map[string]interface{})
+		if ok {
+			filter, _ = input["filter"].(map[string]interface{})
+		}
+	} else if mutationType == schema.DeleteMutation {
+		filter, _ = m.ArgValue("filter").(map[string]interface{})
+	}
+	return filter
 }
 
 func getUidsFromFilter(ctx context.Context, m *schema.Field) ([]uint64, error) {
@@ -556,27 +562,72 @@ func UidsForXid(ctx context.Context, pred, value string) (*sroar.Bitmap, error) 
 	return codec.FromList(result.UidMatrix[0]), nil
 }
 
-func (mr *dgraphResolver) rewriteAndExecute(
-	ctx context.Context,
-	mutation *schema.Field) (*Resolved, bool) {
+// completeMutationResult takes in the result returned for the query field of mutation and builds
+// the JSON required for data field in GraphQL response.
+// The input qryResult can either be nil or of the form:
+//  {"qryFieldAlias":...}
+// and the output will look like:
+//  {"addAuthor":{"qryFieldAlias":...,"numUids":2,"msg":"Deleted"}}
+func completeMutationResult(mutation *schema.Field, qryResult []byte, numUids int) []byte {
+	comma := ""
+	var buf bytes.Buffer
+	x.Check2(buf.WriteRune('{'))
+	mutation.CompleteAlias(&buf)
+	x.Check2(buf.WriteRune('{'))
 
-	ext := &schema.Extensions{}
-	emptyResult := func(err error) *Resolved {
-		return &Resolved{
-			// all the standard mutations are nullable objects, so Data should pretty-much be
-			// {"mutAlias":null} everytime.
-			Data:  mutation.NullResponse(),
-			Field: mutation,
-			// there is no completion down the pipeline, so error's path should be prepended with
-			// mutation's alias before returning the response.
-			Err:        schema.PrependPath(err, mutation.ResponseName()),
-			Extensions: ext,
+	// Our standard MutationPayloads consist of only the following fields:
+	//  * queryField
+	//  * numUids
+	//  * msg (only for DeleteMutationPayload)
+	// And __typename can be present anywhere. So, build data accordingly.
+	// Note that all these fields are nullable, so no need to raise non-null errors.
+	for _, f := range mutation.SelectionSet() {
+		x.Check2(buf.WriteString(comma))
+		f.CompleteAlias(&buf)
+
+		switch f.Name() {
+		case schema.Typename:
+			x.Check2(buf.WriteString(`"` + f.TypeName(nil) + `"`))
+		case schema.Msg:
+			if numUids == 0 {
+				x.Check2(buf.WriteString(`"No nodes were deleted"`))
+			} else {
+				x.Check2(buf.WriteString(`"Deleted"`))
+			}
+		case schema.NumUid:
+			// Although theoretically it is possible that numUids can be out of the int32 range but
+			// we don't need to apply coercion rules here as per Int type because carrying out a
+			// mutation which mutates more than 2 billion uids doesn't seem a practical case.
+			// So, we are skipping coercion here.
+			x.Check2(buf.WriteString(strconv.Itoa(numUids)))
+		default: // this has to be queryField
+			if len(qryResult) == 0 {
+				// don't write null, instead write [] as query field is always a nullable list
+				x.Check2(buf.Write(schema.JsonEmptyList))
+			} else {
+				// need to write only the value returned for query field, so need to remove the JSON
+				// key till colon (:) and also the ending brace }.
+				// 4 = {"":
+				x.Check2(buf.Write(qryResult[4+len(f.ResponseName()) : len(qryResult)-1]))
+			}
 		}
+		comma = ","
 	}
-	_ = emptyResult(nil)
+	x.Check2(buf.WriteString("}}"))
+
+	return buf.Bytes()
+}
+
+func (mr *dgraphResolver) Resolve(ctx context.Context, m *schema.Field) (*Resolved, bool) {
+	span := otrace.FromContext(ctx)
+	stop := x.SpanTimer(span, "resolveMutation")
+	defer stop()
+	if span != nil {
+		span.Annotatef(nil, "mutation alias: [%s] type: [%s]", m.Alias(), m.MutationType())
+	}
 
 	calculateResponse := func(uids []uint64) (*pb.Response, error) {
-		field := mutation.QueryField()
+		field := m.QueryField()
 		dgQuery := []*gql.GraphQuery{{
 			Attr: field.DgraphAlias(),
 		}}
@@ -599,22 +650,22 @@ func (mr *dgraphResolver) rewriteAndExecute(
 		return resp, err
 	}
 
-	uids, err := rewriteQueries(ctx, mutation)
+	uids, err := rewriteQueries(ctx, m)
 	var resp *pb.Response
 	var err2 error
 	if len(uids) > 0 {
 		resp, err2 = calculateResponse(uids)
 	}
-	res := &Resolved{Field: mutation}
+	res := &Resolved{Field: m}
 	if resp != nil && len(resp.Json) > 0 {
-		res.Data = completeMutationResult(mutation, resp.Json, len(uids))
+		res.Data = completeMutationResult(m, resp.Json, len(uids))
 	} else {
-		res.Data = mutation.NullResponse()
+		res.Data = m.NullResponse()
 	}
 	if err == nil && err2 != nil {
-		res.Err = schema.PrependPath(err2, mutation.ResponseName())
+		res.Err = schema.PrependPath(err2, m.ResponseName())
 	} else {
-		res.Err = schema.PrependPath(err, mutation.ResponseName())
+		res.Err = schema.PrependPath(err, m.ResponseName())
 	}
 
 	success := err == nil && err2 == nil

@@ -214,19 +214,19 @@ func (rf *ResolverFactory) WithConventionResolvers(
 
 	for _, m := range s.Mutations(schema.AddMutation) {
 		rf.WithMutationResolver(m, func(m *schema.Field) MutationResolver {
-			return NewDgraphResolver(fns.Arw(), fns.Ex)
+			return NewDgraphResolver()
 		})
 	}
 
 	for _, m := range s.Mutations(schema.UpdateMutation) {
 		rf.WithMutationResolver(m, func(m *schema.Field) MutationResolver {
-			return NewDgraphResolver(fns.Urw(), fns.Ex)
+			return NewDgraphResolver()
 		})
 	}
 
 	for _, m := range s.Mutations(schema.DeleteMutation) {
 		rf.WithMutationResolver(m, func(m *schema.Field) MutationResolver {
-			return NewDgraphResolver(fns.Drw, fns.Ex)
+			return NewDgraphResolver()
 		})
 	}
 
