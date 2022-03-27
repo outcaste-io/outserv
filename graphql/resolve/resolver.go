@@ -23,7 +23,6 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/outcaste-io/outserv/graphql/schema"
-	"github.com/outcaste-io/outserv/lambda"
 )
 
 type resolveCtxKey string
@@ -200,6 +199,9 @@ func (rf *ResolverFactory) WithConventionResolvers(
 		})
 	}
 
+	// TODO(schartey/lambda): Need to distinguish between local Lambda and HTTP resolvers
+	// remote lambda is perfectly fine, but local would not need to be sent over http, but
+	// can be called directly
 	for _, q := range s.Queries(schema.HTTPQuery) {
 		rf.WithQueryResolver(q, func(q *schema.Field) QueryResolver {
 			return NewHTTPQueryResolver(nil)
@@ -231,6 +233,9 @@ func (rf *ResolverFactory) WithConventionResolvers(
 		})
 	}
 
+	// TODO(schartey/lambda): Need to distinguish between local Lambda and HTTP resolvers
+	// remote lambda is perfectly fine, but local would not need to be sent over http, but
+	// can be called directly
 	for _, m := range s.Mutations(schema.HTTPMutation) {
 		rf.WithMutationResolver(m, func(m *schema.Field) MutationResolver {
 			return NewHTTPMutationResolver(nil)
@@ -644,11 +649,9 @@ func (hr *httpResolver) rewriteAndExecute(ctx context.Context, field *schema.Fie
 		return EmptyResult(field, err)
 	}
 
-	// TODO: Call wasm lambda
-	lambda.GetLambda().Execute()
 	// If this is a lambda field, it will always have a body template.
 	// Just convert that into a lambda template.
-	if field.HasLambdaDirective() {
+	if field.GetLambdaDirective() != "" {
 		hrc.Template = schema.GetBodyForLambda(ctx, field, nil, hrc.Template)
 	}
 

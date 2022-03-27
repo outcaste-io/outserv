@@ -4,6 +4,7 @@
 package admin
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"sync"
@@ -333,14 +334,32 @@ func newAdminResolver(
 	lambdaHashPrefix = lambdaHashPrefix[:len(lambdaHashPrefix)-8]
 	// Listen for lambda changes in group 1.
 
-	// We should somehow combine the prefixes
-	go SubscribeForUpdates([][]byte{lambdaScriptPrefix, lambdaHashPrefix}, x.IgnoreBytes,
-		func(uid uint64, prefix []byte, val []byte, err error) {
+	// TODO(schartey/wasm): Why do we not load the script directly when it's updated instead of on subscribe?
+	glog.Error(lambdaHashPrefix, lambdaScriptPrefix)
+	lambdaScript := &lambda.LambdaScript{}
+	SubscribeUpdates([][]byte{lambdaScriptPrefix, lambdaHashPrefix}, x.IgnoreBytes,
+		func(ns uint64, uid uint64, prefix []byte, val []byte, err error) {
 			if err == nil {
-				glog.Infof("Updating Lambda from subscription.")
-				glog.Error(uid)
-				glog.Error(val)
-				lambda.GetLambda().LoadScript(&lambda.LambdaScript{Script: val})
+				// Combining script and hash that fit together
+				if lambdaScript.Script != nil && lambdaScript.Hash != "" {
+					lambdaScript = &lambda.LambdaScript{}
+				}
+				if bytes.Compare(prefix, lambdaScriptPrefix) == 0 {
+					lambdaScript.Script = val
+				} else if bytes.Compare(prefix, lambdaHashPrefix) == 0 {
+					lambdaScript.Hash = string(val)
+				} else {
+					glog.Infof("Got unknown prefix in lambda updates")
+					return
+				}
+				if lambdaScript.Script != nil && lambdaScript.Hash != "" {
+					glog.Infof("Updating Lambda from subscription.")
+					if err := lambda.Instance(ns).LoadScript(lambdaScript); err != nil {
+						glog.Infof("Updating Lambda failed: %s", err)
+					} else {
+						glog.Info("Successfully loaded Lambda Script")
+					}
+				}
 			} else {
 				glog.Errorf("Subscription failed: %s", err)
 			}
@@ -494,7 +513,9 @@ func (as *adminServer) initServer() {
 		} else {
 			glog.Info("Loading lambda script")
 			glog.Error(script)
-			if err := lambda.GetLambda().LoadScript(script); err != nil {
+			// TODO(schartey/lambda): Here we start a script on the GalaxyNamespace, but lambdas should be able to be attached to others as well
+			// Should we add an optional parameter namespace to the mutation and attach it to lamdbascript?
+			if err := lambda.Instance(x.GalaxyNamespace).LoadScript(script); err != nil {
 				glog.Infof("could not update lambda script: %s", err)
 			}
 		}
@@ -692,13 +713,15 @@ func lazyLoadScript(namespace uint64) error {
 	}
 	// Otherwise, fetch it from disk.
 	script, err := edgraph.GetLambdaScript(namespace)
+	// We need to store somewhere that we already tried loading the script, even if it was empty
 	if err != nil {
 		glog.Errorf("namespace: %d. Error reading Lambda Script: %s.", namespace, err)
+		// This is currently written on each request, maybe we should store an empty script
 	} else {
 		if script == nil {
 			glog.Errorf("namespace: %d. No lambda script stored: %s.", namespace, err)
 		} else {
-			if err := lambda.GetLambda().LoadScript(script); err != nil {
+			if err := lambda.Instance(namespace).LoadScript(script); err != nil {
 				glog.Errorf("namespace: %d. Error loading Lambda Script: %s.", namespace, err)
 			}
 			glog.Infof("namespace: %d. Successfully lazy-loaded GraphQL schema.", namespace)

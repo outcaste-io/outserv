@@ -1336,9 +1336,9 @@ func (r *RateLimiter) RefillPeriodically() {
 
 var loop uint32
 
+// TODO(schartey/wasm): Move this to lambda package
 // LambdaUrl returns the correct lambda url for the given namespace
-func LambdaUrl(ns uint64) string {
-	lambdaUrl := Config.Lambda.Url
+func LambdaUrl(ns uint64, lambdaUrl string) string {
 	if len(lambdaUrl) > 0 {
 		return strings.Replace(lambdaUrl, "$ns", strconv.FormatUint(ns, 10), 1)
 	}

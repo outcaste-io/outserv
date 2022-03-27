@@ -1,13 +1,13 @@
 package lambda
 
 import (
-	"encoding/base64"
+	"errors"
+	"fmt"
 
 	"github.com/golang/glog"
 )
 
-// For now this is a packaged variable instead of a class object
-// Simplifies things for now
+var coordinator *Coordinator
 
 type LambdaScript struct {
 	ID     string `json:"id,omitempty"`
@@ -15,41 +15,62 @@ type LambdaScript struct {
 	Hash   string `json:"hash,omitempty"`
 }
 
-var lambda *Lambda
+type Coordinator struct {
+	instances map[uint64]*Lambda
+}
 
 // This is the struct that contains general lambda information
 type Lambda struct {
+	instanceId   uint64
+	lambdaScript *LambdaScript
 	wasmInstance *WasmInstance
 }
 
-func (l *Lambda) Execute() {
-	l.wasmInstance.execute()
+func init() {
+	coordinator = &Coordinator{
+		instances: make(map[uint64]*Lambda),
+	}
+}
+
+func Instance(instance uint64) *Lambda {
+	// Lock
+	lambda, ok := coordinator.instances[instance]
+	if !ok {
+		coordinator.instances[instance] = &Lambda{
+			instanceId: instance,
+		}
+	}
+	// Unlock
+	return lambda
 }
 
 func (l *Lambda) LoadScript(lambdaScript *LambdaScript) error {
-	glog.Info("Loading Lambda Script")
-
-	return nil
-	wasmScript, err := base64.StdEncoding.DecodeString(string(lambdaScript.Script))
-	if err != nil {
-		return err
+	// Lock
+	if l.lambdaScript.Hash == lambdaScript.Hash {
+		return errors.New("lambda script already loaded")
 	}
-
 	if l.wasmInstance == nil {
-		l.wasmInstance, err = NewWasmInstance(wasmScript)
+		i, err := NewWasmInstance(lambdaScript.Script)
 		if err != nil {
 			return err
 		}
+		l.wasmInstance = i
 	} else {
-		return l.wasmInstance.UpdateScript(wasmScript)
+		if err := l.wasmInstance.UpdateScript(lambdaScript.Script); err != nil {
+			return err
+		}
 	}
-
+	l.lambdaScript = lambdaScript
 	return nil
+	// Unlock
 }
 
-func GetLambda() *Lambda {
-	if lambda == nil {
-		lambda = &Lambda{}
+func (l *Lambda) Execute() (string, error) {
+	// Lock
+	if l.wasmInstance == nil {
+		return "", errors.New(fmt.Sprintf("no lambda script loaded for lambda instance %d", l.instanceId))
 	}
-	return lambda
+	glog.Info("Executing lambda")
+	return l.wasmInstance.Execute("")
+	// Unlock
 }

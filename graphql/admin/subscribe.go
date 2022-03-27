@@ -9,9 +9,31 @@ import (
 	"github.com/pkg/errors"
 )
 
-func SubscribeForUpdates(prefixes [][]byte, ignore string, cb func(uid uint64, prefix []byte, val []byte,
+// TODO(schartey/wasm): rewrite to goroutines instead of callbacks
+
+// Async subscription for individual updates
+func SubscribeUpdates(prefixes [][]byte, ignore string, cb func(ns uint64, uid uint64, prefix []byte, val []byte,
 	err error), group uint32, closer *z.Closer) {
-	worker.SubscribeForUpdates(prefixes, x.IgnoreBytes, func(kvs *badgerpb.KVList) {
+	for _, prefix := range prefixes {
+		go SubscribeForUpdate(prefix, ignore, func(ns uint64, uid uint64, pre []byte, val []byte, err error) {
+			cb(ns, uid, pre, val, err)
+		}, group, closer)
+	}
+}
+
+// Async subscription for single update
+func SubscribeForUpdate(prefix []byte, ignore string, cb func(ns uint64, uid uint64, prefix []byte, val []byte,
+	err error), group uint32, closer *z.Closer) {
+	go SubscribeForAnyUpdates([][]byte{prefix}, ignore, func(ns uint64, uid uint64, val []byte, err error) {
+		cb(ns, uid, prefix, val, err)
+	}, group, closer)
+}
+
+// Async subscription for any update of prefix
+// Would it be more Go idiomatic to use channels instead of callbacks?
+func SubscribeForAnyUpdates(prefixes [][]byte, ignore string, cb func(ns uint64, uid uint64, val []byte,
+	err error), group uint32, closer *z.Closer) {
+	go worker.SubscribeForUpdates(prefixes, x.IgnoreBytes, func(kvs *badgerpb.KVList) {
 		kv := x.KvWithMaxVersion(kvs, prefixes)
 
 		// Unmarshal the incoming posting list.
@@ -34,8 +56,9 @@ func SubscribeForUpdates(prefixes [][]byte, ignore string, cb func(uid uint64, p
 			err = errors.Wrapf(err, "Unable to find uid of updated lambda")
 			return
 		}
+		ns, _ := x.ParseNamespaceAttr(pk.Attr)
 
 		// Ideally we also send back the prefix, so we know which prefix got an update
-		cb(pk.Uid, nil, pl.Postings[0].Value, nil)
+		cb(ns, pk.Uid, pl.Postings[0].Value, nil)
 	}, group, closer)
 }

@@ -25,6 +25,12 @@ func resolveUpdateLambda(ctx context.Context, m *schema.Field) (*resolve.Resolve
 		return resolve.EmptyResult(m, err), false
 	}
 
+	// TODO(schartey/wasm)
+	// The following call checks for the hash to not update unnecessarely
+	// We should copy/move this check over here to account for that earlier
+	// Also ideally we try to compile the script here, to check if it is valid
+	// before we store it and send it to each server. Allow empty script
+
 	resp, err := edgraph.UpdateLambdaScript(ctx, input.Script)
 	if err != nil {
 		return resolve.EmptyResult(m, err), false

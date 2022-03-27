@@ -712,7 +712,7 @@ func (n *node) processApplyCh() {
 				previous[prop.Key] = p
 			}
 			if perr != nil {
-				glog.Errorf("Applying proposal. Error: %v. Proposal: %q.", perr, prop.String())
+				glog.Errorf("Applying proposal. Error: %v. Proposal: %q.", perr, "" /*prop.String()*/)
 			}
 			n.elog.Printf("Applied proposal with key: %d, index: %d. Err: %v",
 				prop.Key, prop.Index, perr)

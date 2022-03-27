@@ -1275,19 +1275,19 @@ func lambdaDirectiveValidation(sch *ast.Schema,
 	field *ast.FieldDefinition,
 	dir *ast.Directive,
 	secrets map[string]x.Sensitive) gqlerror.List {
+	var errs []*gqlerror.Error
 	// if the lambda url wasn't specified during alpha startup,
 	// just return that error. Don't confuse the user with errors from @custom yet.
-	if x.LambdaUrl(x.GalaxyNamespace) == "" {
-		return []*gqlerror.Error{gqlerror.ErrorPosf(dir.Position,
-			"Type %s; Field %s: has the @lambda directive, but the "+
-				`--lambda "url=...;" flag wasn't specified during alpha startup.`,
-			typ.Name, field.Name)}
-	}
+
+	//TODO(schartey/wasm): Validate that the directive is either empty or has an url
 	// reuse @custom directive validation
-	errs := customDirectiveValidation(sch, typ, field, buildCustomDirectiveForLambda(typ, field,
-		dir, x.GalaxyNamespace, func(f *ast.FieldDefinition) bool { return false }), secrets)
-	for _, err := range errs {
-		err.Message = "While building @custom for @lambda: " + err.Message
+
+	if dir.Arguments.ForName("url") != nil {
+		errs = customDirectiveValidation(sch, typ, field, buildCustomDirectiveForLambda(typ, field,
+			dir, x.GalaxyNamespace, func(f *ast.FieldDefinition) bool { return false }), secrets)
+		for _, err := range errs {
+			err.Message = "While building @custom for @lambda: " + err.Message
+		}
 	}
 	return errs
 }
@@ -1382,12 +1382,7 @@ func lambdaOnMutateValidation(sch *ast.Schema, typ *ast.Definition) gqlerror.Lis
 
 	var errs []*gqlerror.Error
 
-	// lambda url must be specified during alpha startup
-	if x.LambdaUrl(x.GalaxyNamespace) == "" {
-		errs = append(errs, gqlerror.ErrorPosf(dir.Position,
-			"Type %s: has the @lambdaOnMutate directive, but the "+
-				"`--lambda url` flag wasn't specified during alpha startup.", typ.Name))
-	}
+	//TODO(schartey/wasm): check if directive is empty or has url
 
 	if typ.Directives.ForName(remoteDirective) != nil {
 		errs = append(errs, gqlerror.ErrorPosf(

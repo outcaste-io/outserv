@@ -96,9 +96,9 @@ type existingGQLSchemaQryResp struct {
 
 type existingLambdaQryResp struct {
 	ExistingLambdaScript []struct {
-		Uid    string `json:"uid"`
-		Script []byte `json:"dgraph.graphql.lambda.script"`
-		Hash   string `json:"dgraph.graphql.lambda.hash"`
+		Uid    string          `json:"uid"`
+		Script json.RawMessage `json:"dgraph.graphql.lambda.script"`
+		Hash   string          `json:"dgraph.graphql.lambda.hash"`
 	} `json:"ExistingLambdaScript"`
 }
 
