@@ -333,13 +333,13 @@ func newAdminResolver(
 
 	// TODO(schartey/wasm): Why do we not load the script directly when it's updated instead of on subscribe?
 	glog.Error(lambdaHashPrefix, lambdaScriptPrefix)
-	lambdaScript := &lambda.LambdaScript{}
+	var lambdaScript *lambda.LambdaScript
 	SubscribeUpdates([][]byte{lambdaScriptPrefix, lambdaHashPrefix}, x.IgnoreBytes,
 		func(ns uint64, uid uint64, prefix []byte, val []byte, err error) {
 			if err == nil {
 				// Combining script and hash that fit together
-				if lambdaScript.Script != nil && lambdaScript.Hash != "" {
-					lambdaScript = &lambda.LambdaScript{}
+				if lambdaScript == nil || (lambdaScript.Script != nil && lambdaScript.Hash != "") {
+					lambdaScript = &lambda.LambdaScript{ID: x.ToHexString(uid)}
 				}
 				if bytes.Compare(prefix, lambdaScriptPrefix) == 0 {
 					lambdaScript.Script = val
@@ -509,10 +509,12 @@ func (as *adminServer) initServer() {
 			glog.Info("could not load lambda script: %s", err)
 		} else {
 			if script == nil {
-				glog.Errorf("namespace: %d. No lambda script stored: %s.", x.GalaxyNamespace, err)
+				if script.Hash == "" {
+					glog.Errorf("namespace: %d. No lambda script stored: %s.", x.GalaxyNamespace)
+					lambda.Instance(x.GalaxyNamespace).SetEmptyScript(script)
+				}
 			} else {
 				glog.Info("Loading lambda script")
-				glog.Error(script)
 				if err := lambda.Instance(x.GalaxyNamespace).LoadScript(script); err != nil {
 					glog.Infof("could not update lambda script: %s", err)
 				}
@@ -659,18 +661,17 @@ func (as *adminServer) lazyLoadSchema(namespace uint64) error {
 
 func lazyLoadScript(namespace uint64) error {
 	// If script is already loaded in memory, no need to fetch from disk.
-	if _, ok := worker.Lambda().GetCurrent(namespace); ok {
+	if _, ok := lambda.Instance(namespace).GetCurrentScript(); ok {
 		return nil
 	}
 	// Otherwise, fetch it from disk.
 	script, err := edgraph.GetLambdaScript(namespace)
-	// We need to store somewhere that we already tried loading the script, even if it was empty
 	if err != nil {
 		glog.Errorf("namespace: %d. Error reading Lambda Script: %s.", namespace, err)
-		// This is currently written on each request, maybe we should store an empty script
 	} else {
-		if script == nil {
-			glog.Errorf("namespace: %d. No lambda script stored: %s.", namespace, err)
+		if script.Hash == "" {
+			glog.Errorf("namespace: %d. No lambda script stored: %s.", namespace)
+			lambda.Instance(namespace).SetEmptyScript(script)
 		} else {
 			if err := lambda.Instance(namespace).LoadScript(script); err != nil {
 				glog.Errorf("namespace: %d. Error loading Lambda Script: %s.", namespace, err)

@@ -60,7 +60,7 @@ const graphqlAdminSchema = `
 		"""
 		Input script (multi-part binary)
 		"""
-		script: Upload! @dgraph(pred: "dgraph.graphql.lambda.script")
+		script: Upload @dgraph(pred: "dgraph.graphql.lambda.script")
 		hash: String! @dgraph(pred: "dgraph.graphql.lambda.hash")
 	}
 

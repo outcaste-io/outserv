@@ -32,6 +32,10 @@ func init() {
 	}
 }
 
+func (l *Lambda) GetCurrentScript() (*LambdaScript, bool) {
+	return l.lambdaScript, l.lambdaScript != nil
+}
+
 func Instance(instance uint64) *Lambda {
 	// Lock
 	lambda, ok := coordinator.instances[instance]
@@ -64,6 +68,11 @@ func (l *Lambda) LoadScript(lambdaScript *LambdaScript) error {
 	l.lambdaScript = lambdaScript
 	return nil
 	// Unlock
+}
+
+func (l *Lambda) SetEmptyScript(lambdaScript *LambdaScript) {
+	l.wasmInstance.Stop()
+	l.lambdaScript = lambdaScript
 }
 
 func (l *Lambda) Execute() (string, error) {

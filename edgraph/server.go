@@ -91,12 +91,14 @@ type existingGQLSchemaQryResp struct {
 	ExistingGQLSchema []graphQLSchemaNode `json:"ExistingGQLSchema"`
 }
 
+type lambdaScriptNode struct {
+	Uid    string          `json:"uid"`
+	Script json.RawMessage `json:"dgraph.graphql.lambda.script"`
+	Hash   string          `json:"dgraph.graphql.lambda.hash"`
+}
+
 type existingLambdaQryResp struct {
-	ExistingLambdaScript []struct {
-		Uid    string          `json:"uid"`
-		Script json.RawMessage `json:"dgraph.graphql.lambda.script"`
-		Hash   string          `json:"dgraph.graphql.lambda.hash"`
-	} `json:"ExistingLambdaScript"`
+	ExistingLambdaScript []lambdaScriptNode `json:"ExistingLambdaScript"`
 }
 
 // PeriodicallyPostTelemetry periodically reports telemetry data for alpha.
@@ -155,7 +157,10 @@ func GetLambdaScript(namespace uint64) (lambdaScript *lambda.LambdaScript, err e
 	res := result.ExistingLambdaScript
 	if len(res) == 0 {
 		// no script has been stored yet in Dgraph
-		return nil, errors.New("Could not find lambda script")
+		if err := resetLambdaScript(ctx); err != nil {
+			return nil, errors.Wrap(err, "Couldn't create default lambda script")
+		}
+		return GetLambdaScript(namespace)
 	}
 	// we found an existing Lambda script
 	lambdaScript = &lambda.LambdaScript{
@@ -164,6 +169,11 @@ func GetLambdaScript(namespace uint64) (lambdaScript *lambda.LambdaScript, err e
 		Hash:   res[0].Hash,
 	}
 	return lambdaScript, nil
+}
+
+func resetLambdaScript(ctx context.Context) error {
+	_, err := UpdateLambdaScript(ctx, nil)
+	return err
 }
 
 func GetGQLSchema(namespace uint64) (uid, graphQLSchema string, err error) {

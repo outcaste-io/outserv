@@ -56,7 +56,10 @@ func NewWasmInstance(code []byte) (*WasmInstance, error) {
 // Handle all errors
 // When update was not successful stick to the old instance
 func (w *WasmInstance) UpdateScript(script []byte) error {
-	module, _ := wasmer.NewModule(w.store, script)
+	module, err := wasmer.NewModule(w.store, script)
+	if err != nil {
+		return err
+	}
 	wasiEnv, err := wasmer.NewWasiStateBuilder("wasi-program").
 		// Choose according to your actual situation
 		// Argument("--foo").
