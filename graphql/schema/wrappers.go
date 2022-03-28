@@ -124,9 +124,9 @@ type Schema struct {
 	// something like field.Directives.ForName("custom"), which results in iterating over all the
 	// directives of the field.
 	customDirectives map[string]map[string]*ast.Directive
-	// lambdaDirectives stores the mapping of typeName->fieldName->url, if the field has @lambda.
+	// lambdaDirectives stores the mapping of typeName->fieldName->true, if the field has @lambda.
 	// It is read-only.
-	lambdaDirectives map[string]map[string]string
+	lambdaDirectives map[string]map[string]bool
 	// lambdaOnMutate stores the mapping of mutationName -> true, if the config of @lambdaOnMutate
 	// enables lambdas for that mutation.
 	// It is read-only.
@@ -536,9 +536,9 @@ func typeMappings(s *ast.Schema) map[string][]*ast.Definition {
 //	 So, by constructing an appropriate custom directive for @lambda fields,
 //	 we just reuse logic from @custom.
 func customAndLambdaMappings(s *ast.Schema, ns uint64) (map[string]map[string]*ast.Directive,
-	map[string]map[string]string) {
+	map[string]map[string]bool) {
 	customDirectives := make(map[string]map[string]*ast.Directive)
-	lambdaDirectives := make(map[string]map[string]string)
+	lambdaDirectives := make(map[string]map[string]bool)
 
 	for _, typ := range s.Types {
 		for _, field := range typ.Fields {
@@ -560,16 +560,14 @@ func customAndLambdaMappings(s *ast.Schema, ns uint64) (map[string]map[string]*a
 						// if it was @custom, put the directive at the @custom mapping for the field
 						customFieldMap[field.Name] = dir
 					} else {
-						// for external lambda, first update the lambda directives map
-						var lambdaFieldMap map[string]string
+						// for lambda, first update the lambda directives map
+						var lambdaFieldMap map[string]bool
 						if existingLambdaFieldMap, ok := lambdaDirectives[typ.Name]; ok {
 							lambdaFieldMap = existingLambdaFieldMap
 						} else {
-							lambdaFieldMap = make(map[string]string)
+							lambdaFieldMap = make(map[string]bool)
 						}
-						if url := dir.Arguments.ForName("url"); url != nil {
-							lambdaFieldMap[field.Name] = url.Value.String()
-						}
+						lambdaFieldMap[field.Name] = true
 						lambdaDirectives[typ.Name] = lambdaFieldMap
 						// then, build a custom directive with correct semantics to be put
 						// into custom directives map at this field
@@ -579,13 +577,13 @@ func customAndLambdaMappings(s *ast.Schema, ns uint64) (map[string]map[string]*a
 								// going in body template. The field itself may not have the
 								// directive anymore because the directive may have been removed by
 								// this function already. So, using these maps to find the same.
-								return lambdaFieldMap[f.Name] != "" || customFieldMap[f.Name] != nil
+								return lambdaFieldMap[f.Name] || customFieldMap[f.Name] != nil
 							})
-						// finally, update the custom directives map for this type
-						customDirectives[typ.Name] = customFieldMap
-						// break, as there can only be one @custom/@lambda
-						break
 					}
+					// finally, update the custom directives map for this type
+					customDirectives[typ.Name] = customFieldMap
+					// break, as there can only be one @custom/@lambda
+					break
 				}
 			}
 		}
@@ -755,7 +753,7 @@ func buildCustomDirectiveForLambda(defn *ast.Definition, field *ast.FieldDefinit
 
 	// build the children for http argument
 	httpArgChildrens := []*ast.ChildValue{
-		getChildValue(httpUrl, x.LambdaUrl(ns, lambdaDir.Arguments.ForName(httpUrl).Value.String()), ast.StringValue, lambdaDir.Position),
+		getChildValue(httpUrl, x.LambdaUrl(ns, lambdaDir.Arguments.ForName("url").Value.Raw), ast.StringValue, lambdaDir.Position),
 		getChildValue(httpMethod, http.MethodPost, ast.EnumValue, lambdaDir.Position),
 		getChildValue(httpBody, bodyTemplate.String(), ast.StringValue, lambdaDir.Position),
 	}
@@ -1191,7 +1189,7 @@ func (f *Field) HasCustomHTTPChild() bool {
 	return false
 }
 
-func (f *Field) GetLambdaDirective() string {
+func (f *Field) HasLambdaDirective() bool {
 	return f.op.inSchema.lambdaDirectives[f.GetObjectName()][f.Name()]
 }
 
@@ -1414,8 +1412,7 @@ func getCustomHTTPConfig(f *Field, isQueryOrMutation bool, ns uint64) (*FieldHTT
 	// If we are querying the lambda directive, update the URL using load balancer. Also, set the
 	// Accept-Encoding header to "*", so that no compression happens. Otherwise, http package sets
 	// gzip encoding which adds overhead for communication within the same machine.
-	if url := f.GetLambdaDirective(); url != "" {
-		fconf.URL = x.LambdaUrl(ns, url)
+	if f.HasLambdaDirective() {
 		fconf.ForwardHeaders.Set("Accept-Encoding", "*")
 	}
 	return fconf, nil

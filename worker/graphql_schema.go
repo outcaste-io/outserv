@@ -325,10 +325,10 @@ func (w *grpcWorker) UpdateLambdaScript(ctx context.Context,
 		})
 	} else {
 		uid = x.FromHex(lambdaScript.ID)
-	}
 
-	if lambdaScript.Hash == hash {
-		return nil, errUpdatingLambdaScriptNoChanges
+		if lambdaScript.Hash == hash {
+			return nil, errUpdatingLambdaScriptNoChanges
+		}
 	}
 
 	// prepare GraphQL schema mutation

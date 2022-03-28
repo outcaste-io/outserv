@@ -670,7 +670,7 @@ func lazyLoadScript(namespace uint64) error {
 		glog.Errorf("namespace: %d. Error reading Lambda Script: %s.", namespace, err)
 	} else {
 		if script.Hash == "" {
-			glog.Errorf("namespace: %d. No lambda script stored: %s.", namespace)
+			glog.Errorf("namespace: %d. No lambda script stored.", namespace)
 			lambda.Instance(namespace).SetEmptyScript(script)
 		} else {
 			if err := lambda.Instance(namespace).LoadScript(script); err != nil {

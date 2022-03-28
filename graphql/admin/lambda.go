@@ -5,6 +5,7 @@ package admin
 
 import (
 	"context"
+	"encoding/base64"
 
 	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/edgraph"
@@ -55,15 +56,14 @@ func resolveGetLambda(ctx context.Context, q *schema.Field) *resolve.Resolved {
 		return resolve.EmptyResult(q, err)
 	}
 
-	//TODO(schartey/wasm) This script should be loaded, so no need to query it
-	script, _ := edgraph.GetLambdaScript(ns)
+	script, _ := lambda.Instance(ns).GetCurrentScript()
 	if script == nil || script.ID == "" {
 		data = map[string]interface{}{q.Name(): nil}
 	} else {
 		data = map[string]interface{}{
 			q.Name(): map[string]interface{}{
 				"id":     script.ID,
-				"script": script.Script,
+				"script": []byte(base64.StdEncoding.EncodeToString(script.Script)),
 				"hash":   script.Hash,
 			}}
 	}

@@ -637,7 +637,7 @@ func (hr *httpResolver) rewriteAndExecute(ctx context.Context, field *schema.Fie
 
 	// If this is a lambda field, it will always have a body template.
 	// Just convert that into a lambda template.
-	if field.GetLambdaDirective() != "" {
+	if field.HasLambdaDirective() {
 		hrc.Template = schema.GetBodyForLambda(ctx, field, nil, hrc.Template)
 	}
 
