@@ -200,9 +200,6 @@ func NewServers(withIntrospection bool, globalEpoch map[uint64]*uint64,
 
 	fns := &resolve.ResolverFns{
 		Qrw: resolve.NewQueryRewriter(),
-		Arw: resolve.NewAddRewriter,
-		Urw: resolve.NewUpdateRewriter,
-		Drw: resolve.NewDeleteRewriter(),
 		Ex:  resolve.NewDgraphExecutor(),
 	}
 	adminResolvers := newAdminResolver(mainServer, fns, withIntrospection, globalEpoch, closer)
@@ -511,12 +508,14 @@ func (as *adminServer) initServer() {
 		if err != nil {
 			glog.Info("could not load lambda script: %s", err)
 		} else {
-			glog.Info("Loading lambda script")
-			glog.Error(script)
-			// TODO(schartey/lambda): Here we start a script on the GalaxyNamespace, but lambdas should be able to be attached to others as well
-			// Should we add an optional parameter namespace to the mutation and attach it to lamdbascript?
-			if err := lambda.Instance(x.GalaxyNamespace).LoadScript(script); err != nil {
-				glog.Infof("could not update lambda script: %s", err)
+			if script == nil {
+				glog.Errorf("namespace: %d. No lambda script stored: %s.", x.GalaxyNamespace, err)
+			} else {
+				glog.Info("Loading lambda script")
+				glog.Error(script)
+				if err := lambda.Instance(x.GalaxyNamespace).LoadScript(script); err != nil {
+					glog.Infof("could not update lambda script: %s", err)
+				}
 			}
 		}
 
@@ -527,10 +526,6 @@ func (as *adminServer) initServer() {
 
 // addConnectedAdminResolvers sets up the real resolvers
 func (as *adminServer) addConnectedAdminResolvers() {
-
-	qryRw := resolve.NewQueryRewriter()
-	dgEx := resolve.NewDgraphExecutor()
-
 	as.rf.WithMutationResolver("updateGQLSchema",
 		func(m *schema.Field) resolve.MutationResolver {
 			return &updateSchemaResolver{admin: as}
@@ -538,50 +533,6 @@ func (as *adminServer) addConnectedAdminResolvers() {
 		WithQueryResolver("getGQLSchema",
 			func(q *schema.Field) resolve.QueryResolver {
 				return &getSchemaResolver{admin: as}
-			}).
-		WithQueryResolver("queryGroup",
-			func(q *schema.Field) resolve.QueryResolver {
-				return resolve.NewQueryResolver(qryRw, dgEx)
-			}).
-		WithQueryResolver("queryUser",
-			func(q *schema.Field) resolve.QueryResolver {
-				return resolve.NewQueryResolver(qryRw, dgEx)
-			}).
-		WithQueryResolver("getGroup",
-			func(q *schema.Field) resolve.QueryResolver {
-				return resolve.NewQueryResolver(qryRw, dgEx)
-			}).
-		WithQueryResolver("getCurrentUser",
-			func(q *schema.Field) resolve.QueryResolver {
-				return resolve.NewQueryResolver(&currentUserResolver{baseRewriter: qryRw}, dgEx)
-			}).
-		WithQueryResolver("getUser",
-			func(q *schema.Field) resolve.QueryResolver {
-				return resolve.NewQueryResolver(qryRw, dgEx)
-			}).
-		WithMutationResolver("addUser",
-			func(m *schema.Field) resolve.MutationResolver {
-				return resolve.NewDgraphResolver(resolve.NewAddRewriter(), dgEx)
-			}).
-		WithMutationResolver("addGroup",
-			func(m *schema.Field) resolve.MutationResolver {
-				return resolve.NewDgraphResolver(NewAddGroupRewriter(), dgEx)
-			}).
-		WithMutationResolver("updateUser",
-			func(m *schema.Field) resolve.MutationResolver {
-				return resolve.NewDgraphResolver(resolve.NewUpdateRewriter(), dgEx)
-			}).
-		WithMutationResolver("updateGroup",
-			func(m *schema.Field) resolve.MutationResolver {
-				return resolve.NewDgraphResolver(NewUpdateGroupRewriter(), dgEx)
-			}).
-		WithMutationResolver("deleteUser",
-			func(m *schema.Field) resolve.MutationResolver {
-				return resolve.NewDgraphResolver(resolve.NewDeleteRewriter(), dgEx)
-			}).
-		WithMutationResolver("deleteGroup",
-			func(m *schema.Field) resolve.MutationResolver {
-				return resolve.NewDgraphResolver(resolve.NewDeleteRewriter(), dgEx)
 			})
 }
 

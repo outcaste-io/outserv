@@ -929,7 +929,7 @@ func (genc *graphQLEncoder) resolveCustomField(childField *gqlSchema.Field,
 				uniqueParents[i] = gqlSchema.SubstituteVarsInBody(fconf.Template,
 					uniqueParents[i].(map[string]interface{}))
 			}
-			if childField.HasLambdaDirective() {
+			if childField.GetLambdaDirective() != "" {
 				body = gqlSchema.GetBodyForLambda(genc.ctx, childField, uniqueParents, nil)
 			} else {
 				body = uniqueParents

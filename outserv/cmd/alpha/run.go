@@ -350,7 +350,7 @@ func healthCheck(w http.ResponseWriter, r *http.Request) {
 
 		ctx := x.AttachAccessJwt(context.Background(), r)
 		var resp *pb.Response
-		if resp, err = (&edgraph.Server{}).Health(ctx, true); err != nil {
+		if resp, err = edgraph.Health(ctx, true); err != nil {
 			x.SetStatus(w, x.Error, err.Error())
 			return
 		}
@@ -375,7 +375,7 @@ func healthCheck(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var resp *pb.Response
-	if resp, err = (&edgraph.Server{}).Health(context.Background(), false); err != nil {
+	if resp, err = edgraph.Health(context.Background(), false); err != nil {
 		x.SetStatus(w, x.Error, err.Error())
 		return
 	}
@@ -397,7 +397,7 @@ func stateHandler(w http.ResponseWriter, r *http.Request) {
 	ctx = x.AttachAccessJwt(ctx, r)
 
 	var aResp *pb.Response
-	if aResp, err = (&edgraph.Server{}).State(ctx); err != nil {
+	if aResp, err = edgraph.State(ctx); err != nil {
 		x.SetStatus(w, x.Error, err.Error())
 		return
 	}

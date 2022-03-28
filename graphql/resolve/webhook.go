@@ -110,7 +110,8 @@ func sendWebhookEvent(ctx context.Context, m *schema.Field, commitTs uint64, roo
 	// send the request
 	headers := http.Header{}
 	headers.Set("Content-Type", "application/json")
-	resp, err := schema.MakeHttpRequest(nil, http.MethodPost, x.LambdaUrl(ns), headers, b)
+	// TODO: here we should check if url is set get the url from the webhook if needed
+	resp, err := schema.MakeHttpRequest(nil, http.MethodPost, x.LambdaUrl(ns, ""), headers, b)
 
 	// just log the response errors, if any.
 	if err != nil {

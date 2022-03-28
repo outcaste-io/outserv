@@ -36,9 +36,10 @@ func Instance(instance uint64) *Lambda {
 	// Lock
 	lambda, ok := coordinator.instances[instance]
 	if !ok {
-		coordinator.instances[instance] = &Lambda{
+		lambda = &Lambda{
 			instanceId: instance,
 		}
+		coordinator.instances[instance] = lambda
 	}
 	// Unlock
 	return lambda
@@ -46,7 +47,7 @@ func Instance(instance uint64) *Lambda {
 
 func (l *Lambda) LoadScript(lambdaScript *LambdaScript) error {
 	// Lock
-	if l.lambdaScript.Hash == lambdaScript.Hash {
+	if l.lambdaScript != nil && l.lambdaScript.Hash == lambdaScript.Hash {
 		return errors.New("lambda script already loaded")
 	}
 	if l.wasmInstance == nil {

@@ -12,7 +12,6 @@ import (
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/lambda"
 	"github.com/outcaste-io/outserv/query"
-	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
@@ -56,14 +55,16 @@ func resolveGetLambda(ctx context.Context, q *schema.Field) *resolve.Resolved {
 		return resolve.EmptyResult(q, err)
 	}
 
-	cs, _ := worker.Lambda().GetCurrent(ns)
-	if cs == nil || cs.ID == "" {
+	//TODO(schartey/wasm) This script should be loaded, so no need to query it
+	script, _ := edgraph.GetLambdaScript(ns)
+	if script == nil || script.ID == "" {
 		data = map[string]interface{}{q.Name(): nil}
 	} else {
 		data = map[string]interface{}{
 			q.Name(): map[string]interface{}{
-				"id":     cs.ID,
-				"script": cs.Script,
+				"id":     script.ID,
+				"script": script.Script,
+				"hash":   script.Hash,
 			}}
 	}
 

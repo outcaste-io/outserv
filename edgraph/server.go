@@ -80,9 +80,6 @@ var (
 	errIndexingInProgress = errors.New("errIndexingInProgress. Please retry")
 )
 
-// Server implements protos.DgraphServer
-type Server struct{}
-
 // graphQLSchemaNode represents the node which contains GraphQL schema
 type graphQLSchemaNode struct {
 	Uid    string `json:"uid"`
@@ -136,7 +133,7 @@ func PeriodicallyPostTelemetry() {
 func GetLambdaScript(namespace uint64) (lambdaScript *lambda.LambdaScript, err error) {
 	ctx := context.WithValue(context.Background(), Authorize, false)
 	ctx = x.AttachNamespace(ctx, namespace)
-	resp, err := (&Server{}).Query(ctx,
+	resp, err := Query(ctx,
 		&pb.Request{
 			Query: `
 			query {
@@ -183,7 +180,7 @@ func GetGQLSchema(namespace uint64) (uid, graphQLSchema string, err error) {
 func getGQLSchema(namespace uint64) (string, *x.GQL, error) {
 	ctx := context.WithValue(context.Background(), Authorize, false)
 	ctx = x.AttachNamespace(ctx, namespace)
-	resp, err := (&Server{}).Query(ctx,
+	resp, err := Query(ctx,
 		&pb.Request{
 			Query: `
 			query {
@@ -256,12 +253,14 @@ func UpdateGQLSchema(ctx context.Context, gqlSchema,
 		}
 	}
 
-	return worker.UpdateGQLSchemaOverNetwork(ctx, &pb.UpdateGraphQLSchemaRequest{
+	resp, err := worker.UpdateGQLSchemaOverNetwork(ctx, &pb.UpdateGraphQLSchemaRequest{
 		// TODO: Understand this better and see what timestamp should be set.
 		StartTs:       posting.ReadTimestamp(),
 		GraphqlSchema: gqlSchema,
 		DgraphPreds:   parsedDgraphSchema.Preds,
 	})
+	glog.Infof("UpdateGQLSchemaOverNetwork returned with error: %v\n", err)
+	return resp, err
 }
 
 // UpdateLambdaScript updates the Lambda Script using the given inputs.
@@ -387,7 +386,7 @@ func parseSchemaFromAlterOperation(ctx context.Context, op *pb.Operation) (*sche
 // then restoring from the incremental backup of such a DB would restore even the dropped
 // data back. This is also used to capture the delete namespace operation during backup.
 func InsertDropRecord(ctx context.Context, dropOp string) error {
-	_, err := (&Server{}).doQuery(context.WithValue(ctx, IsGraphql, true), &Request{
+	_, err := doQuery(context.WithValue(ctx, IsGraphql, true), &Request{
 		req: &pb.Request{
 			Mutations: []*pb.Mutation{{
 				Set: []*pb.NQuad{{
@@ -402,7 +401,7 @@ func InsertDropRecord(ctx context.Context, dropOp string) error {
 }
 
 // Alter handles requests to change the schema or remove parts or all of the data.
-func (s *Server) Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, error) {
+func Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, error) {
 	ctx, span := otrace.StartSpan(ctx, "Server.Alter")
 	defer span.End()
 
@@ -688,7 +687,7 @@ func annotateStartTs(span *otrace.Span, ts uint64) {
 	span.AddAttributes(otrace.Int64Attribute("startTs", int64(ts)))
 }
 
-func (s *Server) doMutate(ctx context.Context, qc *queryContext, resp *pb.Response) error {
+func doMutate(ctx context.Context, qc *queryContext, resp *pb.Response) error {
 	if len(qc.gmuList) == 0 {
 		return nil
 	}
@@ -1076,7 +1075,7 @@ type Request struct {
 }
 
 // Health handles /health and /health?all requests.
-func (s *Server) Health(ctx context.Context, all bool) (*pb.Response, error) {
+func Health(ctx context.Context, all bool) (*pb.Response, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -1142,7 +1141,7 @@ func filterTablets(ctx context.Context, ms *pb.MembershipState) error {
 }
 
 // State handles state requests
-func (s *Server) State(ctx context.Context) (*pb.Response, error) {
+func State(ctx context.Context) (*pb.Response, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -1177,7 +1176,7 @@ func getAuthMode(ctx context.Context) AuthMode {
 }
 
 // QueryGraphQL handles only GraphQL queries, neither mutations nor DQL.
-func (s *Server) QueryGraphQL(ctx context.Context, req *pb.Request,
+func QueryGraphQL(ctx context.Context, req *pb.Request,
 	field *gqlSchema.Field) (*pb.Response, error) {
 	// Add a timeout for queries which don't have a deadline set. We don't want to
 	// apply a timeout if it's a mutation, that's currently handled by flag
@@ -1190,11 +1189,11 @@ func (s *Server) QueryGraphQL(ctx context.Context, req *pb.Request,
 		}
 	}
 	// no need to attach namespace here, it is already done by GraphQL layer
-	return s.doQuery(ctx, &Request{req: req, gqlField: field, doAuth: getAuthMode(ctx)})
+	return doQuery(ctx, &Request{req: req, gqlField: field, doAuth: getAuthMode(ctx)})
 }
 
 // Query handles queries or mutations
-func (s *Server) Query(ctx context.Context, req *pb.Request) (*pb.Response, error) {
+func Query(ctx context.Context, req *pb.Request) (*pb.Response, error) {
 	ctx = x.AttachJWTNamespace(ctx)
 	if x.WorkerConfig.AclEnabled && req.GetStartTs() != 0 {
 		// A fresh StartTs is assigned if it is 0.
@@ -1216,7 +1215,7 @@ func (s *Server) Query(ctx context.Context, req *pb.Request) (*pb.Response, erro
 			defer cancel()
 		}
 	}
-	return s.doQuery(ctx, &Request{req: req, doAuth: getAuthMode(ctx)})
+	return doQuery(ctx, &Request{req: req, doAuth: getAuthMode(ctx)})
 }
 
 var pendingQueries int64
@@ -1239,7 +1238,7 @@ func StopServingQueries() {
 	}
 }
 
-func (s *Server) doQuery(ctx context.Context, req *Request) (resp *pb.Response, rerr error) {
+func doQuery(ctx context.Context, req *Request) (resp *pb.Response, rerr error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -1368,7 +1367,7 @@ func (s *Server) doQuery(ctx context.Context, req *Request) (resp *pb.Response, 
 	// if it were a mutation, simple or upsert, in any case gqlErrs would be empty as GraphQL JSON
 	// is formed only for queries. So, gqlErrs can have something only in the case of a pure query.
 	// So, safe to ignore gqlErrs and not return that here.
-	if rerr = s.doMutate(ctx, qc, resp); rerr != nil {
+	if rerr = doMutate(ctx, qc, resp); rerr != nil {
 		return
 	}
 
@@ -1582,12 +1581,12 @@ func validateNamespace(ctx context.Context, tc *pb.TxnContext) error {
 	return nil
 }
 
-func (s *Server) CommitOrAbort(ctx context.Context, tc *pb.TxnContext) (*pb.TxnContext, error) {
+func CommitOrAbort(ctx context.Context, tc *pb.TxnContext) (*pb.TxnContext, error) {
 	return tc, nil
 }
 
 // CheckVersion returns the version of this Dgraph instance.
-func (s *Server) CheckVersion(ctx context.Context, c *pb.Check) (v *pb.Version, err error) {
+func CheckVersion(ctx context.Context, c *pb.Check) (v *pb.Version, err error) {
 	if err := x.HealthCheck(); err != nil {
 		return v, err
 	}

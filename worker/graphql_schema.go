@@ -191,61 +191,19 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 			" update was in progress.", namespace, waitDuration.String())
 	}
 
-	// query the GraphQL schema node uid
+	const schemaNodeUid = uint64(1) // It is always one.
+
+	var gql x.GQL
+	// Fetch the current graphql schema and script using the schema node uid.
 	res, err := ProcessTaskOverNetwork(ctx, &pb.Query{
 		Attr:    x.NamespaceAttr(namespace, GqlSchemaPred),
-		SrcFunc: &pb.SrcFunction{Name: "has"},
+		UidList: &pb.List{SortedUids: []uint64{schemaNodeUid}},
 		ReadTs:  req.StartTs,
-		// there can only be one GraphQL schema node,
-		// so querying two just to detect if this condition is ever violated
-		First: 2,
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	// find if we need to create the node or can use the uid from existing node
-	creatingNode := false
-	var schemaNodeUid uint64
-	uidMtrxLen := len(res.GetUidMatrix())
-	c := codec.ListCardinality(res.GetUidMatrix()[0])
-	if uidMtrxLen == 0 || (uidMtrxLen == 1 && c == 0) {
-		// if there was no schema node earlier, then need to assign a new uid for the node
-		res, err := zero.AssignUids(ctx, 1)
-		if err != nil {
-			return nil, err
-		}
-		creatingNode = true
-		schemaNodeUid = res.StartId
-	} else if uidMtrxLen == 1 && c == 1 {
-		// if there was already a schema node, then just use the uid from that node
-		schemaNodeUid = codec.GetUids(res.GetUidMatrix()[0])[0]
-	} else {
-		// there seems to be multiple nodes for GraphQL schema,Ideally we should never reach here
-		// But if by any bug we reach here then return the schema node which is added last
-		uidList := codec.GetUids(res.GetUidMatrix()[0])
-		sort.Slice(uidList, func(i, j int) bool {
-			return uidList[i] < uidList[j]
-		})
-		glog.Errorf("Multiple schema node found, using the last one")
-		schemaNodeUid = uidList[len(uidList)-1]
-	}
-
-	var gql x.GQL
-	if !creatingNode {
-		// Fetch the current graphql schema and script using the schema node uid.
-		res, err := ProcessTaskOverNetwork(ctx, &pb.Query{
-			Attr:    x.NamespaceAttr(namespace, GqlSchemaPred),
-			UidList: &pb.List{SortedUids: []uint64{schemaNodeUid}},
-			ReadTs:  req.StartTs,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if len(res.GetValueMatrix()) == 0 || len(res.ValueMatrix[0].GetValues()) == 0 {
-			return nil,
-				errors.Errorf("Lambda node was found but the corresponding lambda does not exist")
-		}
+	if len(res.GetValueMatrix()) > 0 && len(res.ValueMatrix[0].GetValues()) > 0 {
 		gql.Schema, gql.Script = ParseAsSchemaAndScript(res.ValueMatrix[0].Values[0].Val)
 	}
 
@@ -278,17 +236,17 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 				ValueType: pb.Posting_STRING,
 				Op:        pb.DirectedEdge_SET,
 			},
+			{
+				Entity:    schemaNodeUid,
+				Attr:      x.NamespaceAttr(namespace, "dgraph.type"),
+				Value:     []byte("dgraph.graphql"),
+				ValueType: pb.Posting_STRING,
+				Op:        pb.DirectedEdge_SET,
+			},
 		},
 	}
-	if creatingNode {
-		m.Edges = append(m.Edges, &pb.DirectedEdge{
-			Entity:    schemaNodeUid,
-			Attr:      x.NamespaceAttr(namespace, "dgraph.type"),
-			Value:     []byte("dgraph.graphql"),
-			ValueType: pb.Posting_STRING,
-			Op:        pb.DirectedEdge_SET,
-		})
-	}
+	glog.Infof("Sending GraphQL schema updates: %+v\n", m)
+
 	// mutate the GraphQL schema. As it is a reserved predicate, and we are in group 1,
 	// so this call is gonna come back to all the group 1 servers only
 	_, err = MutateOverNetwork(ctx, m)
@@ -296,6 +254,7 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 		return nil, err
 	}
 
+	glog.Infof("Now applying Dgraph Schema Updates: %+v\n", req.DgraphPreds)
 	// perform dgraph schema alter, if required. As the schema could be empty if it only has custom
 	// types/queries/mutations.
 	if len(req.DgraphPreds) != 0 {
@@ -357,8 +316,8 @@ func (w *grpcWorker) UpdateLambdaScript(ctx context.Context,
 		return nil, err
 	}
 
-	// TODO(schartey/lambda): Can't use a simple dql query, because we would create a cyclic dependency
-	// find if we need to create the node or can use the uid from existing node
+	// Unfortunately we can't use a fixed uid, if we want backwards compatibility,
+	// uid 2 may already be in use
 	creatingNode := false
 	var lambdaNodeUid uint64
 	uidMtrxLen := len(res.GetUidMatrix())

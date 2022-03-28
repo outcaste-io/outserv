@@ -56,6 +56,7 @@ const graphqlAdminSchema = `
 	Data about the Lambda script served by Dgraph.
 	"""
 	type LambdaScript @dgraph(type: "dgraph.graphql.lambda") {
+		id: ID!
 		"""
 		Input script (multi-part binary)
 		"""
