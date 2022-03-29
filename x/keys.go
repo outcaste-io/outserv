@@ -21,12 +21,8 @@ const (
 	ByteData = byte(0x00)
 	// ByteIndex indicates the key stores an index.
 	ByteIndex = byte(0x02)
-	// ByteReverse indicates the key stores a reverse index.
-	ByteReverse = byte(0x04)
 	// ByteCount indicates the key stores a count index.
 	ByteCount = byte(0x08)
-	// ByteCountRev indicates the key stores a reverse count index.
-	ByteCountRev = ByteCount | ByteReverse
 	// DefaultPrefix is the prefix used for data, index and reverse keys so that relative
 	// order of data doesn't change keys of same attributes are located together.
 	DefaultPrefix = byte(0x00)
@@ -187,28 +183,6 @@ func DataKey(attr string, uid uint64) []byte {
 	return buf
 }
 
-// ReverseKey generates a reverse key with the given attribute and UID.
-// The structure of a reverse key is as follows:
-//
-// byte 0: key type prefix (set to DefaultPrefix or ByteSplit if part of a multi-part list)
-// byte 1-2: length of attr
-// next len(attr) bytes: value of attr
-// next byte: data type prefix (set to ByteReverse)
-// next eight bytes: value of uid
-// next eight bytes (optional): if the key corresponds to a split list, the startUid of
-//   the split stored in this key.
-func ReverseKey(attr string, uid uint64) []byte {
-	extra := 1 + 8 // ByteReverse + UID
-	buf, prefixLen := generateKey(DefaultPrefix, attr, extra)
-
-	rest := buf[prefixLen:]
-	rest[0] = ByteReverse
-
-	rest = rest[1:]
-	binary.BigEndian.PutUint64(rest, uid)
-	return buf
-}
-
 // IndexKey generates a index key with the given attribute and term.
 // The structure of an index key is as follows:
 //
@@ -240,16 +214,12 @@ func IndexKey(attr, term string) []byte {
 // next len(attr) bytes: value of attr
 // next byte: data type prefix (set to ByteCount or ByteCountRev)
 // next four bytes: value of count.
-func CountKey(attr string, count uint32, reverse bool) []byte {
+func CountKey(attr string, count uint32) []byte {
 	extra := 1 + 4 // ByteCount + Count
 	buf, prefixLen := generateKey(DefaultPrefix, attr, extra)
 
 	rest := buf[prefixLen:]
-	if reverse {
-		rest[0] = ByteCountRev
-	} else {
-		rest[0] = ByteCount
-	}
+	rest[0] = ByteCount
 
 	rest = rest[1:]
 	binary.BigEndian.PutUint32(rest, count)
@@ -273,24 +243,9 @@ func (p ParsedKey) IsData() bool {
 	return (p.bytePrefix == DefaultPrefix || p.bytePrefix == ByteSplit) && p.ByteType == ByteData
 }
 
-// IsReverse returns whether the key is a reverse key.
-func (p ParsedKey) IsReverse() bool {
-	return (p.bytePrefix == DefaultPrefix || p.bytePrefix == ByteSplit) && p.ByteType == ByteReverse
-}
-
-// IsCountOrCountRev returns whether the key is a count or a count rev key.
-func (p ParsedKey) IsCountOrCountRev() bool {
-	return p.IsCount() || p.IsCountRev()
-}
-
 // IsCount returns whether the key is a count key.
 func (p ParsedKey) IsCount() bool {
 	return (p.bytePrefix == DefaultPrefix || p.bytePrefix == ByteSplit) && p.ByteType == ByteCount
-}
-
-// IsCountRev returns whether the key is a count rev key.
-func (p ParsedKey) IsCountRev() bool {
-	return (p.bytePrefix == DefaultPrefix || p.bytePrefix == ByteSplit) && p.ByteType == ByteCountRev
 }
 
 // IsIndex returns whether the key is an index key.
@@ -306,10 +261,8 @@ func (p ParsedKey) IsSchema() bool {
 // IsOfType checks whether the key is of the given type.
 func (p ParsedKey) IsOfType(typ byte) bool {
 	switch typ {
-	case ByteCount, ByteCountRev:
-		return p.IsCountOrCountRev()
-	case ByteReverse:
-		return p.IsReverse()
+	case ByteCount:
+		return p.IsCount()
 	case ByteIndex:
 		return p.IsIndex()
 	case ByteData:
@@ -350,22 +303,10 @@ func (p ParsedKey) IndexPrefix() []byte {
 	return buf
 }
 
-// ReversePrefix returns the prefix for index keys.
-func (p ParsedKey) ReversePrefix() []byte {
-	buf, prefixLen := generateKey(DefaultPrefix, p.Attr, 1)
-	buf[prefixLen] = ByteReverse
-	return buf
-}
-
 // CountPrefix returns the prefix for count keys.
-func (p ParsedKey) CountPrefix(reverse bool) []byte {
+func (p ParsedKey) CountPrefix() []byte {
 	buf, prefixLen := generateKey(DefaultPrefix, p.Attr, 1)
-	buf[prefixLen] = ByteReverse
-	if reverse {
-		buf[prefixLen] = ByteCountRev
-	} else {
-		buf[prefixLen] = ByteCount
-	}
+	buf[prefixLen] = ByteCount
 	return buf
 }
 
@@ -447,7 +388,7 @@ func Parse(key []byte) (ParsedKey, error) {
 	k = k[1:]
 
 	switch p.ByteType {
-	case ByteData, ByteReverse:
+	case ByteData:
 		if len(k) < 8 {
 			return p, errors.Errorf("uid length < 8 for key: %q, parsed key: %+v", key, p)
 		}
@@ -479,7 +420,7 @@ func Parse(key []byte) (ParsedKey, error) {
 		startUid := k[len(k)-8:]
 		p.Term = string(term)
 		p.StartUid = binary.BigEndian.Uint64(startUid)
-	case ByteCount, ByteCountRev:
+	case ByteCount:
 		if len(k) < 4 {
 			return p, errors.Errorf("count length < 4 for key: %q, parsed key: %+v", key, p)
 		}

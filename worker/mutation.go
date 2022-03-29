@@ -363,10 +363,6 @@ func checkSchema(s *pb.SchemaUpdate) error {
 		// index on uid type
 		return errors.Errorf("Index not allowed on predicate of type uid on predicate %s",
 			x.ParseAttr(s.Predicate))
-	} else if typ != types.UidID && s.Directive == pb.SchemaUpdate_REVERSE {
-		// reverse on non-uid type
-		return errors.Errorf("Cannot reverse for non-uid type on predicate %s",
-			x.ParseAttr(s.Predicate))
 	}
 
 	// If schema update has upsert directive, it should have index directive.

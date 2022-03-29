@@ -153,8 +153,6 @@ func toSchema(attr string, update *pb.SchemaUpdate) *bpb.KV {
 		x.Check2(buf.WriteRune(']'))
 	}
 	switch {
-	case update.GetDirective() == pb.SchemaUpdate_REVERSE:
-		x.Check2(buf.WriteString(" @reverse"))
 	case update.GetDirective() == pb.SchemaUpdate_INDEX && len(update.GetTokenizer()) > 0:
 		x.Check2(fmt.Fprintf(&buf, " @index(%s)", strings.Join(update.GetTokenizer(), ",")))
 	}

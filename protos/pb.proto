@@ -48,9 +48,6 @@ message Query {
   // Function to generate or filter UIDs.
   SrcFunction src_func = 6;
 
-  // Whether this is a reverse edge.
-  bool reverse = 7;
-
   // Expand all language variants.
   bool expand_all = 10;
 
@@ -312,7 +309,7 @@ message FilterTree {
 message SchemaRequest {
   uint32 group_id = 1;
   repeated string predicates = 2;
-  // Fields can be on of type, index, reverse or tokenizer.
+  // Fields can be on of type, index, or tokenizer.
   repeated string fields = 3;
 
   repeated string types = 4;
@@ -323,7 +320,6 @@ message SchemaNode {
   string type = 2;
   bool index = 3;
   repeated string tokenizer = 4;
-  bool reverse = 5;
   bool count = 6;
   bool list = 7;
   bool upsert = 8;
@@ -339,7 +335,6 @@ message SchemaUpdate {
   enum Directive {
     NONE = 0;
     INDEX = 1;
-    REVERSE = 2;
     DELETE = 3;
   }
   Directive directive = 3;
