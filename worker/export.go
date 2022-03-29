@@ -697,7 +697,7 @@ func ExportOverNetwork(ctx context.Context, input *pb.ExportRequest) (ExportedFi
 	glog.Infof("Using readTs: %d\n", readTs)
 
 	// Let's first collect all groups.
-	gids := groups().KnownGroups()
+	gids := KnownGroups()
 	glog.Infof("Requesting export for groups: %v\n", gids)
 
 	type filesAndError struct {

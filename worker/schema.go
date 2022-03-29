@@ -124,11 +124,11 @@ func addToSchemaMap(schemaMap map[uint32]*pb.SchemaRequest, schema *pb.SchemaReq
 		s.Predicates = append(s.Predicates, attr)
 	}
 	if len(schema.Predicates) > 0 {
+		// If the req had asked for specific predicates, then just return.
 		return nil
 	}
-	// TODO: Janardhan - node shouldn't serve any request until membership
-	// information is synced, should we fail health check till then ?
-	gids := groups().KnownGroups()
+	// No specific predicates asked for. Fetch all the predicates we know about.
+	gids := KnownGroups()
 	for _, gid := range gids {
 		if gid == 0 {
 			continue

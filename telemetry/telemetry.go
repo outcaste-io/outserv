@@ -42,7 +42,6 @@ func NewZero(ms *pb.MembershipState) *Telemetry {
 	}
 	t := &Telemetry{
 		Cid:        ms.GetCid(),
-		NumGroups:  len(ms.GetLeaders()),
 		NumMembers: len(ms.GetMembers()),
 		Version:    x.Version(),
 		OS:         runtime.GOOS,

@@ -559,7 +559,7 @@ func populateMutationMap(src *pb.Mutations) (map[uint32]*pb.Mutations, error) {
 	}
 
 	if src.DropOp > 0 {
-		for _, gid := range groups().KnownGroups() {
+		for _, gid := range KnownGroups() {
 			mu := mm[gid]
 			if mu == nil {
 				mu = &pb.Mutations{GroupId: gid}

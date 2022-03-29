@@ -135,9 +135,8 @@ message ZeroProposal {
 // callee server since the provided lastUpdate.
 message MembershipState {
   map<uint64, Member> members = 1;
-  map<uint32, uint64> leaders = 2;
-  map<string, Tablet> tablets = 3;
-  repeated uint64 removed = 4; // Raft IDs of removed members.
+  map<string, Tablet> tablets = 2;
+  repeated uint64 removed = 3; // Raft IDs of removed members.
 
   uint64 raft_index = 5;
   uint64 maxUID = 6;

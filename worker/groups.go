@@ -491,17 +491,16 @@ func (g *groupi) Leader(gid uint32) *conn.Pool {
 	return nil
 }
 
-func (g *groupi) KnownGroups() (gids []uint32) {
+func KnownGroups() (gids []uint32) {
 	st := zero.MembershipState()
-	for gid := range st.Leaders {
+	gidMap := make(map[uint32]bool)
+	for _, m := range st.Members {
+		gidMap[m.GroupId] = true
+	}
+	for gid := range gidMap {
 		gids = append(gids, gid)
 	}
 	return
-}
-
-// KnownGroups returns the known groups using the global groupi instance.
-func KnownGroups() []uint32 {
-	return groups().KnownGroups()
 }
 
 // GroupId returns the group to which this worker belongs to.
