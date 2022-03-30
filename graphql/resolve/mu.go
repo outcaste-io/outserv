@@ -101,45 +101,6 @@ var objCounter uint64
 func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 	upsert bool) ([]Object, error) {
 
-	var res []Object
-	fields := typ.Fields()
-
-	dst := make(map[string]interface{})
-	for _, f := range fields {
-		val, has := src[f.Name()]
-		if !has {
-			continue
-		}
-
-		if f.Type().IsInbuiltOrEnumType() {
-			dst[f.DgraphAlias()] = val
-			continue
-		}
-
-		if vlist, ok := val.([]interface{}); ok {
-			var all []Object
-			for _, elem := range vlist {
-				e := elem.(map[string]interface{})
-				objs, err := gatherObjects(ctx, e, f.Type(), upsert)
-				if err != nil {
-					return nil, errors.Wrapf(err, "while nesting into %s", f.Name())
-				}
-				all = append(all, objs...)
-			}
-			dst[f.DgraphAlias()] = all
-
-		} else if vmap, ok := val.(map[string]interface{}); ok {
-			objs, err := gatherObjects(ctx, vmap, f.Type(), upsert)
-			if err != nil {
-				return nil, errors.Wrapf(err, "while nesting into %s", f.Name())
-			}
-			dst[f.DgraphAlias()] = objs
-
-		} else {
-			panic(fmt.Sprintf("Unhandled type of val: %+v type: %T", val, val))
-		}
-	}
-
 	var idVal uint64
 	if id := typ.IDField(); id != nil {
 		if val := src[id.Name()]; val != nil {
@@ -151,9 +112,6 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 		}
 	}
 
-	// I think all the XID fields should be present for us to ensure that
-	// we can find the right ID for this object.
-	//
 	// TODO(mrjn): Optimization for later. We should query all of them in a
 	// single call to make this more efficient. Or, run gatherObjects via
 	// goroutines.
@@ -162,7 +120,9 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 		return nil, errors.Wrapf(err, "UidsFromManyXids")
 	}
 
+	dst := make(map[string]interface{})
 	updateObject := true
+
 	switch {
 	case len(uids) > 1:
 		return nil, fmt.Errorf("Found %d UIDs", len(uids))
@@ -196,12 +156,63 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 		}
 	}
 
+	// Now parse the fields.
+	var res []Object
+	fields := typ.Fields()
+
+	for _, f := range fields {
+		val, has := src[f.Name()]
+		if !has {
+			continue
+		}
+
+		if f.Type().IsInbuiltOrEnumType() {
+			dst[f.DgraphAlias()] = val
+			continue
+		}
+
+		var all []Object
+		if vlist, ok := val.([]interface{}); ok {
+			for _, elem := range vlist {
+				e := elem.(map[string]interface{})
+				objs, err := gatherObjects(ctx, e, f.Type(), upsert)
+				if err != nil {
+					return nil, errors.Wrapf(err, "while nesting into %s", f.Name())
+				}
+				all = append(all, objs...)
+			}
+
+		} else if vmap, ok := val.(map[string]interface{}); ok {
+			objs, err := gatherObjects(ctx, vmap, f.Type(), upsert)
+			if err != nil {
+				return nil, errors.Wrapf(err, "while nesting into %s", f.Name())
+			}
+			all = append(all, objs...)
+
+		} else {
+			panic(fmt.Sprintf("Unhandled type of val: %+v type: %T", val, val))
+		}
+
+		if inv := f.Inverse(); inv != nil {
+			glog.Infof("Found a field which has inverse: %q. Inverse is: %q %q\n", f.Name(), inv.Name(), inv.Type().Name())
+			glog.Infof("dst: %+v\n", dst)
+			glog.Infof("objects: %+v\n", all)
+
+			// Add all the reverse edges.
+			uid := dst["uid"]
+			for _, obj := range all {
+				obj[inv.DgraphAlias()] = map[string]interface{}{"uid": uid}
+			}
+		}
+		dst[f.DgraphAlias()] = all
+	}
+
 	if updateObject {
 		res = append(res, dst)
 	}
 	return res, nil
 }
-func runUpsert(ctx context.Context, m *schema.Field) ([]uint64, error) {
+func runAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	// Parsing input
 	val, ok := m.ArgValue(schema.InputArgName).([]interface{})
 	x.AssertTrue(ok)
@@ -237,6 +248,10 @@ func runUpsert(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	data, err := json.Marshal(res)
 	x.Check(err)
 
+	if glog.V(2) {
+		data2, _ := json.MarshalIndent(res, " ", " ")
+		glog.Infof("Mutation Req JSON data: %s\n", data2)
+	}
 	mu := &pb.Mutation{SetJson: data}
 	resp, err := edgraph.Query(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}})
 	if err != nil {
@@ -492,7 +507,7 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	switch m.MutationType() {
 	case schema.AddMutation:
-		return runUpsert(ctx, m)
+		return runAdd(ctx, m)
 	case schema.DeleteMutation:
 		return runDelete(ctx, m)
 	case schema.UpdateMutation:
