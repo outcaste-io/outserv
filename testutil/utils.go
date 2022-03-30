@@ -34,11 +34,6 @@ func GalaxySchemaKey(attr string) []byte {
 	return x.SchemaKey(attr)
 }
 
-func GalaxyTypeKey(attr string) []byte {
-	attr = x.GalaxyAttr(attr)
-	return x.TypeKey(attr)
-}
-
 func GalaxyDataKey(attr string, uid uint64) []byte {
 	attr = x.GalaxyAttr(attr)
 	return x.DataKey(attr, uid)
