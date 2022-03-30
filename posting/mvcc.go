@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"math"
 	"sort"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -214,17 +213,6 @@ func (ir *incrRollupi) Process(closer *z.Closer) {
 	}
 }
 
-func (txn *Txn) addConflictKey(conflictKey uint64) {
-	txn.Lock()
-	defer txn.Unlock()
-	if txn.conflicts == nil {
-		txn.conflicts = make(map[uint64]struct{})
-	}
-	if conflictKey > 0 {
-		txn.conflicts[conflictKey] = struct{}{}
-	}
-}
-
 func (txn *Txn) Cache() *LocalCache {
 	return txn.cache
 }
@@ -233,18 +221,7 @@ func (txn *Txn) Cache() *LocalCache {
 func (txn *Txn) FillContext(ctx *pb.TxnContext, gid uint32) {
 	txn.Lock()
 	ctx.StartTs = txn.StartTs
-
-	for key := range txn.conflicts {
-		// We don'txn need to send the whole conflict key to Zero. Solving #2338
-		// should be done by sending a list of mutating predicates to Zero,
-		// along with the keys to be used for conflict detection.
-		fps := strconv.FormatUint(key, 36)
-		ctx.Keys = append(ctx.Keys, fps)
-	}
-	ctx.Keys = x.Unique(ctx.Keys)
-
 	txn.Unlock()
-	txn.cache.fillPreds(ctx, gid)
 }
 
 // ToSkiplist replaces CommitToDisk. ToSkiplist creates a Badger usable Skiplist from the Txn, so

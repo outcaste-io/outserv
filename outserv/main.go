@@ -21,10 +21,10 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/outcaste-io/outserv/outserv/cmd"
-	"github.com/outcaste-io/ristretto/z"
 	"github.com/dustin/go-humanize"
 	"github.com/golang/glog"
+	"github.com/outcaste-io/outserv/outserv/cmd"
+	"github.com/outcaste-io/ristretto/z"
 )
 
 func main() {

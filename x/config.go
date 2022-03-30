@@ -38,6 +38,7 @@ type Options struct {
 	QueryTimeout         time.Duration
 	MaxRetries           int64
 	SharedInstance       bool
+	MaxUploadSizeMb      int64
 
 	// GraphQL options:
 	//

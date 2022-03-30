@@ -1,25 +1,11 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package worker
 
 import (
 	"context"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
 
@@ -110,8 +96,6 @@ func populateSchema(attr string, fields []string) *pb.SchemaNode {
 			schemaNode.List = pred.GetList()
 		case "upsert":
 			schemaNode.Upsert = pred.GetUpsert()
-		case "noconflict":
-			schemaNode.NoConflict = pred.GetNoConflict()
 		default:
 			//pass
 		}
@@ -234,30 +218,4 @@ func (w *grpcWorker) Schema(ctx context.Context, s *pb.SchemaRequest) (*pb.Schem
 		return &emptySchemaResult, errors.Errorf("This server doesn't serve group id: %v", s.GroupId)
 	}
 	return getSchema(ctx, s)
-}
-
-// GetTypes processes the type requests and retrieves the desired types.
-func GetTypes(ctx context.Context, req *pb.SchemaRequest) ([]*pb.TypeUpdate, error) {
-	if len(req.Types) == 0 && len(req.Predicates) > 0 {
-		return nil, nil
-	}
-
-	var typeNames []string
-	var out []*pb.TypeUpdate
-
-	if len(req.Types) == 0 {
-		typeNames = schema.State().Types()
-	} else {
-		typeNames = req.Types
-	}
-
-	for _, name := range typeNames {
-		typeUpdate, found := schema.State().GetType(name)
-		if !found {
-			continue
-		}
-		out = append(out, proto.Clone(&typeUpdate).(*pb.TypeUpdate))
-	}
-
-	return out, nil
 }

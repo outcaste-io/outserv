@@ -25,7 +25,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/dgraph-io/gqlparser/v2/ast"
+	"github.com/outcaste-io/gqlparser/v2/ast"
 	"github.com/pkg/errors"
 )
 

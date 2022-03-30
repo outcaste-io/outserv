@@ -79,9 +79,6 @@ var (
 	errIndexingInProgress = errors.New("errIndexingInProgress. Please retry")
 )
 
-// Server implements protos.DgraphServer
-type Server struct{}
-
 // graphQLSchemaNode represents the node which contains GraphQL schema
 type graphQLSchemaNode struct {
 	Uid    string `json:"uid"`
@@ -146,7 +143,7 @@ func GetGQLSchema(namespace uint64) (uid, graphQLSchema string, err error) {
 func getGQLSchema(namespace uint64) (string, *x.GQL, error) {
 	ctx := context.WithValue(context.Background(), Authorize, false)
 	ctx = x.AttachNamespace(ctx, namespace)
-	resp, err := (&Server{}).Query(ctx,
+	resp, err := Query(ctx,
 		&pb.Request{
 			Query: `
 			query {
@@ -209,6 +206,7 @@ func UpdateGQLSchema(ctx context.Context, gqlSchema,
 	}
 	// The schema could be empty if it only has custom types/queries/mutations.
 	if dgraphSchema != "" {
+		glog.Infof("Dgraph schema is:\n%s\n", dgraphSchema)
 		op := &pb.Operation{Schema: dgraphSchema}
 		if err = validateAlterOperation(ctx, op); err != nil {
 			return nil, err
@@ -218,14 +216,15 @@ func UpdateGQLSchema(ctx context.Context, gqlSchema,
 		}
 	}
 
-	return worker.UpdateGQLSchemaOverNetwork(ctx, &pb.UpdateGraphQLSchemaRequest{
+	resp, err := worker.UpdateGQLSchemaOverNetwork(ctx, &pb.UpdateGraphQLSchemaRequest{
 		// TODO: Understand this better and see what timestamp should be set.
 		StartTs:       posting.ReadTimestamp(),
 		GraphqlSchema: gqlSchema,
 		DgraphPreds:   parsedDgraphSchema.Preds,
-		DgraphTypes:   parsedDgraphSchema.Types,
 		Op:            pb.UpdateGraphQLSchemaRequest_SCHEMA,
 	})
+	glog.Infof("UpdateGQLSchemaOverNetwork returned with error: %v\n", err)
+	return resp, err
 }
 
 // UpdateLambdaScript updates the Lambda Script using the given inputs.
@@ -341,30 +340,6 @@ func parseSchemaFromAlterOperation(ctx context.Context, op *pb.Operation) (*sche
 		}
 	}
 
-	types := make(map[string]struct{})
-
-	for _, typ := range result.Types {
-		if _, ok := types[typ.TypeName]; ok {
-			return nil, errors.Errorf("type %s defined multiple times", x.ParseAttr(typ.TypeName))
-		}
-		types[typ.TypeName] = struct{}{}
-
-		// Pre-defined types cannot be altered but let the update go through
-		// if the update is equal to the existing one.
-		if schema.IsPreDefTypeChanged(typ) {
-			return nil, errors.Errorf("type %s is pre-defined and is not allowed to be modified",
-				x.ParseAttr(typ.TypeName))
-		}
-
-		// Users are not allowed to create types in reserved namespace. But, there are pre-defined
-		// types for which the update should go through if the update is equal to the existing one.
-		if x.IsReservedType(typ.TypeName) && !x.IsPreDefinedType(typ.TypeName) {
-			return nil, errors.Errorf("Can't alter type `%s` as it is prefixed with `dgraph.` "+
-				"which is reserved as the namespace for dgraph's internal types/predicates.",
-				x.ParseAttr(typ.TypeName))
-		}
-	}
-
 	return result, nil
 }
 
@@ -376,7 +351,7 @@ func parseSchemaFromAlterOperation(ctx context.Context, op *pb.Operation) (*sche
 // then restoring from the incremental backup of such a DB would restore even the dropped
 // data back. This is also used to capture the delete namespace operation during backup.
 func InsertDropRecord(ctx context.Context, dropOp string) error {
-	_, err := (&Server{}).doQuery(context.WithValue(ctx, IsGraphql, true), &Request{
+	_, err := doQuery(context.WithValue(ctx, IsGraphql, true), &Request{
 		req: &pb.Request{
 			Mutations: []*pb.Mutation{{
 				Set: []*pb.NQuad{{
@@ -391,7 +366,7 @@ func InsertDropRecord(ctx context.Context, dropOp string) error {
 }
 
 // Alter handles requests to change the schema or remove parts or all of the data.
-func (s *Server) Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, error) {
+func Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, error) {
 	ctx, span := otrace.StartSpan(ctx, "Server.Alter")
 	defer span.End()
 
@@ -531,24 +506,6 @@ func (s *Server) Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, erro
 		return empty, err
 	}
 
-	if op.DropOp == pb.Operation_TYPE {
-		if op.DropValue == "" {
-			return empty, errors.Errorf("If DropOp is set to TYPE, DropValue must not be empty")
-		}
-
-		// Pre-defined types cannot be dropped.
-		dropPred := x.NamespaceAttr(namespace, op.DropValue)
-		if x.IsPreDefinedType(dropPred) {
-			return empty, errors.Errorf("type %s is pre-defined and is not allowed to be dropped",
-				op.DropValue)
-		}
-
-		m.DropOp = pb.Mutations_TYPE
-		m.DropValue = dropPred
-		_, err := query.ApplyMutations(ctx, m)
-		return empty, err
-	}
-
 	// it is a schema update
 	result, err := parseSchemaFromAlterOperation(ctx, op)
 	if err == errIndexingInProgress {
@@ -565,7 +522,6 @@ func (s *Server) Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, erro
 	glog.Infof("Got schema: %+v\n", result)
 	// TODO: Maybe add some checks about the schema.
 	m.Schema = result.Preds
-	m.Types = result.Types
 	for i := 0; i < 3; i++ {
 		_, err = query.ApplyMutations(ctx, m)
 		if err != nil && strings.Contains(err.Error(), "Please retry operation") {
@@ -610,12 +566,8 @@ func validateDQLSchemaForGraphQL(ctx context.Context,
 
 	// create a mapping for the GraphQL reserved predicates and types
 	gqlReservedPreds := make(map[string]*pb.SchemaUpdate)
-	gqlReservedTypes := make(map[string]*pb.TypeUpdate)
 	for _, pred := range gqlReservedDgSch.Preds {
 		gqlReservedPreds[pred.Predicate] = pred
-	}
-	for _, typ := range gqlReservedDgSch.Types {
-		gqlReservedTypes[typ.TypeName] = typ
 	}
 
 	// now validate the DQL schema to check that it doesn't break the existing GraphQL schema
@@ -688,33 +640,6 @@ func validateDQLSchemaForGraphQL(ctx context.Context,
 		}
 	}
 
-	// Step-2: validate types
-	for _, dqlType := range dqlSch.Types {
-		gqlType := gqlReservedTypes[dqlType.TypeName]
-		if gqlType == nil {
-			continue // if the type isn't used by GraphQL, no need to validate it.
-		}
-
-		// create a mapping of all the fields in the dqlType
-		dqlFields := make(map[string]bool)
-		for _, f := range dqlType.Fields {
-			dqlFields[f.Predicate] = true
-		}
-
-		// check that all the fields of the gqlType must be present in the dqlType
-		var missingFields []string
-		for _, f := range gqlType.Fields {
-			if !dqlFields[f.Predicate] {
-				missingFields = append(missingFields, x.ParseAttr(f.Predicate))
-			}
-		}
-		if len(missingFields) > 0 {
-			return errors.Errorf("can't alter type %s as it is used by the GraphQL API, "+
-				"and is missing fields: [%s] that are expected by the GraphQL API.",
-				x.ParseAttr(gqlType.TypeName), strings.Join(missingFields, ","))
-		}
-	}
-
 	return nil
 }
 
@@ -726,7 +651,7 @@ func annotateStartTs(span *otrace.Span, ts uint64) {
 	span.AddAttributes(otrace.Int64Attribute("startTs", int64(ts)))
 }
 
-func (s *Server) doMutate(ctx context.Context, qc *queryContext, resp *pb.Response) error {
+func doMutate(ctx context.Context, qc *queryContext, resp *pb.Response) error {
 	if len(qc.gmuList) == 0 {
 		return nil
 	}
@@ -762,25 +687,8 @@ func (s *Server) doMutate(ctx context.Context, qc *queryContext, resp *pb.Respon
 	if err != nil {
 		return err
 	}
-	ns, err := x.ExtractNamespace(ctx)
-	if err != nil {
-		return errors.Wrapf(err, "While doing mutations:")
-	}
-	predHints := make(map[string]pb.Metadata_HintType)
-	for _, gmu := range qc.gmuList {
-		for pred, hint := range gmu.Metadata.GetPredHints() {
-			pred = x.NamespaceAttr(ns, pred)
-			if oldHint := predHints[pred]; oldHint == pb.Metadata_LIST {
-				continue
-			}
-			predHints[pred] = hint
-		}
-	}
 	m := &pb.Mutations{
 		Edges: edges,
-		Metadata: &pb.Metadata{
-			PredHints: predHints,
-		},
 	}
 
 	qc.span.Annotatef(nil, "Applying mutations: %+v", m)
@@ -1131,7 +1039,7 @@ type Request struct {
 }
 
 // Health handles /health and /health?all requests.
-func (s *Server) Health(ctx context.Context, all bool) (*pb.Response, error) {
+func Health(ctx context.Context, all bool) (*pb.Response, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -1197,7 +1105,7 @@ func filterTablets(ctx context.Context, ms *pb.MembershipState) error {
 }
 
 // State handles state requests
-func (s *Server) State(ctx context.Context) (*pb.Response, error) {
+func State(ctx context.Context) (*pb.Response, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -1232,7 +1140,7 @@ func getAuthMode(ctx context.Context) AuthMode {
 }
 
 // QueryGraphQL handles only GraphQL queries, neither mutations nor DQL.
-func (s *Server) QueryGraphQL(ctx context.Context, req *pb.Request,
+func QueryGraphQL(ctx context.Context, req *pb.Request,
 	field *gqlSchema.Field) (*pb.Response, error) {
 	// Add a timeout for queries which don't have a deadline set. We don't want to
 	// apply a timeout if it's a mutation, that's currently handled by flag
@@ -1245,11 +1153,11 @@ func (s *Server) QueryGraphQL(ctx context.Context, req *pb.Request,
 		}
 	}
 	// no need to attach namespace here, it is already done by GraphQL layer
-	return s.doQuery(ctx, &Request{req: req, gqlField: field, doAuth: getAuthMode(ctx)})
+	return doQuery(ctx, &Request{req: req, gqlField: field, doAuth: getAuthMode(ctx)})
 }
 
 // Query handles queries or mutations
-func (s *Server) Query(ctx context.Context, req *pb.Request) (*pb.Response, error) {
+func Query(ctx context.Context, req *pb.Request) (*pb.Response, error) {
 	ctx = x.AttachJWTNamespace(ctx)
 	if x.WorkerConfig.AclEnabled && req.GetStartTs() != 0 {
 		// A fresh StartTs is assigned if it is 0.
@@ -1271,7 +1179,7 @@ func (s *Server) Query(ctx context.Context, req *pb.Request) (*pb.Response, erro
 			defer cancel()
 		}
 	}
-	return s.doQuery(ctx, &Request{req: req, doAuth: getAuthMode(ctx)})
+	return doQuery(ctx, &Request{req: req, doAuth: getAuthMode(ctx)})
 }
 
 var pendingQueries int64
@@ -1294,7 +1202,7 @@ func StopServingQueries() {
 	}
 }
 
-func (s *Server) doQuery(ctx context.Context, req *Request) (resp *pb.Response, rerr error) {
+func doQuery(ctx context.Context, req *Request) (resp *pb.Response, rerr error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -1423,7 +1331,7 @@ func (s *Server) doQuery(ctx context.Context, req *Request) (resp *pb.Response, 
 	// if it were a mutation, simple or upsert, in any case gqlErrs would be empty as GraphQL JSON
 	// is formed only for queries. So, gqlErrs can have something only in the case of a pure query.
 	// So, safe to ignore gqlErrs and not return that here.
-	if rerr = s.doMutate(ctx, qc, resp); rerr != nil {
+	if rerr = doMutate(ctx, qc, resp); rerr != nil {
 		return
 	}
 
@@ -1475,23 +1383,17 @@ func processQuery(ctx context.Context, qc *queryContext) (*pb.Response, error) {
 		return resp, errors.Wrap(err, "")
 	}
 
-	if len(er.SchemaNode) > 0 || len(er.Types) > 0 {
+	if len(er.SchemaNode) > 0 {
 		if err = authorizeSchemaQuery(ctx, &er); err != nil {
 			return resp, err
 		}
 		sort.Slice(er.SchemaNode, func(i, j int) bool {
 			return er.SchemaNode[i].Predicate < er.SchemaNode[j].Predicate
 		})
-		sort.Slice(er.Types, func(i, j int) bool {
-			return er.Types[i].TypeName < er.Types[j].TypeName
-		})
 
 		respMap := make(map[string]interface{})
 		if len(er.SchemaNode) > 0 {
 			respMap["schema"] = er.SchemaNode
-		}
-		if len(er.Types) > 0 {
-			respMap["types"] = formatTypes(er.Types)
 		}
 		resp.Json, err = json.Marshal(respMap)
 	} else {
@@ -1643,12 +1545,12 @@ func validateNamespace(ctx context.Context, tc *pb.TxnContext) error {
 	return nil
 }
 
-func (s *Server) CommitOrAbort(ctx context.Context, tc *pb.TxnContext) (*pb.TxnContext, error) {
+func CommitOrAbort(ctx context.Context, tc *pb.TxnContext) (*pb.TxnContext, error) {
 	return tc, nil
 }
 
 // CheckVersion returns the version of this Dgraph instance.
-func (s *Server) CheckVersion(ctx context.Context, c *pb.Check) (v *pb.Version, err error) {
+func CheckVersion(ctx context.Context, c *pb.Check) (v *pb.Version, err error) {
 	if err := x.HealthCheck(); err != nil {
 		return v, err
 	}
@@ -1713,16 +1615,15 @@ func parseMutationObject(mu *pb.Mutation, qc *queryContext) (*gql.Mutation, erro
 	res := &gql.Mutation{Cond: mu.Cond}
 
 	if len(mu.SetJson) > 0 {
-		nqs, md, err := chunker.ParseJSON(mu.SetJson, chunker.SetNquads)
+		nqs, err := chunker.ParseJSON(mu.SetJson, chunker.SetNquads)
 		if err != nil {
 			return nil, err
 		}
 		res.Set = append(res.Set, nqs...)
-		res.Metadata = md
 	}
 	if len(mu.DeleteJson) > 0 {
 		// The metadata is not currently needed for delete operations so it can be safely ignored.
-		nqs, _, err := chunker.ParseJSON(mu.DeleteJson, chunker.DeleteNquads)
+		nqs, err := chunker.ParseJSON(mu.DeleteJson, chunker.DeleteNquads)
 		if err != nil {
 			return nil, err
 		}
@@ -1826,27 +1727,6 @@ func validatePredName(name string) error {
 			name[:80])
 	}
 	return nil
-}
-
-// formatTypes takes a list of TypeUpdates and converts them in to a list of
-// maps in a format that is human-readable to be marshaled into JSON.
-func formatTypes(typeList []*pb.TypeUpdate) []map[string]interface{} {
-	var res []map[string]interface{}
-	for _, typ := range typeList {
-		typeMap := make(map[string]interface{})
-		typeMap["name"] = typ.TypeName
-		fields := make([]map[string]string, len(typ.Fields))
-
-		for i, field := range typ.Fields {
-			m := make(map[string]string, 1)
-			m["name"] = field.Predicate
-			fields[i] = m
-		}
-		typeMap["fields"] = fields
-
-		res = append(res, typeMap)
-	}
-	return res
 }
 
 func isDropAll(op *pb.Operation) bool {

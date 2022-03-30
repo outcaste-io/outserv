@@ -21,10 +21,10 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/outcaste-io/gqlparser/v2/ast"
+	"github.com/outcaste-io/gqlparser/v2/gqlerror"
+	"github.com/outcaste-io/gqlparser/v2/parser"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/dgraph-io/gqlparser/v2/ast"
-	"github.com/dgraph-io/gqlparser/v2/gqlerror"
-	"github.com/dgraph-io/gqlparser/v2/parser"
 )
 
 const (
@@ -120,6 +120,11 @@ The DateTime scalar type represents date and time as a string in RFC3339 format.
 For example: "1985-04-12T23:20:50.52Z" represents 20 minutes and 50.52 seconds after the 23rd hour of April 12th, 1985 in UTC.
 """
 scalar DateTime
+
+"""
+File Upload
+"""
+scalar Upload
 
 input IntRange{
 	min: Int!
@@ -551,6 +556,7 @@ var inbuiltTypeToDgraph = map[string]string{
 	"String":       "string",
 	"DateTime":     "dateTime",
 	"Password":     "password",
+	"Upload":       "upload",
 	"Point":        "geo",
 	"Polygon":      "geo",
 	"MultiPolygon": "geo",

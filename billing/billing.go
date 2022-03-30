@@ -25,19 +25,19 @@ func minOne(a float64) float64 {
 	return a
 }
 
-var microCoreHours int64
+var microCpuHour int64
 
-const USDPerCoreHour = 0.03 // 3 cents per core hour.
-const Minute = time.Minute  // Using this indirection for debugging.
+const USDPerCpuHour = 0.03 // 3 cents per cpu-hour.
+const Minute = time.Minute // Using this indirection for debugging.
 
-func CoreHours() float64 {
-	mch := atomic.LoadInt64(&microCoreHours)
+func CPUHours() float64 {
+	mch := atomic.LoadInt64(&microCpuHour)
 	return float64(mch) / 1e6
 }
 
-func AccountedFor(coreHours float64) {
-	mch := int64(coreHours * 1e6)
-	atomic.AddInt64(&microCoreHours, -mch)
+func AccountedFor(cpuHours float64) {
+	mch := int64(cpuHours * 1e6)
+	atomic.AddInt64(&microCpuHour, -mch)
 }
 
 func trackCPU(closer *z.Closer) {
@@ -62,10 +62,10 @@ func trackCPU(closer *z.Closer) {
 			usage, err := proc.Percent(0)
 			x.Checkf(err, "unable to track CPU usage")
 
-			usage = usage / 100.0 // Convert percentage to the number of cores.
-			usage = minOne(usage) // Minimum usage of one core.
+			usage = usage / 100.0 // Convert percentage to the number of cpus.
+			usage = minOne(usage) // Minimum usage of one cpu.
 			usage = usage / 60    // 60 mins in the hour.
-			atomic.AddInt64(&microCoreHours, int64(usage*1e6))
+			atomic.AddInt64(&microCpuHour, int64(usage*1e6))
 
 		case <-closer.HasBeenClosed():
 			glog.Infof("Billing exiting usage tracking.")
@@ -75,9 +75,9 @@ func trackCPU(closer *z.Closer) {
 }
 
 // Charge returns the amount charged for in dollars, and error if any.
-func Charge(coreHours float64) error {
+func Charge(cpuHours float64) error {
 	// TODO: Fill out this function to charge
-	usd := coreHours * USDPerCoreHour
-	glog.Infof("Charged $%.3f for %.3f core hours\n", usd, coreHours)
+	usd := cpuHours * USDPerCpuHour
+	glog.Infof("Charged $%.3f for %.3f CPU hours\n", usd, cpuHours)
 	return nil
 }

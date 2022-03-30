@@ -52,7 +52,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	_ "google.golang.org/grpc/encoding/gzip" // grpc compression
 
-	_ "github.com/dgraph-io/gqlparser/v2/validator/rules" // make gql validator init() all rules
+	_ "github.com/outcaste-io/gqlparser/v2/validator/rules" // make gql validator init() all rules
 )
 
 var (
@@ -206,6 +206,8 @@ func init() {
 			"for minio, aws, etc.").
 		Flag("max-splits", "How many splits can a single key have, before it is forbidden. "+
 			"Also known as Jupiter key.").
+		Flag("max-upload-size-mb", "What is the maximum upload size that can be uploaded with "+
+			"a multi-part file upload.").
 		String())
 
 	flag.String("graphql", worker.GraphQLDefaults, z.NewSuperFlagHelp(worker.GraphQLDefaults).
@@ -368,7 +370,7 @@ func healthCheck(w http.ResponseWriter, r *http.Request) {
 
 		ctx := x.AttachAccessJwt(context.Background(), r)
 		var resp *pb.Response
-		if resp, err = (&edgraph.Server{}).Health(ctx, true); err != nil {
+		if resp, err = edgraph.Health(ctx, true); err != nil {
 			x.SetStatus(w, x.Error, err.Error())
 			return
 		}
@@ -393,7 +395,7 @@ func healthCheck(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var resp *pb.Response
-	if resp, err = (&edgraph.Server{}).Health(context.Background(), false); err != nil {
+	if resp, err = edgraph.Health(context.Background(), false); err != nil {
 		x.SetStatus(w, x.Error, err.Error())
 		return
 	}
@@ -415,7 +417,7 @@ func stateHandler(w http.ResponseWriter, r *http.Request) {
 	ctx = x.AttachAccessJwt(ctx, r)
 
 	var aResp *pb.Response
-	if aResp, err = (&edgraph.Server{}).State(ctx); err != nil {
+	if aResp, err = edgraph.State(ctx); err != nil {
 		x.SetStatus(w, x.Error, err.Error())
 		return
 	}
@@ -811,6 +813,7 @@ func run() {
 	x.Config.QueryTimeout = x.Config.Limit.GetDuration("query-timeout")
 	x.Config.MaxRetries = x.Config.Limit.GetInt64("max-retries")
 	x.Config.SharedInstance = x.Config.Limit.GetBool("shared-instance")
+	x.Config.MaxUploadSizeMb = x.Config.Limit.GetInt64("max-upload-size-mb")
 
 	graphql := z.NewSuperFlag(Alpha.Conf.GetString("graphql")).MergeAndCheckDefault(
 		worker.GraphQLDefaults)

@@ -490,6 +490,7 @@ func (qs *queryState) handleValuePostings(ctx context.Context, args funcArgs) er
 	return nil
 }
 
+// TODO: Rename this function and see if we still need it.
 func facetsFilterValuePostingList(args funcArgs, pl *posting.List,
 	listType bool, fn func(p *pb.Posting)) error {
 	q := args.q
@@ -543,44 +544,10 @@ func retrieveValuesAndFacets(args funcArgs, pl *posting.List,
 	return vals, nil
 }
 
-func facetsFilterUidPostingList(pl *posting.List, opts posting.ListOptions,
-	fn func(*pb.Posting)) error {
-
-	// We want to iterate over this to allow picking up all the facets.
-	return pl.IterateAll(opts.ReadTs, opts.AfterUid, func(p *pb.Posting) error {
-		// Only pick the UID postings.
-		if p.PostingType != pb.Posting_REF {
-			return nil
-		}
-		fn(p)
-		return nil
-	})
-}
-
 func countForUidPostings(args funcArgs, pl *posting.List,
 	opts posting.ListOptions) (int, error) {
 
 	return pl.Length(opts.ReadTs, opts.AfterUid), nil
-}
-
-func retrieveUidsAndFacets(args funcArgs, pl *posting.List,
-	opts posting.ListOptions) (*pb.List, error) {
-
-	res := sroar.NewBitmap()
-
-	// [1] q.FacetParam == nil, facetsTree == nil => No facets. Pick all UIDs.
-	// [2] q.FacetParam == nil, facetsTree != nil => No facets. Pick selective UIDs.
-	// [3] q.FacetParam != nil, facetsTree != nil => Pick facets. Pick selective UIDs.
-	// [4] q.FacetParam != nil, facetsTree == nil => Pick facets. Pick all UIDs.
-
-	err := facetsFilterUidPostingList(pl, opts, func(p *pb.Posting) {
-		res.Set(p.Uid)
-	})
-	if err != nil {
-		return nil, err
-	}
-	// TODO(Ahsan): Need to figure out for what all cases we need sortedList.
-	return codec.ToSortedList(res), nil
 }
 
 // This function handles operations on uid posting lists. Index keys, reverse keys and some data

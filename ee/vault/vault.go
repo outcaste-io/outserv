@@ -17,8 +17,8 @@
 package vault
 
 import (
-	"github.com/outcaste-io/outserv/x"
 	"github.com/golang/glog"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/spf13/viper"
 )
 

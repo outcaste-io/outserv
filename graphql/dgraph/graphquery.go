@@ -25,6 +25,9 @@ import (
 	"github.com/outcaste-io/outserv/x"
 )
 
+// TODO: Get rid of this file. We shouldn't be converting gql.GraphQuery into a
+// string.
+//
 // AsString writes query as an indented dql query string.  AsString doesn't
 // validate query, and so doesn't return an error if query is 'malformed' - it might
 // just write something that wouldn't parse as a Dgraph query.

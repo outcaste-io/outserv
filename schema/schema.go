@@ -1,18 +1,5 @@
-/*
- * Copyright 2016-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2016-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package schema
 
@@ -21,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 
 	"github.com/golang/glog"
@@ -59,7 +47,6 @@ func GetWriteContext(ctx context.Context) context.Context {
 
 func (s *state) init() {
 	s.predicate = make(map[string]*pb.SchemaUpdate)
-	s.types = make(map[string]*pb.TypeUpdate)
 	s.elog = trace.NewEventLog("Dgraph", "Schema")
 	s.mutSchema = make(map[string]*pb.SchemaUpdate)
 }
@@ -68,7 +55,6 @@ type state struct {
 	sync.RWMutex
 	// Map containing predicate to type information.
 	predicate map[string]*pb.SchemaUpdate
-	types     map[string]*pb.TypeUpdate
 	elog      trace.EventLog
 	// mutSchema holds the schema update that is being applied in the background.
 	mutSchema map[string]*pb.SchemaUpdate
@@ -85,10 +71,6 @@ func (s *state) DeleteAll() {
 
 	for pred := range s.predicate {
 		delete(s.predicate, pred)
-	}
-
-	for typ := range s.types {
-		delete(s.types, typ)
 	}
 
 	for pred := range s.mutSchema {
@@ -116,29 +98,6 @@ func (s *state) Delete(attr string, ts uint64) error {
 	return nil
 }
 
-// DeleteType updates the schema in memory and disk
-func (s *state) DeleteType(typeName string, ts uint64) error {
-	if s == nil {
-		return nil
-	}
-
-	s.Lock()
-	defer s.Unlock()
-
-	glog.Infof("Deleting type definition for type: [%s]", typeName)
-	txn := pstore.NewTransactionAt(ts, true)
-	if err := txn.Delete(x.TypeKey(typeName)); err != nil {
-		return err
-	}
-	// Delete is called rarely so sync write should be fine.
-	if err := txn.CommitAt(ts, nil); err != nil {
-		return err
-	}
-
-	delete(s.types, typeName)
-	return nil
-}
-
 // Namespaces returns the active namespaces based on the current types.
 func (s *state) Namespaces() map[uint64]struct{} {
 	if s == nil {
@@ -148,11 +107,8 @@ func (s *state) Namespaces() map[uint64]struct{} {
 	s.RLock()
 	defer s.RUnlock()
 
-	ns := make(map[uint64]struct{})
-	for typ := range s.types {
-		ns[x.ParseNamespace(typ)] = struct{}{}
-	}
-	return ns
+	// TODO: Find another way of figuring out namespaces.
+	return nil
 }
 
 // DeletePredsForNs deletes the predicate information for the namespace from the schema.
@@ -169,12 +125,6 @@ func (s *state) DeletePredsForNs(delNs uint64) {
 			delete(s.mutSchema, pred)
 		}
 	}
-	for typ := range s.types {
-		ns := x.ParseNamespace(typ)
-		if ns == delNs {
-			delete(s.types, typ)
-		}
-	}
 }
 
 func logUpdate(schema *pb.SchemaUpdate, pred string) string {
@@ -188,10 +138,6 @@ func logUpdate(schema *pb.SchemaUpdate, pred string) string {
 	}
 	return fmt.Sprintf("Setting schema for attr %s: %v, tokenizer: %v, directive: %v, count: %v\n",
 		pred, typ, schema.Tokenizer, schema.Directive, schema.Count)
-}
-
-func logTypeUpdate(typ pb.TypeUpdate, typeName string) string {
-	return fmt.Sprintf("Setting type definition for type %s: %v\n", typeName, typ)
 }
 
 // Set sets the schema for the given predicate in memory.
@@ -237,15 +183,6 @@ func GetIndexingPredicates() []string {
 	return ps
 }
 
-// SetType sets the type for the given predicate in memory.
-// schema mutations must flow through the update function, which are synced to the db.
-func (s *state) SetType(typeName string, typ pb.TypeUpdate) {
-	s.Lock()
-	defer s.Unlock()
-	s.types[typeName] = &typ
-	s.elog.Printf(logTypeUpdate(typ, typeName))
-}
-
 // Get gets the schema for the given predicate.
 func (s *state) Get(ctx context.Context, pred string) (pb.SchemaUpdate, bool) {
 	isWrite, _ := ctx.Value(isWrite).(bool)
@@ -264,17 +201,6 @@ func (s *state) Get(ctx context.Context, pred string) (pb.SchemaUpdate, bool) {
 		return pb.SchemaUpdate{}, false
 	}
 	return *schema, true
-}
-
-// GetType gets the type definition for the given type name.
-func (s *state) GetType(typeName string) (pb.TypeUpdate, bool) {
-	s.RLock()
-	defer s.RUnlock()
-	typ, has := s.types[typeName]
-	if !has {
-		return pb.TypeUpdate{}, false
-	}
-	return *typ, true
 }
 
 // TypeOf returns the schema type of predicate
@@ -321,17 +247,27 @@ func (s *state) Predicates() []string {
 	return out
 }
 
-// Types returns the list of types.
-func (s *state) Types() []string {
+func (s *state) PredicatesFor(typeName ...string) []string {
 	if s == nil {
 		return nil
 	}
 
+	types := make(map[string]struct{})
+	for _, tn := range typeName {
+		types[tn] = struct{}{}
+	}
+
 	s.RLock()
 	defer s.RUnlock()
+
+	// All predicates are of form: <typename>.<fieldname> . So, we can just
+	// split the predicate names by dot and check if the type name matches.
 	var out []string
-	for k := range s.types {
-		out = append(out, k)
+	for k := range s.predicate {
+		tn := strings.SplitN(k, ".", 2)[0]
+		if _, has := types[tn]; has {
+			out = append(out, k)
+		}
 	}
 	return out
 }
@@ -443,12 +379,6 @@ func (s *state) HasLang(pred string) bool {
 	return false
 }
 
-func (s *state) HasNoConflict(pred string) bool {
-	s.RLock()
-	defer s.RUnlock()
-	return s.predicate[pred].GetNoConflict()
-}
-
 // IndexingInProgress checks whether indexing is going on for a given predicate.
 func (s *state) IndexingInProgress() bool {
 	s.RLock()
@@ -498,15 +428,11 @@ func LoadFromDb() error {
 	// that the state would be empty before loading the schema from the DB as we don't do drop all
 	// in case of incremental restores.
 	State().DeleteAll()
-	if err := loadFromDB(loadSchema); err != nil {
-		return err
-	}
-	return loadFromDB(loadType)
+	return loadFromDB(loadSchema)
 }
 
 const (
 	loadSchema int = iota
-	loadType
 )
 
 // loadFromDb iterates through the DB and loads all the stored schema updates.
@@ -517,9 +443,6 @@ func loadFromDB(loadType int) error {
 	case loadSchema:
 		stream.Prefix = x.SchemaPrefix()
 		stream.LogPrefix = "LoadFromDb Schema"
-	case loadType:
-		stream.Prefix = x.TypePrefix()
-		stream.LogPrefix = "LoadFromDb Type"
 	default:
 		glog.Fatalf("Invalid load type")
 	}
@@ -544,18 +467,8 @@ func loadFromDB(loadType int) error {
 					s = pb.SchemaUpdate{Predicate: pk.Attr, ValueType: pb.Posting_DEFAULT}
 				}
 				x.Checkf(s.Unmarshal(val), "Error while loading schema from db")
+				glog.Infof("Setting schema: %+v\n", s)
 				State().Set(pk.Attr, &s)
-				return nil
-			})
-			return nil, err
-		case loadType:
-			var t pb.TypeUpdate
-			err := item.Value(func(val []byte) error {
-				if len(val) == 0 {
-					t = pb.TypeUpdate{TypeName: pk.Attr}
-				}
-				x.Checkf(t.Unmarshal(val), "Error while loading types from db")
-				State().SetType(pk.Attr, t)
 				return nil
 			})
 			return nil, err
@@ -564,106 +477,6 @@ func loadFromDB(loadType int) error {
 		return nil, errors.New("shouldn't reach here")
 	}
 	return stream.Orchestrate(context.Background())
-}
-
-// InitialTypes returns the type updates to insert at the beginning of
-// Dgraph's execution. It looks at the worker options to determine which
-// types to insert.
-func InitialTypes(namespace uint64) []*pb.TypeUpdate {
-	return initialTypesInternal(namespace, false)
-}
-
-// CompleteInitialTypes returns all the type updates regardless of the worker
-// options. This is useful in situations where the worker options are not known
-// in advance or it is required to consider all initial pre-defined types. An
-// example of such situation is while allowing type updates to go through during
-// alter if they are same as existing pre-defined types. This is useful for
-// live loading a previously exported schema.
-func CompleteInitialTypes(namespace uint64) []*pb.TypeUpdate {
-	return initialTypesInternal(namespace, true)
-}
-
-// NOTE: whenever defining a new type here, please also add it in x/keys.go: preDefinedTypeMap
-func initialTypesInternal(namespace uint64, all bool) []*pb.TypeUpdate {
-	var initialTypes []*pb.TypeUpdate
-	initialTypes = append(initialTypes,
-		&pb.TypeUpdate{
-			TypeName: "dgraph.graphql",
-			Fields: []*pb.SchemaUpdate{
-				{
-					Predicate: "dgraph.graphql.schema",
-					ValueType: pb.Posting_STRING,
-				},
-				{
-					Predicate: "dgraph.graphql.xid",
-					ValueType: pb.Posting_STRING,
-				},
-			},
-		}, &pb.TypeUpdate{
-			TypeName: "dgraph.graphql.persisted_query",
-			Fields: []*pb.SchemaUpdate{
-				{
-					Predicate: "dgraph.graphql.p_query",
-					ValueType: pb.Posting_STRING,
-				},
-			},
-		})
-
-	if all || x.WorkerConfig.AclEnabled {
-		// These type definitions are required for deleteUser and deleteGroup GraphQL API to work
-		// properly.
-		initialTypes = append(initialTypes, &pb.TypeUpdate{
-			TypeName: "dgraph.type.User",
-			Fields: []*pb.SchemaUpdate{
-				{
-					Predicate: "dgraph.xid",
-					ValueType: pb.Posting_STRING,
-				},
-				{
-					Predicate: "dgraph.password",
-					ValueType: pb.Posting_PASSWORD,
-				},
-				{
-					Predicate: "dgraph.user.group",
-					ValueType: pb.Posting_UID,
-				},
-			},
-		},
-			&pb.TypeUpdate{
-				TypeName: "dgraph.type.Group",
-				Fields: []*pb.SchemaUpdate{
-					{
-						Predicate: "dgraph.xid",
-						ValueType: pb.Posting_STRING,
-					},
-					{
-						Predicate: "dgraph.acl.rule",
-						ValueType: pb.Posting_UID,
-					},
-				},
-			},
-			&pb.TypeUpdate{
-				TypeName: "dgraph.type.Rule",
-				Fields: []*pb.SchemaUpdate{
-					{
-						Predicate: "dgraph.rule.predicate",
-						ValueType: pb.Posting_STRING,
-					},
-					{
-						Predicate: "dgraph.rule.permission",
-						ValueType: pb.Posting_INT,
-					},
-				},
-			})
-	}
-
-	for _, typ := range initialTypes {
-		typ.TypeName = x.NamespaceAttr(namespace, typ.TypeName)
-		for _, fields := range typ.Fields {
-			fields.Predicate = x.NamespaceAttr(namespace, fields.Predicate)
-		}
-	}
-	return initialTypes
 }
 
 // InitialSchema returns the schema updates to insert at the beginning of
@@ -772,33 +585,6 @@ func IsPreDefPredChanged(update *pb.SchemaUpdate) bool {
 		return !proto.Equal(original, update)
 	}
 	return true
-}
-
-// IsPreDefTypeChanged returns true if the initial update for the pre-defined
-// type is different than the passed update.
-// If the passed update is not a pre-defined type than it just returns false.
-func IsPreDefTypeChanged(update *pb.TypeUpdate) bool {
-	// Return false for non-pre-defined types.
-	if !x.IsPreDefinedType(update.TypeName) {
-		return false
-	}
-
-	initialTypes := CompleteInitialTypes(x.ParseNamespace(update.TypeName))
-	for _, original := range initialTypes {
-		if original.TypeName != update.TypeName {
-			continue
-		}
-		if len(original.Fields) != len(update.Fields) {
-			return true
-		}
-		for i, field := range original.Fields {
-			if field.Predicate != update.Fields[i].Predicate {
-				return true
-			}
-		}
-	}
-
-	return false
 }
 
 func reset() {

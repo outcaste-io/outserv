@@ -14,10 +14,10 @@ import (
 
 	"github.com/outcaste-io/outserv/gql"
 
-	"github.com/dgraph-io/gqlparser/v2/ast"
-	"github.com/dgraph-io/gqlparser/v2/gqlerror"
-	"github.com/dgraph-io/gqlparser/v2/parser"
-	"github.com/dgraph-io/gqlparser/v2/validator"
+	"github.com/outcaste-io/gqlparser/v2/ast"
+	"github.com/outcaste-io/gqlparser/v2/gqlerror"
+	"github.com/outcaste-io/gqlparser/v2/parser"
+	"github.com/outcaste-io/gqlparser/v2/validator"
 )
 
 const (

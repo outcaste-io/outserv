@@ -234,7 +234,7 @@ func entitiesQuery(field *schema.Field, authRw *authRewriter) ([]*gql.GraphQuery
 	// 	}
 	addTypeFilter(dgQuery, typeDefn)
 
-	selectionAuth := addSelectionSetFrom(dgQuery, field, authRw)
+	selectionAuth := addSelectionSetFrom(dgQuery, field)
 	addUID(dgQuery)
 
 	dgQueries := authRw.addAuthQueries(typeDefn, []*gql.GraphQuery{dgQuery}, rbac)
@@ -480,7 +480,7 @@ func rewriteAsQueryByIds(
 	// from addSelectionSetFrom function.
 	oldAuthSelector := authRw.selector
 	authRw.selector = queryAuthSelector
-	selectionAuth := addSelectionSetFrom(dgQuery[0], field, authRw)
+	selectionAuth := addSelectionSetFrom(dgQuery[0], field)
 	authRw.selector = oldAuthSelector
 
 	addUID(dgQuery[0])
@@ -600,7 +600,7 @@ func rewriteAsGet(
 	// Apply query auth rules even for password query
 	oldAuthSelector := auth.selector
 	auth.selector = queryAuthSelector
-	selectionAuth := addSelectionSetFrom(dgQuery[0], query, auth)
+	selectionAuth := addSelectionSetFrom(dgQuery[0], query)
 	auth.selector = oldAuthSelector
 
 	addUID(dgQuery[0])
@@ -838,7 +838,7 @@ func rewriteAsQuery(field *schema.Field, authRw *authRewriter) []*gql.GraphQuery
 	}
 
 	addArgumentsToField(dgQuery[0], field)
-	selectionAuth := addSelectionSetFrom(dgQuery[0], field, authRw)
+	selectionAuth := addSelectionSetFrom(dgQuery[0], field)
 	// we don't need to query uid for auth queries, as they always have at least one field in their
 	// selection set.
 	if !authRw.writingAuth() {
@@ -1502,8 +1502,7 @@ func generateUniqueDgraphAlias(f schema.Field, fieldSeenCount map[string]int) st
 // of extra queries needed to satisfy auth requirements
 func addSelectionSetFrom(
 	q *gql.GraphQuery,
-	field *schema.Field,
-	auth *authRewriter) []*gql.GraphQuery {
+	field *schema.Field) []*gql.GraphQuery {
 
 	var authQueries []*gql.GraphQuery
 
@@ -1515,16 +1514,6 @@ func addSelectionSetFrom(
 		if field.AbstractType() {
 			q.Children = append(q.Children, &gql.GraphQuery{
 				Attr: "dgraph.type",
-			})
-
-		} else if !auth.writingAuth() &&
-			len(selSet) == 1 &&
-			selSet[0].Name() == schema.Typename {
-			q.Children = append(q.Children, &gql.GraphQuery{
-				// we don't need this for auth queries because they are added by us used for internal purposes.
-				// Querying it for them would just add an overhead which we can avoid.
-				Attr:  "uid",
-				Alias: "dgraph.uid",
 			})
 		}
 	}
@@ -1555,7 +1544,7 @@ func addSelectionSetFrom(
 
 		// Handle aggregation queries
 		if f.IsAggregateField() {
-			aggregateChildren, aggregateAuthQueries := buildAggregateFields(f, auth)
+			aggregateChildren, aggregateAuthQueries := buildAggregateFields(f, nil)
 
 			authQueries = append(authQueries, aggregateAuthQueries...)
 			q.Children = append(q.Children, aggregateChildren...)
@@ -1590,88 +1579,15 @@ func addSelectionSetFrom(
 		addOrder(child, f)
 		addPagination(child, f)
 		addCascadeDirective(child, f)
-		rbac := auth.evaluateStaticRules(f.Type())
-
-		// Since the recursion processes the query in bottom up way, we store the state of the so
-		// that we can restore it later.
-		var parentVarName, parentQryName string
-		if len(f.SelectionSet()) > 0 && !auth.isWritingAuth && auth.hasAuthRules {
-			parentVarName = auth.parentVarName
-			parentQryName = auth.varName
-			auth.parentVarName = auth.varGen.Next(f.Type(), "", "", auth.isWritingAuth)
-			auth.varName = auth.varGen.Next(f.Type(), "", "", auth.isWritingAuth)
-		}
 
 		var selectionAuth []*gql.GraphQuery
 		if !f.Type().IsGeo() {
-			selectionAuth = addSelectionSetFrom(child, f, auth)
-		}
-
-		restoreAuthState := func() {
-			if len(f.SelectionSet()) > 0 && !auth.isWritingAuth && auth.hasAuthRules {
-				// Restore the auth state after processing is done.
-				auth.parentVarName = parentVarName
-				auth.varName = parentQryName
-			}
+			selectionAuth = addSelectionSetFrom(child, f)
 		}
 
 		fieldAdded[f.DgraphAlias()] = true
-
-		if rbac == schema.Positive || rbac == schema.Uncertain {
-			q.Children = append(q.Children, child)
-		}
-
-		var fieldAuth []*gql.GraphQuery
-		var authFilter *gql.FilterTree
-		if rbac == schema.Negative && auth.hasAuthRules && auth.hasCascade && !auth.isWritingAuth {
-			// If RBAC rules are evaluated to Negative but we have cascade directive we continue
-			// to write the query and add a dummy filter that doesn't return anything.
-			// Example: AdminTask5 as var(func: uid())
-			q.Children = append(q.Children, child)
-			varName := auth.varGen.Next(f.Type(), "", "", auth.isWritingAuth)
-			fieldAuth = append(fieldAuth, &gql.GraphQuery{
-				Var:  varName,
-				Attr: "var",
-				Func: &gql.Function{
-					Name: "uid",
-				},
-			})
-			authFilter = &gql.FilterTree{
-				Func: &gql.Function{
-					Name: "uid",
-					Args: []gql.Arg{{Value: varName}},
-				},
-			}
-			rbac = schema.Positive
-		} else if rbac == schema.Negative {
-			// If RBAC rules are evaluated to Negative, we don't write queries for deeper levels.
-			// Hence we don't need to do any further processing for this field.
-			restoreAuthState()
-			continue
-		}
-
-		// If RBAC rules are evaluated to `Uncertain` then we add the Auth rules.
-		if rbac == schema.Uncertain {
-			fieldAuth, authFilter = auth.rewriteAuthQueries(f.Type())
-		}
-
-		if len(f.SelectionSet()) > 0 && !auth.isWritingAuth && auth.hasAuthRules {
-			commonAuthQueryVars := buildCommonAuthQueries(f, auth, parentVarName)
-			// add child filter to parent query, auth filters to selection query and
-			// selection query as a filter to child
-			commonAuthQueryVars.parentQry.Children[0].Filter = child.Filter
-			commonAuthQueryVars.selectionQry.Filter = authFilter
-			child.Filter = &gql.FilterTree{
-				Func: &gql.Function{
-					Name: "uid",
-					Args: []gql.Arg{{Value: commonAuthQueryVars.selectionQry.Var}},
-				},
-			}
-			authQueries = append(authQueries, commonAuthQueryVars.parentQry, commonAuthQueryVars.selectionQry)
-		}
+		q.Children = append(q.Children, child)
 		authQueries = append(authQueries, selectionAuth...)
-		authQueries = append(authQueries, fieldAuth...)
-		restoreAuthState()
 	}
 
 	// Sort the required fields before adding them to q.Children so that the query produced after
@@ -1976,6 +1892,10 @@ func addFilter(q *gql.GraphQuery, typ *schema.Type, filter map[string]interface{
 		q.Filter = buildFilter(typ, filter)
 	}
 	if filterAtRoot {
+		// TODO: Remove this type filter later.
+		// But, if the user passes a wrong UID, which is not of the same type,
+		// we need some way to ensure that we won't end up deleting a different
+		// object. So, we need some sort of a type safety check.
 		addTypeFilter(q, typ)
 	}
 	return true

@@ -30,6 +30,11 @@ const graphqlAdminSchema = `
 	scalar DateTime
 
 	"""
+	File Upload
+	"""
+	scalar Upload
+
+	"""
 	Data about the GraphQL schema being served by Dgraph.
 	"""
 	type GQLSchema @dgraph(type: "dgraph.graphql") {

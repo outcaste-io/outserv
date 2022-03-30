@@ -144,8 +144,7 @@ func StartRaftNodes(walStore *raftwal.DiskStorage, bindall bool) {
 
 	glog.Infof("Informed Zero about tablets I have: OK")
 	gr.applyInitialSchema()
-	gr.applyInitialTypes()
-	glog.Infof("Upserted Schema and Types: OK")
+	glog.Infof("Upserted Schema: OK")
 
 	x.UpdateHealthStatus(true)
 	glog.Infof("Server is ready: OK")
@@ -174,19 +173,6 @@ func (g *groupi) informZeroAboutTablets() {
 		} else {
 			glog.V(1).Infof("Done informing Zero about the %d tablets I have", len(preds))
 			return
-		}
-	}
-}
-
-func (g *groupi) applyInitialTypes() {
-	initialTypes := schema.InitialTypes(x.GalaxyNamespace)
-	for _, t := range initialTypes {
-		if _, ok := schema.State().GetType(t.TypeName); ok {
-			continue
-		}
-		// It is okay to write initial types at ts=1.
-		if err := updateType(t.GetTypeName(), *t, 1); err != nil {
-			glog.Errorf("Error while applying initial type: %s", err)
 		}
 	}
 }
@@ -262,7 +248,6 @@ func (g *groupi) applyState(state *pb.MembershipState) {
 	g.Lock()
 	defer g.Unlock()
 
-	glog.Infof("Got membership state: %+v\n", state)
 	if _, has := state.Members[myId]; !has {
 		// I'm not part of this cluster. I should crash myself.
 		glog.Fatalf("Unable to find myself [id:%d group:%d] in membership state: %+v. Goodbye!",

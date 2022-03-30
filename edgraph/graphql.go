@@ -64,7 +64,7 @@ func ProcessPersistedQuery(ctx context.Context, gqlReq *schema.Request) error {
 		},
 		doAuth: NoAuthorize,
 	}
-	storedQuery, err := (&Server{}).doQuery(ctx, req)
+	storedQuery, err := doQuery(ctx, req)
 
 	if err != nil {
 		glog.Errorf("Error while querying sha %s", sha256Hash)
@@ -119,7 +119,7 @@ func ProcessPersistedQuery(ctx context.Context, gqlReq *schema.Request) error {
 		}
 
 		ctx := context.WithValue(ctx, IsGraphql, true)
-		_, err := (&Server{}).doQuery(ctx, req)
+		_, err := doQuery(ctx, req)
 		return err
 	}
 

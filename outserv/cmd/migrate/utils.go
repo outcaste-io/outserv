@@ -24,8 +24,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/outcaste-io/outserv/x"
 	"github.com/go-sql-driver/mysql"
+	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
 

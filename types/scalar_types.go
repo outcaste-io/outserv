@@ -70,6 +70,7 @@ var typeNameMap = map[string]TypeID{
 	"uid":      UidID,
 	"string":   StringID,
 	"password": PasswordID,
+	"upload":   BinaryID,
 }
 
 // TypeID represents the type of the data.

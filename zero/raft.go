@@ -198,6 +198,11 @@ func (n *node) applyProposal(e raftpb.Entry) error {
 	defer n.state.Unlock()
 
 	dst := proto.Clone(n.state._state).(*pb.MembershipState)
+	if dst.MaxUID == 0 {
+		// Keep the first 16 for special purposes.
+		dst.MaxUID = 16
+	}
+
 	if len(p.Cid) > 0 {
 		if len(dst.Cid) > 0 {
 			return errInvalidProposal
@@ -226,9 +231,12 @@ func (n *node) applyProposal(e raftpb.Entry) error {
 		dst.MaxUID += uint64(p.NumUids)
 	case p.NumNsids > 0:
 		dst.MaxNsID += uint64(p.NumNsids)
-	case p.CoreHours > 0.0:
-		dst.CoreHours += p.CoreHours
-		dst.CoreHours = math.Round(dst.CoreHours*1000.0) / 1000.0
+	case p.CpuHours > 0.0:
+		dst.CpuHours += p.CpuHours
+		dst.CpuHours = math.Round(dst.CpuHours*1000.0) / 1000.0
+	}
+	if p.LastCharged > 0 {
+		dst.LastCharged = p.LastCharged
 	}
 
 	// Now assign the new state back.

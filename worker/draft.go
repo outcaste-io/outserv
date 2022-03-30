@@ -444,31 +444,17 @@ func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr erro
 				}
 			}
 		}
-
-		// Propose initial types as well after a drop all as they would have been cleared.
-		initialTypes := schema.InitialTypes(x.GalaxyNamespace)
-		for _, t := range initialTypes {
-			if err := updateType(t.GetTypeName(), *t, 1); err != nil {
-				return err
-			}
-		}
-
 		return nil
-	}
-
-	if prop.Mutations.DropOp == pb.Mutations_TYPE {
-		n.keysWritten.rejectBeforeIndex = prop.Index
-		return schema.State().DeleteType(prop.Mutations.DropValue, prop.CommitTs)
 	}
 
 	if prop.ReadTs == 0 || prop.CommitTs == 0 {
 		return errors.New("ReadTs and CommitTs must be provided")
 	}
 
-	if len(prop.Mutations.Schema) > 0 || len(prop.Mutations.Types) > 0 {
+	if len(prop.Mutations.Schema) > 0 {
 		n.keysWritten.rejectBeforeIndex = prop.Index
 
-		span.Annotatef(nil, "Applying schema and types")
+		span.Annotatef(nil, "Applying schema")
 		for _, supdate := range prop.Mutations.Schema {
 			// We should not need to check for predicate move here.
 			if err := detectPendingTxns(supdate.Predicate); err != nil {
@@ -484,12 +470,6 @@ func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr erro
 		// will invalidate the state.
 		if len(prop.Mutations.Schema) > 0 {
 			posting.ResetCache()
-		}
-
-		for _, tupdate := range prop.Mutations.Types {
-			if err := runTypeMutation(ctx, tupdate, prop.CommitTs); err != nil {
-				return err
-			}
 		}
 		return nil
 	}
@@ -539,11 +519,7 @@ func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr erro
 	// schema deduction is done by JSON chunker.
 	for attr, storageType := range schemaMap {
 		if _, err := schema.State().TypeOf(attr); err != nil {
-			hint := pb.Metadata_DEFAULT
-			if mutHint, ok := prop.GetMutations().GetMetadata().GetPredHints()[attr]; ok {
-				hint = mutHint
-			}
-			if err := createSchema(attr, storageType, hint, prop.CommitTs); err != nil {
+			if err := createSchema(attr, storageType, prop.CommitTs); err != nil {
 				return err
 			}
 		}

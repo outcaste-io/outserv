@@ -22,8 +22,6 @@ type Mutation struct {
 	Set          []*pb.NQuad
 	Del          []*pb.NQuad
 	AllowedPreds []string
-
-	Metadata *pb.Metadata
 }
 
 // ParseUid parses the given string into an UID. This method returns with an error
