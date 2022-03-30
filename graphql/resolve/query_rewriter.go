@@ -1531,7 +1531,7 @@ func addSelectionSetFrom(
 			for dgAlias, fieldDef := range f.CustomRequiredFields() {
 				requiredFields[dgAlias] = fieldDef
 			}
-			// This field is resolved through a custom directive so its selection set doesn't need
+			// This field is resolved through a custom/lambda directive so its selection set doesn't need
 			// to be part of query rewriting.
 			continue
 		}
@@ -1598,7 +1598,7 @@ func addSelectionSetFrom(
 	}
 	sort.Strings(rfset)
 
-	// Add fields required by other custom fields which haven't already been added as a
+	// Add fields required by other custom/lambda fields which haven't already been added as a
 	// child to be fetched from Dgraph.
 	for _, dgAlias := range rfset {
 		if !fieldAdded[dgAlias] {

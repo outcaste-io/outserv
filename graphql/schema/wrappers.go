@@ -124,9 +124,11 @@ type Schema struct {
 	// something like field.Directives.ForName("custom"), which results in iterating over all the
 	// directives of the field.
 	customDirectives map[string]map[string]*ast.Directive
-	// lambdaDirectives stores the mapping of typeName->fieldName->true, if the field has @lambda.
+	// lambdaDirectives stores the mapping of typeName->fieldName->true, if the field has @lambda with url.
+	// typeName->fieldName->false, if the field has @lambda without url
+	// typeName->fieldName->nil, if the field has no @lambda
 	// It is read-only.
-	lambdaDirectives map[string]map[string]bool
+	lambdaDirectives map[string]map[string]*bool
 	// lambdaOnMutate stores the mapping of mutationName -> true, if the config of @lambdaOnMutate
 	// enables lambdas for that mutation.
 	// It is read-only.
@@ -177,10 +179,10 @@ type Field struct {
 	// for the GraphQL variables supplied in the query.
 	arguments map[string]interface{}
 	// hasCustomHTTPChild is used to cache whether any of the descendents of this field have a
-	// @custom(http: {...}) on them. Its type is purposefully set to *bool to find out whether
+	// @lambda/@custom(http: {...}) on them. Its type is purposefully set to *bool to find out whether
 	// this flag has already been calculated or not. If not calculated, it would be nil.
 	// Otherwise, it would always contain a boolean value.
-	hasCustomHTTPChild *bool
+	hasLambdaOrCustomHTTPChild *bool
 }
 
 // A FieldDefinition is a field as defined in some Type in the schema.  As opposed
@@ -199,7 +201,7 @@ func (s *Schema) Queries(t QueryType) []string {
 	}
 	var result []string
 	for _, q := range s.schema.Query.Fields {
-		if queryType(q.Name, s.customDirectives["Query"][q.Name]) == t {
+		if s.queryType(q.Name) == t {
 			result = append(result, q.Name)
 		}
 	}
@@ -212,7 +214,7 @@ func (s *Schema) Mutations(t MutationType) []string {
 	}
 	var result []string
 	for _, m := range s.schema.Mutation.Fields {
-		if mutationType(m.Name, s.customDirectives["Mutation"][m.Name]) == t {
+		if s.mutationType(m.Name) == t {
 			result = append(result, m.Name)
 		}
 	}
@@ -536,9 +538,9 @@ func typeMappings(s *ast.Schema) map[string][]*ast.Definition {
 //	 So, by constructing an appropriate custom directive for @lambda fields,
 //	 we just reuse logic from @custom.
 func customAndLambdaMappings(s *ast.Schema, ns uint64) (map[string]map[string]*ast.Directive,
-	map[string]map[string]bool) {
+	map[string]map[string]*bool) {
 	customDirectives := make(map[string]map[string]*ast.Directive)
-	lambdaDirectives := make(map[string]map[string]bool)
+	lambdaDirectives := make(map[string]map[string]*bool)
 
 	for _, typ := range s.Types {
 		for _, field := range typ.Fields {
@@ -561,13 +563,17 @@ func customAndLambdaMappings(s *ast.Schema, ns uint64) (map[string]map[string]*a
 						customFieldMap[field.Name] = dir
 					} else {
 						// for lambda, first update the lambda directives map
-						var lambdaFieldMap map[string]bool
+						var lambdaFieldMap map[string]*bool
 						if existingLambdaFieldMap, ok := lambdaDirectives[typ.Name]; ok {
 							lambdaFieldMap = existingLambdaFieldMap
 						} else {
-							lambdaFieldMap = make(map[string]bool)
+							lambdaFieldMap = make(map[string]*bool)
 						}
-						lambdaFieldMap[field.Name] = true
+						if dir.Arguments.ForName("url") != nil {
+							lambdaFieldMap[field.Name] = &trueVal
+						} else {
+							lambdaFieldMap[field.Name] = &falseVal
+						}
 						lambdaDirectives[typ.Name] = lambdaFieldMap
 						// then, build a custom directive with correct semantics to be put
 						// into custom directives map at this field
@@ -577,7 +583,7 @@ func customAndLambdaMappings(s *ast.Schema, ns uint64) (map[string]map[string]*a
 								// going in body template. The field itself may not have the
 								// directive anymore because the directive may have been removed by
 								// this function already. So, using these maps to find the same.
-								return lambdaFieldMap[f.Name] || customFieldMap[f.Name] != nil
+								return lambdaFieldMap[f.Name] != nil || customFieldMap[f.Name] != nil
 							})
 					}
 					// finally, update the custom directives map for this type
@@ -751,9 +757,16 @@ func buildCustomDirectiveForLambda(defn *ast.Definition, field *ast.FieldDefinit
 	}
 	bodyTemplate.WriteString("}")
 
+	var url string
+	if lambdaDir.Arguments.ForName("url") != nil {
+		url = lambdaDir.Arguments.ForName("url").Value.Raw
+	} else {
+		// placeholder url for local lambdas, will not be called
+		url = "https://localhost/"
+	}
 	// build the children for http argument
 	httpArgChildrens := []*ast.ChildValue{
-		getChildValue(httpUrl, x.LambdaUrl(ns, lambdaDir.Arguments.ForName("url").Value.Raw), ast.StringValue, lambdaDir.Position),
+		getChildValue(httpUrl, x.LambdaUrl(ns, url), ast.StringValue, lambdaDir.Position),
 		getChildValue(httpMethod, http.MethodPost, ast.EnumValue, lambdaDir.Position),
 		getChildValue(httpBody, bodyTemplate.String(), ast.StringValue, lambdaDir.Position),
 	}
@@ -1158,10 +1171,15 @@ func (f *Field) IsCustomHTTP() bool {
 	return custom.Arguments.ForName(httpArg) != nil
 }
 
-func (f *Field) HasCustomHTTPChild() bool {
+func (f *Field) IsLocalLambda() bool {
+	dir := f.op.inSchema.lambdaDirectives[f.GetObjectName()][f.Name()]
+	return dir != nil && !*dir
+}
+
+func (f *Field) HasCustomHTTPOrLambdaChild() bool {
 	// let's see if we have already calculated whether this field has any custom http children
-	if f.hasCustomHTTPChild != nil {
-		return *(f.hasCustomHTTPChild)
+	if f.hasLambdaOrCustomHTTPChild != nil {
+		return *(f.hasLambdaOrCustomHTTPChild)
 	}
 	// otherwise, we need to find out whether any descendents of this field have custom http
 	selSet := f.SelectionSet()
@@ -1169,28 +1187,29 @@ func (f *Field) HasCustomHTTPChild() bool {
 	if len(selSet) == 0 {
 		return false
 	}
-	// lets find if any direct child of this field has a @custom on it
+	// lets find if any direct child of this field has a @lambda/@custom on it
 	for _, fld := range selSet {
-		if f.op.inSchema.customDirectives[fld.GetObjectName()][fld.Name()] != nil {
-			f.hasCustomHTTPChild = &trueVal
+		if f.op.inSchema.customDirectives[fld.GetObjectName()][fld.Name()] != nil ||
+			f.op.inSchema.lambdaDirectives[fld.GetObjectName()][fld.Name()] != nil {
+			f.hasLambdaOrCustomHTTPChild = &trueVal
 			return true
 		}
 	}
 	// if none of the direct child of this field have a @custom,
 	// then lets see if any further descendents have @custom.
 	for _, fld := range selSet {
-		if fld.HasCustomHTTPChild() {
-			f.hasCustomHTTPChild = &trueVal
+		if fld.HasCustomHTTPOrLambdaChild() {
+			f.hasLambdaOrCustomHTTPChild = &trueVal
 			return true
 		}
 	}
 	// if none of the descendents of this field have a @custom, return false
-	f.hasCustomHTTPChild = &falseVal
+	f.hasLambdaOrCustomHTTPChild = &falseVal
 	return false
 }
 
 func (f *Field) HasLambdaDirective() bool {
-	return f.op.inSchema.lambdaDirectives[f.GetObjectName()][f.Name()]
+	return f.op.inSchema.lambdaDirectives[f.GetObjectName()][f.Name()] != nil
 }
 
 func (f *Field) XIDArgs() map[string]string {
@@ -1683,7 +1702,7 @@ func (f *Field) DgraphPredicateForAggregateField() string {
 }
 
 func (q *Field) QueryType() QueryType {
-	return queryType(q.Name(), q.op.inSchema.customDirectives["Query"][q.Name()])
+	return q.op.inSchema.queryType(q.Name())
 }
 
 func (q *Field) DQLQuery() string {
@@ -1698,10 +1717,10 @@ func (q *Field) DQLQuery() string {
 	return ""
 }
 
-func queryType(name string, custom *ast.Directive) QueryType {
+func (s *Schema) queryType(name string) QueryType {
 	switch {
-	case custom != nil:
-		if custom.Arguments.ForName(dqlArg) != nil {
+	case s.customDirectives["Query"][name] != nil:
+		if s.customDirectives["Query"][name].Arguments.ForName(dqlArg) != nil {
 			return DQLQuery
 		}
 		return HTTPQuery
@@ -1765,12 +1784,12 @@ func (m *Field) MutationType() MutationType {
 	if m.Kind != MutationKind {
 		panic("MutationType shouldn't have been called")
 	}
-	return mutationType(m.Name(), m.op.inSchema.customDirectives["Mutation"][m.Name()])
+	return m.op.inSchema.mutationType(m.Name())
 }
 
-func mutationType(name string, custom *ast.Directive) MutationType {
+func (s *Schema) mutationType(name string) MutationType {
 	switch {
-	case custom != nil:
+	case s.customDirectives["Mutation"][name] != nil:
 		return HTTPMutation
 	case strings.HasPrefix(name, "add"):
 		return AddMutation

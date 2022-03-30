@@ -1160,7 +1160,7 @@ func (sg *SubGraph) toGraphqlJSON(genc *graphQLEncoder, n fastJsonNode, f *gqlSc
 	// implying that the root fastJson node will always have at least one child. So, no need
 	// to check for the case where there are no children for the root fastJson node.
 
-	// if this field has any @custom(http: {...}) children,
+	// if this field has any @lambda/@custom(http: {...}) children,
 	// then need to resolve them first before encoding the final GraphQL result.
 	genc.processCustomFields(f, n)
 	// now encode the GraphQL results.

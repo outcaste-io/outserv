@@ -1,6 +1,7 @@
 package lambda
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -75,12 +76,29 @@ func (l *Lambda) SetEmptyScript(lambdaScript *LambdaScript) {
 	l.lambdaScript = lambdaScript
 }
 
-func (l *Lambda) Execute() (string, error) {
+func (l *Lambda) Execute(body interface{}) (interface{}, error) {
 	// Lock
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			return nil, err
+		}
+		glog.Info(b)
+	}
+
 	if l.wasmInstance == nil {
-		return "", errors.New(fmt.Sprintf("no lambda script loaded for lambda instance %d", l.instanceId))
+		return nil, errors.New(fmt.Sprintf("no lambda script loaded for lambda instance %d", l.instanceId))
 	}
 	glog.Info("Executing lambda")
-	return l.wasmInstance.Execute("")
+	//return l.wasmInstance.Execute("")
+
+	// Hint:
+	// we expect an []interface{}
+	t := []string{"Test"}
+	s := make([]interface{}, len(t))
+	for i, v := range t {
+		s[i] = v
+	}
+	return s, nil
 	// Unlock
 }

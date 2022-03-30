@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	gqlSchema "github.com/outcaste-io/outserv/graphql/schema"
+	"github.com/outcaste-io/outserv/lambda"
 	"github.com/outcaste-io/outserv/x"
 )
 
@@ -604,7 +605,7 @@ func (genc *graphQLEncoder) initChildAttrId(field *gqlSchema.Field) {
 }
 
 func (genc *graphQLEncoder) processCustomFields(field *gqlSchema.Field, n fastJsonNode) {
-	if field.HasCustomHTTPChild() {
+	if field.HasCustomHTTPOrLambdaChild() {
 		// initially, create attr ids for all the descendents of this field,
 		// so that they don't result in race-conditions later
 		genc.initChildAttrId(field)
@@ -673,10 +674,13 @@ func (genc *graphQLEncoder) processCustomFields(field *gqlSchema.Field, n fastJs
 	}
 }
 
-// resolveCustomFields resolves fields with custom directive. Here is the rough algorithm that it
+// resolveCustomFields resolves fields with lambda/custom directive. Here is the rough algorithm that it
 // follows.
 // queryUser {
-// 	name @custom
+//  firstname
+//  lastname
+// 	name @lambda
+//  username @custom
 // 	age
 // 	school {
 // 		name
@@ -685,6 +689,7 @@ func (genc *graphQLEncoder) processCustomFields(field *gqlSchema.Field, n fastJs
 // 			name
 // 			numChildren
 // 		}
+//		oddChildren @lambda(url: "...")
 // 	}
 // 	cars @custom {
 // 		name
@@ -708,7 +713,7 @@ func (genc *graphQLEncoder) resolveCustomFields(childFields []*gqlSchema.Field,
 		if childField.IsCustomHTTP() {
 			wg.Add(1)
 			go genc.resolveCustomField(childField, parentNodeHeads, wg)
-		} else if childField.HasCustomHTTPChild() {
+		} else if childField.HasCustomHTTPOrLambdaChild() {
 			wg.Add(1)
 			go genc.resolveNestedFields(childField, parentNodeHeads, wg)
 		}
@@ -880,8 +885,20 @@ func (genc *graphQLEncoder) resolveCustomField(childField *gqlSchema.Field,
 
 				// Step-3 & 4: Make the request to external HTTP endpoint using the URL and
 				// body. Then, Decode the HTTP response.
-				response, errs, hardErrs := fconf.MakeAndDecodeHTTPRequest(nil, url, body,
-					childField)
+				// Alternative: Call local lambda
+				var response interface{}
+				var errs x.GqlErrorList
+				var hardErrs x.GqlErrorList
+				if childField.IsLocalLambda() {
+					response, err = lambda.Instance(ns).Execute(body)
+					if err != nil {
+						hardErrs = x.GqlErrorList{childField.GqlErrorf(nil, "Evaluation of lambda field failed because external request"+
+							" returned an error: %s for field: %s within type: %s.", err, childField.Name(), childField.GetObjectName())}
+					}
+				} else {
+					response, errs, hardErrs = fconf.MakeAndDecodeHTTPRequest(nil, url, body,
+						childField)
+				}
 				if hardErrs != nil {
 					genc.errCh <- hardErrs
 					return
@@ -938,7 +955,20 @@ func (genc *graphQLEncoder) resolveCustomField(childField *gqlSchema.Field,
 
 		// Step-3 & 4: Make the request to external HTTP endpoint using the URL and
 		// body. Then, Decode the HTTP response.
-		response, errs, hardErrs := fconf.MakeAndDecodeHTTPRequest(nil, fconf.URL, body, childField)
+		// Alternative: Call local lambda
+		var response interface{}
+		var errs x.GqlErrorList
+		var hardErrs x.GqlErrorList
+		if childField.IsLocalLambda() {
+			response, err = lambda.Instance(ns).Execute(body)
+			if err != nil {
+				hardErrs = x.GqlErrorList{childField.GqlErrorf(nil, "Evaluation of lambda field failed because external request"+
+					" returned an error: %s for field: %s within type: %s.", err, childField.Name(), childField.GetObjectName())}
+			}
+		} else {
+			response, errs, hardErrs = fconf.MakeAndDecodeHTTPRequest(nil, fconf.URL, body,
+				childField)
+		}
 		if hardErrs != nil {
 			genc.errCh <- hardErrs
 			return

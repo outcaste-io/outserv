@@ -14,6 +14,7 @@ import (
 
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/api"
+	"github.com/outcaste-io/outserv/lambda"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
@@ -185,9 +186,6 @@ func (rf *ResolverFactory) WithConventionResolvers(
 		})
 	}
 
-	// TODO(schartey/lambda): Need to distinguish between local Lambda and HTTP resolvers
-	// remote lambda is perfectly fine, but local would not need to be sent over http, but
-	// can be called directly
 	for _, q := range s.Queries(schema.HTTPQuery) {
 		rf.WithQueryResolver(q, func(q *schema.Field) QueryResolver {
 			return NewHTTPQueryResolver(nil)
@@ -219,9 +217,6 @@ func (rf *ResolverFactory) WithConventionResolvers(
 		})
 	}
 
-	// TODO(schartey/lambda): Need to distinguish between local Lambda and HTTP resolvers
-	// remote lambda is perfectly fine, but local would not need to be sent over http, but
-	// can be called directly
 	for _, m := range s.Mutations(schema.HTTPMutation) {
 		rf.WithMutationResolver(m, func(m *schema.Field) MutationResolver {
 			return NewHTTPMutationResolver(nil)
@@ -641,8 +636,19 @@ func (hr *httpResolver) rewriteAndExecute(ctx context.Context, field *schema.Fie
 		hrc.Template = schema.GetBodyForLambda(ctx, field, nil, hrc.Template)
 	}
 
-	fieldData, errs, hardErrs := hrc.MakeAndDecodeHTTPRequest(hr.Client, hrc.URL, hrc.Template,
-		field)
+	var fieldData interface{}
+	var errs x.GqlErrorList
+	var hardErrs x.GqlErrorList
+	if field.IsLocalLambda() {
+		fieldData, err = lambda.Instance(ns).Execute(hrc.Template)
+		if err != nil {
+			hardErrs = x.GqlErrorList{field.GqlErrorf(nil, "Evaluation of lambda field failed because external request"+
+				" returned an error: %s for field: %s within type: %s.", err, field.Name(), field.GetObjectName())}
+		}
+	} else {
+		fieldData, errs, hardErrs = hrc.MakeAndDecodeHTTPRequest(hr.Client, hrc.URL, hrc.Template,
+			field)
+	}
 	if hardErrs != nil {
 		// Not using EmptyResult() here as we don't want to wrap the errors returned from remote
 		// endpoints
