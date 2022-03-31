@@ -47,7 +47,7 @@ tools:
 	go install github.com/outcaste-io/outserv/compose
 
 image:
-	docker build -f contrib/Dockerfile --target final -t outcaste/outserv:$(subst /,-,${BUILD_BRANCH}) .
+	docker build -f contrib/Dockerfile --build-arg BUILD_RACE=$(BUILD_RACE) --target final -t outcaste/outserv:$(subst /,-,${BUILD_BRANCH}) .
 
 help:
 	@echo

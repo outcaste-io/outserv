@@ -717,9 +717,9 @@ func run() error {
 	if *rebuildBinary {
 		var cmd *exec.Cmd
 		if *race {
-			cmd = command("make", "BUILD_RACE=y", "install")
+			cmd = command("make", "BUILD_RACE=y", "image")
 		} else {
-			cmd = command("make", "install")
+			cmd = command("make", "BUILD_BRANCH=test", "image")
 		}
 		cmd.Dir = *baseDir
 		if err := cmd.Run(); err != nil {

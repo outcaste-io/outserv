@@ -13,7 +13,8 @@ RUN make -C /tmp jemalloc
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 COPY . .
-RUN make install
+ARG BUILD_RACE
+RUN make BUILD_RACE=$BUILD_RACE install
 
 FROM ubuntu:20.04 as final
 LABEL maintainer="Outcaste, Inc. <team@outcaste.io>"
