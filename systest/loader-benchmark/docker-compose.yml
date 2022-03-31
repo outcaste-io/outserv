@@ -1,4 +1,4 @@
-# Auto-generated with: [compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test -O ../systest/loader-benchmark/docker-compose.yml --alpha_volume data:/data/alpha1 --port_offset=100 --expose_ports=true]
+# Auto-generated with: [../compose/compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test -O ../systest/loader-benchmark/docker-compose.yml --alpha_volume data:/data/alpha1 --port_offset=100 --expose_ports=true]
 #
 version: "3.5"
 services:

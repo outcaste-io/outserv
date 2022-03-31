@@ -1,4 +1,4 @@
-# Auto-generated with: [compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test -O ../outserv/cmd/alpha/mutations_mode/docker-compose.yml --custom_alpha_options 1:--mutations=disallow --custom_alpha_options 2:--mutations=strict --custom_alpha_options 2:--mutations=strict]
+# Auto-generated with: [../compose/compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test -O ../outserv/cmd/alpha/mutations_mode/docker-compose.yml --custom_alpha_options 1:--mutations=disallow --custom_alpha_options 2:--mutations=strict --custom_alpha_options 2:--mutations=strict]
 #
 version: "3.5"
 services:

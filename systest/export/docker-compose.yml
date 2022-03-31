@@ -1,4 +1,4 @@
-# Auto-generated with: [compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test -O ../systest/export/docker-compose.yml --num_alphas 3 --alpha_env_file export.env --minio --minio_port=9001 --alpha_volume data:/data]
+# Auto-generated with: [../compose/compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test -O ../systest/export/docker-compose.yml --num_alphas 3 --alpha_env_file export.env --minio --minio_port=9001 --alpha_volume data:/data]
 #
 version: "3.5"
 services:

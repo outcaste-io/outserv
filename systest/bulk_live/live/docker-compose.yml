@@ -1,4 +1,4 @@
-# Auto-generated with: [compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test -O ../systest/bulk_live/live/docker-compose.yml --minio --minio_data_dir=.]
+# Auto-generated with: [../compose/compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test -O ../systest/bulk_live/live/docker-compose.yml --minio --minio_data_dir=.]
 #
 version: "3.5"
 services:

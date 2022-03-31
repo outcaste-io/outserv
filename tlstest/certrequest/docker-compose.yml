@@ -1,4 +1,4 @@
-# Auto-generated with: [compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test -O ../tlstest/certrequest/docker-compose.yml --extra_alpha_flags '--tls="ca-cert=/dgraph-tls/ca.crt;client-auth-type=REQUEST;server-cert=/dgraph-tls/node.crt;server-key=/dgraph-tls/node.key;"' --alpha_volume ../tls:/dgraph-tls:ro]
+# Auto-generated with: [../compose/compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test -O ../tlstest/certrequest/docker-compose.yml --extra_alpha_flags '--tls="ca-cert=/dgraph-tls/ca.crt;client-auth-type=REQUEST;server-cert=/dgraph-tls/node.crt;server-key=/dgraph-tls/node.key;"' --alpha_volume ../tls:/dgraph-tls:ro]
 #
 version: "3.5"
 services:

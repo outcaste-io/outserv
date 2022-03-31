@@ -1,4 +1,4 @@
-# Auto-generated with: [compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test -O ../graphql/e2e/auth/debug_off/docker-compose.yml --extra_alpha_flags='--graphql="debug=false;"' --names=false]
+# Auto-generated with: [../compose/compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test -O ../graphql/e2e/auth/debug_off/docker-compose.yml --extra_alpha_flags='--graphql="debug=false;"' --names=false]
 #
 version: "3.5"
 services:
