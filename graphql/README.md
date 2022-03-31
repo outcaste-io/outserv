@@ -36,9 +36,9 @@ The GraphQL updates look like:
 
 ```
 input UpdateAuthorInput {
-	filter: AuthorFilter!
-	set: PatchAuthor
-	remove: PatchAuthor
+  filter: AuthorFilter!
+  set: PatchAuthor
+  remove: PatchAuthor
 }
 ```
 

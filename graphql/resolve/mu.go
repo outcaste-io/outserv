@@ -99,27 +99,6 @@ type Object map[string]interface{}
 var objCounter uint64
 var upsertFlag int = 0x1
 
-func copyObjectUnused(obj Object) Object {
-	dst := make(Object)
-	for k, v := range obj {
-		if vo, has := v.(Object); has {
-			co := copyObjectUnused(vo)
-			dst[k] = co
-
-		} else if vlist, has := v.([]Object); has {
-			var dstList []Object
-			for _, l := range vlist {
-				lo := copyObjectUnused(l)
-				dstList = append(dstList, lo)
-			}
-			dst[k] = dstList
-		} else {
-			dst[k] = v
-		}
-	}
-	return dst
-}
-
 func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 	flags int) ([]Object, error) {
 
@@ -187,13 +166,12 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 		if !has {
 			continue
 		}
-
 		if f.Type().IsInbuiltOrEnumType() {
 			dst[f.DgraphAlias()] = val
 			continue
 		}
 
-		var all []Object
+		var children []Object
 		if vlist, ok := val.([]interface{}); ok {
 			for _, elem := range vlist {
 				e := elem.(map[string]interface{})
@@ -201,7 +179,7 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 				if err != nil {
 					return nil, errors.Wrapf(err, "while nesting into %s", f.Name())
 				}
-				all = append(all, objs...)
+				children = append(children, objs...)
 			}
 
 		} else if vmap, ok := val.(map[string]interface{}); ok {
@@ -209,7 +187,7 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 			if err != nil {
 				return nil, errors.Wrapf(err, "while nesting into %s", f.Name())
 			}
-			all = append(all, objs...)
+			children = append(children, objs...)
 
 		} else {
 			panic(fmt.Sprintf("Unhandled type of val: %+v type: %T", val, val))
@@ -218,21 +196,21 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 		if inv := f.Inverse(); inv != nil {
 			uid := dst["uid"]
 			lt := inv.Type().ListType()
-			for _, obj := range all {
+			// Add reverse edge from child -> parent.
+			for _, child := range children {
 				if lt != nil {
-					obj[inv.DgraphAlias()] = []Object{{"uid": uid}}
+					child[inv.DgraphAlias()] = []Object{{"uid": uid}}
 				} else {
-					obj[inv.DgraphAlias()] = Object{"uid": uid}
+					child[inv.DgraphAlias()] = Object{"uid": uid}
 				}
 			}
-			// Add all the reverse edges.
 		}
 
 		if list := f.Type().ListType(); list != nil {
-			dst[f.DgraphAlias()] = all
-		} else if len(all) == 1 {
-			dst[f.DgraphAlias()] = all[0]
-		} else if len(all) > 1 {
+			dst[f.DgraphAlias()] = children
+		} else if len(children) == 1 {
+			dst[f.DgraphAlias()] = children[0]
+		} else if len(children) > 1 {
 			return nil, fmt.Errorf("Found multiple children for non-list field: %s",
 				f.DgraphAlias())
 		}
@@ -376,11 +354,6 @@ func getChildrenUids(ctx context.Context, uid, pred string) ([]string, error) {
 	if co, has := childObj.(map[string]interface{}); has {
 		childUid := co["uid"].(string)
 		children = append(children, childUid)
-	} else if clist, has := childObj.([]map[string]interface{}); has {
-		for _, co := range clist {
-			childUid := co["uid"].(string)
-			children = append(children, childUid)
-		}
 	} else if clist, has := childObj.([]interface{}); has {
 		for _, co := range clist {
 			cm := co.(map[string]interface{})
@@ -394,20 +367,20 @@ func getChildrenUids(ctx context.Context, uid, pred string) ([]string, error) {
 }
 
 func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
-	// TODO: If I delete the user, the tasks still point to it.
 	uids, err := getUidsFromFilter(ctx, m)
 	if err != nil {
 		return nil, errors.Wrapf(err, "getUidsFromFilter")
 	}
 
 	mu := &pb.Mutation{}
-
 	accountForInverse := func(uidHex string, f *schema.FieldDefinition) {
 		inv := f.Inverse()
 		if inv == nil {
 			return
 		}
 
+		// Find all the children and send deletion markers, so they no longer
+		// point to the parent.
 		cuids, err := getChildrenUids(ctx, uidHex, f.DgraphAlias())
 		if err != nil {
 			glog.Errorf("While getting %s.%s: %+v", f.Type().Name(), f.Name(), err)
@@ -438,6 +411,7 @@ func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			ObjectValue: &pb.Value{&pb.Value_StrVal{m.MutatedType().DgraphName()}},
 		})
 	}
+
 	req := &pb.Request{}
 	req.Mutations = append(req.Mutations, mu)
 
@@ -469,6 +443,9 @@ func getObject(ctx context.Context, uid string, fields ...string) (map[string]in
 	return list[0], nil
 }
 
+// checkIfDuplicateExists ensures that there's no other object like dst. That
+// dst's XIDs are unique when put together (invidually they can still have
+// multiple results).
 func checkIfDuplicateExists(ctx context.Context,
 	typ *schema.Type, dst map[string]interface{}) error {
 
@@ -518,10 +495,6 @@ func checkIfDuplicateExists(ctx context.Context,
 	return fmt.Errorf("Duplicate entries exist for these unique ids: %v", xids)
 }
 
-func dgName(typ *schema.Type, field string) string {
-	return typ.Name() + "." + field
-}
-
 func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	uids, err := getUidsFromFilter(ctx, m)
 	if err != nil {
@@ -531,8 +504,6 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		return nil, nil
 	}
 
-	// TODO(mrjn): Ensure that the update does not violate the @id uniqueness
-	// constraint.
 	typ := m.MutatedType()
 	defs := make(map[string]*schema.FieldDefinition)
 	for _, f := range typ.Fields() {
@@ -576,6 +547,8 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			}
 		}
 
+		// TODO: We should probably make this concurrent if the number of uids
+		// warrant it.
 		for _, uid := range uids {
 			dst := make(Object)
 			uidStr := x.ToHexString(uid)
@@ -629,8 +602,6 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 				}
 			}
 			dst["uid"] = x.ToHexString(uid)
-			// TODO: We should probably make this concurrent if the number of
-			// uids warrant it.
 			if forAdd {
 				if err := checkIfDuplicateExists(ctx, typ, dst); err != nil {
 					return err

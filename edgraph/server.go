@@ -665,11 +665,6 @@ func doMutate(ctx context.Context, qc *queryContext, resp *pb.Response) error {
 		return err
 	}
 
-	glog.Infof("GMU list: %+v\n", qc.gmuList)
-	for i, mu := range qc.gmuList {
-		glog.Infof("mutation %d set: %+v del: %+v\n", i, mu.Set, mu.Del)
-	}
-
 	newUids, err := query.AssignUids(ctx, qc.gmuList)
 	if err != nil {
 		return err
