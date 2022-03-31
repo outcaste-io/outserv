@@ -616,7 +616,7 @@ func TestParseGroupby(t *testing.T) {
 	query := `
 	query {
 		me(func: uid(0x1)) {
-			friends @groupby(name@en) {
+			friends @groupby(name) {
 				count(uid)
 			}
 			hometown
@@ -628,7 +628,6 @@ func TestParseGroupby(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, len(res.Query[0].Children[0].GroupbyAttrs))
 	require.Equal(t, "name", res.Query[0].Children[0].GroupbyAttrs[0].Attr)
-	require.Equal(t, "en", res.Query[0].Children[0].GroupbyAttrs[0].Langs[0])
 }
 
 func TestParseGroupbyWithAlias(t *testing.T) {
@@ -734,7 +733,7 @@ func TestParseRepeatArgsError2(t *testing.T) {
 
 func TestHasFuncAtRoot(t *testing.T) {
 	query := `{
-		me(func: has(name@en)) {
+		me(func: has(name)) {
 			name
 		}
 	}`
@@ -1014,7 +1013,7 @@ func TestEqArgWithDollar(t *testing.T) {
 	// This is a fix for #1444.
 	query := `
 	{
-		ab(func: eq(name@en, "$pringfield (or, How)")) {
+		ab(func: eq(name, "$pringfield (or, How)")) {
 			uid
 		}
 	}

@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Cert is the sub-command invoked when running "dgraph cert".
+// Cert is the sub-command invoked when running "outserv cert".
 var Cert x.SubCommand
 
 type options struct {
@@ -39,7 +39,7 @@ var opt options
 func init() {
 	Cert.Cmd = &cobra.Command{
 		Use:   "cert",
-		Short: "Dgraph TLS certificate management",
+		Short: "Outserv TLS certificate management",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer x.StartProfile(Cert.Conf).Stop()
@@ -89,7 +89,7 @@ func run() error {
 	return createCerts(&opt)
 }
 
-// listCerts handles the subcommand of "dgraph cert ls".
+// listCerts handles the subcommand of "outserv cert ls".
 // This function will traverse the certs directory, "tls" by default, and
 // display information about all supported files: ca.{crt,key}, node.{crt,key},
 // client.{name}.{crt,key}. Any other files are flagged as unsupported.

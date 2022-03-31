@@ -118,7 +118,7 @@ const (
 	ManifestVersion = 2105
 
 	// MagicVersion is a unique uint16 number. Badger won't start if this magic number doesn't match
-	// with the one present in the manifest. It prevents starting up dgraph with new data format
+	// with the one present in the manifest. It prevents starting up outserv with new data format
 	// (eg. the change in 21.09 by using roaring bitmap) on older p directory.
 	MagicVersion = 1
 )
@@ -427,7 +427,7 @@ func AttachJWTNamespace(ctx context.Context) context.Context {
 	if err == nil {
 		// Attach the namespace only if we got one from JWT.
 		// This preserves any namespace directly present in the context which is needed for
-		// requests originating from dgraph internal code like server.go::GetGQLSchema() where
+		// requests originating from outserv internal code like server.go::GetGQLSchema() where
 		// context is created by hand.
 		ctx = AttachNamespace(ctx, ns)
 	}
@@ -1218,19 +1218,19 @@ Generic: {{range .Commands}} {{if (or (and .IsAvailableCommand (eq .Annotations.
 
 Available Commands:
 
-Dgraph Core: {{range .Commands}} {{if (and .IsAvailableCommand (eq .Annotations.group "core"))}}
+Outserv Core: {{range .Commands}} {{if (and .IsAvailableCommand (eq .Annotations.group "core"))}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
 
 Data Loading: {{range .Commands}} {{if (and .IsAvailableCommand (eq .Annotations.group "data-load"))}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
 
-Dgraph Security: {{range .Commands}} {{if (and .IsAvailableCommand (eq .Annotations.group "security"))}}
+Outserv Security: {{range .Commands}} {{if (and .IsAvailableCommand (eq .Annotations.group "security"))}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
 
-Dgraph Debug: {{range .Commands}} {{if (and .IsAvailableCommand (eq .Annotations.group "debug"))}}
+Outserv Debug: {{range .Commands}} {{if (and .IsAvailableCommand (eq .Annotations.group "debug"))}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
 
-Dgraph Tools: {{range .Commands}} {{if (and .IsAvailableCommand (eq .Annotations.group "tool"))}}
+Outserv Tools: {{range .Commands}} {{if (and .IsAvailableCommand (eq .Annotations.group "tool"))}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
 ` +
 	// uncomment this part when new availalble commands are added
@@ -1245,7 +1245,7 @@ Flags:
 Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
 `
 
-// NonRootTemplate defines the help template for dgraph sub-command.
+// NonRootTemplate defines the help template for outserv sub-command.
 var NonRootTemplate string = `{{if .Long}} {{.Long}} {{else}} {{.Short}} {{end}}
 Usage:{{if .Runnable}}
   {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}

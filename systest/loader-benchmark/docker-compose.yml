@@ -1,43 +1,20 @@
-# Docker compose file for use with test-21million.sh.
+# Auto-generated with: [../compose/compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test -O ../systest/loader-benchmark/docker-compose.yml --alpha_volume data:/data/alpha1 --port_offset=100 --expose_ports=true]
 #
 version: "3.5"
 services:
-  zero1:
-    image: dgraph/dgraph:latest
-    container_name: bank-dg0.1
-    working_dir: /data/dg0.1
-    ports:
-      - 5180:5180
-      - 6180:6180
+  alpha1:
+    image: outcaste/outserv:test
+    working_dir: /data/alpha1
     labels:
       cluster: test
-    volumes:
-      - type: bind
-        source: $GOPATH/bin
-        target: /gobin
-        read_only: true
-    command: /gobin/outserv zero -o 100 --my=zero1:5180 --logtostderr --bindall
-
-  dg1:
-    image: dgraph/dgraph:latest
-    container_name: bank-dg1
-    working_dir: /data/dg1
-    volumes:
-      - type: bind
-        source: $GOPATH/bin
-        target: /gobin
-        read_only: true
-      - type: volume
-        source: data
-        target: /data/dg1
     ports:
-      - 8180:8180
-      - 9180:9180
-    labels:
-      cluster: test
-    command: >
-      /gobin/outserv alpha --my=dg1:7180 --zero=zero1:5180 -o 100 --logtostderr
-                          --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16;"
-
+    - 8180:8180
+    volumes:
+    - type: volume
+      source: data
+      target: /data/alpha1
+      read_only: false
+    command: outserv alpha -o 100 --my=alpha1:7180 --logtostderr -v=2 --expose_trace=true
+      --raft "idx=1; group=1" --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.0.0.0/8;"
 volumes:
-  data:
+  data: {}

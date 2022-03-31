@@ -14,6 +14,41 @@
  * limitations under the License.
  */
 
+//go:generate go build -o ../compose/compose ../compose
+//go:generate -command Compose ../compose/compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test
+//go:generate -command ComposeTls ../compose/compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test --custom_alpha_options=1:--tls="ca-cert=/dgraph-tls/alpha1/ca.crt;server-cert=/dgraph-tls/alpha1/node.crt;server-key=/dgraph-tls/alpha1/node.key;internal-port=true;client-cert=/dgraph-tls/alpha1/client.alpha1.crt;client-key=/dgraph-tls/alpha2/client.alpha1.key;" --custom_alpha_options=2:--tls="ca-cert=/dgraph-tls/alpha2/ca.crt;server-cert=/dgraph-tls/alpha2/node.crt;server-key=/dgraph-tls/alpha2/node.key;internal-port=true;client-cert=/dgraph-tls/alpha2/client.alpha2.crt;client-key=/dgraph-tls/alpha2/client.alpha2.key;" --custom_alpha_options=3:--tls="ca-cert=/dgraph-tls/alpha3/ca.crt;server-cert=/dgraph-tls/alpha3/node.crt;server-key=/dgraph-tls/alpha3/node.key;internal-port=true;client-cert=/dgraph-tls/alpha3/client.alpha3.crt;client-key=/dgraph-tls/alpha3/client.alpha3.key;" --custom_alpha_options=4:--tls="ca-cert=/dgraph-tls/alpha4/ca.crt;server-cert=/dgraph-tls/alpha4/node.crt;server-key=/dgraph-tls/alpha4/node.key;internal-port=true;client-cert=/dgraph-tls/alpha4/client.alpha4.crt;client-key=/dgraph-tls/alpha4/client.alpha4.key;" --custom_alpha_options=5:--tls="ca-cert=/dgraph-tls/alpha5/ca.crt;server-cert=/dgraph-tls/alpha5/node.crt;server-key=/dgraph-tls/alpha5/node.key;internal-port=true;client-cert=/dgraph-tls/alpha5/client.alpha5.crt;client-key=/dgraph-tls/alpha5/client.alpha5.key;" --custom_alpha_options=6:--tls="ca-cert=/dgraph-tls/alpha6/ca.crt;server-cert=/dgraph-tls/alpha6/node.crt;server-key=/dgraph-tls/alpha6/node.key;internal-port=true;client-cert=/dgraph-tls/alpha6/client.alpha6.crt;client-key=/dgraph-tls/alpha6/client.alpha6.key;" --alpha_volume ../tls:/dgraph-tls:ro
+//go:generate Compose -O ../graphql/e2e/admin_auth/poorman_auth/docker-compose.yml	--token itIsSecret
+//go:generate Compose -O ../graphql/e2e/auth/debug_off/docker-compose.yml			--extra_alpha_flags='--graphql="debug=false;"' --names=false
+//go:generate Compose -O ../graphql/e2e/auth/docker-compose.yml						--extra_alpha_flags='--graphql="debug=true;"' --names=false
+//go:generate Compose -O ../graphql/e2e/auth_closed_by_default/docker-compose.yml	--extra_alpha_flags='--graphql="debug=true;"'
+//go:generate Compose -O ../graphql/e2e/custom_logic/docker-compose.yml				--extra_alpha_flags='--lamda="num=2;"'
+//go:generate Compose -O ../graphql/e2e/directives/docker-compose.yml
+//go:generate Compose -O ../graphql/e2e/normal/docker-compose.yml					--extra_alpha_flags='--lambda="num=2;"'
+//go:generate Compose -O ../graphql/e2e/schema/docker-compose.yml					--num_alphas 3
+//go:generate Compose -O ../graphql/e2e/subscription/docker-compose.yml				--num_alphas 3
+//go:generate Compose -O ../outserv/cmd/alpha/mutations_mode/docker-compose.yml		--custom_alpha_options 1:--mutations=disallow --custom_alpha_options 2:--mutations=strict --custom_alpha_options 2:--mutations=strict
+//go:generate Compose -O ../outserv/docker-compose.yml								--num_alphas 3 --acl_secret ../ee/acl/hmac-secret
+//go:generate Compose -O ../systest/backup/filesystem/docker-compose.yml
+//go:generate Compose -O ../systest/backup/minio-large/docker-compose.yml           --num_alphas 3 --alpha_env_file ../../backup.env --num_replicas 1 --minio --minio_port=9001 --minio_env_file ../../backup.env --custom_alpha_options=1:--tls="ca-cert=/dgraph-tls/alpha1/ca.crt;server-cert=/dgraph-tls/alpha1/node.crt;server-key=/dgraph-tls/alpha1/node.key;internal-port=true;client-cert=/dgraph-tls/alpha1/client.alpha1.crt;client-key=/dgraph-tls/alpha2/client.alpha1.key;" --custom_alpha_options=2:--tls="ca-cert=/dgraph-tls/alpha2/ca.crt;server-cert=/dgraph-tls/alpha2/node.crt;server-key=/dgraph-tls/alpha2/node.key;internal-port=true;client-cert=/dgraph-tls/alpha2/client.alpha2.crt;client-key=/dgraph-tls/alpha2/client.alpha2.key;" --custom_alpha_options=3:--tls="ca-cert=/dgraph-tls/alpha3/ca.crt;server-cert=/dgraph-tls/alpha3/node.crt;server-key=/dgraph-tls/alpha3/node.key;internal-port=true;client-cert=/dgraph-tls/alpha3/client.alpha3.crt;client-key=/dgraph-tls/alpha3/client.alpha3.key;" --alpha_volume ../../../tlstest/mtls_internal/tls:/dgraph-tls:ro
+//go:generate Compose -O ../systest/backup/minio/docker-compose.yml --num_alphas 3 --alpha_env_file ../../backup.env --num_replicas 1 --minio --minio_port=9001 --minio_env_file ../../backup.env --custom_alpha_options=1:--tls="ca-cert=/dgraph-tls/alpha1/ca.crt;server-cert=/dgraph-tls/alpha1/node.crt;server-key=/dgraph-tls/alpha1/node.key;internal-port=true;client-cert=/dgraph-tls/alpha1/client.alpha1.crt;client-key=/dgraph-tls/alpha2/client.alpha1.key;" --custom_alpha_options=2:--tls="ca-cert=/dgraph-tls/alpha2/ca.crt;server-cert=/dgraph-tls/alpha2/node.crt;server-key=/dgraph-tls/alpha2/node.key;internal-port=true;client-cert=/dgraph-tls/alpha2/client.alpha2.crt;client-key=/dgraph-tls/alpha2/client.alpha2.key;" --custom_alpha_options=3:--tls="ca-cert=/dgraph-tls/alpha3/ca.crt;server-cert=/dgraph-tls/alpha3/node.crt;server-key=/dgraph-tls/alpha3/node.key;internal-port=true;client-cert=/dgraph-tls/alpha3/client.alpha3.crt;client-key=/dgraph-tls/alpha3/client.alpha3.key;" --alpha_volume ../../../tlstest/mtls_internal/tls:/dgraph-tls:ro
+//go:generate Compose -O ../systest/bgindex/docker-compose.yml
+//go:generate Compose -O ../systest/bulk_live/bulk/docker-compose.yml --num_alphas 0 --minio --minio_data_dir=.
+//go:generate Compose -O ../systest/bulk_live/live/docker-compose.yml --minio --minio_data_dir=.
+//go:generate Compose -O ../systest/cloud/docker-compose.yml                        --minio --minio_env_file minio.env --extra_alpha_flags='--limit="shared-instance=true;"'
+//go:generate Compose -O ../systest/export/docker-compose.yml                       --num_alphas 3 --alpha_env_file export.env --minio --minio_port=9001 --alpha_volume data:/data
+//go:generate Compose -O ../systest/group-delete/docker-compose.yml					--num_alphas 3
+//go:generate Compose -O ../systest/license/docker-compose.yml
+//go:generate Compose -O ../systest/loader-benchmark/docker-compose.yml				--alpha_volume data:/data/alpha1 --port_offset=100 --expose_ports=true
+//go:generate Compose -O ../systest/loader/docker-compose.yml						--alpha_volume ../../tlstest/mtls_internal/tls:/dgraph-tls:ro --custom_alpha_options=1:--tls="ca-cert=/dgraph-tls/alpha1/ca.crt;server-cert=/dgraph-tls/alpha1/node.crt;server-key=/dgraph-tls/alpha1/node.key;internal-port=true;client-cert=/dgraph-tls/alpha1/client.alpha1.crt;client-key=/dgraph-tls/alpha2/client.alpha1.key;"
+//go:generate Compose -O ../systest/online-restore/docker-compose.yml				--num_alphas 6  --alpha_volume ./keys:/data/keys:ro --alpha_volume ./backup:/data/backup2:ro --alpha_volume backup:/data/backup --alpha_volume ../../tlstest/mtls_internal/tls:/dgraph-tls:ro --custom_alpha_options=1:--tls="ca-cert=/dgraph-tls/alpha1/ca.crt;server-cert=/dgraph-tls/alpha1/node.crt;server-key=/dgraph-tls/alpha1/node.key;internal-port=true;client-cert=/dgraph-tls/alpha1/client.alpha1.crt;client-key=/dgraph-tls/alpha2/client.alpha1.key;" --custom_alpha_options=2:--tls="ca-cert=/dgraph-tls/alpha2/ca.crt;server-cert=/dgraph-tls/alpha2/node.crt;server-key=/dgraph-tls/alpha2/node.key;internal-port=true;client-cert=/dgraph-tls/alpha2/client.alpha2.crt;client-key=/dgraph-tls/alpha2/client.alpha2.key;" --custom_alpha_options=3:--tls="ca-cert=/dgraph-tls/alpha3/ca.crt;server-cert=/dgraph-tls/alpha3/node.crt;server-key=/dgraph-tls/alpha3/node.key;internal-port=true;client-cert=/dgraph-tls/alpha3/client.alpha3.crt;client-key=/dgraph-tls/alpha3/client.alpha3.key;" --custom_alpha_options=4:--tls="ca-cert=/dgraph-tls/alpha4/ca.crt;server-cert=/dgraph-tls/alpha4/node.crt;server-key=/dgraph-tls/alpha4/node.key;internal-port=true;client-cert=/dgraph-tls/alpha4/client.alpha4.crt;client-key=/dgraph-tls/alpha4/client.alpha4.key;" --custom_alpha_options=5:--tls="ca-cert=/dgraph-tls/alpha5/ca.crt;server-cert=/dgraph-tls/alpha5/node.crt;server-key=/dgraph-tls/alpha5/node.key;internal-port=true;client-cert=/dgraph-tls/alpha5/client.alpha5.crt;client-key=/dgraph-tls/alpha5/client.alpha5.key;" --custom_alpha_options=6:--tls="ca-cert=/dgraph-tls/alpha6/ca.crt;server-cert=/dgraph-tls/alpha6/node.crt;server-key=/dgraph-tls/alpha6/node.key;internal-port=true;client-cert=/dgraph-tls/alpha6/client.alpha6.crt;client-key=/dgraph-tls/alpha6/client.alpha6.key;"
+//go:generate Compose -O ../systest/plugin/docker-compose.yml						--extra_alpha_flags '--custom_tokenizers=/plugins/0.so,/plugins/1.so,/plugins/2.so,/plugins/3.so' --alpha_volume ../../testutil/custom_plugins:/plugins:ro
+//go:generate Compose -O ../tlstest/certrequest/docker-compose.yml					--extra_alpha_flags '--tls="ca-cert=/dgraph-tls/ca.crt;client-auth-type=REQUEST;server-cert=/dgraph-tls/node.crt;server-key=/dgraph-tls/node.key;"' --alpha_volume ../tls:/dgraph-tls:ro
+//go:generate Compose -O ../tlstest/certrequireandverify/docker-compose.yml			--extra_alpha_flags '--tls="ca-cert=/dgraph-tls/ca.crt;client-auth-type=REQUIREANDVERIFY;server-cert=/dgraph-tls/node.crt;server-key=/dgraph-tls/node.key;"' --alpha_volume ../tls:/dgraph-tls:ro
+//go:generate Compose -O ../tlstest/certverifyifgiven/docker-compose.yml			--extra_alpha_flags '--tls="ca-cert=/dgraph-tls/ca.crt;client-auth-type=VERIFYIFGIVEN;server-cert=/dgraph-tls/node.crt;server-key=/dgraph-tls/node.key;"' --alpha_volume ../tls:/dgraph-tls:ro
+//go:generate Compose -O ../tlstest/mtls_internal/ha_6_node/docker-compose.yml		--num_alphas 3 --custom_alpha_options=1:--tls="ca-cert=/dgraph-tls/alpha1/ca.crt;server-cert=/dgraph-tls/alpha1/node.crt;server-key=/dgraph-tls/alpha1/node.key;internal-port=true;client-cert=/dgraph-tls/alpha1/client.alpha1.crt;client-key=/dgraph-tls/alpha2/client.alpha1.key;" --custom_alpha_options=2:--tls="ca-cert=/dgraph-tls/alpha2/ca.crt;server-cert=/dgraph-tls/alpha2/node.crt;server-key=/dgraph-tls/alpha2/node.key;internal-port=true;client-cert=/dgraph-tls/alpha2/client.alpha2.crt;client-key=/dgraph-tls/alpha2/client.alpha2.key;" --custom_alpha_options=3:--tls="ca-cert=/dgraph-tls/alpha3/ca.crt;server-cert=/dgraph-tls/alpha3/node.crt;server-key=/dgraph-tls/alpha3/node.key;internal-port=true;client-cert=/dgraph-tls/alpha3/client.alpha3.crt;client-key=/dgraph-tls/alpha3/client.alpha3.key;" --alpha_volume ../tls:/dgraph-tls:ro
+//go:generate Compose -O ../tlstest/mtls_internal/multi_group/docker-compose.yml	--num_alphas 3 --custom_alpha_options=1:--tls="ca-cert=/dgraph-tls/alpha1/ca.crt;server-cert=/dgraph-tls/alpha1/node.crt;server-key=/dgraph-tls/alpha1/node.key;internal-port=true;client-cert=/dgraph-tls/alpha1/client.alpha1.crt;client-key=/dgraph-tls/alpha2/client.alpha1.key;" --custom_alpha_options=2:--tls="ca-cert=/dgraph-tls/alpha2/ca.crt;server-cert=/dgraph-tls/alpha2/node.crt;server-key=/dgraph-tls/alpha2/node.key;internal-port=true;client-cert=/dgraph-tls/alpha2/client.alpha2.crt;client-key=/dgraph-tls/alpha2/client.alpha2.key;" --custom_alpha_options=3:--tls="ca-cert=/dgraph-tls/alpha3/ca.crt;server-cert=/dgraph-tls/alpha3/node.crt;server-key=/dgraph-tls/alpha3/node.key;internal-port=true;client-cert=/dgraph-tls/alpha3/client.alpha3.crt;client-key=/dgraph-tls/alpha3/client.alpha3.key;" --alpha_volume ../tls:/dgraph-tls:ro
+//go:generate Compose -O ../tlstest/mtls_internal/single_node/docker-compose.yml	--num_alphas 1 --custom_alpha_options=1:--tls="ca-cert=/dgraph-tls/alpha1/ca.crt;server-cert=/dgraph-tls/alpha1/node.crt;server-key=/dgraph-tls/alpha1/node.key;internal-port=true;client-cert=/dgraph-tls/alpha1/client.alpha1.crt;client-key=/dgraph-tls/alpha2/client.alpha1.key;" --custom_alpha_options=2:--tls="ca-cert=/dgraph-tls/alpha2/ca.crt;server-cert=/dgraph-tls/alpha2/node.crt;server-key=/dgraph-tls/alpha2/node.key;internal-port=true;client-cert=/dgraph-tls/alpha2/client.alpha2.crt;client-key=/dgraph-tls/alpha2/client.alpha2.key;" --custom_alpha_options=3:--tls="ca-cert=/dgraph-tls/alpha3/ca.crt;server-cert=/dgraph-tls/alpha3/node.crt;server-key=/dgraph-tls/alpha3/node.key;internal-port=true;client-cert=/dgraph-tls/alpha3/client.alpha3.crt;client-key=/dgraph-tls/alpha3/client.alpha3.key;" --alpha_volume ../tls:/dgraph-tls:ro
+//go:generate Compose -O ../worker/docker-compose.yml								--num_alphas 6 --snapshot_after=snapshot-after-entries=100;
 package main
 
 import (
@@ -54,7 +89,7 @@ var (
 	testId     int32
 
 	baseDir = pflag.StringP("base", "", "../",
-		"Base dir for Dgraph")
+		"Base dir for Outserv")
 	runPkg = pflag.StringP("pkg", "p", "",
 		"Only run tests for this package")
 	runTest = pflag.StringP("test", "t", "",
@@ -682,9 +717,9 @@ func run() error {
 	if *rebuildBinary {
 		var cmd *exec.Cmd
 		if *race {
-			cmd = command("make", "BUILD_RACE=y", "install")
+			cmd = command("make", "BUILD_RACE=y", "image")
 		} else {
-			cmd = command("make", "install")
+			cmd = command("make", "BUILD_BRANCH=test", "image")
 		}
 		cmd.Dir = *baseDir
 		if err := cmd.Run(); err != nil {
@@ -693,7 +728,7 @@ func run() error {
 		oc.Took(0, "COMPILE", time.Since(start))
 	}
 
-	tmpDir, err := ioutil.TempDir("", "dgraph-test")
+	tmpDir, err := ioutil.TempDir("", "outserv-test")
 	x.Check(err)
 	defer os.RemoveAll(tmpDir)
 

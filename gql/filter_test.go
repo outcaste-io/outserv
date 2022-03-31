@@ -164,7 +164,7 @@ func TestParseFilter_opError1(t *testing.T) {
 `
 	_, err := Parse(Request{Str: query})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "Expected comma or language but got: \"aaa\"")
+	require.Contains(t, err.Error(), "Expected comma but got: \"aaa\"")
 }
 
 func TestParseFilter_opNoError2(t *testing.T) {
@@ -413,7 +413,7 @@ func TestParseFilter_unknowndirectiveError1(t *testing.T) {
 	// see a () after it we assume its a language but attr which specify a language can't have
 	// children.
 	// The test below tests for unknown directive.
-	require.Contains(t, err.Error(), "Cannot have children for attr: friends with lang tags:")
+	require.Contains(t, err.Error(), "Expected directive or language list")
 }
 
 func TestParseFilter_unknowndirectiveError2(t *testing.T) {
@@ -428,80 +428,6 @@ func TestParseFilter_unknowndirectiveError2(t *testing.T) {
 	_, err := Parse(Request{Str: query})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Unknown directive [filtererr]")
-}
-func TestLangsFilter(t *testing.T) {
-	query := `
-	query {
-		me(func: uid(0x0a)) {
-			friends @filter(alloftext(descr@en, "something")) {
-				name
-			}
-			gender,age
-			hometown
-		}
-	}
-`
-	res, err := Parse(Request{Str: query})
-	require.NoError(t, err)
-	require.NotNil(t, res.Query[0])
-	require.NotNil(t, res.Query[0].Children[0])
-	require.NotNil(t, res.Query[0].Children[0].Filter)
-	require.NotNil(t, res.Query[0].Children[0].Filter.Func)
-	require.Equal(t, "descr", res.Query[0].Children[0].Filter.Func.Attr)
-	require.Equal(t, "en", res.Query[0].Children[0].Filter.Func.Lang)
-}
-
-func TestLangsFilter_error1(t *testing.T) {
-	// this query should fail, because '@lang' is used twice (and only one appearance is allowed)
-	query := `
-	query {
-		me(func: uid(0x0a)) {
-			friends @filter(alloftext(descr@en@de, "something")) {
-				name
-			}
-			gender,age
-			hometown
-		}
-	}
-`
-	_, err := Parse(Request{Str: query})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "Invalid usage of '@' in function argument")
-}
-
-func TestLangsFilter_error2(t *testing.T) {
-	// this query should fail, because there is no lang after '@'
-	query := `
-	query {
-		me(func: uid(0x0a)) {
-			friends @filter(alloftext(descr@, "something")) {
-				name
-			}
-			gender,age
-			hometown
-		}
-	}
-`
-	_, err := Parse(Request{Str: query})
-	require.Error(t, err)
-	require.Contains(t, err.Error(),
-		"Unrecognized character in lexDirective: U+002C ','")
-}
-
-func TestFacetsFilterFailRoot(t *testing.T) {
-	query := `
-	{
-		me(func: uid(0x1)) @facets(eq(some-facet, true)) {
-			friend	{
-				name
-			}
-		}
-	}
-`
-
-	_, err := Parse(Request{Str: query})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "Unknown directive [facets]")
 }
 
 func TestHasFilterAtRoot(t *testing.T) {
