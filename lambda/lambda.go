@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/golang/glog"
 )
@@ -17,11 +18,13 @@ type LambdaScript struct {
 }
 
 type Coordinator struct {
+	m         sync.Mutex
 	instances map[uint64]*Lambda
 }
 
 // This is the struct that contains general lambda information
 type Lambda struct {
+	mu           sync.RWMutex
 	instanceId   uint64
 	lambdaScript *LambdaScript
 	wasmInstance *WasmInstance
@@ -38,7 +41,8 @@ func (l *Lambda) GetCurrentScript() (*LambdaScript, bool) {
 }
 
 func Instance(instance uint64) *Lambda {
-	// Lock
+	coordinator.m.Lock()
+	defer coordinator.m.Unlock()
 	lambda, ok := coordinator.instances[instance]
 	if !ok {
 		lambda = &Lambda{
@@ -46,59 +50,67 @@ func Instance(instance uint64) *Lambda {
 		}
 		coordinator.instances[instance] = lambda
 	}
-	// Unlock
 	return lambda
 }
 
 func (l *Lambda) LoadScript(lambdaScript *LambdaScript) error {
-	// Lock
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
 	if l.lambdaScript != nil && l.lambdaScript.Hash == lambdaScript.Hash {
 		return errors.New("lambda script already loaded")
 	}
 	if l.wasmInstance == nil {
-		i, err := NewWasmInstance(lambdaScript.Script)
+		i, err := NewWasmInstance()
 		if err != nil {
 			return err
 		}
 		l.wasmInstance = i
-	} else {
-		if err := l.wasmInstance.UpdateScript(lambdaScript.Script); err != nil {
-			return err
-		}
+	}
+	if err := l.wasmInstance.LoadScript(lambdaScript.Script); err != nil {
+		return err
 	}
 	l.lambdaScript = lambdaScript
 	return nil
-	// Unlock
 }
 
 func (l *Lambda) SetEmptyScript(lambdaScript *LambdaScript) {
-	l.wasmInstance.Stop()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.wasmInstance != nil {
+		l.wasmInstance.Stop()
+	}
 	l.lambdaScript = lambdaScript
 }
 
 func (l *Lambda) Execute(body interface{}) (interface{}, error) {
-	// Lock
-	if body != nil {
-		b, err := json.Marshal(body)
-		if err != nil {
-			return nil, err
-		}
-		glog.Info(b)
-	}
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 
 	if l.wasmInstance == nil {
 		return nil, errors.New(fmt.Sprintf("no lambda script loaded for lambda instance %d", l.instanceId))
 	}
-	glog.Info("Executing lambda")
-	//return l.wasmInstance.Execute("")
 
-	// Hint:
-	// we expect an []interface{}
-	t := []string{"Test"}
-	s := make([]interface{}, len(t))
-	for i, v := range t {
-		s[i] = v
+	var b []byte
+	var err error
+	if body != nil {
+		b, err = json.Marshal(body)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return s, nil
-	// Unlock
+
+	glog.Info("Executing lambda")
+	res, err := l.wasmInstance.Execute(b)
+	if err != nil {
+		return nil, err
+	}
+
+	var result interface{}
+	err = json.Unmarshal(res, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
