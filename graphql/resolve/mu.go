@@ -216,10 +216,6 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 		}
 
 		if inv := f.Inverse(); inv != nil {
-			glog.Infof("Found a field which has inverse: %q. Inverse is: %q %q\n", f.Name(), inv.Name(), inv.Type().Name())
-			glog.Infof("dst: %+v\n", dst)
-			glog.Infof("objects: %+v\n", all)
-
 			uid := dst["uid"]
 			lt := inv.Type().ListType()
 			for _, obj := range all {
@@ -232,7 +228,6 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 			// Add all the reverse edges.
 		}
 
-		glog.Infof("setting %s as list type %+v: %+v\n", f.DgraphAlias(), f.Type().ListType(), all)
 		if list := f.Type().ListType(); list != nil {
 			dst[f.DgraphAlias()] = all
 		} else if len(all) == 1 {
@@ -243,7 +238,6 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 		}
 	}
 
-	glog.Infof("Parsed dst: %+v\n", dst)
 	if updateObject {
 		res = append(res, dst)
 	}
@@ -283,6 +277,9 @@ func runAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			continue
 		}
 		resultUids = append(resultUids, x.FromHex(uidStr))
+	}
+	if len(res) == 0 {
+		return resultUids, nil
 	}
 	data, err := json.Marshal(res)
 	x.Check(err)
@@ -369,7 +366,6 @@ func getChildrenUids(ctx context.Context, uid, pred string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("While getting %s: %+v", pred, err)
 	}
-	glog.Infof("got object: %+v\n", obj)
 	childObj := obj[pred]
 	if childObj == nil {
 		return nil, nil
@@ -385,11 +381,20 @@ func getChildrenUids(ctx context.Context, uid, pred string) ([]string, error) {
 			childUid := co["uid"].(string)
 			children = append(children, childUid)
 		}
+	} else if clist, has := childObj.([]interface{}); has {
+		for _, co := range clist {
+			cm := co.(map[string]interface{})
+			childUid := cm["uid"].(string)
+			children = append(children, childUid)
+		}
+	} else {
+		return nil, fmt.Errorf("getChildrenUids is unable to parse: %+v", childObj)
 	}
 	return children, nil
 }
 
 func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
+	// TODO: If I delete the user, the tasks still point to it.
 	uids, err := getUidsFromFilter(ctx, m)
 	if err != nil {
 		return nil, errors.Wrapf(err, "getUidsFromFilter")
@@ -403,8 +408,6 @@ func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			return
 		}
 
-		glog.Infof("Found a field which has inverse: %q. Inverse is: %q %q\n",
-			f.Name(), inv.Name(), inv.Type().Name())
 		cuids, err := getChildrenUids(ctx, uidHex, f.DgraphAlias())
 		if err != nil {
 			glog.Errorf("While getting %s.%s: %+v", f.Type().Name(), f.Name(), err)
@@ -435,7 +438,6 @@ func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			ObjectValue: &pb.Value{&pb.Value_StrVal{m.MutatedType().DgraphName()}},
 		})
 	}
-	glog.Infof("Got mutations: %+v\n", mu)
 	req := &pb.Request{}
 	req.Mutations = append(req.Mutations, mu)
 
@@ -449,7 +451,6 @@ func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 
 func getObject(ctx context.Context, uid string, fields ...string) (map[string]interface{}, error) {
 	q := fmt.Sprintf(`{q(func: uid(%s)) { %s }}`, uid, strings.Join(fields[:], ", "))
-	glog.Infof("Running query: %s\n", q)
 	resp, err := edgraph.Query(ctx, &pb.Request{Query: q})
 	if err != nil {
 		return nil, errors.Wrapf(err, "while requesting for object")
@@ -480,12 +481,10 @@ func checkIfDuplicateExists(ctx context.Context,
 	for _, xidField := range typ.XIDFields() {
 		if _, has := dst[xidField.DgraphAlias()]; has {
 			needToCheck = true
-			glog.Infof("Found that we're updating an XID: %s for %s\n", xidField.Name(), uid)
 		}
 		xidList = append(xidList, xidField.DgraphAlias())
 	}
 	if !needToCheck {
-		glog.Infof("No need to check for duplicate for %s\n", uid)
 		return nil
 	}
 
@@ -497,12 +496,10 @@ func checkIfDuplicateExists(ctx context.Context,
 	for key, val := range dst {
 		src[key] = val
 	}
-	glog.Infof("Updated object after applying patch: %+v\n", src)
 	uids, err := UidsFromManyXids(ctx, src, typ, true)
 	if err != nil {
 		return errors.Wrapf(err, "UidsFromManyXids")
 	}
-	glog.Infof("Got UIDs: %#x\n", uids)
 	if len(uids) == 0 {
 		// No duplicates found.
 		return nil

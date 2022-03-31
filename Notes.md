@@ -8,7 +8,7 @@
 
 ### Type System
 
-Use type level UIDs.
+[ ] Rewrite type system. Perhaps using type level UIDs.
 
 ### GraphQL Mutations
 
@@ -16,3 +16,13 @@ Use type level UIDs.
 [x] Deal with nested objects and their upserts.
 [ ] NumUids in deletion operation doesn't return any value.
 [ ] Without upsert, we seem to be adding duplicate records.
+
+#### Inverse
+
+[ ] Addition works with inverse.
+[ ] Deletion works with inverse.
+[ ] Update works with inverse.
+
+### Performance
+
+[ ] Build a cache system, which can retrieve objects concurrently to aid with mutations.
