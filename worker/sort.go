@@ -19,7 +19,6 @@ package worker
 import (
 	"context"
 	"encoding/hex"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -538,10 +537,6 @@ func destUids(uidMatrix []*pb.List) *sroar.Bitmap {
 
 func fetchValues(ctx context.Context, in *pb.Query, idx int, or chan orderResult) {
 	var err error
-	in.Reverse = strings.HasPrefix(in.Attr, "~")
-	if in.Reverse {
-		in.Attr = strings.TrimPrefix(in.Attr, "~")
-	}
 	r, err := ProcessTaskOverNetwork(ctx, in)
 	or <- orderResult{
 		idx: idx,

@@ -616,14 +616,6 @@ func validateDQLSchemaForGraphQL(ctx context.Context,
 					strings.Join(dqlPred.Tokenizer, ","))
 			}
 		}
-		// if gqlSchema had @reverse, then dqlSchema must have it. dqlSchema can't remove @reverse.
-		// if gqlSchema didn't had @reverse, it is allowed to dqlSchema to add it.
-		if gqlPred.Directive == pb.SchemaUpdate_REVERSE && dqlPred.Directive != pb.
-			SchemaUpdate_REVERSE {
-			return errors.Errorf("can't alter predicate %s as it is used by the GraphQL API, "+
-				"and is missing @reverse that is expected by the GraphQL API.",
-				x.ParseAttr(gqlPred.Predicate))
-		}
 		// if gqlSchema had @count, then dqlSchema must have it. dqlSchema can't remove @count.
 		// if gqlSchema didn't had @count, it is allowed to dqlSchema to add it.
 		if gqlPred.Count && !dqlPred.Count {

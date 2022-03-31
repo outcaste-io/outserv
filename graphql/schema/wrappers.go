@@ -1928,7 +1928,6 @@ func (fd *FieldDefinition) ParentType() *Type {
 }
 
 func (fd *FieldDefinition) Inverse() *FieldDefinition {
-
 	invDirective := fd.fieldDef.Directives.ForName(inverseDirective)
 	if invDirective == nil {
 		return nil

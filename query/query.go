@@ -832,11 +832,6 @@ func createTaskQuery(ctx context.Context, sg *SubGraph) (*pb.Query, error) {
 		return nil, errors.Wrapf(err, "While creating query task")
 	}
 	attr := sg.Attr
-	// Might be safer than just checking first byte due to i18n
-	reverse := strings.HasPrefix(attr, "~")
-	if reverse {
-		attr = strings.TrimPrefix(attr, "~")
-	}
 	var srcFunc *pb.SrcFunction
 	if sg.SrcFunc != nil {
 		srcFunc = &pb.SrcFunction{}
@@ -857,7 +852,6 @@ func createTaskQuery(ctx context.Context, sg *SubGraph) (*pb.Query, error) {
 		ReadTs:    sg.ReadTs,
 		Cache:     int32(sg.Cache),
 		Attr:      x.NamespaceAttr(namespace, attr),
-		Reverse:   reverse,
 		SrcFunc:   srcFunc,
 		AfterUid:  sg.Params.AfterUID,
 		DoCount:   len(sg.Filters) == 0 && sg.Params.DoCount,
