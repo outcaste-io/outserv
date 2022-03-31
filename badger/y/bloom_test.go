@@ -5,7 +5,9 @@
 package y
 
 import (
+	"fmt"
 	"math"
+	"math/rand"
 	"testing"
 )
 
@@ -122,6 +124,23 @@ loop:
 
 	if nMediocreFilters > nGoodFilters/5 {
 		t.Errorf("%d mediocre filters but only %d good filters", nMediocreFilters, nGoodFilters)
+	}
+}
+
+func BenchmarkHash(b *testing.B) {
+	for _, sz := range []int64{1, 3, 4, 7, 8, 16, 32, 256, 1024, 4096} {
+		d := make([]byte, sz)
+		_, err := rand.Read(d)
+		if err != nil {
+			b.Errorf("failed to read %d random bytes %s", sz, err)
+		}
+		b.Run(fmt.Sprintf("hasher-%d", sz), func(b *testing.B) {
+			b.SetBytes(sz)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_ = Hash(d)
+			}
+		})
 	}
 }
 
