@@ -71,7 +71,7 @@ func UidsFromManyXids(ctx context.Context, obj map[string]interface{},
 			xidVal = obj[xid.Name()]
 		}
 		if xidVal == nil {
-			return nil, fmt.Errorf("XID %s can't be nil for obj: %+v\n", xid.Name(), obj)
+			return nil, fmt.Errorf("XID %q can't be nil for obj: %+v\n", xid.Name(), obj)
 		}
 		xidString, err := extractVal(xidVal, xid)
 		if err != nil {
@@ -97,9 +97,31 @@ func UidsFromManyXids(ctx context.Context, obj map[string]interface{},
 type Object map[string]interface{}
 
 var objCounter uint64
+var upsertFlag int = 0x1
+
+func copyObjectUnused(obj Object) Object {
+	dst := make(Object)
+	for k, v := range obj {
+		if vo, has := v.(Object); has {
+			co := copyObjectUnused(vo)
+			dst[k] = co
+
+		} else if vlist, has := v.([]Object); has {
+			var dstList []Object
+			for _, l := range vlist {
+				lo := copyObjectUnused(l)
+				dstList = append(dstList, lo)
+			}
+			dst[k] = dstList
+		} else {
+			dst[k] = v
+		}
+	}
+	return dst
+}
 
 func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
-	upsert bool) ([]Object, error) {
+	flags int) ([]Object, error) {
 
 	var idVal uint64
 	if id := typ.IDField(); id != nil {
@@ -148,7 +170,7 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 		}
 		// idVal if present matches with uids[0]
 		dst["uid"] = x.ToHexString(uids[0])
-		if !upsert {
+		if flags&upsertFlag == 0 {
 			// We won't add a new object here, because an object already
 			// exists. And we should not be updating this object because
 			// upsert is false. Just return the list of UIDS found.
@@ -175,7 +197,7 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 		if vlist, ok := val.([]interface{}); ok {
 			for _, elem := range vlist {
 				e := elem.(map[string]interface{})
-				objs, err := gatherObjects(ctx, e, f.Type(), upsert)
+				objs, err := gatherObjects(ctx, e, f.Type(), flags)
 				if err != nil {
 					return nil, errors.Wrapf(err, "while nesting into %s", f.Name())
 				}
@@ -183,7 +205,7 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 			}
 
 		} else if vmap, ok := val.(map[string]interface{}); ok {
-			objs, err := gatherObjects(ctx, vmap, f.Type(), upsert)
+			objs, err := gatherObjects(ctx, vmap, f.Type(), flags)
 			if err != nil {
 				return nil, errors.Wrapf(err, "while nesting into %s", f.Name())
 			}
@@ -198,13 +220,27 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 			glog.Infof("dst: %+v\n", dst)
 			glog.Infof("objects: %+v\n", all)
 
-			// Add all the reverse edges.
 			uid := dst["uid"]
+			lt := inv.Type().ListType()
 			for _, obj := range all {
-				obj[inv.DgraphAlias()] = map[string]interface{}{"uid": uid}
+				if lt != nil {
+					obj[inv.DgraphAlias()] = []Object{{"uid": uid}}
+				} else {
+					obj[inv.DgraphAlias()] = Object{"uid": uid}
+				}
 			}
+			// Add all the reverse edges.
 		}
-		dst[f.DgraphAlias()] = all
+
+		glog.Infof("setting %s as list type %+v: %+v\n", f.DgraphAlias(), f.Type().ListType(), all)
+		if list := f.Type().ListType(); list != nil {
+			dst[f.DgraphAlias()] = all
+		} else if len(all) == 1 {
+			dst[f.DgraphAlias()] = all[0]
+		} else if len(all) > 1 {
+			return nil, fmt.Errorf("Found multiple children for non-list field: %s",
+				f.DgraphAlias())
+		}
 	}
 
 	if updateObject {
@@ -217,10 +253,12 @@ func runAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	val, ok := m.ArgValue(schema.InputArgName).([]interface{})
 	x.AssertTrue(ok)
 
-	upsert := false
-	upsertVal := m.ArgValue(schema.UpsertArgName)
-	if upsertVal != nil {
-		upsert = upsertVal.(bool)
+	var flags int
+	if upsertVal := m.ArgValue(schema.UpsertArgName); upsertVal != nil {
+		upsert := upsertVal.(bool)
+		if upsert {
+			flags |= upsertFlag
+		}
 	}
 
 	typ := m.MutatedType()
@@ -228,7 +266,7 @@ func runAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	var res []Object
 	for _, i := range val {
 		obj := i.(map[string]interface{})
-		objs, err := gatherObjects(ctx, obj, typ, upsert)
+		objs, err := gatherObjects(ctx, obj, typ, flags)
 		if err != nil {
 			return nil, errors.Wrapf(err, "while gathering objects")
 		}
@@ -329,15 +367,46 @@ func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		return nil, errors.Wrapf(err, "getUidsFromFilter")
 	}
 
-	// TODO(mrjn): Deal with reverse edges.
-
 	mu := &pb.Mutation{}
+
+	accountForInverse := func(uidHex string, f *schema.FieldDefinition) {
+		inv := f.Inverse()
+		if inv == nil {
+			return
+		}
+
+		glog.Infof("Found a field which has inverse: %q. Inverse is: %q %q\n",
+			f.Name(), inv.Name(), inv.Type().Name())
+		// We need to get the UID for the object. So, the field in
+		// getObject is really a query.
+		obj, err := getObject(ctx, uidHex, fmt.Sprintf("%s {uid}", f.DgraphAlias()))
+		if err != nil {
+			glog.Errorf("While getting %s.%s: %+v", f.Type().Name(), f.Name(), err)
+			return
+		}
+		glog.Infof("got object: %+v\n", obj)
+		childObj := obj[f.DgraphAlias()]
+		if childObj == nil {
+			return
+		}
+
+		// Delete in the reverse direction.
+		co := childObj.(map[string]interface{})
+		childUid := co["uid"].(string)
+		mu.Del = append(mu.Del, &pb.NQuad{
+			Subject:   childUid,
+			Predicate: inv.DgraphAlias(),
+			ObjectId:  uidHex,
+		})
+	}
+
 	for _, uid := range uids {
 		uidHex := x.ToHexString(uid)
-		for _, field := range m.MutatedType().Fields() {
+		for _, f := range m.MutatedType().Fields() {
+			accountForInverse(uidHex, f)
 			mu.Del = append(mu.Del, &pb.NQuad{
 				Subject:     uidHex,
-				Predicate:   field.DgraphAlias(),
+				Predicate:   f.DgraphAlias(),
 				ObjectValue: &pb.Value{&pb.Value_DefaultVal{x.Star}},
 			})
 		}
@@ -347,6 +416,7 @@ func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			ObjectValue: &pb.Value{&pb.Value_StrVal{m.MutatedType().DgraphName()}},
 		})
 	}
+	glog.Infof("Got mutations: %+v\n", mu)
 	req := &pb.Request{}
 	req.Mutations = append(req.Mutations, mu)
 
@@ -360,6 +430,7 @@ func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 
 func getObject(ctx context.Context, uid string, fields ...string) (map[string]interface{}, error) {
 	q := fmt.Sprintf(`{q(func: uid(%s)) { %s }}`, uid, strings.Join(fields[:], ", "))
+	glog.Infof("Running query: %s\n", q)
 	resp, err := edgraph.Query(ctx, &pb.Request{Query: q})
 	if err != nil {
 		return nil, errors.Wrapf(err, "while requesting for object")
@@ -378,79 +449,174 @@ func getObject(ctx context.Context, uid string, fields ...string) (map[string]in
 	return list[0], nil
 }
 
+func checkIfDuplicateExists(ctx context.Context,
+	typ *schema.Type, dst map[string]interface{}) error {
+
+	u, has := dst["uid"]
+	x.AssertTrue(has)
+	uid := u.(string)
+
+	var needToCheck bool
+	var xidList []string
+	for _, xidField := range typ.XIDFields() {
+		if _, has := dst[xidField.DgraphAlias()]; has {
+			needToCheck = true
+			glog.Infof("Found that we're updating an XID: %s for %s\n", xidField.Name(), uid)
+		}
+		xidList = append(xidList, xidField.DgraphAlias())
+	}
+	if !needToCheck {
+		glog.Infof("No need to check for duplicate for %s\n", uid)
+		return nil
+	}
+
+	src, err := getObject(ctx, uid, xidList...)
+	if err != nil {
+		return errors.Wrapf(err, "while getting object %s", uid)
+	}
+	x.AssertTrue(src != nil)
+	for key, val := range dst {
+		src[key] = val
+	}
+	glog.Infof("Updated object after applying patch: %+v\n", src)
+	uids, err := UidsFromManyXids(ctx, src, typ, true)
+	if err != nil {
+		return errors.Wrapf(err, "UidsFromManyXids")
+	}
+	glog.Infof("Got UIDs: %#x\n", uids)
+	if len(uids) == 0 {
+		// No duplicates found.
+		return nil
+	}
+	if uid == x.ToHexString(uids[0]) {
+		// This UID shouldn't be the one with the given updated XIDs if they
+		// were changed. Irrespective, no duplicate entries exist, so we're
+		// good.
+		return nil
+	}
+
+	var xids []string
+	for _, x := range typ.XIDFields() {
+		xids = append(xids, x.Name())
+	}
+	return fmt.Errorf("Duplicate entries exist for these unique ids: %v", xids)
+}
+
+func dgName(typ *schema.Type, field string) string {
+	return typ.Name() + "." + field
+}
+
 func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	uids, err := getUidsFromFilter(ctx, m)
 	if err != nil {
 		return nil, errors.Wrapf(err, "getUidsFromFilter")
 	}
-
-	inp := m.ArgValue(schema.InputArgName).(map[string]interface{})
-	setObj, hasSet := inp["set"].(map[string]interface{})
-	delObj, hasDel := inp["remove"].(map[string]interface{})
+	if len(uids) == 0 {
+		return nil, nil
+	}
 
 	// TODO(mrjn): Ensure that the update does not violate the @id uniqueness
 	// constraint.
 	typ := m.MutatedType()
-
-	dgName := func(field string) string {
-		return typ.Name() + "." + field
+	defs := make(map[string]*schema.FieldDefinition)
+	for _, f := range typ.Fields() {
+		defs[f.DgraphAlias()] = f
 	}
 
-	var xidList []string
-	xidMap := make(map[string]*schema.FieldDefinition)
-	for _, xidField := range typ.XIDFields() {
-		xidMap[dgName(xidField.Name())] = xidField
-		xidList = append(xidList, dgName(xidField.Name()))
-	}
+	parseObjects := func(src map[string]interface{}, forAdd bool) ([]Object, []*pb.NQuad, error) {
+		var dstObjs []Object
+		var nquads []*pb.NQuad
 
-	checkIfDuplicateExists := func(dst map[string]interface{}) error {
-		u, has := dst["uid"]
-		x.AssertTrue(has)
-		uid := u.(string)
-
-		var needToCheck bool
-		for key := range dst {
-			if _, has := xidMap[key]; has {
-				// We're updating an XID for this object. So, we need to check
-				// for duplicates.
-				needToCheck = true
-				glog.Infof("Found that we're updating an XID: %s for %s\n", key, uid)
+		obj := make(Object)
+		for _, f := range typ.Fields() {
+			val, ok := src[f.Name()]
+			if !ok {
+				continue
+			}
+			if f.Type().IsInbuiltOrEnumType() {
+				obj[f.DgraphAlias()] = val
+				continue
+			}
+			objs, err := gatherObjects(ctx, val.(map[string]interface{}), f.Type(), upsertFlag)
+			if err != nil {
+				return nil, nil, errors.Wrapf(err, "while gathering object for %q", f.Name())
+			}
+			if list := f.Type().ListType(); list != nil {
+				var l []Object
+				for _, obj := range objs {
+					l = append(l, Object{"uid": obj["uid"]})
+				}
+				obj[f.DgraphAlias()] = l
+			} else if len(objs) == 1 {
+				obj[f.DgraphAlias()] = Object{"uid": objs[0]["uid"]}
+			} else if len(objs) > 1 {
+				return nil, nil, fmt.Errorf("Found multiple objects when expecting one: %+v", objs)
+			}
+			if forAdd {
+				// If this is for delete, we shouldn't delete the children.
+				// Deletes on those should be run separately.
+				dstObjs = append(dstObjs, objs...)
 			}
 		}
-		if !needToCheck {
-			glog.Infof("No need to check for duplicate for %s\n", uid)
-			return nil
-		}
-		src, err := getObject(ctx, uid, xidList...)
-		if err != nil {
-			return errors.Wrapf(err, "while getting object %s", uid)
-		}
-		x.AssertTrue(src != nil)
-		for key, val := range dst {
-			src[key] = val
-		}
-		glog.Infof("Updated object after applying patch: %+v\n", src)
-		uids, err := UidsFromManyXids(ctx, src, typ, true)
-		if err != nil {
-			return errors.Wrapf(err, "UidsFromManyXids")
-		}
-		glog.Infof("Got UIDs: %#x\n", uids)
-		if len(uids) == 0 {
-			// No duplicates found.
-			return nil
-		}
-		if uid == x.ToHexString(uids[0]) {
-			// This UID shouldn't be the one with the given updated XIDs if they
-			// were changed. Irrespective, no duplicate entries exist, so we're
-			// good.
-			return nil
-		}
 
-		var xids []string
-		for _, x := range typ.XIDFields() {
-			xids = append(xids, x.Name())
+		for _, uid := range uids {
+			dst := make(Object)
+			for key, val := range obj {
+				dst[key] = val
+
+				f := defs[key]
+				inv := f.Inverse()
+				if inv == nil {
+					continue
+				}
+				vo := val.(Object)
+				nquads = append(nquads, &pb.NQuad{
+					Subject:   vo["uid"].(string),
+					Predicate: inv.DgraphAlias(),
+					ObjectId:  x.ToHexString(uid),
+				})
+			}
+			dst["uid"] = x.ToHexString(uid)
+			// TODO: We should probably make this concurrent if the number of
+			// uids warrant it.
+			if forAdd {
+				if err := checkIfDuplicateExists(ctx, typ, dst); err != nil {
+					return nil, nil, err
+				}
+			}
+			dstObjs = append(dstObjs, dst)
 		}
-		return fmt.Errorf("Duplicate entries exist for these unique ids: %v", xids)
+		return dstObjs, nquads, nil
+	}
+
+	mu := &pb.Mutation{}
+	inp := m.ArgValue(schema.InputArgName).(map[string]interface{})
+	if set, hasSet := inp["set"].(map[string]interface{}); hasSet {
+		objs, nquads, err := parseObjects(set, true)
+		if err != nil {
+			return nil, errors.Wrapf(err, "while parseObjAndChildren: %v", err)
+		}
+		if len(objs) > 0 {
+			mu.SetJson, err = json.Marshal(objs)
+			x.Check(err)
+		}
+		if len(nquads) > 0 {
+			mu.Set = nquads
+		}
+	}
+
+	if del, hasDel := inp["remove"].(map[string]interface{}); hasDel {
+		objs, nquads, err := parseObjects(del, false)
+		if err != nil {
+			return nil, errors.Wrapf(err, "while parseObjAndChildren: %v", err)
+		}
+		if len(objs) > 0 {
+			mu.DeleteJson, err = json.Marshal(objs)
+			x.Check(err)
+		}
+		if len(nquads) > 0 {
+			mu.Del = nquads
+		}
 	}
 
 	// We need to ensure that we're not modifying an object which would violate
@@ -460,42 +626,8 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	// Step 2. Apply the set patch to the object.
 	// Step 3. Check if there is another UID for this set of XIDs.
 	// Step 4. If so, reject the update for this UID.
-	var setJson, delJson []map[string]interface{}
-	if hasSet {
-		for _, uid := range uids {
-			dst := make(map[string]interface{})
-			dst["uid"] = x.ToHexString(uid)
-			for key, val := range setObj {
-				dst[dgName(key)] = val
-			}
-			if err := checkIfDuplicateExists(dst); err != nil {
-				// TODO(mrjn): We should just skip this one. And continue onto
-				// the next UID -- the GraphQL way.
-				return uids, err
-			}
-			setJson = append(setJson, dst)
-		}
-	}
-	if hasDel {
-		for _, uid := range uids {
-			dst := make(map[string]interface{})
-			dst["uid"] = x.ToHexString(uid)
-			for key, val := range delObj {
-				dst[dgName(key)] = val
-			}
-			delJson = append(delJson, dst)
-		}
-	}
-	mu := &pb.Mutation{}
-	if len(setJson) > 0 {
-		mu.SetJson, err = json.Marshal(setJson)
-		x.Check(err)
-	}
-	if len(delJson) > 0 {
-		mu.DeleteJson, err = json.Marshal(delJson)
-		x.Check(err)
-	}
 
+	glog.V(2).Infof("Mutation: %+v\n", mu)
 	resp, err := edgraph.Query(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}})
 	if err != nil {
 		return nil, errors.Wrapf(err, "while executing updates")
