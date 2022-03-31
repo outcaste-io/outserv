@@ -230,7 +230,8 @@ func initService(basename string, idx, httpPort int) service {
 
 func getAlpha(idx int, raft string, customFlags string) service {
 	basename := "alpha"
-	internalPort := alphaBasePort + opts.PortOffset + getOffset(idx)
+	basePort := alphaBasePort + opts.PortOffset
+	internalPort := basePort + getOffset(idx)
 	httpPort := internalPort + 1000
 	svc := initService(basename, idx, httpPort)
 
@@ -248,7 +249,7 @@ func getAlpha(idx int, raft string, customFlags string) service {
 
 	if idx > 1 {
 		peerHost := name(basename, 1)
-		svc.Command += fmt.Sprintf(" --peer=%s:%d", getHost(peerHost), internalPort)
+		svc.Command += fmt.Sprintf(" --peer=%s:%d", getHost(peerHost), basePort)
 	}
 
 	if opts.SnapshotAfter != "" {
