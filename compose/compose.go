@@ -121,7 +121,6 @@ type options struct {
 var opts options
 
 const (
-	zeroBasePort  int = 5080 // HTTP=6080
 	alphaBasePort int = 7080 // HTTP=8080
 )
 
@@ -602,8 +601,8 @@ func main() {
 	cmd.PersistentFlags().StringVarP(&opts.PDir, "postings", "p", "",
 		"launch cluster with local path of p directory, data_vol must be set to true and a=r."+
 			"\nFor new cluster to pick postings, you might have to move uids and timestamp..."+
-			"\ncurl \"http://localhost:<zeroPort>/assign?what=timestamps&num=1000000\""+
-			"\ncurl \"http://localhost:<zeroPort>/assign?what=uids&num=1000000\"")
+			"\ncurl \"http://localhost:<alphaPort>/assign?what=timestamps&num=1000000\""+
+			"\ncurl \"http://localhost:<alphaPort>/assign?what=uids&num=1000000\"")
 
 	cmd.PersistentFlags().BoolVar(&opts.Acl, "acl", false, "Create ACL secret file and enable ACLs")
 	cmd.PersistentFlags().StringVar(&opts.AclSecret, "acl_secret", "",
@@ -664,7 +663,7 @@ func main() {
 		"Custom alpha flags for specific alphas,"+
 			" following {\"1:custom_flags\", \"2:custom_flags\"}, eg: {\"2: -p <bulk_path>\"")
 	cmd.PersistentFlags().StringVar(&opts.Hostname, "hostname", "",
-		"hostname for the alpha and zero servers")
+		"hostname for the alpha servers")
 	cmd.PersistentFlags().BoolVar(&opts.Cdc, "cdc", false,
 		"run Kafka and push CDC data to it")
 	cmd.PersistentFlags().BoolVar(&opts.CdcConsumer, "cdc_consumer", false,
@@ -838,7 +837,7 @@ func main() {
 
 	if opts.PDir != "" {
 		fmt.Printf("For new cluster to pick \"postings\", you might have to move uids and timestamp..." +
-			"\n\tcurl \"http://localhost:<zeroPort>/assign?what=timestamps&num=1000000\"" +
-			"\n\tcurl \"http://localhost:<zeroPort>/assign?what=uids&num=1000000\"\n")
+			"\n\tcurl \"http://localhost:<alphaPort>/assign?what=timestamps&num=1000000\"" +
+			"\n\tcurl \"http://localhost:<alphaPort>/assign?what=uids&num=1000000\"\n")
 	}
 }
