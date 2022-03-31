@@ -155,7 +155,6 @@ func initTestExport(t *testing.T, schemaStr string) {
 	require.NoError(t, err)
 
 	txn = pstore.NewTransactionAt(math.MaxUint64, true)
-	require.NoError(t, txn.Set(testutil.GalaxyTypeKey("Person"), val))
 	require.NoError(t, txn.CommitAt(1, nil))
 
 	populateGraphExport(t)

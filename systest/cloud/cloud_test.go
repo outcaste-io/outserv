@@ -161,7 +161,7 @@ func TestEnvironmentAccess(t *testing.T) {
 	mc, err := testutil.NewMinioClient()
 	require.NoError(t, err)
 	require.NoError(t, mc.MakeBucket(bucketname, ""))
-	minioDest := "minio://minio:9001/dgraph-export?secure=false"
+	minioDest := "minio://minio1:9001/dgraph-export?secure=false"
 
 	// Export without the minio creds should fail for non-galaxy.
 	resp := testutil.Export(t, nsToken, minioDest, "", "")

@@ -903,7 +903,7 @@ func TestParseQueryFilterError1B(t *testing.T) {
 `
 	_, err := Parse(Request{Str: query})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "Expected comma or language but got: \"alice\"")
+	require.Contains(t, err.Error(), "Expected comma but got: \"alice\"")
 }
 
 func TestParseQueryFilterError2(t *testing.T) {
@@ -916,7 +916,7 @@ func TestParseQueryFilterError2(t *testing.T) {
 `
 	_, err := Parse(Request{Str: query})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "Expected comma or language but got: \"alice\"")
+	require.Contains(t, err.Error(), "Expected comma but got: \"alice\"")
 }
 
 func TestParseQueryWithVarAtRootFilterID(t *testing.T) {

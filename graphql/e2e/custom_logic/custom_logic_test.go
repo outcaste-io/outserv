@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+//go:generate compose -q -a 1 -z 1 --mem= --names=false --expose_ports=false
 package custom_logic
 
 import (

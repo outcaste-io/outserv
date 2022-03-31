@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+//go:generate compose -q -a 1 -z 1 --mem= --extra_alpha_flags='--lambda="num=2;"'
 package normal
 
 import (

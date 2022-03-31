@@ -39,7 +39,7 @@ import (
 var (
 	mc             *minio.Client
 	bucketName     = "dgraph-backup"
-	minioDest      = "minio://minio:9001/dgraph-backup?secure=false"
+	minioDest      = "minio://minio1:9001/dgraph-backup?secure=false"
 	localBackupDst = "minio://localhost:9001/dgraph-backup?secure=false"
 	copyExportDir  = "./data/export-copy"
 )
