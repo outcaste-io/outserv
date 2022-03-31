@@ -243,6 +243,7 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 		}
 	}
 
+	glog.Infof("Parsed dst: %+v\n", dst)
 	if updateObject {
 		res = append(res, dst)
 	}
@@ -361,6 +362,33 @@ func getUidsFromFilter(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	return uids, nil
 }
 
+func getChildrenUids(ctx context.Context, uid, pred string) ([]string, error) {
+	// We need to get the UID for the object. So, the field in
+	// getObject is really a query.
+	obj, err := getObject(ctx, uid, fmt.Sprintf("%s {uid}", pred))
+	if err != nil {
+		return nil, fmt.Errorf("While getting %s: %+v", pred, err)
+	}
+	glog.Infof("got object: %+v\n", obj)
+	childObj := obj[pred]
+	if childObj == nil {
+		return nil, nil
+	}
+
+	// Delete in the reverse direction.
+	var children []string
+	if co, has := childObj.(map[string]interface{}); has {
+		childUid := co["uid"].(string)
+		children = append(children, childUid)
+	} else if clist, has := childObj.([]map[string]interface{}); has {
+		for _, co := range clist {
+			childUid := co["uid"].(string)
+			children = append(children, childUid)
+		}
+	}
+	return children, nil
+}
+
 func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	uids, err := getUidsFromFilter(ctx, m)
 	if err != nil {
@@ -377,27 +405,18 @@ func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 
 		glog.Infof("Found a field which has inverse: %q. Inverse is: %q %q\n",
 			f.Name(), inv.Name(), inv.Type().Name())
-		// We need to get the UID for the object. So, the field in
-		// getObject is really a query.
-		obj, err := getObject(ctx, uidHex, fmt.Sprintf("%s {uid}", f.DgraphAlias()))
+		cuids, err := getChildrenUids(ctx, uidHex, f.DgraphAlias())
 		if err != nil {
 			glog.Errorf("While getting %s.%s: %+v", f.Type().Name(), f.Name(), err)
 			return
 		}
-		glog.Infof("got object: %+v\n", obj)
-		childObj := obj[f.DgraphAlias()]
-		if childObj == nil {
-			return
+		for _, childUid := range cuids {
+			mu.Del = append(mu.Del, &pb.NQuad{
+				Subject:   childUid,
+				Predicate: inv.DgraphAlias(),
+				ObjectId:  uidHex,
+			})
 		}
-
-		// Delete in the reverse direction.
-		co := childObj.(map[string]interface{})
-		childUid := co["uid"].(string)
-		mu.Del = append(mu.Del, &pb.NQuad{
-			Subject:   childUid,
-			Predicate: inv.DgraphAlias(),
-			ObjectId:  uidHex,
-		})
 	}
 
 	for _, uid := range uids {
@@ -523,7 +542,8 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		defs[f.DgraphAlias()] = f
 	}
 
-	parseObjects := func(src map[string]interface{}, forAdd bool) ([]Object, []*pb.NQuad, error) {
+	mu := &pb.Mutation{}
+	parseObjects := func(src map[string]interface{}, forAdd bool) error {
 		var dstObjs []Object
 		var nquads []*pb.NQuad
 
@@ -539,7 +559,7 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			}
 			objs, err := gatherObjects(ctx, val.(map[string]interface{}), f.Type(), upsertFlag)
 			if err != nil {
-				return nil, nil, errors.Wrapf(err, "while gathering object for %q", f.Name())
+				return errors.Wrapf(err, "while gathering object for %q", f.Name())
 			}
 			if list := f.Type().ListType(); list != nil {
 				var l []Object
@@ -550,7 +570,7 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			} else if len(objs) == 1 {
 				obj[f.DgraphAlias()] = Object{"uid": objs[0]["uid"]}
 			} else if len(objs) > 1 {
-				return nil, nil, fmt.Errorf("Found multiple objects when expecting one: %+v", objs)
+				return fmt.Errorf("Found multiple objects when expecting one: %+v", objs)
 			}
 			if forAdd {
 				// If this is for delete, we shouldn't delete the children.
@@ -561,6 +581,7 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 
 		for _, uid := range uids {
 			dst := make(Object)
+			uidStr := x.ToHexString(uid)
 			for key, val := range obj {
 				dst[key] = val
 
@@ -570,52 +591,78 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 					continue
 				}
 				vo := val.(Object)
-				nquads = append(nquads, &pb.NQuad{
+				nq := &pb.NQuad{
 					Subject:   vo["uid"].(string),
 					Predicate: inv.DgraphAlias(),
-					ObjectId:  x.ToHexString(uid),
-				})
+					ObjectId:  uidStr,
+				}
+
+				include := true
+				if list := f.Type().ListType(); forAdd && list == nil {
+					// This can only have one UID it points to. And that UID has
+					// an inverse. So, we need to delete the inverse edge.
+					cuids, err := getChildrenUids(ctx, uidStr, f.DgraphAlias())
+					if err != nil {
+						return errors.Wrapf(err,
+							"while getting %s for %s", f.DgraphAlias(), uidStr)
+					}
+					if len(cuids) > 1 {
+						return fmt.Errorf("Found multiple child UIDs %v for %s",
+							cuids, f.DgraphAlias())
+					}
+					if len(cuids) == 1 {
+						cuid := cuids[0]
+						if cuid == nq.Subject {
+							include = false
+						} else {
+							// This is "forAdd". So, we can safely just directly
+							// set this in mu.Del. This won't be called for
+							// delete.
+							mu.Del = append(mu.Del,
+								&pb.NQuad{
+									Subject:   cuids[0],
+									Predicate: inv.DgraphAlias(),
+									ObjectId:  uidStr,
+								})
+						}
+					}
+				}
+				if include {
+					nquads = append(nquads, nq)
+				}
 			}
 			dst["uid"] = x.ToHexString(uid)
 			// TODO: We should probably make this concurrent if the number of
 			// uids warrant it.
 			if forAdd {
 				if err := checkIfDuplicateExists(ctx, typ, dst); err != nil {
-					return nil, nil, err
+					return err
 				}
 			}
 			dstObjs = append(dstObjs, dst)
 		}
-		return dstObjs, nquads, nil
+		data, err := json.Marshal(dstObjs)
+		x.Check(err)
+		if forAdd {
+			mu.SetJson = data
+			mu.Set = append(mu.Set, nquads...)
+		} else {
+			mu.DeleteJson = data
+			mu.Del = append(mu.Del, nquads...)
+		}
+		return nil
 	}
 
-	mu := &pb.Mutation{}
 	inp := m.ArgValue(schema.InputArgName).(map[string]interface{})
 	if set, hasSet := inp["set"].(map[string]interface{}); hasSet {
-		objs, nquads, err := parseObjects(set, true)
-		if err != nil {
+		if err := parseObjects(set, true); err != nil {
 			return nil, errors.Wrapf(err, "while parseObjAndChildren: %v", err)
-		}
-		if len(objs) > 0 {
-			mu.SetJson, err = json.Marshal(objs)
-			x.Check(err)
-		}
-		if len(nquads) > 0 {
-			mu.Set = nquads
 		}
 	}
 
 	if del, hasDel := inp["remove"].(map[string]interface{}); hasDel {
-		objs, nquads, err := parseObjects(del, false)
-		if err != nil {
+		if err := parseObjects(del, false); err != nil {
 			return nil, errors.Wrapf(err, "while parseObjAndChildren: %v", err)
-		}
-		if len(objs) > 0 {
-			mu.DeleteJson, err = json.Marshal(objs)
-			x.Check(err)
-		}
-		if len(nquads) > 0 {
-			mu.Del = nquads
 		}
 	}
 
