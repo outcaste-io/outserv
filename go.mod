@@ -2,6 +2,8 @@ module github.com/outcaste-io/outserv
 
 go 1.16
 
+// replace github.com/outcaste-io/ristretto => /home/mrjn/source/ristretto
+
 require (
 	cloud.google.com/go/storage v1.15.0
 	contrib.go.opencensus.io/exporter/jaeger v0.1.0
@@ -39,13 +41,12 @@ require (
 	github.com/graph-gophers/graphql-go v0.0.0-20201113091052-beb923fada29
 	github.com/minio/minio-go/v6 v6.0.55
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
-	github.com/outcaste-io/badger/v3 v3.0.0-20220210203236-1b1148a36313
+	github.com/outcaste-io/badger/v3 v3.2202.1-0.20220401003101-6bfcd5e451a0
 	github.com/outcaste-io/dgo/v210 v210.0.0-20220225180226-43bd1b427e86
 	github.com/outcaste-io/gqlgen v0.13.3
 	github.com/outcaste-io/gqlparser/v2 v2.2.3
-	github.com/outcaste-io/ristretto v0.2.0
+	github.com/outcaste-io/ristretto v0.1.1-0.20220401002559-4aa2153b8411
 	github.com/outcaste-io/sroar v0.0.0-20220207092908-fa5c189ea338
-	github.com/paulmach/go.geojson v1.4.0
 	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/profile v1.2.1
