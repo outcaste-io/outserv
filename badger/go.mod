@@ -12,11 +12,11 @@ require (
 	github.com/google/go-cmp v0.5.4 // indirect
 	github.com/klauspost/compress v1.12.3
 	github.com/kr/pretty v0.1.0 // indirect
-	github.com/outcaste-io/ristretto v0.2.0
+	github.com/outcaste-io/ristretto v0.1.1-0.20220401002559-4aa2153b8411
 	github.com/pkg/errors v0.9.1
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/cobra v0.0.5
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.7.0
 	go.opencensus.io v0.22.5
 	golang.org/x/net v0.0.0-20201021035429-f5854403a974
 	golang.org/x/sys v0.0.0-20210124154548-22da62e12c0c
