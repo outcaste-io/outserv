@@ -89,7 +89,7 @@ func (l *Lambda) Execute(body interface{}) (interface{}, error) {
 	defer l.mu.RUnlock()
 
 	if l.wasmInstance == nil {
-		return nil, errors.New(fmt.Sprintf("no lambda script loaded for lambda instance %d", l.instanceId))
+		return nil, fmt.Errorf("no lambda script loaded for lambda instance %d", l.instanceId)
 	}
 
 	var b []byte

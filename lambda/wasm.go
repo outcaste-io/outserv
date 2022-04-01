@@ -13,6 +13,7 @@ import (
 
 // One page per routine; if we want more we could grow the amount of pages dynamically
 const MAX_PAGES uint32 = 4
+const PAGE_SIZE uint32 = 65536
 
 var store *wasmer.Store
 var wasiEnv *wasmer.WasiEnvironment
@@ -161,7 +162,6 @@ func (w *WasmInstance) Execute(request []byte) ([]byte, error) {
 			w.releasePage(page)
 			return nil, err
 		}
-		w.releasePage(page)
 		data := w.readMemory(page, int(r.(int32)))
 		w.releasePage(page)
 		return data, nil
@@ -203,7 +203,6 @@ func (w *WasmInstance) log(args []wasmer.Value) ([]wasmer.Value, error) {
 	len := int64(args[1].I32())
 
 	data := w.guest.Data()
-	glog.Error(ptr, len)
 	fmt.Printf("Log: %s\n", string(data[ptr:ptr+len]))
 	return []wasmer.Value{}, nil
 }
@@ -216,12 +215,12 @@ func (w *WasmInstance) writeToMemory(page int, data []byte) (int, error) {
 		// Grow to max size for now
 		w.guest.Grow(wasmer.Pages(MAX_PAGES - size))
 	}
-	if len(data) > int(pages.ToBytes()) {
+	if len(data) > int(PAGE_SIZE) {
 		return 0, errors.New("data does not fit into one page")
 	}
 
 	memory := w.guest.Data()
-	addr := page*int(pages.ToBytes()) + w.buf
+	addr := page*int(PAGE_SIZE) + w.buf
 
 	copy(memory[addr:addr+int(len(data))], data)
 
@@ -229,9 +228,8 @@ func (w *WasmInstance) writeToMemory(page int, data []byte) (int, error) {
 }
 
 func (w *WasmInstance) readMemory(page int, len int) []byte {
-	pages := w.memory.Size()
 	memory := w.guest.Data()
-	addr := page*int(pages.ToBytes()) + w.buf
+	addr := page*int(PAGE_SIZE) + w.buf
 
 	data := make([]byte, len)
 	copy(data, memory[addr:addr+len])

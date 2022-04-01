@@ -6,10 +6,10 @@ import (
 	"github.com/valyala/fastjson"
 )
 
-// 4 pages of data space
-var buf [4 * 65536]byte
+// 5 pages of data space
+var buf [5 * 65536]byte
 
-//export getBuffer
+//export GetBuffer
 func GetBuffer() *byte {
 	return &buf[0]
 }
