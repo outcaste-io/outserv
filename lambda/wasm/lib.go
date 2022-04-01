@@ -1,18 +1,14 @@
 package wasm
 
 import (
+	"context"
+	"errors"
 	"unsafe"
 
 	"github.com/valyala/fastjson"
 )
 
-// 5 pages of data space
-var buf [5 * 65536]byte
-
-//export GetBuffer
-func GetBuffer() *byte {
-	return &buf[0]
-}
+var router *Router
 
 // stores the response in the buffer. res should be a valid json.
 func Respond(res string) int {
@@ -115,4 +111,60 @@ type UpdateEventInfo struct {
 
 type DeleteEventInfo struct {
 	RootUIDs []string `json:"rootUIDs"`
+}
+
+type middlewareFunc func(ctx context.Context, request *Request) (context.Context, error)
+
+type handlerFunc func(ctx context.Context, request *Request) ([]byte, error)
+
+type Route struct {
+	handlerFunc handlerFunc
+	middleware  []middlewareFunc
+}
+
+type Router struct {
+	routes map[string]*Route
+}
+
+func NewRouter() *Router {
+	return &Router{routes: make(map[string]*Route)}
+}
+
+func (r *Router) Post(name string, handlerFunc handlerFunc) {
+	if r.routes[name] == nil {
+		r.routes[name] = &Route{}
+	}
+	r.routes[name].handlerFunc = handlerFunc
+}
+
+func (r *Router) Use(name string, middlewareFunc middlewareFunc) {
+	if r.routes[name] == nil {
+		r.routes[name] = &Route{}
+	}
+	r.routes[name].middleware = append(r.routes[name].middleware, middlewareFunc)
+}
+
+func Serve(r *Router) {
+	router = r
+}
+
+func (r *Router) resolve(ctx context.Context, request *Request) ([]byte, error) {
+	route, ok := r.routes[request.Resolver]
+	if !ok {
+		return nil, errors.New("resolver not found")
+	}
+
+	var err error
+	for _, mf := range route.middleware {
+		if mf == nil {
+			return nil, errors.New("middleware func cannot be nil")
+		}
+		if ctx, err = mf(ctx, request); err != nil {
+			return nil, err
+		}
+	}
+	if route.handlerFunc != nil {
+		return route.handlerFunc(ctx, request)
+	}
+	return nil, errors.New("handler func cannot be nil")
 }
