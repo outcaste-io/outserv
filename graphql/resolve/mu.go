@@ -122,7 +122,6 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 	}
 
 	dst := make(map[string]interface{})
-	updateObject := true
 
 	switch {
 	case len(uids) > 1:
@@ -149,12 +148,12 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 		}
 		// idVal if present matches with uids[0]
 		dst["uid"] = x.ToHexString(uids[0])
-		if flags&upsertFlag == 0 {
-			// We won't add a new object here, because an object already
-			// exists. And we should not be updating this object because
-			// upsert is false. Just return the list of UIDS found.
-			updateObject = false
-		}
+		// if flags&upsertFlag == 0 {
+		// 	// We won't add a new object here, because an object already
+		// 	// exists. And we should not be updating this object because
+		// 	// upsert is false. Just return the list of UIDS found.
+		// 	updateObject = false
+		// }
 	}
 
 	// Now parse the fields.
@@ -193,6 +192,27 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 			panic(fmt.Sprintf("Unhandled type of val: %+v type: %T", val, val))
 		}
 
+		if flags&upsertFlag == 0 {
+			// We are not supposed to update anything. So, let's remove all the
+			// fields from children, except their UIDs.
+			for i, child := range children {
+				glog.Infof("Child before: %+v\n", child)
+				uid := child["uid"].(string)
+				if strings.HasPrefix(uid, "_:") {
+					// We are creating a new child. That's OK. We just can't
+					// update one.
+					continue
+				}
+				// This child already exists. Let's only pick up the UID field.
+				tmp := make(Object)
+				tmp["uid"] = uid
+				children[i] = tmp
+			}
+			for _, child := range children {
+				glog.Infof("Child after: %+v\n", child)
+			}
+		}
+
 		if inv := f.Inverse(); inv != nil {
 			uid := dst["uid"]
 			lt := inv.Type().ListType()
@@ -216,12 +236,10 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 		}
 	}
 
-	if updateObject {
-		res = append(res, dst)
-	}
+	res = append(res, dst)
 	return res, nil
 }
-func runAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
+func handleAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	// Parsing input
 	val, ok := m.ArgValue(schema.InputArgName).([]interface{})
 	x.AssertTrue(ok)
@@ -245,17 +263,27 @@ func runAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		}
 		res = append(res, objs...)
 	}
+	glog.Infof("Got objects: %+v\n", res)
 
+	tmp := res[:0]
 	var resultUids []uint64
 	for _, obj := range res {
-		uid := obj["uid"]
-		x.AssertTrue(uid != nil)
-		uidStr := uid.(string)
-		if strings.HasPrefix(uidStr, "_:") {
+		uid := obj["uid"].(string)
+		if strings.HasPrefix(uid, "_:") {
+			tmp = append(tmp, obj)
 			continue
 		}
-		resultUids = append(resultUids, x.FromHex(uidStr))
+		if flags&upsertFlag > 0 {
+			// Either this is a new object, or we allow updating existing
+			// objects. If so, include.
+			tmp = append(tmp, obj)
+		} else {
+			glog.Infof("Not updating existing object: %+v\n", obj)
+			// We do not allow updating existing objects. So, don't add it.
+		}
+		resultUids = append(resultUids, x.FromHex(uid))
 	}
+	res = tmp
 	if len(res) == 0 {
 		return resultUids, nil
 	}
@@ -366,7 +394,7 @@ func getChildrenUids(ctx context.Context, uid, pred string) ([]string, error) {
 	return children, nil
 }
 
-func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
+func handleDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	uids, err := getUidsFromFilter(ctx, m)
 	if err != nil {
 		return nil, errors.Wrapf(err, "getUidsFromFilter")
@@ -495,7 +523,64 @@ func checkIfDuplicateExists(ctx context.Context,
 	return fmt.Errorf("Duplicate entries exist for these unique ids: %v", xids)
 }
 
-func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
+// TODO: We need a function to deal with updating an existing object while
+// handling its inverse field correctly.
+//
+// func handleOneUid(ctx context.Context, obj Object, uid uint64, defs map[string]*schema.FieldDefinition, forAdd bool) error {
+// 	dst := make(Object)
+// 	uidStr := x.ToHexString(uid)
+// 	for key, val := range obj {
+// 		dst[key] = val
+
+// 		f := defs[key]
+// 		inv := f.Inverse()
+// 		if inv == nil {
+// 			continue
+// 		}
+// 		vo := val.(Object)
+// 		nq := &pb.NQuad{
+// 			Subject:   vo["uid"].(string),
+// 			Predicate: inv.DgraphAlias(),
+// 			ObjectId:  uidStr,
+// 		}
+
+// 		include := true
+// 		if list := f.Type().ListType(); forAdd && list == nil {
+// 			// This can only have one UID it points to. And that UID has
+// 			// an inverse. So, we need to delete the inverse edge.
+// 			cuids, err := getChildrenUids(ctx, uidStr, f.DgraphAlias())
+// 			if err != nil {
+// 				return errors.Wrapf(err,
+// 					"while getting %s for %s", f.DgraphAlias(), uidStr)
+// 			}
+// 			if len(cuids) > 1 {
+// 				return fmt.Errorf("Found multiple child UIDs %v for %s",
+// 					cuids, f.DgraphAlias())
+// 			}
+// 			if len(cuids) == 1 {
+// 				cuid := cuids[0]
+// 				if cuid == nq.Subject {
+// 					include = false
+// 				} else {
+// 					// This is "forAdd". So, we can safely just directly
+// 					// set this in mu.Del. This won't be called for
+// 					// delete.
+// 					mu.Del = append(mu.Del,
+// 						&pb.NQuad{
+// 							Subject:   cuids[0],
+// 							Predicate: inv.DgraphAlias(),
+// 							ObjectId:  uidStr,
+// 						})
+// 				}
+// 			}
+// 		}
+// 		if include {
+// 			nquads = append(nquads, nq)
+// 		}
+// 	}
+// }
+
+func handleUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	uids, err := getUidsFromFilter(ctx, m)
 	if err != nil {
 		return nil, errors.Wrapf(err, "getUidsFromFilter")
@@ -654,11 +739,11 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	switch m.MutationType() {
 	case schema.AddMutation:
-		return runAdd(ctx, m)
+		return handleAdd(ctx, m)
 	case schema.DeleteMutation:
-		return runDelete(ctx, m)
+		return handleDelete(ctx, m)
 	case schema.UpdateMutation:
-		return runUpdate(ctx, m)
+		return handleUpdate(ctx, m)
 	default:
 		return nil, fmt.Errorf("Invalid mutation type: %s\n", m.MutationType())
 	}
