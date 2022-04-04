@@ -213,22 +213,13 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 			}
 		}
 
-		if inv := f.Inverse(); inv != nil {
-			uid := dst["uid"]
-			lt := inv.Type().ListType()
-			// Add reverse edge from child -> parent.
-			for _, child := range children {
-				if lt != nil {
-					child[inv.DgraphAlias()] = []Object{{"uid": uid}}
-				} else {
-					child[inv.DgraphAlias()] = Object{"uid": uid}
-				}
-			}
-		}
-
+		// Only adding forward direction edges. Inverses would be taken care of
+		// by handleInverses.
 		if list := f.Type().ListType(); list != nil {
+			// Is list type.
 			dst[f.DgraphAlias()] = children
 		} else if len(children) == 1 {
+			// Single child.
 			dst[f.DgraphAlias()] = children[0]
 		} else if len(children) > 1 {
 			return nil, fmt.Errorf("Found multiple children for non-list field: %s",
@@ -253,6 +244,12 @@ func handleAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	}
 
 	typ := m.MutatedType()
+	defs := make(map[string]*schema.FieldDefinition)
+	for _, f := range typ.Fields() {
+		defs[f.DgraphAlias()] = f
+	}
+	glog.Infof("Got defs: %+v\n", defs)
+
 	// Just consider the first one for now.
 	var res []Object
 	for _, i := range val {
@@ -265,36 +262,46 @@ func handleAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	}
 	glog.Infof("Got objects: %+v\n", res)
 
-	tmp := res[:0]
+	filter := res[:0]
 	var resultUids []uint64
 	for _, obj := range res {
 		uid := obj["uid"].(string)
 		if strings.HasPrefix(uid, "_:") {
-			tmp = append(tmp, obj)
+			// Adding a new object.
+			filter = append(filter, obj)
 			continue
 		}
 		if flags&upsertFlag > 0 {
 			// Either this is a new object, or we allow updating existing
 			// objects. If so, include.
-			tmp = append(tmp, obj)
+			filter = append(filter, obj)
 		} else {
-			glog.Infof("Not updating existing object: %+v\n", obj)
 			// We do not allow updating existing objects. So, don't add it.
 		}
 		resultUids = append(resultUids, x.FromHex(uid))
 	}
-	res = tmp
+	res = filter
 	if len(res) == 0 {
 		return resultUids, nil
 	}
+
+	nquads, err := handleInverses(ctx, typ, res)
+	if err != nil {
+		return nil, errors.Wrapf(err, "handleAdd.handleInverses")
+	}
+
 	data, err := json.Marshal(res)
 	x.Check(err)
+	mu := &pb.Mutation{
+		SetJson: data,
+		Nquads:  nquads,
+	}
 
 	if glog.V(2) {
 		data2, _ := json.MarshalIndent(res, " ", " ")
 		glog.Infof("Mutation Req JSON data: %s\n", data2)
+		glog.Infof("NQuads: %+v\n", mu.Nquads)
 	}
-	mu := &pb.Mutation{SetJson: data}
 	resp, err := edgraph.Query(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}})
 	if err != nil {
 		return nil, err
@@ -526,62 +533,106 @@ func checkIfDuplicateExists(ctx context.Context,
 	return fmt.Errorf("Duplicate entries exist for these unique ids: %v", xids)
 }
 
-// TODO: We need a function to deal with updating an existing object while
-// handling its inverse field correctly.
-//
-// func handleOneUid(ctx context.Context, obj Object, uid uint64, defs map[string]*schema.FieldDefinition, forAdd bool) error {
-// 	dst := make(Object)
-// 	uidStr := x.ToHexString(uid)
-// 	for key, val := range obj {
-// 		dst[key] = val
+func deletePreviousChild(ctx context.Context, uidStr string, f *schema.FieldDefinition) (*pb.NQuad, error) {
+	if strings.HasPrefix(uidStr, "_:") {
+		// It's a new object. So, it can't have an previous child.
+		return nil, nil
+	}
+	if f.Type().ListType() != nil {
+		// field is of type list. So, it can have multiple items. No need to
+		// delete anything from before.
+		return nil, nil
+	}
+	cuids, err := getChildrenUids(ctx, uidStr, f.DgraphAlias())
+	if err != nil {
+		return nil, errors.Wrapf(err,
+			"while getting %s for %s", f.DgraphAlias(), uidStr)
+	}
+	if len(cuids) > 1 {
+		return nil, fmt.Errorf("Found multiple child UIDs %v for %s",
+			cuids, f.DgraphAlias())
+	}
+	if len(cuids) == 0 {
+		return nil, nil
+	}
+	// len(cuids) == 1
+	// This is "forAdd". So, we can safely just directly
+	// set this in mu.Del. This won't be called for
+	// delete.
+	inv := f.Inverse()
+	return &pb.NQuad{
+		Subject:   cuids[0],
+		Predicate: inv.DgraphAlias(),
+		ObjectId:  uidStr,
+		Op:        pb.NQuad_DEL,
+	}, nil
+}
 
-// 		f := defs[key]
-// 		inv := f.Inverse()
-// 		if inv == nil {
-// 			continue
-// 		}
-// 		vo := val.(Object)
-// 		nq := &pb.NQuad{
-// 			Subject:   vo["uid"].(string),
-// 			Predicate: inv.DgraphAlias(),
-// 			ObjectId:  uidStr,
-// 		}
+// handleInverses gets a list of objects. For these objects, it assumes that the
+// forward edge from parent -> child already exist. It parses these edges and
+// creates reverse edges. If the parent can only have one child, it queries what
+// the previous child was, and creates delete reverse edges for the previous
+// child.
+func handleInverses(ctx context.Context, typ *schema.Type, objs []Object) ([]*pb.NQuad, error) {
+	var nquads []*pb.NQuad
+	for _, f := range typ.Fields() {
+		inv := f.Inverse()
+		if inv == nil {
+			// Does not have an inverse. No need to do anything.
+			continue
+		}
+		for _, obj := range objs {
+			val := obj[f.DgraphAlias()]
+			if val == nil {
+				continue
+			}
+			var children []Object
+			if clist, ok := val.([]interface{}); ok {
+				for _, child := range clist {
+					children = append(children, child.(Object))
+				}
+			} else if child, ok := val.(Object); ok {
+				children = append(children, child)
+			}
 
-// 		include := true
-// 		if list := f.Type().ListType(); forAdd && list == nil {
-// 			// This can only have one UID it points to. And that UID has
-// 			// an inverse. So, we need to delete the inverse edge.
-// 			cuids, err := getChildrenUids(ctx, uidStr, f.DgraphAlias())
-// 			if err != nil {
-// 				return errors.Wrapf(err,
-// 					"while getting %s for %s", f.DgraphAlias(), uidStr)
-// 			}
-// 			if len(cuids) > 1 {
-// 				return fmt.Errorf("Found multiple child UIDs %v for %s",
-// 					cuids, f.DgraphAlias())
-// 			}
-// 			if len(cuids) == 1 {
-// 				cuid := cuids[0]
-// 				if cuid == nq.Subject {
-// 					include = false
-// 				} else {
-// 					// This is "forAdd". So, we can safely just directly
-// 					// set this in mu.Del. This won't be called for
-// 					// delete.
-// 					mu.Del = append(mu.Del,
-// 						&pb.NQuad{
-// 							Subject:   cuids[0],
-// 							Predicate: inv.DgraphAlias(),
-// 							ObjectId:  uidStr,
-// 						})
-// 				}
-// 			}
-// 		}
-// 		if include {
-// 			nquads = append(nquads, nq)
-// 		}
-// 	}
-// }
+			childQuads, err := handleInverses(ctx, f.Type(), children)
+			if err != nil {
+				return nil, errors.Wrapf(err, "handleInverses.recurse")
+			}
+			nquads = append(nquads, childQuads...)
+
+			parentUid := obj["uid"].(string)
+			for _, childObj := range children {
+				childUid := childObj["uid"].(string)
+
+				// Add an edge from new child -> parent.
+				nq := &pb.NQuad{
+					Subject:   childUid,
+					Predicate: inv.DgraphAlias(),
+					ObjectId:  parentUid,
+					Op:        pb.NQuad_SET,
+				}
+				// If the parent can only have one child, we need to delete the edge
+				// from that previous child -> parent.
+				prevChildNq, err := deletePreviousChild(ctx, parentUid, f)
+				if err != nil {
+					return nil, errors.Wrapf(err, "handleInverses.deletePreviousChild")
+				}
+				if prevChildNq == nil {
+					nquads = append(nquads, nq)
+					// Do nothing.
+				} else if childUid == prevChildNq.Subject {
+					// The previous child and the new child are the same. No need
+					// for an update.
+				} else {
+					nquads = append(nquads, nq)
+					nquads = append(nquads, prevChildNq)
+				}
+			}
+		}
+	}
+	return nquads, nil
+}
 
 func handleUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	uids, err := getUidsFromFilter(ctx, m)
@@ -601,16 +652,18 @@ func handleUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	mu := &pb.Mutation{}
 	parseObjects := func(src map[string]interface{}, forAdd bool) error {
 		var dstObjs []Object
-		var nquads []*pb.NQuad
 
-		obj := make(Object)
+		// We parse the set or remove field to generate a template of the
+		// object. We also pick up any children objects that need to be
+		// created.
+		templateObj := make(Object)
 		for _, f := range typ.Fields() {
 			val, ok := src[f.Name()]
 			if !ok {
 				continue
 			}
 			if f.Type().IsInbuiltOrEnumType() {
-				obj[f.DgraphAlias()] = val
+				templateObj[f.DgraphAlias()] = val
 				continue
 			}
 			objs, err := gatherObjects(ctx, val.(map[string]interface{}), f.Type(), upsertFlag)
@@ -622,9 +675,9 @@ func handleUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 				for _, obj := range objs {
 					l = append(l, Object{"uid": obj["uid"]})
 				}
-				obj[f.DgraphAlias()] = l
+				templateObj[f.DgraphAlias()] = l
 			} else if len(objs) == 1 {
-				obj[f.DgraphAlias()] = Object{"uid": objs[0]["uid"]}
+				templateObj[f.DgraphAlias()] = Object{"uid": objs[0]["uid"]}
 			} else if len(objs) > 1 {
 				return fmt.Errorf("Found multiple objects when expecting one: %+v", objs)
 			}
@@ -639,66 +692,25 @@ func handleUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		// warrant it.
 		for _, uid := range uids {
 			dst := make(Object)
-			uidStr := x.ToHexString(uid)
-			for key, val := range obj {
+			for key, val := range templateObj {
 				dst[key] = val
-
-				f := defs[key]
-				inv := f.Inverse()
-				if inv == nil {
-					continue
-				}
-				vo := val.(Object)
-				nq := &pb.NQuad{
-					Subject:   vo["uid"].(string),
-					Predicate: inv.DgraphAlias(),
-					ObjectId:  uidStr,
-					Op:        pb.NQuad_SET,
-				}
-
-				include := true
-				if list := f.Type().ListType(); forAdd && list == nil {
-					// This can only have one UID it points to. And that UID has
-					// an inverse. So, we need to delete the inverse edge.
-					cuids, err := getChildrenUids(ctx, uidStr, f.DgraphAlias())
-					if err != nil {
-						return errors.Wrapf(err,
-							"while getting %s for %s", f.DgraphAlias(), uidStr)
-					}
-					if len(cuids) > 1 {
-						return fmt.Errorf("Found multiple child UIDs %v for %s",
-							cuids, f.DgraphAlias())
-					}
-					if len(cuids) == 1 {
-						cuid := cuids[0]
-						if cuid == nq.Subject {
-							include = false
-						} else {
-							// This is "forAdd". So, we can safely just directly
-							// set this in mu.Del. This won't be called for
-							// delete.
-							mu.Nquads = append(mu.Nquads,
-								&pb.NQuad{
-									Subject:   cuids[0],
-									Predicate: inv.DgraphAlias(),
-									ObjectId:  uidStr,
-									Op:        pb.NQuad_DEL,
-								})
-						}
-					}
-				}
-				if include {
-					nquads = append(nquads, nq)
-				}
 			}
 			dst["uid"] = x.ToHexString(uid)
 			if forAdd {
+				// We need to ensure that we're not modifying an object which
+				// would violate the XID uniqueness constraints.
 				if err := checkIfDuplicateExists(ctx, typ, dst); err != nil {
 					return err
 				}
 			}
 			dstObjs = append(dstObjs, dst)
 		}
+
+		nquads, err := handleInverses(ctx, typ, dstObjs)
+		if err != nil {
+			return errors.Wrapf(err, "handleUpdate.handleInverses")
+		}
+
 		data, err := json.Marshal(dstObjs)
 		x.Check(err)
 		if forAdd {
@@ -707,6 +719,11 @@ func handleUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			mu.DeleteJson = data
 		}
 		mu.Nquads = append(mu.Nquads, nquads...)
+		if glog.V(2) {
+			data2, _ := json.MarshalIndent(dstObjs, " ", " ")
+			glog.Infof("Mutation Req JSON data: %s\n", data2)
+			glog.Infof("NQuads: %+v\n", mu.Nquads)
+		}
 		return nil
 	}
 
@@ -723,15 +740,6 @@ func handleUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		}
 	}
 
-	// We need to ensure that we're not modifying an object which would violate
-	// the XID uniqueness constraints.
-	//
-	// Step 1. Get the object XIDs.
-	// Step 2. Apply the set patch to the object.
-	// Step 3. Check if there is another UID for this set of XIDs.
-	// Step 4. If so, reject the update for this UID.
-
-	glog.V(2).Infof("Mutation: %+v\n", mu)
 	resp, err := edgraph.Query(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}})
 	if err != nil {
 		return nil, errors.Wrapf(err, "while executing updates")
