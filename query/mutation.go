@@ -142,11 +142,14 @@ func verifyUid(ctx context.Context, uid uint64) error {
 // AssignUids tries to assign unique ids to each identity in the subjects and objects in the
 // format of _:xxx. An identity, e.g. _:a, will only be assigned one uid regardless how many times
 // it shows up in the subjects or objects
-func AssignUids(ctx context.Context, gmuList []*gql.Mutation) (map[string]uint64, error) {
+func AssignUids(ctx context.Context, gmuList []*pb.Mutation) (map[string]uint64, error) {
 	newUids := make(map[string]uint64)
 	var err error
 	for _, gmu := range gmuList {
-		for _, nq := range gmu.Set {
+		for _, nq := range gmu.Nquads {
+			if nq.Op != pb.NQuad_SET {
+				continue
+			}
 			// We dont want to assign uids to these.
 			if nq.Subject == x.Star && nq.ObjectValue.GetDefaultVal() == x.Star {
 				return newUids, errors.New("predicate deletion should be called via alter")
@@ -199,7 +202,7 @@ func AssignUids(ctx context.Context, gmuList []*gql.Mutation) (map[string]uint64
 }
 
 // ToDirectedEdges converts the gql.Mutation input into a set of directed edges.
-func ToDirectedEdges(gmuList []*gql.Mutation, newUids map[string]uint64) (
+func ToDirectedEdges(gmuList []*pb.Mutation, newUids map[string]uint64) (
 	edges []*pb.DirectedEdge, err error) {
 
 	// Wrapper for a pointer to protos.Nquad
@@ -223,20 +226,21 @@ func ToDirectedEdges(gmuList []*gql.Mutation, newUids map[string]uint64) (
 
 	for _, gmu := range gmuList {
 		// We delete first and then we set. Order of the mutation is important.
-		for _, nq := range gmu.Del {
+		for _, nq := range gmu.Nquads {
+			if nq.Op != pb.NQuad_DEL {
+				continue
+			}
 			if nq.Subject == x.Star && nq.ObjectValue.GetDefaultVal() == x.Star {
 				return edges, errors.New("Predicate deletion should be called via alter")
 			}
 			if err := parse(nq, pb.DirectedEdge_DEL); err != nil {
 				return edges, err
 			}
-			if gmu.AllowedPreds != nil {
-				for _, e := range edges {
-					e.AllowedPreds = gmu.AllowedPreds
-				}
-			}
 		}
-		for _, nq := range gmu.Set {
+		for _, nq := range gmu.Nquads {
+			if nq.Op != pb.NQuad_SET {
+				continue
+			}
 			if err := parse(nq, pb.DirectedEdge_SET); err != nil {
 				return edges, err
 			}

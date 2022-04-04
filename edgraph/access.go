@@ -46,7 +46,7 @@ func authorizeAlter(ctx context.Context, op *pb.Operation) error {
 	return nil
 }
 
-func authorizeMutation(ctx context.Context, gmu *gql.Mutation) error {
+func authorizeMutation(ctx context.Context, gmu *pb.Mutation) error {
 	return nil
 }
 

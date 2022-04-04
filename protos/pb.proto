@@ -424,10 +424,7 @@ message Response {
 message Mutation {
   bytes set_json = 1;
   bytes delete_json = 2;
-  bytes set_nquads = 3;
-  bytes del_nquads = 4;
-  repeated NQuad set = 5;
-  repeated NQuad del = 6;
+  repeated NQuad nquads = 3;
 
   // This is being used for upserts.
   string cond = 9;
@@ -482,7 +479,12 @@ message NQuad {
   string object_id = 3;
   Value object_value = 4;
   uint64 namespace = 5;
-  string lang = 6;
+
+  enum Op {
+    SET = 0;
+    DEL = 1;
+  }
+  Op op = 6;
 }
 
 message Value {
