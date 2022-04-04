@@ -569,12 +569,12 @@ func handleInverses(ctx context.Context, typ *schema.Type, objs []Object) ([]*pb
 				continue
 			}
 			var children []Object
-			if clist, ok := val.([]interface{}); ok {
-				for _, child := range clist {
-					children = append(children, child.(Object))
-				}
+			if clist, ok := val.([]Object); ok {
+				children = append(children, clist...)
 			} else if child, ok := val.(Object); ok {
 				children = append(children, child)
+			} else {
+				panic(fmt.Sprintf("Unhandled type of val: %+v type: %T", val, val))
 			}
 
 			childQuads, err := handleInverses(ctx, f.Type(), children)
