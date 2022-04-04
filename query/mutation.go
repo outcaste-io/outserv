@@ -147,7 +147,7 @@ func AssignUids(ctx context.Context, gmuList []*pb.Mutation) (map[string]uint64,
 	var err error
 	for _, gmu := range gmuList {
 		for _, nq := range gmu.Nquads {
-			if nq.Op == pb.NQuad_DEL {
+			if nq.Op != pb.NQuad_SET {
 				continue
 			}
 			// We dont want to assign uids to these.

@@ -1640,7 +1640,7 @@ func validateForGraphql(nq *pb.NQuad, isGraphql bool) error {
 
 func validateNQuads(nquads []*pb.NQuad, qc *queryContext) error {
 	for _, nq := range nquads {
-		if nq.Op == pb.NQuad_DEL {
+		if nq.Op != pb.NQuad_SET {
 			continue
 		}
 		if err := validatePredName(nq.Predicate); err != nil {
@@ -1661,7 +1661,7 @@ func validateNQuads(nquads []*pb.NQuad, qc *queryContext) error {
 		}
 	}
 	for _, nq := range nquads {
-		if nq.Op == pb.NQuad_SET {
+		if nq.Op != pb.NQuad_DEL {
 			continue
 		}
 		if err := validatePredName(nq.Predicate); err != nil {
