@@ -354,7 +354,7 @@ func InsertDropRecord(ctx context.Context, dropOp string) error {
 	_, err := doQuery(context.WithValue(ctx, IsGraphql, true), &Request{
 		req: &pb.Request{
 			Mutations: []*pb.Mutation{{
-				Set: []*pb.NQuad{{
+				Nquads: []*pb.NQuad{{
 					Subject:     "_:r",
 					Predicate:   "dgraph.drop.op",
 					ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: dropOp}},
@@ -751,8 +751,7 @@ func updateMutations(qc *queryContext) error {
 		if condVar != "" {
 			uids, ok := qc.uidRes[condVar]
 			if !(ok && len(uids) == 1) {
-				gmu.Set = nil
-				gmu.Del = nil
+				gmu.Nquads = nil
 				continue
 			}
 		}
@@ -782,11 +781,7 @@ func findMutationVars(qc *queryContext) []string {
 	}
 
 	for _, gmu := range qc.gmuList {
-		for _, nq := range gmu.Set {
-			updateVars(nq.Subject)
-			updateVars(nq.ObjectId)
-		}
-		for _, nq := range gmu.Del {
+		for _, nq := range gmu.Nquads {
 			updateVars(nq.Subject)
 			updateVars(nq.ObjectId)
 		}
@@ -807,7 +802,7 @@ func findMutationVars(qc *queryContext) []string {
 // Assumption is that Subject can contain UID, whereas Object can contain Val
 // If val(variable) exists in a query, but the values are not there for the variable,
 // it will ignore the mutation silently.
-func updateValInNQuads(nquads []*pb.NQuad, qc *queryContext, isSet bool) []*pb.NQuad {
+func updateValInNQuads(nquads []*pb.NQuad, qc *queryContext) []*pb.NQuad {
 	getNewVals := func(s string) (map[uint64]types.Val, bool) {
 		if strings.HasPrefix(s, "val(") {
 			varName := s[4 : len(s)-1]
@@ -841,6 +836,7 @@ func updateValInNQuads(nquads []*pb.NQuad, qc *queryContext, isSet bool) []*pb.N
 			continue
 		}
 
+		isSet := nq.Op == pb.NQuad_SET
 		// uid(u) <amount> val(amt)
 		// For each NQuad, we need to convert the val(variable_name)
 		// to *pb.Value before applying the mutation. For that, first
@@ -891,9 +887,8 @@ func updateValInNQuads(nquads []*pb.NQuad, qc *queryContext, isSet bool) []*pb.N
 
 // updateValInMutations does following transformations:
 // 0x123 <amount> val(v) -> 0x123 <amount> 13.0
-func updateValInMutations(gmu *gql.Mutation, qc *queryContext) error {
-	gmu.Del = updateValInNQuads(gmu.Del, qc, false)
-	gmu.Set = updateValInNQuads(gmu.Set, qc, true)
+func updateValInMutations(gmu *pb.Mutation, qc *queryContext) error {
+	gmu.Nquads = updateValInNQuads(gmu.Nquads, qc)
 	if qc.nquadsCount > x.Config.LimitMutationsNquad {
 		return errors.Errorf("NQuad count in the request: %d, is more that threshold: %d",
 			qc.nquadsCount, int(x.Config.LimitMutationsNquad))
@@ -904,7 +899,7 @@ func updateValInMutations(gmu *gql.Mutation, qc *queryContext) error {
 // updateUIDInMutations does following transformations:
 //   * uid(v) -> 0x123     -- If v is defined in query block
 //   * uid(v) -> _:uid(v)  -- Otherwise
-func updateUIDInMutations(gmu *gql.Mutation, qc *queryContext) error {
+func updateUIDInMutations(gmu *pb.Mutation, qc *queryContext) error {
 	// usedMutationVars keeps track of variables that are used in mutations.
 	getNewVals := func(s string) []string {
 		if strings.HasPrefix(s, "uid(") {
@@ -930,8 +925,11 @@ func updateUIDInMutations(gmu *gql.Mutation, qc *queryContext) error {
 	}
 
 	// Remove the mutations from gmu.Del when no UID was found.
-	gmuDel := make([]*pb.NQuad, 0, len(gmu.Del))
-	for _, nq := range gmu.Del {
+	nquads := make([]*pb.NQuad, 0, len(gmu.Nquads))
+	for _, nq := range gmu.Nquads {
+		if nq.Op != pb.NQuad_DEL {
+			continue
+		}
 		// if Subject or/and Object are variables, each NQuad can result
 		// in multiple NQuads if any variable stores more than one UIDs.
 		newSubs := getNewVals(nq.Subject)
@@ -945,7 +943,7 @@ func updateUIDInMutations(gmu *gql.Mutation, qc *queryContext) error {
 					continue
 				}
 
-				gmuDel = append(gmuDel, getNewNQuad(nq, s, o))
+				nquads = append(nquads, getNewNQuad(nq, s, o))
 				qc.nquadsCount++
 			}
 			if qc.nquadsCount > int(x.Config.LimitMutationsNquad) {
@@ -955,11 +953,11 @@ func updateUIDInMutations(gmu *gql.Mutation, qc *queryContext) error {
 		}
 	}
 
-	gmu.Del = gmuDel
-
 	// Update the values in mutation block from the query block.
-	gmuSet := make([]*pb.NQuad, 0, len(gmu.Set))
-	for _, nq := range gmu.Set {
+	for _, nq := range gmu.Nquads {
+		if nq.Op != pb.NQuad_SET {
+			continue
+		}
 		newSubs := getNewVals(nq.Subject)
 		newObs := getNewVals(nq.ObjectId)
 
@@ -971,11 +969,11 @@ func updateUIDInMutations(gmu *gql.Mutation, qc *queryContext) error {
 
 		for _, s := range newSubs {
 			for _, o := range newObs {
-				gmuSet = append(gmuSet, getNewNQuad(nq, s, o))
+				nquads = append(nquads, getNewNQuad(nq, s, o))
 			}
 		}
 	}
-	gmu.Set = gmuSet
+	gmu.Nquads = nquads
 	return nil
 }
 
@@ -986,7 +984,7 @@ type queryContext struct {
 	// a query or more than one mutations or both (in case of upsert)
 	req *pb.Request
 	// gmuList is the list of mutations after parsing req.Mutations
-	gmuList []*gql.Mutation
+	gmuList []*pb.Mutation
 	// gqlRes contains result of parsing the req.Query
 	gqlRes gql.Result
 	// condVars are conditional variables used in the (modified) query to figure out
@@ -1466,7 +1464,7 @@ func parseRequest(qc *queryContext) error {
 	upsertQuery := qc.req.Query
 	if len(qc.req.Mutations) > 0 {
 		// parsing mutations
-		qc.gmuList = make([]*gql.Mutation, 0, len(qc.req.Mutations))
+		qc.gmuList = make([]*pb.Mutation, 0, len(qc.req.Mutations))
 		for _, mu := range qc.req.Mutations {
 			gmu, err := parseMutationObject(mu, qc)
 			if err != nil {
@@ -1603,15 +1601,15 @@ func hasPoormansAuth(ctx context.Context) error {
 // pb.Mutation#SetJson, pb.Mutation#SetNquads and pb.Mutation#Set are consolidated into the
 // gql.Mutation.Set field. Similarly the 3 fields pb.Mutation#DeleteJson, pb.Mutation#DelNquads
 // and pb.Mutation#Del are merged into the gql.Mutation#Del field.
-func parseMutationObject(mu *pb.Mutation, qc *queryContext) (*gql.Mutation, error) {
-	res := &gql.Mutation{Cond: mu.Cond}
+func parseMutationObject(mu *pb.Mutation, qc *queryContext) (*pb.Mutation, error) {
+	res := &pb.Mutation{Cond: mu.Cond}
 
 	if len(mu.SetJson) > 0 {
 		nqs, err := chunker.ParseJSON(mu.SetJson, chunker.SetNquads)
 		if err != nil {
 			return nil, err
 		}
-		res.Set = append(res.Set, nqs...)
+		res.Nquads = append(res.Nquads, nqs...)
 	}
 	if len(mu.DeleteJson) > 0 {
 		// The metadata is not currently needed for delete operations so it can be safely ignored.
@@ -1619,11 +1617,13 @@ func parseMutationObject(mu *pb.Mutation, qc *queryContext) (*gql.Mutation, erro
 		if err != nil {
 			return nil, err
 		}
-		res.Del = append(res.Del, nqs...)
+		for _, nq := range nqs {
+			nq.Op = pb.NQuad_DEL
+		}
+		res.Nquads = append(res.Nquads, nqs...)
 	}
-	res.Set = append(res.Set, mu.Set...)
-	res.Del = append(res.Del, mu.Del...)
-	if err := validateNQuads(res.Set, res.Del, qc); err != nil {
+	res.Nquads = append(res.Nquads, mu.Nquads...)
+	if err := validateNQuads(res.Nquads, qc); err != nil {
 		return nil, err
 	}
 	return res, nil
@@ -1638,8 +1638,11 @@ func validateForGraphql(nq *pb.NQuad, isGraphql bool) error {
 	return nil
 }
 
-func validateNQuads(set, del []*pb.NQuad, qc *queryContext) error {
-	for _, nq := range set {
+func validateNQuads(nquads []*pb.NQuad, qc *queryContext) error {
+	for _, nq := range nquads {
+		if nq.Op != pb.NQuad_SET {
+			continue
+		}
 		if err := validatePredName(nq.Predicate); err != nil {
 			return err
 		}
@@ -1657,7 +1660,10 @@ func validateNQuads(set, del []*pb.NQuad, qc *queryContext) error {
 			return err
 		}
 	}
-	for _, nq := range del {
+	for _, nq := range nquads {
+		if nq.Op != pb.NQuad_DEL {
+			continue
+		}
 		if err := validatePredName(nq.Predicate); err != nil {
 			return err
 		}

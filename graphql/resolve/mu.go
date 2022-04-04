@@ -387,10 +387,11 @@ func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			return
 		}
 		for _, childUid := range cuids {
-			mu.Del = append(mu.Del, &pb.NQuad{
+			mu.Nquads = append(mu.Nquads, &pb.NQuad{
 				Subject:   childUid,
 				Predicate: inv.DgraphAlias(),
 				ObjectId:  uidHex,
+				Op:        pb.NQuad_DEL,
 			})
 		}
 	}
@@ -399,16 +400,18 @@ func runDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		uidHex := x.ToHexString(uid)
 		for _, f := range m.MutatedType().Fields() {
 			accountForInverse(uidHex, f)
-			mu.Del = append(mu.Del, &pb.NQuad{
+			mu.Nquads = append(mu.Nquads, &pb.NQuad{
 				Subject:     uidHex,
 				Predicate:   f.DgraphAlias(),
 				ObjectValue: &pb.Value{&pb.Value_DefaultVal{x.Star}},
+				Op:          pb.NQuad_DEL,
 			})
 		}
-		mu.Del = append(mu.Del, &pb.NQuad{
+		mu.Nquads = append(mu.Nquads, &pb.NQuad{
 			Subject:     uidHex,
 			Predicate:   "dgraph.type",
 			ObjectValue: &pb.Value{&pb.Value_StrVal{m.MutatedType().DgraphName()}},
+			Op:          pb.NQuad_DEL,
 		})
 	}
 
@@ -565,6 +568,7 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 					Subject:   vo["uid"].(string),
 					Predicate: inv.DgraphAlias(),
 					ObjectId:  uidStr,
+					Op:        pb.NQuad_SET,
 				}
 
 				include := true
@@ -588,11 +592,12 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 							// This is "forAdd". So, we can safely just directly
 							// set this in mu.Del. This won't be called for
 							// delete.
-							mu.Del = append(mu.Del,
+							mu.Nquads = append(mu.Nquads,
 								&pb.NQuad{
 									Subject:   cuids[0],
 									Predicate: inv.DgraphAlias(),
 									ObjectId:  uidStr,
+									Op:        pb.NQuad_DEL,
 								})
 						}
 					}
@@ -613,11 +618,10 @@ func runUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		x.Check(err)
 		if forAdd {
 			mu.SetJson = data
-			mu.Set = append(mu.Set, nquads...)
 		} else {
 			mu.DeleteJson = data
-			mu.Del = append(mu.Del, nquads...)
 		}
+		mu.Nquads = append(mu.Nquads, nquads...)
 		return nil
 	}
 

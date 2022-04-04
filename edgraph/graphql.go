@@ -98,7 +98,7 @@ func ProcessPersistedQuery(ctx context.Context, gqlReq *schema.Request) error {
 			req: &pb.Request{
 				Mutations: []*pb.Mutation{
 					{
-						Set: []*pb.NQuad{
+						Nquads: []*pb.NQuad{
 							{
 								Subject:     "_:a",
 								Predicate:   "dgraph.graphql.p_query",
