@@ -45,7 +45,7 @@ require (
 	github.com/outcaste-io/dgo/v210 v210.0.0-20220225180226-43bd1b427e86
 	github.com/outcaste-io/gqlgen v0.13.3
 	github.com/outcaste-io/gqlparser/v2 v2.2.3
-	github.com/outcaste-io/ristretto v0.1.1-0.20220401002559-4aa2153b8411
+	github.com/outcaste-io/ristretto v0.1.1-0.20220404164505-73809bc14974
 	github.com/outcaste-io/sroar v0.0.0-20220207092908-fa5c189ea338
 	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
 	github.com/pkg/errors v0.9.1
