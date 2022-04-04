@@ -243,7 +243,6 @@ func handleAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		}
 		res = append(res, objs...)
 	}
-	glog.Infof("Got objects: %+v\n", res)
 
 	filter := res[:0]
 	var resultUids []uint64
