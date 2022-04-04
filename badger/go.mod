@@ -12,7 +12,7 @@ require (
 	github.com/google/go-cmp v0.5.4 // indirect
 	github.com/klauspost/compress v1.12.3
 	github.com/kr/pretty v0.1.0 // indirect
-	github.com/outcaste-io/ristretto v0.1.1-0.20220401002559-4aa2153b8411
+	github.com/outcaste-io/ristretto v0.1.1-0.20220404170646-118eb5c81eac
 	github.com/pkg/errors v0.9.1
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/cobra v0.0.5
