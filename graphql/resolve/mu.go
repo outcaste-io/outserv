@@ -148,12 +148,6 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 		}
 		// idVal if present matches with uids[0]
 		dst["uid"] = x.ToHexString(uids[0])
-		// if flags&upsertFlag == 0 {
-		// 	// We won't add a new object here, because an object already
-		// 	// exists. And we should not be updating this object because
-		// 	// upsert is false. Just return the list of UIDS found.
-		// 	updateObject = false
-		// }
 	}
 
 	// Now parse the fields.
@@ -196,7 +190,6 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 			// We are not supposed to update anything. So, let's remove all the
 			// fields from children, except their UIDs.
 			for i, child := range children {
-				glog.Infof("Child before: %+v\n", child)
 				uid := child["uid"].(string)
 				if strings.HasPrefix(uid, "_:") {
 					// We are creating a new child. That's OK. We just can't
@@ -207,9 +200,6 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 				tmp := make(Object)
 				tmp["uid"] = uid
 				children[i] = tmp
-			}
-			for _, child := range children {
-				glog.Infof("Child after: %+v\n", child)
 			}
 		}
 
@@ -244,13 +234,6 @@ func handleAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	}
 
 	typ := m.MutatedType()
-	defs := make(map[string]*schema.FieldDefinition)
-	for _, f := range typ.Fields() {
-		defs[f.DgraphAlias()] = f
-	}
-	glog.Infof("Got defs: %+v\n", defs)
-
-	// Just consider the first one for now.
 	var res []Object
 	for _, i := range val {
 		obj := i.(map[string]interface{})
@@ -533,7 +516,9 @@ func checkIfDuplicateExists(ctx context.Context,
 	return fmt.Errorf("Duplicate entries exist for these unique ids: %v", xids)
 }
 
-func deletePreviousChild(ctx context.Context, uidStr string, f *schema.FieldDefinition) (*pb.NQuad, error) {
+func deletePreviousChild(ctx context.Context, uidStr string,
+	f *schema.FieldDefinition) (*pb.NQuad, error) {
+
 	if strings.HasPrefix(uidStr, "_:") {
 		// It's a new object. So, it can't have an previous child.
 		return nil, nil
@@ -556,9 +541,6 @@ func deletePreviousChild(ctx context.Context, uidStr string, f *schema.FieldDefi
 		return nil, nil
 	}
 	// len(cuids) == 1
-	// This is "forAdd". So, we can safely just directly
-	// set this in mu.Del. This won't be called for
-	// delete.
 	inv := f.Inverse()
 	return &pb.NQuad{
 		Subject:   cuids[0],
