@@ -26,3 +26,8 @@
 ### Performance
 
 [ ] Build a cache system, which can retrieve objects concurrently to aid with mutations.
+
+### Posting List
+
+[ ] Separate out values from UIDs. Posting shouldn't be storing both.
+[ ] Don't use value hashes as UIDs for postings.
