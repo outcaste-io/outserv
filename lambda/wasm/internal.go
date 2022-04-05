@@ -4,34 +4,41 @@ import (
 	"context"
 )
 
-// 5 pages of data space
-var buf [5 * 65536]byte
+// return buffer
+var result string
 
-//export GetBuffer
-func GetBuffer() *byte {
-	return &buf[0]
+//export setResult
+func setResult(res string) {
+	result = res
 }
 
 //export execute
-func execute(req string) int {
+func execute(req string, requestId int32) {
 	ctx := context.Background()
 
 	request, err := UnmarshalRequest([]byte(req))
 	if err != nil {
-		// We need a way to send back errors
-		// We could write to an error buffer and indicate an error with result -1
-		Log(err.Error())
-		return 0
+		execError(requestId, err.Error())
 	}
 	if router == nil {
-		Log("no router defined")
-		return 0
+		execError(requestId, "no router defined")
 	}
 	res, err := router.resolve(ctx, request)
 	if err != nil {
-		Log(err.Error())
-		return 0
+		execError(requestId, err.Error())
 	}
 
-	return Respond(string(res))
+	execResponse(requestId, string(res))
+}
+
+//export execError
+func execError(requestId int32, err string)
+
+//export execResponse
+func execResponse(requestId int32, res string)
+
+//export allocate
+func allocate(length uint64) *byte {
+	buf := make([]byte, length)
+	return &buf[0]
 }

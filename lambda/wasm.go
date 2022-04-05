@@ -1,54 +1,54 @@
 package lambda
 
 import (
-	"context"
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
 	"sync"
-	"time"
+	"sync/atomic"
 
 	"github.com/golang/glog"
 	wasmer "github.com/wasmerio/wasmer-go/wasmer"
 )
 
-// One page per routine; if we want more we could grow the amount of pages dynamically
-const MAX_PAGES uint32 = 4
-const PAGE_SIZE uint32 = 65536
-
-var store *wasmer.Store
-var wasiEnv *wasmer.WasiEnvironment
-
-func init() {
-	engine := wasmer.NewEngine()
-	store = wasmer.NewStore(engine)
-
-	// For now we use one standard environment for all instances
-	wasiEnv, _ = wasmer.NewWasiStateBuilder("lambda").Finalize()
+type ExecResult struct {
+	RequestId int32
+	Res       []byte
 }
 
 type WasmInstance struct {
-	avail    []bool
-	pageLock *sync.Mutex
-	memory   *wasmer.Memory
+	requestId int32
+	// Could be combined to one
+	execChan  chan ExecResult
+	errorChan chan ExecResult
+
+	mu *sync.Mutex
+
 	guest    *wasmer.Memory
 	instance *wasmer.Instance
 
-	buf int
+	mux *http.ServeMux
 
-	start   func(...interface{}) (interface{}, error)
-	execute func(...interface{}) (interface{}, error)
+	start     func(...interface{}) (interface{}, error)
+	execute   func(...interface{}) (interface{}, error)
+	allocate  func(...interface{}) (interface{}, error)
+	setResult func(...interface{}) (interface{}, error)
 }
 
-func NewWasmInstance() (*WasmInstance, error) {
-	// 4 pages for four concurrent routines
-	limits, err := wasmer.NewLimits(1, MAX_PAGES)
-	if err != nil {
-		return nil, err
-	}
-	memory := wasmer.NewMemory(store, wasmer.NewMemoryType(limits))
-	wasmInstance := &WasmInstance{memory: memory, avail: make([]bool, MAX_PAGES), pageLock: &sync.Mutex{}}
+func NewWasmInstance(mux *http.ServeMux) *WasmInstance {
 
-	return wasmInstance, nil
+	wasmInstance := &WasmInstance{
+		execChan:  make(chan ExecResult),
+		errorChan: make(chan ExecResult),
+		mu:        &sync.Mutex{},
+		mux:       mux,
+	}
+
+	return wasmInstance
 }
 
 func (w *WasmInstance) LoadScript(script []byte) error {
@@ -103,6 +103,39 @@ func (w *WasmInstance) registerFunctions(importObject *wasmer.ImportObject) {
 			"Log": log,
 		},
 	)
+	execError := wasmer.NewFunction(
+		store,
+		wasmer.NewFunctionType(wasmer.NewValueTypes(wasmer.I32, wasmer.I32, wasmer.I32), wasmer.NewValueTypes()),
+		w.execError,
+	)
+	importObject.Register(
+		"env",
+		map[string]wasmer.IntoExtern{
+			"execError": execError,
+		},
+	)
+	execResponse := wasmer.NewFunction(
+		store,
+		wasmer.NewFunctionType(wasmer.NewValueTypes(wasmer.I32, wasmer.I32, wasmer.I32), wasmer.NewValueTypes()),
+		w.execResponse,
+	)
+	importObject.Register(
+		"env",
+		map[string]wasmer.IntoExtern{
+			"execResponse": execResponse,
+		},
+	)
+	do := wasmer.NewFunction(
+		store,
+		wasmer.NewFunctionType(wasmer.NewValueTypes(wasmer.I32, wasmer.I32), wasmer.NewValueTypes(wasmer.I32)),
+		w.do,
+	)
+	importObject.Register(
+		"env",
+		map[string]wasmer.IntoExtern{
+			"do": do,
+		},
+	)
 }
 
 func (w *WasmInstance) registerExports(instance *wasmer.Instance) {
@@ -113,24 +146,26 @@ func (w *WasmInstance) registerExports(instance *wasmer.Instance) {
 	}
 	w.guest = guest
 
-	getBuffer, err := instance.Exports.GetFunction("GetBuffer")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	buffer, err := getBuffer()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	w.buf = int(buffer.(int32))
-
 	execute, err := instance.Exports.GetFunction("execute")
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	w.execute = execute
+
+	allocate, err := instance.Exports.GetFunction("allocate")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	w.allocate = allocate
+
+	setResult, err := instance.Exports.GetFunction("setResult")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	w.setResult = setResult
 
 	start, err := instance.Exports.GetWasiStartFunction()
 	if err == nil {
@@ -145,57 +180,31 @@ func (w *WasmInstance) Start() {
 }
 
 func (w *WasmInstance) Execute(request []byte) ([]byte, error) {
-	if w.execute != nil {
-		page, err := w.getAvailablePage()
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.allocate != nil && w.execute != nil {
+		requestId := atomic.AddInt32(&w.requestId, 1)
+
+		ptr, err := w.store(request)
 		if err != nil {
-			w.releasePage(page)
-			return nil, err
-		}
-		addr, err := w.writeToMemory(page, request)
-		if err != nil {
-			w.releasePage(page)
+			glog.Error(err)
 			return nil, err
 		}
 
-		r, err := w.execute(addr, len(request))
-		if err != nil {
-			w.releasePage(page)
-			return nil, err
-		}
-		data := w.readMemory(page, int(r.(int32)))
-		w.releasePage(page)
-		return data, nil
-	}
-	return nil, errors.New("execute function not found")
-}
+		go w.execute(ptr, len(request), requestId)
 
-func (w *WasmInstance) getAvailablePage() (int, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	for {
-		w.pageLock.Lock()
-		for page := 0; page < len(w.avail); page++ {
-			if !w.avail[page] {
-				w.avail[page] = true
-				ctx.Done()
-				w.pageLock.Unlock()
-				return page, nil
+		select {
+		case res := <-w.execChan:
+			if requestId == res.RequestId {
+				return res.Res, nil
+			}
+		case res := <-w.errorChan:
+			if requestId == res.RequestId {
+				return nil, errors.New(string(res.Res))
 			}
 		}
-		w.pageLock.Unlock()
-		if ctx.Err() != nil {
-			cancel()
-			return 0, errors.New("Could not acquire page for wasm execution")
-		}
-		glog.Error("Watiing?")
-		time.Sleep(10 * time.Millisecond)
 	}
-}
-
-func (w *WasmInstance) releasePage(page int) {
-	w.pageLock.Lock()
-	defer w.pageLock.Unlock()
-	w.avail[page] = false
+	return nil, errors.New("allocate or execute function not found")
 }
 
 func (w *WasmInstance) log(args []wasmer.Value) ([]wasmer.Value, error) {
@@ -207,32 +216,100 @@ func (w *WasmInstance) log(args []wasmer.Value) ([]wasmer.Value, error) {
 	return []wasmer.Value{}, nil
 }
 
-func (w *WasmInstance) writeToMemory(page int, data []byte) (int, error) {
-	pages := w.guest.Size()
-	size := pages.ToUint32()
+func (w *WasmInstance) execError(args []wasmer.Value) ([]wasmer.Value, error) {
+	requestId := args[0].I32()
+	ptr := int64(args[1].I32())
+	len := int64(args[2].I32())
 
-	if size <= uint32(page) && uint32(page) < MAX_PAGES {
-		// Grow to max size for now
-		w.guest.Grow(wasmer.Pages(MAX_PAGES - size))
+	data := w.guest.Data()
+	w.errorChan <- ExecResult{
+		RequestId: requestId,
+		Res:       data[ptr : ptr+len],
 	}
-	if len(data) > int(PAGE_SIZE) {
-		return 0, errors.New("data does not fit into one page")
-	}
-
-	memory := w.guest.Data()
-	addr := page*int(PAGE_SIZE) + w.buf
-
-	copy(memory[addr:addr+int(len(data))], data)
-
-	return addr, nil
+	return []wasmer.Value{}, nil
 }
 
-func (w *WasmInstance) readMemory(page int, len int) []byte {
+func (w *WasmInstance) execResponse(args []wasmer.Value) ([]wasmer.Value, error) {
+	requestId := args[0].I32()
+	ptr := int64(args[1].I32())
+	len := int64(args[2].I32())
+
+	data := w.guest.Data()
+	w.execChan <- ExecResult{
+		RequestId: requestId,
+		Res:       data[ptr : ptr+len],
+	}
+	return []wasmer.Value{}, nil
+}
+
+func (w *WasmInstance) do(args []wasmer.Value) ([]wasmer.Value, error) {
+	data := w.guest.Data()
+
+	ptr := int64(args[0].I32())
+	length := int64(args[1].I32())
+
+	reqJson := data[ptr : ptr+length]
+
+	req := &HttpRequest{}
+
+	err := json.Unmarshal(reqJson, &req)
+	if err != nil {
+		glog.Error(err.Error())
+	}
+
+	var buf bytes.Buffer
+	buf.Write([]byte(req.Body))
+
+	request, err := http.NewRequest(req.Method, req.Url, &buf)
+	if err != nil {
+		glog.Error(err.Error())
+	}
+	request.Header = http.Header{}
+	for k, a := range req.Header {
+		for _, v := range a {
+			request.Header.Add(k, v)
+		}
+	}
+
+	// relative
+	var res []byte
+	if strings.HasPrefix(req.Url, "/") {
+		writer := NewWasmResponseWriter()
+		w.mux.ServeHTTP(writer, request)
+		res = writer.body
+	} else {
+		response, err := http.DefaultClient.Do(request)
+		if err != nil {
+			w.storeResult([]byte(err.Error()))
+			return []wasmer.Value{wasmer.NewI32(0)}, nil
+		}
+		res, err = io.ReadAll(response.Body)
+		if err != nil {
+			w.storeResult([]byte(err.Error()))
+			return []wasmer.Value{wasmer.NewI32(0)}, nil
+		}
+	}
+	w.storeResult(res)
+	return []wasmer.Value{wasmer.NewI32(1)}, nil
+}
+
+func (w *WasmInstance) storeResult(data []byte) error {
+	ptr, err := w.store(data)
+	if err != nil {
+		return err
+	}
+	_, err = w.setResult(ptr, len(data))
+	return err
+}
+
+func (w *WasmInstance) store(data []byte) (int, error) {
+	p, err := w.allocate(len(data))
+	if err != nil {
+		return 0, err
+	}
+	ptr := int(p.(int32))
 	memory := w.guest.Data()
-	addr := page*int(PAGE_SIZE) + w.buf
+	copy(memory[ptr:ptr+len(data)], data)
 
-	data := make([]byte, len)
-	copy(data, memory[addr:addr+len])
-
-	return data
+	return ptr, nil
 }

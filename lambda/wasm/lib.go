@@ -3,26 +3,38 @@ package wasm
 import (
 	"context"
 	"errors"
-	"unsafe"
+	"fmt"
+
+	// TODO: would like to support http.Request, but file size explodes with net/http package
+	//"net/http"
+	"strings"
 
 	"github.com/valyala/fastjson"
 )
 
 var router *Router
 
-// stores the response in the buffer. res should be a valid json.
-func Respond(res string) int {
-	ptr := unsafe.Pointer(GetBuffer())
-
-	for i := 0; i < len(res); i++ {
-		t := (*uint8)(unsafe.Pointer(uintptr(ptr) + uintptr(i)*unsafe.Sizeof(res[0])))
-		*t = res[i]
+func MarshalStringListMap(m map[string][]string) []byte {
+	var entries []string
+	for k, v := range m {
+		entry := fmt.Sprintf("\"%s\": [\"%s\"]", k, strings.Join(v, "\",\""))
+		entries = append(entries, entry)
 	}
-	return len(res)
+	return []byte(fmt.Sprintf(`{
+		%s
+		}`, strings.Join(entries, ",\n")))
+}
+
+func Graphql(query string, vars []byte, authHeader AuthHeader) {
+	mah := marshalAuthHeader(authHeader)
+	graphql(query, string(vars), string(mah))
 }
 
 //export Log
 func Log(s string)
+
+//export graphql
+func graphql(query string, vars string, header string)
 
 // Unmarshals the request into a Request object, until encoding/json is supported
 func UnmarshalRequest(data []byte) (*Request, error) {
@@ -57,6 +69,15 @@ func UnmarshalRequest(data []byte) (*Request, error) {
 	return t, nil
 }
 
+func marshalAuthHeader(authHeader AuthHeader) []byte {
+	return []byte(fmt.Sprintf(`{
+		"key": "%s",
+		"value": "%s"
+	}`,
+		authHeader.Key,
+		authHeader.Value))
+}
+
 type AuthHeader struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
@@ -79,6 +100,7 @@ type InfoField struct {
 	Field SelectionField `json:"field"`
 }
 
+// Rename LambdaRequest
 type Request struct {
 	AccessToken string            `json:"X-Dgraph-AccessToken"`
 	Args        []*fastjson.Value `json:"args"`

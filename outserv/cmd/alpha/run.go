@@ -25,6 +25,7 @@ import (
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/ee"
 	"github.com/outcaste-io/outserv/ee/audit"
+	"github.com/outcaste-io/outserv/lambda"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/zero"
 
@@ -425,6 +426,19 @@ func setupListener(addr string, port int) (net.Listener, error) {
 	return net.Listen("tcp", fmt.Sprintf("%s:%d", addr, port))
 }
 
+func setupLambda(closer *z.Closer, mux *http.ServeMux) {
+	glog.Error(mux)
+	coordinator := lambda.NewLambdaCoordinator(mux)
+	closer.AddRunning(1)
+	go func() {
+		defer closer.Done()
+
+		<-closer.HasBeenClosed()
+		err := coordinator.Close()
+		glog.Infof("Lambda closed with error: %v", err)
+	}()
+}
+
 func setupServer(closer *z.Closer) {
 	laddr := "localhost"
 	if bindall {
@@ -518,9 +532,9 @@ func setupServer(closer *z.Closer) {
 	baseMux.Handle("/", http.HandlerFunc(homeHandler))
 	baseMux.Handle("/ui/keywords", http.HandlerFunc(keywordHandler))
 
-	// TODO: Here the old lambda server started
-	// Since lambda should become a go routine, we do not need to start it
-	// right at the beginning, would be ok to start when it's needed
+	//TODO: schartey/wasm start lambda
+	glog.Error(baseMux)
+	setupLambda(x.ServerCloser, baseMux)
 
 	// Initialize the servers.
 	x.ServerCloser.AddRunning(2)
@@ -673,11 +687,11 @@ func run() {
 		Extensions:    graphql.GetBool("extensions"),
 		PollInterval:  graphql.GetDuration("poll-interval"),
 	}
-	// TODO: Lambda options if needed
-	/*lambda := z.NewSuperFlag(Alpha.Conf.GetString("lambda")).MergeAndCheckDefault(
+	lambda := z.NewSuperFlag(Alpha.Conf.GetString("lambda")).MergeAndCheckDefault(
 		worker.LambdaDefaults)
 	x.Config.Lambda = x.LambdaOptions{
-	}*/
+		Num: lambda.GetUint32("num"),
+	}
 	edgraph.Init()
 
 	x.PrintVersion()
