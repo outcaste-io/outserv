@@ -29,7 +29,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cespare/xxhash"
+	"github.com/cespare/xxhash/v2"
 	"github.com/outcaste-io/badger/v3/options"
 	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/ristretto"
