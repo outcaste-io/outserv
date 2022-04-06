@@ -2,9 +2,12 @@
 
 **This is a fork of dgraph-io/badger, maintained by the Outcaste team.**
 
-Core Maintainers:
-- https://github.com/manishrjain
+Core Maintainers (sorted alphabetically):
+
+- https://github.com/ahsanbarkati
+- https://github.com/aman-bansal
 - https://github.com/jarifibrahim
+- https://github.com/manishrjain
 - https://github.com/poonai
 
 BadgerDB is an embeddable, persistent and fast key-value (KV) database written
