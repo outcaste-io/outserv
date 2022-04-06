@@ -490,6 +490,7 @@ func (qs *queryState) handleValuePostings(ctx context.Context, args funcArgs) er
 	return nil
 }
 
+// TODO: Rename this function and see if we still need it.
 func facetsFilterValuePostingList(args funcArgs, pl *posting.List,
 	listType bool, fn func(p *pb.Posting)) error {
 	q := args.q
@@ -543,44 +544,10 @@ func retrieveValuesAndFacets(args funcArgs, pl *posting.List,
 	return vals, nil
 }
 
-func facetsFilterUidPostingList(pl *posting.List, opts posting.ListOptions,
-	fn func(*pb.Posting)) error {
-
-	// We want to iterate over this to allow picking up all the facets.
-	return pl.IterateAll(opts.ReadTs, opts.AfterUid, func(p *pb.Posting) error {
-		// Only pick the UID postings.
-		if p.PostingType != pb.Posting_REF {
-			return nil
-		}
-		fn(p)
-		return nil
-	})
-}
-
 func countForUidPostings(args funcArgs, pl *posting.List,
 	opts posting.ListOptions) (int, error) {
 
 	return pl.Length(opts.ReadTs, opts.AfterUid), nil
-}
-
-func retrieveUidsAndFacets(args funcArgs, pl *posting.List,
-	opts posting.ListOptions) (*pb.List, error) {
-
-	res := sroar.NewBitmap()
-
-	// [1] q.FacetParam == nil, facetsTree == nil => No facets. Pick all UIDs.
-	// [2] q.FacetParam == nil, facetsTree != nil => No facets. Pick selective UIDs.
-	// [3] q.FacetParam != nil, facetsTree != nil => Pick facets. Pick selective UIDs.
-	// [4] q.FacetParam != nil, facetsTree == nil => Pick facets. Pick all UIDs.
-
-	err := facetsFilterUidPostingList(pl, opts, func(p *pb.Posting) {
-		res.Set(p.Uid)
-	})
-	if err != nil {
-		return nil, err
-	}
-	// TODO(Ahsan): Need to figure out for what all cases we need sortedList.
-	return codec.ToSortedList(res), nil
 }
 
 // This function handles operations on uid posting lists. Index keys, reverse keys and some data
@@ -641,11 +608,7 @@ func (qs *queryState) handleUidPostings(
 			var key []byte
 			switch srcFn.fnType {
 			case notAFunction, compareScalarFn, hasFn, uidInFn:
-				if q.Reverse {
-					key = x.ReverseKey(q.Attr, uids[i])
-				} else {
-					key = x.DataKey(q.Attr, uids[i])
-				}
+				key = x.DataKey(q.Attr, uids[i])
 			case geoFn, regexFn, fullTextSearchFn, standardFn, customIndexFn, matchFn,
 				compareAttrFn:
 				key = x.IndexKey(q.Attr, srcFn.tokens[i])
@@ -824,10 +787,6 @@ func (qs *queryState) helpProcessTask(ctx context.Context, q *pb.Query, gid uint
 		return nil, err
 	}
 
-	if q.Reverse && !schema.State().IsReversed(ctx, attr) {
-		return nil, errors.Errorf("Predicate %s doesn't have reverse edge", x.ParseAttr(attr))
-	}
-
 	if needsIndex(srcFn.fnType, q.UidList) && !schema.State().IsIndexed(ctx, q.Attr) {
 		return nil, errors.Errorf("Predicate %s is not indexed", x.ParseAttr(q.Attr))
 	}
@@ -842,12 +801,6 @@ func (qs *queryState) helpProcessTask(ctx context.Context, q *pb.Query, gid uint
 	}
 	out.List = schema.State().IsList(attr)
 	srcFn.atype = typ
-
-	// Reverse attributes might have more than 1 results even if the original attribute
-	// is not a list.
-	if q.Reverse {
-		out.List = true
-	}
 
 	opts := posting.ListOptions{
 		ReadTs:   q.ReadTs,
@@ -933,12 +886,11 @@ func (qs *queryState) handleCompareScalarFunction(ctx context.Context, arg funcA
 	}
 	counts := arg.srcFn.threshold
 	cp := countParams{
-		fn:      arg.srcFn.fname,
-		counts:  counts,
-		attr:    attr,
-		gid:     arg.gid,
-		readTs:  arg.q.ReadTs,
-		reverse: arg.q.Reverse,
+		fn:     arg.srcFn.fname,
+		counts: counts,
+		attr:   attr,
+		gid:    arg.gid,
+		readTs: arg.q.ReadTs,
 	}
 	return qs.evaluate(cp, arg.out)
 }
@@ -1842,12 +1794,11 @@ var commonTypeIDs = [...]types.TypeID{types.StringID, types.IntID, types.FloatID
 	types.DateTimeID, types.BoolID, types.DefaultID}
 
 type countParams struct {
-	readTs  uint64
-	counts  []int64
-	attr    string
-	gid     uint32
-	reverse bool   // If query is asking for ~pred
-	fn      string // function name
+	readTs uint64
+	counts []int64
+	attr   string
+	gid    uint32
+	fn     string // function name
 }
 
 func (qs *queryState) evaluate(cp countParams, out *pb.Result) error {
@@ -1878,7 +1829,7 @@ func (qs *queryState) evaluate(cp countParams, out *pb.Result) error {
 			"negative counts (nonsensical) or zero counts (not tracked).")
 	}
 
-	countKey := x.CountKey(cp.attr, uint32(countl), cp.reverse)
+	countKey := x.CountKey(cp.attr, uint32(countl))
 	if cp.fn == "eq" {
 		pl, err := qs.cache.Get(countKey)
 		if err != nil {
@@ -1900,7 +1851,7 @@ func (qs *queryState) evaluate(cp countParams, out *pb.Result) error {
 	}
 
 	x.AssertTrue(countl >= 1)
-	countKey = x.CountKey(cp.attr, uint32(countl), cp.reverse)
+	countKey = x.CountKey(cp.attr, uint32(countl))
 
 	txn := pstore.NewTransactionAt(cp.readTs, false)
 	defer txn.Discard()
@@ -1909,7 +1860,7 @@ func (qs *queryState) evaluate(cp countParams, out *pb.Result) error {
 	itOpt := badger.DefaultIteratorOptions
 	itOpt.PrefetchValues = false
 	itOpt.Reverse = cp.fn == "le" || cp.fn == "lt"
-	itOpt.Prefix = pk.CountPrefix(cp.reverse)
+	itOpt.Prefix = pk.CountPrefix()
 
 	itr := txn.NewIterator(itOpt)
 	defer itr.Close()
@@ -1956,12 +1907,6 @@ func (qs *queryState) handleHasFunction(ctx context.Context, q *pb.Query, out *p
 	}
 	startKey := x.DataKey(q.Attr, q.AfterUid+1)
 	prefix := initKey.DataPrefix()
-	if q.Reverse {
-		// Reverse does not mean reverse iteration. It means we're looking for
-		// the reverse index.
-		startKey = x.ReverseKey(q.Attr, q.AfterUid+1)
-		prefix = initKey.ReversePrefix()
-	}
 
 	var prevKey []byte
 	itOpt := badger.DefaultIteratorOptions

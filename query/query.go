@@ -479,9 +479,6 @@ func uniqueKey(gchild *gql.GraphQuery) string {
 	if gchild.IsCount { // ignore count subgraphs..
 		key += "count"
 	}
-	if len(gchild.Langs) > 0 {
-		key += fmt.Sprintf("%v", gchild.Langs)
-	}
 	if gchild.MathExp != nil {
 		// We would only be here if Alias is empty, so Var would be non
 		// empty because MathExp should have atleast one of them.
@@ -601,14 +598,6 @@ func treeCopy(gq *gql.GraphQuery, sg *SubGraph) error {
 				return err
 			}
 			dst.Filters = append(dst.Filters, dstf)
-		}
-
-		if gchild.FacetsFilter != nil {
-			facetsFilter, err := toFacetsFilter(gchild.FacetsFilter)
-			if err != nil {
-				return err
-			}
-			dst.facetsFilter = facetsFilter
 		}
 
 		sg.Children = append(sg.Children, dst)
@@ -833,42 +822,7 @@ func newGraph(ctx context.Context, gq *gql.GraphQuery) (*SubGraph, error) {
 		}
 		sg.Filters = append(sg.Filters, sgf)
 	}
-	if gq.FacetsFilter != nil {
-		facetsFilter, err := toFacetsFilter(gq.FacetsFilter)
-		if err != nil {
-			return nil, errors.Wrapf(err, "while converting to facets filter")
-		}
-		sg.facetsFilter = facetsFilter
-	}
 	return sg, nil
-}
-
-func toFacetsFilter(gft *gql.FilterTree) (*pb.FilterTree, error) {
-	if gft == nil {
-		return nil, nil
-	}
-	if gft.Func != nil && len(gft.Func.NeedsVar) != 0 {
-		return nil, errors.Errorf("Variables not supported in pb.FilterTree")
-	}
-	ftree := &pb.FilterTree{Op: gft.Op}
-	for _, gftc := range gft.Child {
-		ftc, err := toFacetsFilter(gftc)
-		if err != nil {
-			return nil, err
-		}
-		ftree.Children = append(ftree.Children, ftc)
-	}
-	if gft.Func != nil {
-		ftree.Func = &pb.Function{
-			Key:  gft.Func.Attr,
-			Name: gft.Func.Name,
-		}
-		// TODO(Janardhan): Handle variable in facets later.
-		for _, arg := range gft.Func.Args {
-			ftree.Func.Args = append(ftree.Func.Args, arg.Value)
-		}
-	}
-	return ftree, nil
 }
 
 // createTaskQuery generates the query buffer.
@@ -878,11 +832,6 @@ func createTaskQuery(ctx context.Context, sg *SubGraph) (*pb.Query, error) {
 		return nil, errors.Wrapf(err, "While creating query task")
 	}
 	attr := sg.Attr
-	// Might be safer than just checking first byte due to i18n
-	reverse := strings.HasPrefix(attr, "~")
-	if reverse {
-		attr = strings.TrimPrefix(attr, "~")
-	}
 	var srcFunc *pb.SrcFunction
 	if sg.SrcFunc != nil {
 		srcFunc = &pb.SrcFunction{}
@@ -903,7 +852,6 @@ func createTaskQuery(ctx context.Context, sg *SubGraph) (*pb.Query, error) {
 		ReadTs:    sg.ReadTs,
 		Cache:     int32(sg.Cache),
 		Attr:      x.NamespaceAttr(namespace, attr),
-		Reverse:   reverse,
 		SrcFunc:   srcFunc,
 		AfterUid:  sg.Params.AfterUID,
 		DoCount:   len(sg.Filters) == 0 && sg.Params.DoCount,

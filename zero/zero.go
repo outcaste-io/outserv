@@ -49,10 +49,9 @@ func NewState() *State {
 	s._state = &pb.MembershipState{
 		Tablets: make(map[string]*pb.Tablet),
 		Members: make(map[uint64]*pb.Member),
-		Leaders: make(map[uint32]uint64),
 	}
 	s.nextUint = make(map[pb.NumLeaseType]uint64)
-	s.nextUint[pb.Num_UID] = 1
+	s.nextUint[pb.Num_UID] = 16 // We keep the first 16 for special purposes.
 	s.nextUint[pb.Num_NS_ID] = 1
 	s.closer = z.NewCloser(2) // grpc and http
 
@@ -90,9 +89,6 @@ func (s *State) SetMembershipState(state *pb.MembershipState) {
 	}
 	if state.Tablets == nil {
 		state.Tablets = make(map[string]*pb.Tablet)
-	}
-	if state.Leaders == nil {
-		state.Leaders = make(map[uint32]uint64)
 	}
 
 	// Create connections to all members.

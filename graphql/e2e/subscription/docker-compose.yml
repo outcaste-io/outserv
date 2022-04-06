@@ -1,72 +1,32 @@
-# Auto-generated with: [./compose -a 3 -z 1 -w]
+# Auto-generated with: [../compose/compose -q --local=false --names=false --port_offset=0 --expose_ports=false --mem= --num_alphas 1 --image=outcaste/outserv --tag=test -O ../graphql/e2e/subscription/docker-compose.yml --num_alphas 3]
 #
 version: "3.5"
 services:
   alpha1:
-    image: dgraph/dgraph:latest
+    image: outcaste/outserv:test
     working_dir: /data/alpha1
     labels:
       cluster: test
     ports:
-    - 8080
-    - 9080
-    volumes:
-    - type: bind
-      source: $GOPATH/bin
-      target: /gobin
-      read_only: true
-    command: /gobin/outserv alpha --my=alpha1:7080 --zero=zero1:5080
-      --logtostderr -v=2 --raft="idx=1;" 
-      --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16;"
+    - "8080"
+    command: outserv alpha --my=alpha1:7080 --logtostderr -v=2 --expose_trace=true
+      --raft "idx=1; group=1" --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.0.0.0/8;"
   alpha2:
-    image: dgraph/dgraph:latest
+    image: outcaste/outserv:test
     working_dir: /data/alpha2
-    depends_on:
-    - alpha1
     labels:
       cluster: test
     ports:
-    - 8080
-    - 9080
-    volumes:
-    - type: bind
-      source: $GOPATH/bin
-      target: /gobin
-      read_only: true
-    command: /gobin/outserv alpha --my=alpha2:7080 --zero=zero1:5080
-      --logtostderr -v=2 --raft="idx=2;" 
-      --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16;"
+    - "8080"
+    command: outserv alpha --my=alpha2:7080 --logtostderr -v=2 --expose_trace=true
+      --peer=alpha1:7080 --raft "idx=2; group=1" --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.0.0.0/8;"
   alpha3:
-    image: dgraph/dgraph:latest
+    image: outcaste/outserv:test
     working_dir: /data/alpha3
-    depends_on:
-    - alpha2
     labels:
       cluster: test
     ports:
-    - 8080
-    - 9080
-    volumes:
-    - type: bind
-      source: $GOPATH/bin
-      target: /gobin
-      read_only: true
-    command: /gobin/outserv alpha --my=alpha3:7080 --zero=zero1:5080
-      --logtostderr -v=2 --raft="idx=3;" 
-      --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16;"
-  zero1:
-    image: dgraph/dgraph:latest
-    working_dir: /data/zero1
-    labels:
-      cluster: test
-    ports:
-    - 580
-    - 6080
-    volumes:
-    - type: bind
-      source: $GOPATH/bin
-      target: /gobin
-      read_only: true
-    command: /gobin/outserv zero --raft="idx=1;" --my=zero1:5080 --replicas=1 --logtostderr
-      -v=2 --bindall
+    - "8080"
+    command: outserv alpha --my=alpha3:7080 --logtostderr -v=2 --expose_trace=true
+      --peer=alpha1:7080 --raft "idx=3; group=1" --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.0.0.0/8;"
 volumes: {}

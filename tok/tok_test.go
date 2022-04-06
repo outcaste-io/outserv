@@ -66,7 +66,7 @@ func TestFullTextTokenizer(t *testing.T) {
 	require.True(t, has)
 	require.NotNil(t, tokenizer)
 
-	tokens, err := BuildTokens("Stemming works!", GetTokenizerForLang(tokenizer, "en"))
+	tokens, err := BuildTokens("Stemming works!", tokenizer)
 	require.Nil(t, err)
 	require.Equal(t, 2, len(tokens))
 	id := tokenizer.Identifier()
@@ -127,19 +127,6 @@ func TestDateTimeTokenizer(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, len(tokens))
 	require.Equal(t, 1+2, len(tokens[0]))
-}
-
-func TestFullTextTokenizerLang(t *testing.T) {
-	tokenizer, has := GetTokenizer("fulltext")
-	require.True(t, has)
-	require.NotNil(t, tokenizer)
-
-	tokens, err := BuildTokens("Katzen und Auffassung und Auffassung", GetTokenizerForLang(tokenizer, "de"))
-	require.NoError(t, err)
-	require.Equal(t, 2, len(tokens))
-	id := tokenizer.Identifier()
-	// tokens should be sorted and unique
-	require.Equal(t, []string{encodeToken("auffassung", id), encodeToken("katz", id)}, tokens)
 }
 
 func TestTermTokenizer(t *testing.T) {
@@ -206,113 +193,10 @@ func TestGetFullTextTokens(t *testing.T) {
 }
 
 func TestGetFullTextTokens1(t *testing.T) {
-	tokens, err := GetFullTextTokens([]string{"Quick brown fox"}, "en")
+	tokens, err := GetFullTextTokens([]string{"Quick brown fox"})
 	require.NoError(t, err)
 	require.NotNil(t, tokens)
 	require.Equal(t, 3, len(tokens))
-}
-
-func TestGetFullTextTokensInvalidLang(t *testing.T) {
-	tokens, err := GetFullTextTokens([]string{"Quick brown fox"}, "xxx_such_language")
-	require.NoError(t, err)
-	require.NotNil(t, tokens)
-	require.Equal(t, 3, len(tokens))
-}
-
-// NOTE: The Chinese/Japanese/Korean tests were are based on assuming that the
-// output is correct (and adding it to the test), with some verification using
-// Google translate.
-
-func TestFullTextTokenizerCJKChinese(t *testing.T) {
-	tokenizer, has := GetTokenizer("fulltext")
-	require.True(t, has)
-	require.NotNil(t, tokenizer)
-
-	got, err := BuildTokens("他是一个薪水很高的商人", GetTokenizerForLang(tokenizer, "zh"))
-	require.NoError(t, err)
-
-	id := tokenizer.Identifier()
-	wantToks := []string{
-		encodeToken("一个", id),
-		encodeToken("个薪", id),
-		encodeToken("他是", id),
-		encodeToken("商人", id),
-		encodeToken("很高", id),
-		encodeToken("是一", id),
-		encodeToken("水很", id),
-		encodeToken("的商", id),
-		encodeToken("薪水", id),
-		encodeToken("高的", id),
-	}
-	require.Equal(t, wantToks, got)
-	checkSortedAndUnique(t, got)
-}
-
-func TestFullTextTokenizerCJKKorean(t *testing.T) {
-	tokenizer, has := GetTokenizer("fulltext")
-	require.True(t, has)
-	require.NotNil(t, tokenizer)
-
-	got, err := BuildTokens("그는 큰 급여를 가진 사업가입니다.", GetTokenizerForLang(tokenizer, "ko"))
-	require.NoError(t, err)
-
-	id := tokenizer.Identifier()
-	wantToks := []string{
-		encodeToken("가진", id),
-		encodeToken("그는", id),
-		encodeToken("급여를", id),
-		encodeToken("사업가입니다", id),
-		encodeToken("큰", id),
-	}
-	require.Equal(t, wantToks, got)
-	checkSortedAndUnique(t, got)
-}
-
-func TestFullTextTokenizerCJKJapanese(t *testing.T) {
-	tokenizer, has := GetTokenizer("fulltext")
-	require.True(t, has)
-	require.NotNil(t, tokenizer)
-
-	got, err := BuildTokens("彼は大きな給与を持つ実業家です", GetTokenizerForLang(tokenizer, "ja"))
-	require.NoError(t, err)
-
-	id := tokenizer.Identifier()
-	wantToks := []string{
-		encodeToken("きな", id),
-		encodeToken("つ実", id),
-		encodeToken("です", id),
-		encodeToken("な給", id),
-		encodeToken("は大", id),
-		encodeToken("を持", id),
-		encodeToken("与を", id),
-		encodeToken("大き", id),
-		encodeToken("実業", id),
-		encodeToken("家で", id),
-		encodeToken("彼は", id),
-		encodeToken("持つ", id),
-		encodeToken("業家", id),
-		encodeToken("給与", id),
-	}
-	require.Equal(t, wantToks, got)
-	checkSortedAndUnique(t, got)
-}
-
-func TestTermTokenizeCJKChinese(t *testing.T) {
-	tokenizer, ok := GetTokenizer("term")
-	require.True(t, ok)
-	require.NotNil(t, tokenizer)
-
-	got, err := BuildTokens("第一轮 第二轮 第一轮", GetTokenizerForLang(tokenizer, "zh"))
-	require.NoError(t, err)
-
-	id := tokenizer.Identifier()
-	wantToks := []string{
-		encodeToken("第一轮", id),
-		encodeToken("第二轮", id),
-	}
-	require.Equal(t, wantToks, got)
-	checkSortedAndUnique(t, got)
-
 }
 
 func checkSortedAndUnique(t *testing.T, tokens []string) {

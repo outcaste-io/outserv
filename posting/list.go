@@ -390,7 +390,7 @@ func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.DirectedEdge) uint64 {
 	case pk.IsData(): // NOT a list. This case must happen after the above case.
 		conflictKey = getKey(key, 0)
 
-	case pk.IsIndex() || pk.IsCountOrCountRev():
+	case pk.IsIndex() || pk.IsCount():
 		// Index keys are by default of type [uid].
 		conflictKey = getKey(key, t.ValueId)
 

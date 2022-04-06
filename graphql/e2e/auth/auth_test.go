@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+//go:generate compose -q -a 1 -z 1 --mem= --extra_alpha_flags='--graphql="debug=true;"' --names=false
 package auth
 
 import (

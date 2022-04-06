@@ -363,10 +363,6 @@ func checkSchema(s *pb.SchemaUpdate) error {
 		// index on uid type
 		return errors.Errorf("Index not allowed on predicate of type uid on predicate %s",
 			x.ParseAttr(s.Predicate))
-	} else if typ != types.UidID && s.Directive == pb.SchemaUpdate_REVERSE {
-		// reverse on non-uid type
-		return errors.Errorf("Cannot reverse for non-uid type on predicate %s",
-			x.ParseAttr(s.Predicate))
 	}
 
 	// If schema update has upsert directive, it should have index directive.
@@ -427,12 +423,14 @@ func ValidateAndConvert(edge *pb.DirectedEdge, su *pb.SchemaUpdate) error {
 		return nil
 
 	case !schemaType.IsScalar() && storageType.IsScalar():
-		return errors.Errorf("Input for predicate %q of type uid is scalar. Edge: %v",
-			x.ParseAttr(edge.Attr), edge)
+		return errors.Errorf("Schema type: %q and Storage type: %q"+
+			" don't match for pred: %q edge: %v",
+			schemaType.Name(), storageType.Name(), x.ParseAttr(edge.Attr), edge)
 
 	case schemaType.IsScalar() && !storageType.IsScalar():
-		return errors.Errorf("Input for predicate %q of type scalar is uid. Edge: %v",
-			x.ParseAttr(edge.Attr), edge)
+		return errors.Errorf("Schema type: %q and Storage type: %q"+
+			" don't match for pred: %q edge: %v",
+			schemaType.Name(), storageType.Name(), x.ParseAttr(edge.Attr), edge)
 
 	// The suggested storage type matches the schema, OK!
 	case storageType == schemaType && schemaType != types.DefaultID:
@@ -557,7 +555,7 @@ func populateMutationMap(src *pb.Mutations) (map[uint32]*pb.Mutations, error) {
 	}
 
 	if src.DropOp > 0 {
-		for _, gid := range groups().KnownGroups() {
+		for _, gid := range KnownGroups() {
 			mu := mm[gid]
 			if mu == nil {
 				mu = &pb.Mutations{GroupId: gid}

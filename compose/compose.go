@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/user"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -70,7 +71,7 @@ type composeConfig struct {
 }
 
 type options struct {
-	NumZeros       int
+	Quiet          bool
 	NumAlphas      int
 	NumReplicas    int
 	NumLearners    int
@@ -91,15 +92,14 @@ type options struct {
 	Image          string
 	Tag            string
 	WhiteList      bool
+	Token          string
 	MemLimit       string
 	ExposePorts    bool
 	Encryption     bool
 	SnapshotAfter  string
 	ContainerNames bool
 	AlphaVolumes   []string
-	ZeroVolumes    []string
 	AlphaEnvFile   []string
-	ZeroEnvFile    []string
 	Minio          bool
 	MinioDataDir   string
 	MinioPort      uint16
@@ -108,7 +108,7 @@ type options struct {
 	Cdc            bool
 	CdcConsumer    bool
 
-	// Alpha Configurations
+	// Custom Configurations
 	CustomAlphaOptions []string
 
 	// Container Alias
@@ -116,14 +116,12 @@ type options struct {
 
 	// Extra flags
 	AlphaFlags string
-	ZeroFlags  string
 }
 
 var opts options
 
 const (
-	zeroBasePort  int = 5080 // HTTP=6080
-	alphaBasePort int = 7080 // HTTP=8080, GRPC=9080
+	alphaBasePort int = 7080 // HTTP=8080
 )
 
 func name(prefix string, idx int) string {
@@ -161,7 +159,7 @@ func getHost(host string) string {
 	return host
 }
 
-func initService(basename string, idx, grpcPort int) service {
+func initService(basename string, idx, httpPort int) service {
 	var svc service
 	containerPrefix := basename
 	if opts.ContainerPrefix != "" {
@@ -177,13 +175,12 @@ func initService(basename string, idx, grpcPort int) service {
 	svc.Labels = map[string]string{"cluster": "test"}
 
 	svc.Ports = []string{
-		toPort(grpcPort),
-		toPort(grpcPort + 1000), // http port
+		toPort(httpPort),
 	}
 
 	// If hostname is specified then expose the internal grpc port (7080) of alpha.
 	if basename == "alpha" && opts.Hostname != "" {
-		svc.Ports = append(svc.Ports, toPort(grpcPort-1000))
+		svc.Ports = append(svc.Ports, toPort(httpPort-1000))
 	}
 	if opts.LocalBin {
 		svc.Volumes = append(svc.Volumes, volume{
@@ -231,102 +228,29 @@ func initService(basename string, idx, grpcPort int) service {
 	return svc
 }
 
-func getZero(idx int, raft string) service {
-	basename := "zero"
-	basePort := zeroBasePort + opts.PortOffset
-	grpcPort := basePort + getOffset(idx)
-
-	svc := initService(basename, idx, grpcPort)
-
-	if opts.TmpFS {
-		svc.TmpFS = append(svc.TmpFS, fmt.Sprintf("/data/%s/zw", svc.name))
-	}
-
-	offset := getOffset(idx)
-	if (opts.PortOffset + offset) != 0 {
-		svc.Command += fmt.Sprintf(" -o %d", opts.PortOffset+offset)
-	}
-	svc.Command += fmt.Sprintf(" --raft='%s'", raft)
-	svc.Command += fmt.Sprintf(" --my=%s:%d", getHost(svc.name), grpcPort)
-	if opts.NumAlphas > 1 {
-		svc.Command += fmt.Sprintf(" --replicas=%d", opts.NumReplicas)
-	}
-	svc.Command += fmt.Sprintf(" --logtostderr -v=%d", opts.Verbosity)
-	if opts.Vmodule != "" {
-		svc.Command += fmt.Sprintf(" --vmodule=%s", opts.Vmodule)
-	}
-	if idx == 1 {
-		svc.Command += fmt.Sprintf(" --bindall")
-	} else {
-		peerHost := name(basename, 1)
-		svc.Command += fmt.Sprintf(" --peer=%s:%d", getHost(peerHost), basePort)
-	}
-	if len(opts.MemLimit) > 0 {
-		svc.Deploy.Resources = res{
-			Limits: limit{Memory: opts.MemLimit},
-		}
-	}
-	if opts.ZeroFlags != "" {
-		svc.Command += " " + opts.ZeroFlags
-	}
-
-	if len(opts.ZeroVolumes) > 0 {
-		for _, vol := range opts.ZeroVolumes {
-			svc.Volumes = append(svc.Volumes, getVolume(vol))
-		}
-	}
-	svc.EnvFile = opts.ZeroEnvFile
-
-	return svc
-}
-
 func getAlpha(idx int, raft string, customFlags string) service {
 	basename := "alpha"
-	internalPort := alphaBasePort + opts.PortOffset + getOffset(idx)
-	grpcPort := internalPort + 1000
-	svc := initService(basename, idx, grpcPort)
+	basePort := alphaBasePort + opts.PortOffset
+	internalPort := basePort + getOffset(idx)
+	httpPort := internalPort + 1000
+	svc := initService(basename, idx, httpPort)
 
 	if opts.TmpFS {
 		svc.TmpFS = append(svc.TmpFS, fmt.Sprintf("/data/%s/w", svc.name))
 	}
-
-	isMultiZeros := true
-	var isInvalidVersion, err = semverCompare("< 1.2.3 || 20.03.0", opts.Tag)
-	if err != nil || isInvalidVersion {
-		if opts.Tag != "latest" {
-			isMultiZeros = false
-		}
-	}
-
-	maxZeros := 1
-	if isMultiZeros {
-		maxZeros = opts.NumZeros
-	}
-
-	zeroName := "zero"
-	if opts.ContainerPrefix != "" {
-		zeroName = opts.ContainerPrefix + "_" + zeroName
-	}
-
-	zeroHostAddr := fmt.Sprintf("%s:%d", getHost(zeroName+"1"), zeroBasePort+opts.PortOffset)
-	zeros := []string{zeroHostAddr}
-	for i := 2; i <= maxZeros; i++ {
-		port := zeroBasePort + opts.PortOffset + getOffset(i)
-		zeroHost := fmt.Sprintf("%s%d", zeroName, i)
-		zeroHostAddr = fmt.Sprintf("%s:%d", getHost(zeroHost), port)
-		zeros = append(zeros, zeroHostAddr)
-	}
-
-	zerosOpt := strings.Join(zeros, ",")
 
 	offset := getOffset(idx)
 	if (opts.PortOffset + offset) != 0 {
 		svc.Command += fmt.Sprintf(" -o %d", opts.PortOffset+offset)
 	}
 	svc.Command += fmt.Sprintf(" --my=%s:%d", getHost(svc.name), internalPort)
-	svc.Command += fmt.Sprintf(" --zero=%s", zerosOpt)
 	svc.Command += fmt.Sprintf(" --logtostderr -v=%d", opts.Verbosity)
 	svc.Command += " --expose_trace=true"
+
+	if idx > 1 {
+		peerHost := name(basename, 1)
+		svc.Command += fmt.Sprintf(" --peer=%s:%d", getHost(peerHost), basePort)
+	}
 
 	if opts.SnapshotAfter != "" {
 		raft = fmt.Sprintf("%s; %s", raft, opts.SnapshotAfter)
@@ -338,9 +262,17 @@ func getAlpha(idx int, raft string, customFlags string) service {
 	if opts.Vmodule != "" {
 		svc.Command += fmt.Sprintf(" --vmodule=%s", opts.Vmodule)
 	}
-	if opts.WhiteList {
-		svc.Command += ` --security "whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.0.0.0/8;"`
+	if opts.WhiteList || opts.Token != "" {
+		svc.Command += ` --security "`
+		if opts.WhiteList {
+			svc.Command += `whitelist=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.0.0.0/8;`
+		}
+		if opts.Token != "" {
+			svc.Command += fmt.Sprintf("token=%s;", opts.Token)
+		}
+		svc.Command += `"`
 	}
+
 	if opts.Acl {
 		svc.Command += ` --acl "secret-file=/secret/hmac;"`
 		svc.Volumes = append(svc.Volumes, volume{
@@ -486,7 +418,7 @@ func addMetrics(cfg *composeConfig) {
 			},
 			{
 				Type:     "bind",
-				Source:   "$GOPATH/src/github.com/dgraph-io/dgraph/compose/prometheus.yml",
+				Source:   "$GOPATH/src/github.com/outcaste-io/outserv/compose/prometheus.yml",
 				Target:   "/etc/prometheus/prometheus.yml",
 				ReadOnly: true,
 			},
@@ -647,22 +579,22 @@ func copyDir(src string, dst string) error {
 func main() {
 	var cmd = &cobra.Command{
 		Use:     "compose",
-		Short:   "docker-compose config file generator for dgraph",
-		Long:    "Dynamically generate a docker-compose.yml file for running a dgraph cluster.",
+		Short:   "docker-compose config file generator for outserv",
+		Long:    "Dynamically generate a docker-compose.yml file for running a outserv cluster.",
 		Example: "$ compose -z=3 -a=3",
 		Run: func(cmd *cobra.Command, args []string) {
 			// dummy to get "Usage:" template in Usage() output.
 		},
 	}
 
-	cmd.PersistentFlags().IntVarP(&opts.NumZeros, "num_zeros", "z", 3,
-		"number of zeros in Dgraph cluster")
+	cmd.PersistentFlags().BoolVarP(&opts.Quiet, "quiet", "q", false,
+		"Quiet output")
 	cmd.PersistentFlags().IntVarP(&opts.NumAlphas, "num_alphas", "a", 3,
-		"number of alphas in Dgraph cluster")
+		"number of alphas in Outserv cluster")
 	cmd.PersistentFlags().IntVarP(&opts.NumReplicas, "num_replicas", "r", 3,
-		"number of alpha replicas in Dgraph cluster")
+		"number of alpha replicas in Outserv cluster")
 	cmd.PersistentFlags().IntVarP(&opts.NumLearners, "num_learners", "n", 0,
-		"number of learner replicas in Dgraph cluster")
+		"number of learner replicas in Outserv cluster")
 	cmd.PersistentFlags().BoolVar(&opts.DataVol, "data_vol", false,
 		"mount a docker volume as /data in containers")
 	cmd.PersistentFlags().StringVarP(&opts.DataDir, "data_dir", "d", "",
@@ -670,8 +602,8 @@ func main() {
 	cmd.PersistentFlags().StringVarP(&opts.PDir, "postings", "p", "",
 		"launch cluster with local path of p directory, data_vol must be set to true and a=r."+
 			"\nFor new cluster to pick postings, you might have to move uids and timestamp..."+
-			"\ncurl \"http://localhost:<zeroPort>/assign?what=timestamps&num=1000000\""+
-			"\ncurl \"http://localhost:<zeroPort>/assign?what=uids&num=1000000\"")
+			"\ncurl \"http://localhost:<alphaPort>/assign?what=timestamps&num=1000000\""+
+			"\ncurl \"http://localhost:<alphaPort>/assign?what=uids&num=1000000\"")
 
 	cmd.PersistentFlags().BoolVar(&opts.Acl, "acl", false, "Create ACL secret file and enable ACLs")
 	cmd.PersistentFlags().StringVar(&opts.AclSecret, "acl_secret", "",
@@ -685,20 +617,21 @@ func main() {
 	cmd.PersistentFlags().BoolVarP(&opts.Metrics, "metrics", "m", false,
 		"include metrics (prometheus, grafana) services")
 	cmd.PersistentFlags().IntVarP(&opts.PortOffset, "port_offset", "o", 0,
-		"port offset for alpha and zero")
+		"port offset for alpha")
 	cmd.PersistentFlags().IntVarP(&opts.Verbosity, "verbosity", "v", 2,
 		"glog verbosity level")
 	cmd.PersistentFlags().StringVarP(&opts.OutFile, "out", "O",
 		"./docker-compose.yml", "name of output file")
 	cmd.PersistentFlags().BoolVarP(&opts.LocalBin, "local", "l", true,
 		"use locally-compiled binary if true, otherwise use binary from docker container")
-	// TODO(Naman): Change this to dgraph/dgraph once the lambda changes are released.
-	cmd.PersistentFlags().StringVar(&opts.Image, "image", "public.ecr.aws/n1e3y0t3/dgraph-lambda",
-		"Docker image for alphas and zeros.")
+	cmd.PersistentFlags().StringVar(&opts.Image, "image", "outcaste/outserv",
+		"Docker image for alphas.")
 	cmd.PersistentFlags().StringVarP(&opts.Tag, "tag", "t", "latest",
 		"Docker tag for the --image image. Requires -l=false to use binary from docker container.")
 	cmd.PersistentFlags().BoolVarP(&opts.WhiteList, "whitelist", "w", true,
 		"include a whitelist if true")
+	cmd.PersistentFlags().StringVar(&opts.Token, "token", "",
+		"Admin security token")
 	cmd.PersistentFlags().StringVarP(&opts.MemLimit, "mem", "", "32G",
 		"Limit memory provided to the docker containers, for example 8G.")
 	cmd.PersistentFlags().BoolVar(&opts.ExposePorts, "expose_ports", true,
@@ -711,18 +644,12 @@ func main() {
 		"create a new Raft snapshot after this many number of Raft entries.")
 	cmd.PersistentFlags().StringVar(&opts.AlphaFlags, "extra_alpha_flags", "",
 		"extra flags for alphas.")
-	cmd.PersistentFlags().StringVar(&opts.ZeroFlags, "extra_zero_flags", "",
-		"extra flags for zeros.")
 	cmd.PersistentFlags().BoolVar(&opts.ContainerNames, "names", true,
 		"set container names in docker compose.")
 	cmd.PersistentFlags().StringArrayVar(&opts.AlphaVolumes, "alpha_volume", nil,
 		"alpha volume mounts, following srcdir:dstdir[:ro]")
-	cmd.PersistentFlags().StringArrayVar(&opts.ZeroVolumes, "zero_volume", nil,
-		"zero volume mounts, following srcdir:dstdir[:ro]")
 	cmd.PersistentFlags().StringArrayVar(&opts.AlphaEnvFile, "alpha_env_file", nil,
 		"env_file for alpha")
-	cmd.PersistentFlags().StringArrayVar(&opts.ZeroEnvFile, "zero_env_file", nil,
-		"env_file for zero")
 	cmd.PersistentFlags().BoolVar(&opts.Minio, "minio", false,
 		"include minio service")
 	cmd.PersistentFlags().StringVar(&opts.MinioDataDir, "minio_data_dir", "",
@@ -737,7 +664,7 @@ func main() {
 		"Custom alpha flags for specific alphas,"+
 			" following {\"1:custom_flags\", \"2:custom_flags\"}, eg: {\"2: -p <bulk_path>\"")
 	cmd.PersistentFlags().StringVar(&opts.Hostname, "hostname", "",
-		"hostname for the alpha and zero servers")
+		"hostname for the alpha servers")
 	cmd.PersistentFlags().BoolVar(&opts.Cdc, "cdc", false,
 		"run Kafka and push CDC data to it")
 	cmd.PersistentFlags().BoolVar(&opts.CdcConsumer, "cdc_consumer", false,
@@ -752,9 +679,6 @@ func main() {
 	}
 
 	// Do some sanity checks.
-	if opts.NumZeros < 1 || opts.NumZeros > 99 {
-		fatal(errors.Errorf("number of zeros must be 1-99"))
-	}
 	if opts.NumAlphas < 0 || opts.NumAlphas > 99 {
 		fatal(errors.Errorf("number of alphas must be 0-99"))
 	}
@@ -779,11 +703,6 @@ func main() {
 
 	services := make(map[string]service)
 
-	for i := 1; i <= opts.NumZeros; i++ {
-		svc := getZero(i, fmt.Sprintf("idx=%d", i))
-		services[svc.name] = svc
-	}
-
 	// Alpha Customization
 	customAlphas := make(map[int]string)
 	for _, flag := range opts.CustomAlphaOptions {
@@ -793,7 +712,7 @@ func main() {
 		}
 		idx, err := strconv.Atoi(splits[0])
 		if err != nil {
-			fatal(errors.Errorf(" custom_alpha_options, captured erros while parsing index value %v", err))
+			fatal(errors.Errorf(" custom_alpha_options, error while parsing index value %v", err))
 		}
 		customAlphas[idx] = splits[1]
 	}
@@ -808,14 +727,8 @@ func main() {
 	}
 
 	numGroups := opts.NumAlphas / opts.NumReplicas
-	lidx := opts.NumZeros
-	for i := 1; i <= opts.NumLearners; i++ {
-		lidx++
-		rs := fmt.Sprintf("idx=%d; learner=true", lidx)
-		svc := getZero(lidx, rs)
-		services[svc.name] = svc
-	}
-	lidx = opts.NumAlphas
+
+	lidx := opts.NumAlphas
 	for gid := 1; gid <= numGroups; gid++ {
 		for i := 1; i <= opts.NumLearners; i++ {
 			lidx++
@@ -833,15 +746,6 @@ func main() {
 
 	if len(opts.AlphaVolumes) > 0 {
 		for _, vol := range opts.AlphaVolumes {
-			s := strings.Split(vol, ":")
-			srcDir := s[0]
-			if !isBindMount(srcDir) {
-				cfg.Volumes[srcDir] = stringMap{}
-			}
-		}
-	}
-	if len(opts.ZeroVolumes) > 0 {
-		for _, vol := range opts.ZeroVolumes {
 			s := strings.Split(vol, ":")
 			srcDir := s[0]
 			if !isBindMount(srcDir) {
@@ -917,8 +821,15 @@ func main() {
 	if opts.OutFile == "-" {
 		x.Check2(fmt.Printf("%s", doc))
 	} else {
-		fmt.Printf("Options: %+v\n", opts)
-		fmt.Printf("Writing file: %s\n", opts.OutFile)
+		if !opts.Quiet {
+			fmt.Printf("Options: %+v\n", opts)
+			fmt.Printf("Writing file: %s\n", opts.OutFile)
+		}
+		path, err := filepath.Abs(opts.OutFile)
+		if err != nil {
+			fatal(errors.Errorf("unable to get absolute path: %v", err))
+		}
+		fmt.Printf("Generating %s\n", path)
 		err = ioutil.WriteFile(opts.OutFile, []byte(doc), 0644)
 		if err != nil {
 			fatal(errors.Errorf("unable to write file: %v", err))
@@ -927,7 +838,7 @@ func main() {
 
 	if opts.PDir != "" {
 		fmt.Printf("For new cluster to pick \"postings\", you might have to move uids and timestamp..." +
-			"\n\tcurl \"http://localhost:<zeroPort>/assign?what=timestamps&num=1000000\"" +
-			"\n\tcurl \"http://localhost:<zeroPort>/assign?what=uids&num=1000000\"\n")
+			"\n\tcurl \"http://localhost:<alphaPort>/assign?what=timestamps&num=1000000\"" +
+			"\n\tcurl \"http://localhost:<alphaPort>/assign?what=uids&num=1000000\"\n")
 	}
 }

@@ -153,8 +153,6 @@ func toSchema(attr string, update *pb.SchemaUpdate) *bpb.KV {
 		x.Check2(buf.WriteRune(']'))
 	}
 	switch {
-	case update.GetDirective() == pb.SchemaUpdate_REVERSE:
-		x.Check2(buf.WriteString(" @reverse"))
 	case update.GetDirective() == pb.SchemaUpdate_INDEX && len(update.GetTokenizer()) > 0:
 		x.Check2(fmt.Fprintf(&buf, " @index(%s)", strings.Join(update.GetTokenizer(), ",")))
 	}
@@ -697,7 +695,7 @@ func ExportOverNetwork(ctx context.Context, input *pb.ExportRequest) (ExportedFi
 	glog.Infof("Using readTs: %d\n", readTs)
 
 	// Let's first collect all groups.
-	gids := groups().KnownGroups()
+	gids := KnownGroups()
 	glog.Infof("Requesting export for groups: %v\n", gids)
 
 	type filesAndError struct {

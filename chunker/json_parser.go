@@ -217,7 +217,6 @@ func getNextBlank() string {
 	return fmt.Sprintf("_:dg.%d.%d", randomID, id)
 }
 
-// TODO - Abstract these parameters to a struct.
 func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred string) (
 	mapResponse, error) {
 	var mr mapResponse
@@ -253,7 +252,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 			}
 		}
 		if uid > 0 {
-			mr.uid = fmt.Sprintf("%d", uid)
+			mr.uid = x.ToHexString(uid)
 		}
 	}
 

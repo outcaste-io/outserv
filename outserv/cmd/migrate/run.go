@@ -31,7 +31,7 @@ import (
 
 var (
 	logger = log.New(os.Stderr, "", 0)
-	// Migrate is the sub-command invoked when running "dgraph migrate".
+	// Migrate is the sub-command invoked when running "outserv migrate".
 	Migrate x.SubCommand
 	quiet   bool // enabling quiet mode would suppress the warning logs
 )
@@ -39,7 +39,7 @@ var (
 func init() {
 	Migrate.Cmd = &cobra.Command{
 		Use:   "migrate",
-		Short: "Run the Dgraph migration tool from a MySQL database to Dgraph",
+		Short: "Run the Outserv migration tool from a MySQL database to Outserv",
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := run(Migrate.Conf); err != nil {
 				logger.Fatalf("%v\n", err)

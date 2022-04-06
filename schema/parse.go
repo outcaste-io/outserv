@@ -43,11 +43,6 @@ func parseDirective(it *lex.ItemIterator, schema *pb.SchemaUpdate, t types.TypeI
 		return next.Errorf("Missing directive name")
 	}
 	switch next.Val {
-	case "reverse":
-		if t != types.UidID {
-			return next.Errorf("Cannot reverse for non-UID type")
-		}
-		schema.Directive = pb.SchemaUpdate_REVERSE
 	case "index":
 		tokenizer, err := parseIndexDirective(it, schema.Predicate, t)
 		if err != nil {

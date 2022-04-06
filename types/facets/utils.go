@@ -23,7 +23,6 @@ import (
 	"unicode"
 
 	"github.com/outcaste-io/dgo/v210/protos/api"
-	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/tok"
 	"github.com/outcaste-io/outserv/types"
 	"github.com/pkg/errors"
@@ -44,41 +43,6 @@ func SortAndValidate(fs []*api.Facet) error {
 		}
 	}
 	return nil
-}
-
-// CopyFacets makes a copy of facets of the posting which are requested in param.Keys.
-func CopyFacets(fcs []*api.Facet, param *pb.FacetParams) (fs []*api.Facet) {
-	if param == nil || fcs == nil {
-		return nil
-	}
-	// facets and param.keys are both sorted,
-	// We also need all keys if param.AllKeys is true.
-	numKeys := len(param.Param)
-	numFacets := len(fcs)
-	for kidx, fidx := 0, 0; (param.AllKeys || kidx < numKeys) && fidx < numFacets; {
-		f := fcs[fidx]
-		switch {
-		case param.AllKeys || param.Param[kidx].Key == f.Key:
-			fcopy := &api.Facet{
-				Key:     f.Key,
-				Value:   nil,
-				ValType: f.ValType,
-			}
-			if !param.AllKeys {
-				fcopy.Alias = param.Param[kidx].Alias
-			}
-			fcopy.Value = make([]byte, len(f.Value))
-			copy(fcopy.Value, f.Value)
-			fs = append(fs, fcopy)
-			kidx++
-			fidx++
-		case f.Key > param.Param[kidx].Key:
-			kidx++
-		default:
-			fidx++
-		}
-	}
-	return fs
 }
 
 // valAndValType returns interface val and valtype for facet.

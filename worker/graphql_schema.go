@@ -6,7 +6,6 @@ package worker
 import (
 	"context"
 	"encoding/json"
-	"sort"
 	"sync"
 	"time"
 
@@ -14,12 +13,10 @@ import (
 
 	"github.com/golang/glog"
 
-	"github.com/outcaste-io/outserv/codec"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/outcaste-io/outserv/zero"
 	"github.com/pkg/errors"
 )
 
@@ -119,6 +116,8 @@ func ParseAsSchemaAndScript(b []byte) (string, string) {
 	return data.Schema, data.Script
 }
 
+const SchemaNodeUid = uint64(1) // It is always one.
+
 // UpdateGraphQLSchema updates the GraphQL schema node with the new GraphQL schema,
 // and then alters the dgraph schema. All this is done only on group one leader.
 func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
@@ -145,61 +144,17 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 			" update was in progress.", namespace, waitDuration.String())
 	}
 
-	// query the GraphQL schema node uid
+	var gql x.GQL
+	// Fetch the current graphql schema and script using the schema node uid.
 	res, err := ProcessTaskOverNetwork(ctx, &pb.Query{
 		Attr:    x.NamespaceAttr(namespace, GqlSchemaPred),
-		SrcFunc: &pb.SrcFunction{Name: "has"},
+		UidList: &pb.List{SortedUids: []uint64{SchemaNodeUid}},
 		ReadTs:  req.StartTs,
-		// there can only be one GraphQL schema node,
-		// so querying two just to detect if this condition is ever violated
-		First: 2,
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	// find if we need to create the node or can use the uid from existing node
-	creatingNode := false
-	var schemaNodeUid uint64
-	uidMtrxLen := len(res.GetUidMatrix())
-	c := codec.ListCardinality(res.GetUidMatrix()[0])
-	if uidMtrxLen == 0 || (uidMtrxLen == 1 && c == 0) {
-		// if there was no schema node earlier, then need to assign a new uid for the node
-		res, err := zero.AssignUids(ctx, 1)
-		if err != nil {
-			return nil, err
-		}
-		creatingNode = true
-		schemaNodeUid = res.StartId
-	} else if uidMtrxLen == 1 && c == 1 {
-		// if there was already a schema node, then just use the uid from that node
-		schemaNodeUid = codec.GetUids(res.GetUidMatrix()[0])[0]
-	} else {
-		// there seems to be multiple nodes for GraphQL schema,Ideally we should never reach here
-		// But if by any bug we reach here then return the schema node which is added last
-		uidList := codec.GetUids(res.GetUidMatrix()[0])
-		sort.Slice(uidList, func(i, j int) bool {
-			return uidList[i] < uidList[j]
-		})
-		glog.Errorf("Multiple schema node found, using the last one")
-		schemaNodeUid = uidList[len(uidList)-1]
-	}
-
-	var gql x.GQL
-	if !creatingNode {
-		// Fetch the current graphql schema and script using the schema node uid.
-		res, err := ProcessTaskOverNetwork(ctx, &pb.Query{
-			Attr:    x.NamespaceAttr(namespace, GqlSchemaPred),
-			UidList: &pb.List{SortedUids: []uint64{schemaNodeUid}},
-			ReadTs:  req.StartTs,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if len(res.GetValueMatrix()) == 0 || len(res.ValueMatrix[0].GetValues()) == 0 {
-			return nil,
-				errors.Errorf("Schema node was found but the corresponding schema does not exist")
-		}
+	if len(res.GetValueMatrix()) > 0 && len(res.ValueMatrix[0].GetValues()) > 0 {
 		gql.Schema, gql.Script = ParseAsSchemaAndScript(res.ValueMatrix[0].Values[0].Val)
 	}
 
@@ -220,7 +175,7 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 	m := &pb.Mutations{
 		Edges: []*pb.DirectedEdge{
 			{
-				Entity:    schemaNodeUid,
+				Entity:    SchemaNodeUid,
 				Attr:      x.NamespaceAttr(namespace, GqlSchemaPred),
 				Value:     val,
 				ValueType: pb.Posting_STRING,
@@ -233,23 +188,23 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 				// same value will cause one of the mutations to abort, because of the upsert
 				// directive on xid. So, this way we make sure that even in this rare case there can
 				// only be one server which is able to successfully update the GraphQL schema.
-				Entity:    schemaNodeUid,
+				Entity:    SchemaNodeUid,
 				Attr:      x.NamespaceAttr(namespace, gqlSchemaXidPred),
 				Value:     []byte(gqlSchemaXidVal),
 				ValueType: pb.Posting_STRING,
 				Op:        pb.DirectedEdge_SET,
 			},
+			{
+				Entity:    SchemaNodeUid,
+				Attr:      x.NamespaceAttr(namespace, "dgraph.type"),
+				Value:     []byte("dgraph.graphql"),
+				ValueType: pb.Posting_STRING,
+				Op:        pb.DirectedEdge_SET,
+			},
 		},
 	}
-	if creatingNode {
-		m.Edges = append(m.Edges, &pb.DirectedEdge{
-			Entity:    schemaNodeUid,
-			Attr:      x.NamespaceAttr(namespace, "dgraph.type"),
-			Value:     []byte("dgraph.graphql"),
-			ValueType: pb.Posting_STRING,
-			Op:        pb.DirectedEdge_SET,
-		})
-	}
+	glog.Infof("Sending GraphQL schema updates: %+v\n", m)
+
 	// mutate the GraphQL schema. As it is a reserved predicate, and we are in group 1,
 	// so this call is gonna come back to all the group 1 servers only
 	_, err = MutateOverNetwork(ctx, m)
@@ -257,6 +212,7 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 		return nil, err
 	}
 
+	glog.Infof("Now applying Dgraph Schema Updates: %+v\n", req.DgraphPreds)
 	// perform dgraph schema alter, if required. As the schema could be empty if it only has custom
 	// types/queries/mutations.
 	if len(req.DgraphPreds) != 0 {
@@ -272,7 +228,7 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 	}
 
 	// return the uid of the GraphQL schema node
-	return &pb.UpdateGraphQLSchemaResponse{Uid: schemaNodeUid}, nil
+	return &pb.UpdateGraphQLSchemaResponse{Uid: SchemaNodeUid}, nil
 }
 
 // WaitForIndexing does a busy wait for indexing to finish or the context to error out,

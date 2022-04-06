@@ -16,14 +16,6 @@ var (
 	errInvalidUID = errors.New("UID must to be greater than 0")
 )
 
-// Mutation stores the strings corresponding to set and delete operations.
-type Mutation struct {
-	Cond         string
-	Set          []*pb.NQuad
-	Del          []*pb.NQuad
-	AllowedPreds []string
-}
-
 // ParseUid parses the given string into an UID. This method returns with an error
 // if the string cannot be parsed or the parsed UID is zero.
 func ParseUid(xid string) (uint64, error) {
@@ -194,7 +186,6 @@ func copyValue(out *pb.DirectedEdge, nq NQuad) error {
 
 func (nq NQuad) valueType() x.ValueTypeInfo {
 	hasValue := nq.ObjectValue != nil
-	hasLang := len(nq.Lang) > 0
 	hasSpecialId := len(nq.ObjectId) == 0
-	return x.ValueType(hasValue, hasLang, hasSpecialId)
+	return x.ValueType(hasValue, hasSpecialId)
 }

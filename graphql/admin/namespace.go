@@ -34,7 +34,7 @@ func resolveAddNamespace(ctx context.Context, m *schema.Field) (*resolve.Resolve
 		req.Password = "password"
 	}
 	var ns uint64
-	if ns, err = (&edgraph.Server{}).CreateNamespace(ctx, req.Password); err != nil {
+	if ns, err = edgraph.CreateNamespace(ctx, req.Password); err != nil {
 		return resolve.EmptyResult(m, err), false
 	}
 	return resolve.DataResult(
@@ -56,7 +56,7 @@ func resolveDeleteNamespace(ctx context.Context, m *schema.Field) (*resolve.Reso
 	if uint64(req.NamespaceId) == x.GalaxyNamespace {
 		return resolve.EmptyResult(m, errors.New("Cannot delete default namespace.")), false
 	}
-	if err = (&edgraph.Server{}).DeleteNamespace(ctx, uint64(req.NamespaceId)); err != nil {
+	if err = edgraph.DeleteNamespace(ctx, uint64(req.NamespaceId)); err != nil {
 		return resolve.EmptyResult(m, err), false
 	}
 	dropOp := "DROP_NS;" + fmt.Sprintf("%#x", req.NamespaceId)

@@ -35,7 +35,7 @@ import (
 )
 
 var (
-	// Debug is the sub-command invoked when calling "dgraph debug"
+	// Debug is the sub-command invoked when calling "outserv debug"
 	Debug x.SubCommand
 	opt   flagOptions
 )
@@ -67,7 +67,7 @@ type flagOptions struct {
 func init() {
 	Debug.Cmd = &cobra.Command{
 		Use:   "debug",
-		Short: "Debug Dgraph instance",
+		Short: "Debug Outserv instance",
 		Run: func(cmd *cobra.Command, args []string) {
 			run()
 		},
@@ -564,14 +564,11 @@ func printKeys(db *badger.DB) {
 		if pk.IsIndex() {
 			x.Check2(buf.WriteString("{i}"))
 		}
-		if pk.IsCountOrCountRev() {
+		if pk.IsCount() {
 			x.Check2(buf.WriteString("{c}"))
 		}
 		if pk.IsSchema() {
 			x.Check2(buf.WriteString("{s}"))
-		}
-		if pk.IsReverse() {
-			x.Check2(buf.WriteString("{r}"))
 		}
 		ns, attr := x.ParseNamespaceAttr(pk.Attr)
 		x.Check2(buf.WriteString(fmt.Sprintf(" ns: %#x ", ns)))

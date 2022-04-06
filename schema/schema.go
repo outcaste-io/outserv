@@ -324,22 +324,6 @@ func (s *state) HasTokenizer(ctx context.Context, id byte, pred string) bool {
 	return false
 }
 
-// IsReversed returns whether the predicate has reverse edge or not
-func (s *state) IsReversed(ctx context.Context, pred string) bool {
-	isWrite, _ := ctx.Value(isWrite).(bool)
-	s.RLock()
-	defer s.RUnlock()
-	if isWrite {
-		if schema, ok := s.mutSchema[pred]; ok && schema.Directive == pb.SchemaUpdate_REVERSE {
-			return true
-		}
-	}
-	if schema, ok := s.predicate[pred]; ok {
-		return schema.Directive == pb.SchemaUpdate_REVERSE
-	}
-	return false
-}
-
 // HasCount returns whether we want to mantain a count index for the given predicate or not.
 func (s *state) HasCount(ctx context.Context, pred string) bool {
 	isWrite, _ := ctx.Value(isWrite).(bool)
@@ -467,6 +451,7 @@ func loadFromDB(loadType int) error {
 					s = pb.SchemaUpdate{Predicate: pk.Attr, ValueType: pb.Posting_DEFAULT}
 				}
 				x.Checkf(s.Unmarshal(val), "Error while loading schema from db")
+				glog.Infof("Setting schema: %+v\n", s)
 				State().Set(pk.Attr, &s)
 				return nil
 			})
@@ -539,7 +524,8 @@ func initialSchemaInternal(namespace uint64, all bool) []*pb.SchemaUpdate {
 			},
 			{
 				Predicate: "dgraph.user.group",
-				Directive: pb.SchemaUpdate_REVERSE,
+				// Note: This was using a reverse directive. Instead, we should
+				// be handling this via GraphQL.
 				ValueType: pb.Posting_UID,
 				List:      true,
 			},

@@ -27,5 +27,6 @@ func TestBulkCases(t *testing.T) {
 }
 
 func TestBulkCasesAcl(t *testing.T) {
+	t.Skip() // EE
 	t.Run("bulk test cases with acl", common.RunBulkCasesAcl)
 }

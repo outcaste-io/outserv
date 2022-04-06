@@ -123,143 +123,13 @@ type countParams struct {
 	reverse     bool
 }
 
-func (txn *Txn) addReverseMutationHelper(ctx context.Context, plist *List,
-	hasCountIndex bool, edge *pb.DirectedEdge) (countParams, error) {
-	countBefore, countAfter := 0, 0
-	found := false
-
-	plist.Lock()
-	defer plist.Unlock()
-	if hasCountIndex {
-		countBefore, found, _ = plist.getPostingAndLength(txn.StartTs, 0, edge.ValueId)
-		if countBefore == -1 {
-			return emptyCountParams, ErrTsTooOld
-		}
-	}
-	if err := plist.addMutationInternal(ctx, txn, edge); err != nil {
-		return emptyCountParams, err
-	}
-	if hasCountIndex {
-		countAfter = countAfterMutation(countBefore, found, edge.Op)
-		return countParams{
-			attr:        edge.Attr,
-			countBefore: countBefore,
-			countAfter:  countAfter,
-			entity:      edge.Entity,
-			reverse:     true,
-		}, nil
-	}
-	return emptyCountParams, nil
-}
-
-func (txn *Txn) addReverseMutation(ctx context.Context, t *pb.DirectedEdge) error {
-	key := x.ReverseKey(t.Attr, t.ValueId)
-	plist, err := txn.GetFromDelta(key)
-	if err != nil {
-		return err
-	}
-	x.AssertTrue(plist != nil)
-
-	// We must create a copy here.
-	edge := &pb.DirectedEdge{
-		Entity:  t.ValueId,
-		ValueId: t.Entity,
-		Attr:    t.Attr,
-		Op:      t.Op,
-	}
-	return plist.addMutation(ctx, txn, edge)
-}
-
-func (txn *Txn) addReverseAndCountMutation(ctx context.Context, t *pb.DirectedEdge) error {
-	key := x.ReverseKey(t.Attr, t.ValueId)
-	hasCountIndex := schema.State().HasCount(ctx, t.Attr)
-
-	var getFn func(key []byte) (*List, error)
-	if hasCountIndex {
-		// We need to retrieve the full posting list from disk, to allow us to get the length of the
-		// posting list for the counts.
-		getFn = txn.Get
-	} else {
-		// We are just adding a reverse edge. No need to read the list from disk.
-		getFn = txn.GetFromDelta
-	}
-	plist, err := getFn(key)
-	if err != nil {
-		return err
-	}
-	if plist == nil {
-		return errors.Errorf("nil posting list for reverse key %s", hex.Dump(key))
-	}
-
-	// For single uid predicates, updating the reverse index requires that the existing
-	// entries for this key in the index are removed.
-	pred, ok := schema.State().Get(ctx, t.Attr)
-	isSingleUidUpdate := ok && !pred.GetList() && pred.GetValueType() == pb.Posting_UID &&
-		t.Op == pb.DirectedEdge_SET && t.ValueId != 0
-	if isSingleUidUpdate {
-		dataKey := x.DataKey(t.Attr, t.Entity)
-		dataList, err := getFn(dataKey)
-		if err != nil {
-			return errors.Wrapf(err, "cannot find single uid list to update with key %s",
-				hex.Dump(dataKey))
-		}
-
-		bm, err := dataList.Bitmap(ListOptions{ReadTs: txn.StartTs})
-		if err != nil {
-			return errors.Wrapf(err, "while retriving Bitmap for key %s", hex.Dump(dataKey))
-		}
-
-		for _, uid := range bm.ToArray() {
-			delEdge := &pb.DirectedEdge{
-				Entity:  t.Entity,
-				ValueId: uid,
-				Attr:    t.Attr,
-				Op:      pb.DirectedEdge_DEL,
-			}
-			if err := txn.addReverseAndCountMutation(ctx, delEdge); err != nil {
-				return errors.Wrapf(err, "cannot remove existing reverse index entries for key %s",
-					hex.Dump(dataKey))
-			}
-		}
-	}
-
-	// We must create a copy here.
-	edge := &pb.DirectedEdge{
-		Entity:  t.ValueId,
-		ValueId: t.Entity,
-		Attr:    t.Attr,
-		Op:      t.Op,
-	}
-
-	cp, err := txn.addReverseMutationHelper(ctx, plist, hasCountIndex, edge)
-	if err != nil {
-		return err
-	}
-	if hasCountIndex && cp.countAfter != cp.countBefore {
-		if err := txn.updateCount(ctx, cp); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (l *List) handleDeleteAll(ctx context.Context, edge *pb.DirectedEdge, txn *Txn) error {
-	isReversed := schema.State().IsReversed(ctx, edge.Attr)
 	isIndexed := schema.State().IsIndexed(ctx, edge.Attr)
 	hasCount := schema.State().HasCount(ctx, edge.Attr)
-	delEdge := &pb.DirectedEdge{
-		Attr:   edge.Attr,
-		Op:     edge.Op,
-		Entity: edge.Entity,
-	}
 	// To calculate length of posting list. Used for deletion of count index.
 	plen := l.Length(txn.StartTs, 0)
 	err := l.IterateAll(txn.StartTs, 0, func(p *pb.Posting) error {
 		switch {
-		case isReversed:
-			// Delete reverse edge for each posting.
-			delEdge.ValueId = p.Uid
-			return txn.addReverseAndCountMutation(ctx, delEdge)
 		case isIndexed:
 			// Delete index edge of each posting.
 			val := types.Val{
@@ -297,7 +167,7 @@ func (l *List) handleDeleteAll(ctx context.Context, edge *pb.DirectedEdge, txn *
 
 func (txn *Txn) addCountMutation(ctx context.Context, t *pb.DirectedEdge, count uint32,
 	reverse bool) error {
-	key := x.CountKey(t.Attr, count, reverse)
+	key := x.CountKey(t.Attr, count)
 	plist, err := txn.cache.GetFromDelta(key)
 	if err != nil {
 		return err
@@ -439,14 +309,6 @@ func (l *List) AddMutationWithIndex(ctx context.Context, edge *pb.DirectedEdge, 
 
 	doUpdateIndex := pstore != nil && schema.State().IsIndexed(ctx, edge.Attr)
 	hasCountIndex := schema.State().HasCount(ctx, edge.Attr)
-
-	// Add reverse mutation irrespective of hasMutated, server crash can happen after
-	// mutation is synced and before reverse edge is synced
-	if (pstore != nil) && (edge.ValueId != 0) && schema.State().IsReversed(ctx, edge.Attr) {
-		if err := txn.addReverseAndCountMutation(ctx, edge); err != nil {
-			return err
-		}
-	}
 
 	val, found, cp, err := txn.addMutationHelper(ctx, l, doUpdateIndex, hasCountIndex, edge)
 	if err != nil {
@@ -727,9 +589,6 @@ func (rb *IndexRebuild) GetQuerySchema() *pb.SchemaUpdate {
 	if rb.needsCountIndexRebuild() == indexRebuild {
 		querySchema.Count = false
 	}
-	if rb.needsReverseEdgesRebuild() == indexRebuild {
-		querySchema.Directive = pb.SchemaUpdate_NONE
-	}
 	return &querySchema
 }
 
@@ -739,7 +598,6 @@ func (rb *IndexRebuild) DropIndexes(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	prefixes = append(prefixes, prefixesToDropReverseEdges(ctx, rb)...)
 	prefixes = append(prefixes, prefixesToDropCountIndex(ctx, rb)...)
 	glog.Infof("Deleting indexes for %s", rb.Attr)
 	return pstore.DropPrefix(prefixes...)
@@ -754,16 +612,12 @@ func (rb *IndexRebuild) BuildData(ctx context.Context) error {
 // or count indexes need to be rebuilt.
 func (rb *IndexRebuild) NeedIndexRebuild() bool {
 	return rb.needsTokIndexRebuild().op == indexRebuild ||
-		rb.needsReverseEdgesRebuild() == indexRebuild ||
 		rb.needsCountIndexRebuild() == indexRebuild
 }
 
 // BuildIndexes builds indexes.
 func (rb *IndexRebuild) BuildIndexes(ctx context.Context) error {
 	if err := rebuildTokIndex(ctx, rb); err != nil {
-		return err
-	}
-	if err := rebuildReverseEdges(ctx, rb); err != nil {
 		return err
 	}
 	return rebuildCountIndex(ctx, rb)
@@ -975,19 +829,13 @@ func prefixesToDropCountIndex(ctx context.Context, rb *IndexRebuild) [][]byte {
 	}
 
 	pk := x.ParsedKey{Attr: rb.Attr}
-	prefixes := append([][]byte{}, pk.CountPrefix(false))
-	prefixes = append(prefixes, pk.CountPrefix(true))
+	prefixes := append([][]byte{}, pk.CountPrefix())
 
 	// All the parts of any list that has been split into multiple parts.
 	// Such keys have a different prefix (the last byte is set to 1).
-	countPrefix := pk.CountPrefix(false)
+	countPrefix := pk.CountPrefix()
 	countPrefix[0] = x.ByteSplit
 	prefixes = append(prefixes, countPrefix)
-
-	// Parts for count-reverse index.
-	countReversePrefix := pk.CountPrefix(true)
-	countReversePrefix[0] = x.ByteSplit
-	prefixes = append(prefixes, countReversePrefix)
 
 	return prefixes
 }
@@ -1026,96 +874,6 @@ func rebuildCountIndex(ctx context.Context, rb *IndexRebuild) error {
 	pk := x.ParsedKey{Attr: rb.Attr}
 	builder := rebuilder{attr: rb.Attr, prefix: pk.DataPrefix(), startTs: rb.StartTs}
 	builder.fn = fn
-	if err := builder.Run(ctx); err != nil {
-		return err
-	}
-
-	// Create the reverse index. The count reverse index is created if this
-	// predicate has both a count and reverse directive in the schema. It's safe
-	// to call builder.Run even if that's not the case as the reverse prefix
-	// will be empty.
-	reverse = true
-	builder = rebuilder{attr: rb.Attr, prefix: pk.ReversePrefix(), startTs: rb.StartTs}
-	builder.fn = fn
-	return builder.Run(ctx)
-}
-
-func (rb *IndexRebuild) needsReverseEdgesRebuild() indexOp {
-	x.AssertTruef(rb.CurrentSchema != nil, "Current schema cannot be nil.")
-
-	// If old schema is nil, treat it as an empty schema. Copy it to avoid
-	// overwriting it in rb.
-	old := rb.OldSchema
-	if old == nil {
-		old = &pb.SchemaUpdate{}
-	}
-
-	currIndex := rb.CurrentSchema.Directive == pb.SchemaUpdate_REVERSE
-	prevIndex := old.Directive == pb.SchemaUpdate_REVERSE
-
-	// If the schema directive did not change, return indexNoop.
-	if currIndex == prevIndex {
-		return indexNoop
-	}
-
-	// If the current schema requires an index, index should be rebuilt.
-	if currIndex {
-		return indexRebuild
-	}
-	// Otherwise, index should only be deleted.
-	return indexDelete
-}
-
-func prefixesToDropReverseEdges(ctx context.Context, rb *IndexRebuild) [][]byte {
-	// Exit early if indices do not need to be rebuilt.
-	op := rb.needsReverseEdgesRebuild()
-	if op == indexNoop {
-		return nil
-	}
-
-	pk := x.ParsedKey{Attr: rb.Attr}
-	prefixes := append([][]byte{}, pk.ReversePrefix())
-
-	// All the parts of any list that has been split into multiple parts.
-	// Such keys have a different prefix (the last byte is set to 1).
-	reversePrefix := pk.ReversePrefix()
-	reversePrefix[0] = x.ByteSplit
-	prefixes = append(prefixes, reversePrefix)
-
-	return prefixes
-}
-
-// rebuildReverseEdges rebuilds the reverse edges for a given attribute.
-func rebuildReverseEdges(ctx context.Context, rb *IndexRebuild) error {
-	op := rb.needsReverseEdgesRebuild()
-	if op != indexRebuild {
-		return nil
-	}
-
-	glog.Infof("Rebuilding reverse index for %s", rb.Attr)
-	pk := x.ParsedKey{Attr: rb.Attr}
-	builder := rebuilder{attr: rb.Attr, prefix: pk.DataPrefix(), startTs: rb.StartTs}
-	builder.fn = func(uid uint64, pl *List, txn *Txn) error {
-		edge := pb.DirectedEdge{Attr: rb.Attr, Entity: uid}
-		return pl.IterateAll(txn.StartTs, 0, func(pp *pb.Posting) error {
-			puid := pp.Uid
-			// Add reverse entries based on p.
-			edge.ValueId = puid
-			edge.Op = pb.DirectedEdge_SET
-
-			for {
-				// we only need to build reverse index here.
-				// We will update the reverse count index separately.
-				err := txn.addReverseMutation(ctx, &edge)
-				switch err {
-				case ErrRetry:
-					time.Sleep(10 * time.Millisecond)
-				default:
-					return err
-				}
-			}
-		})
-	}
 	return builder.Run(ctx)
 }
 

@@ -2,6 +2,8 @@ module github.com/outcaste-io/outserv
 
 go 1.16
 
+// replace github.com/outcaste-io/ristretto => /home/mrjn/source/ristretto
+
 require (
 	cloud.google.com/go/storage v1.15.0
 	contrib.go.opencensus.io/exporter/jaeger v0.1.0
@@ -16,7 +18,6 @@ require (
 	github.com/blevesearch/bleve v1.0.13
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd
 	github.com/dgraph-io/graphql-transport-ws v0.0.0-20210511143556-2cef522f1f15
-	github.com/dgraph-io/ristretto v0.1.0
 	github.com/dgraph-io/simdjson-go v0.3.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dgrijalva/jwt-go/v4 v4.0.0-preview1
@@ -38,11 +39,11 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/graph-gophers/graphql-go v1.3.0
 	github.com/minio/minio-go/v6 v6.0.55
-	github.com/outcaste-io/badger/v3 v3.0.0-20220210203236-1b1148a36313
+	github.com/outcaste-io/badger/v3 v3.2202.1-0.20220401003101-6bfcd5e451a0
 	github.com/outcaste-io/dgo/v210 v210.0.0-20220225180226-43bd1b427e86
 	github.com/outcaste-io/gqlgen v0.13.3
 	github.com/outcaste-io/gqlparser/v2 v2.2.3
-	github.com/outcaste-io/ristretto v0.2.0
+	github.com/outcaste-io/ristretto v0.1.1-0.20220404170646-118eb5c81eac
 	github.com/outcaste-io/sroar v0.0.0-20220207092908-fa5c189ea338
 	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
 	github.com/pkg/errors v0.9.1

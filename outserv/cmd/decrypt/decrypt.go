@@ -41,8 +41,8 @@ var Decrypt x.SubCommand
 func init() {
 	Decrypt.Cmd = &cobra.Command{
 		Use:   "decrypt",
-		Short: "Run the Dgraph decryption tool",
-		Long:  "A tool to decrypt an export file created by an encrypted Dgraph cluster",
+		Short: "Run the Outserv decryption tool",
+		Long:  "A tool to decrypt an export file created by an encrypted Outserv cluster",
 		Run: func(cmd *cobra.Command, args []string) {
 			run()
 		},

@@ -34,11 +34,9 @@ const (
 )
 
 // ValueType s a helper function to decide value type of DirectedEdge/Posting/N-Quad.
-func ValueType(hasValue, hasLang, hasSpecialId bool) ValueTypeInfo {
+func ValueType(hasValue, hasSpecialId bool) ValueTypeInfo {
 	switch {
-	case hasValue && hasLang:
-		return ValueMulti
-	case hasValue && !hasLang:
+	case hasValue:
 		return ValuePlain
 	case !hasValue && hasSpecialId:
 		return ValueEmpty
