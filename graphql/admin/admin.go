@@ -401,12 +401,12 @@ func newAdminResolverFactory() *resolve.ResolverFactory {
 }
 
 func getCurrentGraphQLSchema(namespace uint64) (*worker.GqlSchema, error) {
-	uid, graphQLSchema, err := edgraph.GetGQLSchema(namespace)
+	graphQLSchema, err := edgraph.GetGQLSchema(namespace)
 	if err != nil {
 		return nil, err
 	}
 
-	return &worker.GqlSchema{ID: uid, Schema: graphQLSchema}, nil
+	return &worker.GqlSchema{Schema: graphQLSchema}, nil
 }
 
 func generateGQLSchema(sch *worker.GqlSchema, ns uint64) (*schema.Schema, error) {
@@ -434,19 +434,11 @@ func (as *adminServer) initServer() {
 	as.mux.Lock()
 	defer as.mux.Unlock()
 
-	// It takes a few seconds for the Dgraph cluster to be up and running.
-	// Before that, trying to read the GraphQL schema will result in error:
-	// "Please retry again, server is not ready to accept requests."
-	// 5 seconds is a pretty reliable wait for a fresh instance to read the
-	// schema on a first try.
-	waitFor := 5 * time.Second
-
 	for {
-		<-time.After(waitFor)
-
 		sch, err := getCurrentGraphQLSchema(x.GalaxyNamespace)
 		if err != nil {
 			glog.Errorf("namespace: %d. Error reading GraphQL schema: %s.", x.GalaxyNamespace, err)
+			time.Sleep(time.Second)
 			continue
 		}
 		sch.Loaded = true
@@ -459,22 +451,21 @@ func (as *adminServer) initServer() {
 		if sch.Schema == "" {
 			glog.Infof("namespace: %d. No GraphQL schema in Dgraph; serving empty GraphQL API",
 				x.GalaxyNamespace)
-			break
+			return
 		}
 
 		generatedSchema, err := generateGQLSchema(sch, x.GalaxyNamespace)
 		if err != nil {
 			glog.Errorf("namespace: %d. Error processing GraphQL schema: %s.",
 				x.GalaxyNamespace, err)
-			break
+			return
 		}
 		as.incrementSchemaUpdateCounter(x.GalaxyNamespace)
 		as.resetSchema(x.GalaxyNamespace, generatedSchema)
 
-		glog.Infof("namespace: %d. Successfully loaded GraphQL schema.  Serving GraphQL API.",
-			x.GalaxyNamespace)
-
-		break
+		glog.Infof("namespace: %d. Successfully loaded GraphQL schema: \n---\n%s\n---\n",
+			x.GalaxyNamespace, sch.Schema)
+		return
 	}
 }
 
@@ -617,13 +608,12 @@ func lazyLoadScript(namespace uint64) error {
 		return nil
 	}
 	// Otherwise, fetch it from disk.
-	uid, script, err := edgraph.GetLambdaScript(namespace)
+	script, err := edgraph.GetLambdaScript(namespace)
 	if err != nil {
 		glog.Errorf("namespace: %d. Error reading Lambda Script: %s.", namespace, err)
 		return errors.Wrap(err, "failed to lazy-load Lambda Script")
 	}
 	worker.Lambda().Set(namespace, &worker.LambdaScript{
-		ID:     uid,
 		Script: script,
 	})
 	return nil
