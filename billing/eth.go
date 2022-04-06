@@ -8,20 +8,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
+	"github.com/wealdtech/go-ens/v3"
 )
-
-type payInfo struct {
-	wei         *big.Int // Amount to be paid
-	gasLimit    uint64
-	destAddress common.Address
-
-	chainEndpoint string
-}
 
 type ethWallet struct {
 	account accounts.Account
@@ -59,15 +51,23 @@ func initWallet() {
 	glog.Infof("Wallet is successfully initialized with keystore: %v", EthKeyStorePath)
 }
 
-func (w *ethWallet) Pay(ctx context.Context, in *payInfo) error {
+func (w *ethWallet) Pay(ctx context.Context, wei *big.Int) error {
 	if w == nil {
 		return errors.New("Wallet is not initialized")
 	}
 
-	client, err := ethclient.Dial(in.chainEndpoint)
+	client, err := ethclient.Dial(ethEndpoint)
 	if err != nil {
 		return errors.Wrap(err, "Failed to establish connection.")
 	}
+
+	// The ETH address is registered in ENS via outcaste.io.
+	addr, err := ens.Resolve(client, "outcaste.io")
+	if err != nil {
+		return errors.Wrapf(err, "Error while resolving outcaste.io ENS address")
+	}
+	glog.Infof("Found outcaste.io ETH address: %s", addr.Hex())
+
 	nonce, err := client.PendingNonceAt(ctx, w.account.Address)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get pending nonce.")
@@ -79,7 +79,8 @@ func (w *ethWallet) Pay(ctx context.Context, in *payInfo) error {
 	}
 
 	var data []byte
-	tx := types.NewTransaction(nonce, in.destAddress, in.wei, in.gasLimit, gasPrice, data)
+	// Set gas limit to 21K.
+	tx := types.NewTransaction(nonce, addr, wei, gasLimit, gasPrice, data)
 
 	chainID, err := client.NetworkID(ctx)
 	if err != nil {
