@@ -121,75 +121,58 @@ func PeriodicallyPostTelemetry() {
 	}
 }
 
-func GetLambdaScript(namespace uint64) (uid, script string, err error) {
-	uid, gql, err := getGQLSchema(namespace)
+func GetLambdaScript(namespace uint64) (script string, err error) {
+	gql, err := getGQLSchema(namespace)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
-	return uid, gql.Script, nil
+	return gql.Script, nil
 }
 
-func GetGQLSchema(namespace uint64) (uid, graphQLSchema string, err error) {
-	uid, gql, err := getGQLSchema(namespace)
+func GetGQLSchema(namespace uint64) (graphQLSchema string, err error) {
+	gql, err := getGQLSchema(namespace)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
-	return uid, gql.Schema, nil
+	return gql.Schema, nil
 }
 
 // getGQLSchema queries for the GraphQL schema node, and returns the uid and the GraphQL schema and
 // lambda script.
 // If multiple schema nodes were found, it returns an error.
-func getGQLSchema(namespace uint64) (string, *x.GQL, error) {
+func getGQLSchema(namespace uint64) (*x.GQL, error) {
 	ctx := context.WithValue(context.Background(), Authorize, false)
 	ctx = x.AttachNamespace(ctx, namespace)
 	resp, err := Query(ctx,
 		&pb.Request{
-			Query: `
+			Query: fmt.Sprintf(`
 			query {
-			  ExistingGQLSchema(func: has(dgraph.graphql.schema)) {
-				uid
+			  ExistingGQLSchema(func: uid(%#x)) {
 				dgraph.graphql.schema
 			  }
-			}`})
+			}`, worker.SchemaNodeUid)})
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
 	var result existingGQLSchemaQryResp
 	if err := json.Unmarshal(resp.GetJson(), &result); err != nil {
-		return "", nil, errors.Wrap(err, "Couldn't unmarshal response from Dgraph query")
+		return nil, errors.Wrap(err, "Couldn't unmarshal response from Dgraph query")
 	}
 
 	data := &x.GQL{}
 	res := result.ExistingGQLSchema
 	if len(res) == 0 {
 		// no schema has been stored yet in Dgraph
-		return "", data, nil
-	} else if len(res) == 1 {
+		return data, nil
+	}
+	if len(res) == 1 {
 		// we found an existing GraphQL schema
 		gqlSchemaNode := res[0]
 		data.Schema, data.Script = worker.ParseAsSchemaAndScript([]byte(gqlSchemaNode.Schema))
-		return gqlSchemaNode.Uid, data, nil
+		return data, nil
 	}
-
-	// found multiple GraphQL schema nodes, this should never happen
-	// returning the schema node which is added last
-	for i := range res {
-		iUid, err := gql.ParseUid(res[i].Uid)
-		if err != nil {
-			return "", nil, err
-		}
-		res[i].UidInt = iUid
-	}
-
-	sort.Slice(res, func(i, j int) bool {
-		return res[i].UidInt < res[j].UidInt
-	})
-	glog.Errorf("namespace: %d. Multiple schema nodes found, using the last one", namespace)
-	resLast := res[len(res)-1]
-	data.Schema, data.Script = worker.ParseAsSchemaAndScript([]byte(resLast.Schema))
-	return resLast.Uid, data, nil
+	panic(fmt.Sprintf("Not expecting multiple schemas. Found: %s\n", res))
 }
 
 // UpdateGQLSchema updates the GraphQL and Dgraph schemas using the given inputs.
@@ -432,11 +415,11 @@ func Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, error) {
 		}
 
 		// query the GraphQL schema and keep it in memory, so it can be inserted again
-		_, graphQLSchema, err := GetGQLSchema(namespace)
+		graphQLSchema, err := GetGQLSchema(namespace)
 		if err != nil {
 			return empty, err
 		}
-		_, lambdaScript, err := GetLambdaScript(namespace)
+		lambdaScript, err := GetLambdaScript(namespace)
 		if err != nil {
 			return empty, err
 		}
@@ -545,7 +528,7 @@ func Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, error) {
 func validateDQLSchemaForGraphQL(ctx context.Context,
 	dqlSch *schema.ParsedSchema, ns uint64) error {
 	// fetch the GraphQL schema for this namespace from disk
-	_, existingGQLSch, err := GetGQLSchema(ns)
+	existingGQLSch, err := GetGQLSchema(ns)
 	if err != nil || existingGQLSch == "" {
 		return err
 	}

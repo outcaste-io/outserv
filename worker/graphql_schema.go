@@ -116,6 +116,8 @@ func ParseAsSchemaAndScript(b []byte) (string, string) {
 	return data.Schema, data.Script
 }
 
+const SchemaNodeUid = uint64(1) // It is always one.
+
 // UpdateGraphQLSchema updates the GraphQL schema node with the new GraphQL schema,
 // and then alters the dgraph schema. All this is done only on group one leader.
 func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
@@ -142,13 +144,11 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 			" update was in progress.", namespace, waitDuration.String())
 	}
 
-	const schemaNodeUid = uint64(1) // It is always one.
-
 	var gql x.GQL
 	// Fetch the current graphql schema and script using the schema node uid.
 	res, err := ProcessTaskOverNetwork(ctx, &pb.Query{
 		Attr:    x.NamespaceAttr(namespace, GqlSchemaPred),
-		UidList: &pb.List{SortedUids: []uint64{schemaNodeUid}},
+		UidList: &pb.List{SortedUids: []uint64{SchemaNodeUid}},
 		ReadTs:  req.StartTs,
 	})
 	if err != nil {
@@ -175,7 +175,7 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 	m := &pb.Mutations{
 		Edges: []*pb.DirectedEdge{
 			{
-				Entity:    schemaNodeUid,
+				Entity:    SchemaNodeUid,
 				Attr:      x.NamespaceAttr(namespace, GqlSchemaPred),
 				Value:     val,
 				ValueType: pb.Posting_STRING,
@@ -188,14 +188,14 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 				// same value will cause one of the mutations to abort, because of the upsert
 				// directive on xid. So, this way we make sure that even in this rare case there can
 				// only be one server which is able to successfully update the GraphQL schema.
-				Entity:    schemaNodeUid,
+				Entity:    SchemaNodeUid,
 				Attr:      x.NamespaceAttr(namespace, gqlSchemaXidPred),
 				Value:     []byte(gqlSchemaXidVal),
 				ValueType: pb.Posting_STRING,
 				Op:        pb.DirectedEdge_SET,
 			},
 			{
-				Entity:    schemaNodeUid,
+				Entity:    SchemaNodeUid,
 				Attr:      x.NamespaceAttr(namespace, "dgraph.type"),
 				Value:     []byte("dgraph.graphql"),
 				ValueType: pb.Posting_STRING,
@@ -228,7 +228,7 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 	}
 
 	// return the uid of the GraphQL schema node
-	return &pb.UpdateGraphQLSchemaResponse{Uid: schemaNodeUid}, nil
+	return &pb.UpdateGraphQLSchemaResponse{Uid: SchemaNodeUid}, nil
 }
 
 // WaitForIndexing does a busy wait for indexing to finish or the context to error out,
