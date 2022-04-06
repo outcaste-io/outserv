@@ -13,7 +13,6 @@ require (
 	github.com/DataDog/opencensus-go-exporter-datadog v0.0.0-20190503082300-0f32ad59ab08
 	github.com/Masterminds/semver/v3 v3.1.0
 	github.com/Microsoft/go-winio v0.4.15 // indirect
-	github.com/OneOfOne/xxhash v1.2.5 // indirect
 	github.com/Shopify/sarama v1.27.2
 	github.com/blevesearch/bleve v1.0.13
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd
@@ -39,7 +38,7 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/graph-gophers/graphql-go v1.3.0
 	github.com/minio/minio-go/v6 v6.0.55
-	github.com/outcaste-io/badger/v3 v3.2202.1-0.20220401003101-6bfcd5e451a0
+	github.com/outcaste-io/badger/v3 v3.2202.1-0.20220405110642-ade7785339cb
 	github.com/outcaste-io/dgo/v210 v210.0.0-20220225180226-43bd1b427e86
 	github.com/outcaste-io/gqlgen v0.13.3
 	github.com/outcaste-io/gqlparser/v2 v2.2.3
