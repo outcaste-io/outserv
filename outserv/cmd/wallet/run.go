@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"os"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/outcaste-io/outserv/x"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 var (
@@ -21,8 +22,8 @@ var (
 
 func init() {
 	Wallet.Cmd = &cobra.Command{
-		Use:   "wallet",
-		Short: "Create an ethereum account",
+		Use:   "create-wallet",
+		Short: "Create Ethereum wallet with an anonymous account",
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := run(Wallet.Conf); err != nil {
 				logger.Fatalf("%v\n", err)
@@ -43,10 +44,10 @@ func run(conf *viper.Viper) error {
 
 	if len(passPhrase) == 0 {
 		for {
-			pass := readPassword("Please enter passphrase of the wallet.")
-			passVerify := readPassword("Please re-enter passphrase of the wallet.")
+			pass := readPassword("Please enter passphrase for the wallet: ")
+			passVerify := readPassword("Please re-enter passphrase for the wallet: ")
 			if pass != passVerify {
-				glog.Info("Passphrase didn't match. Please retry...")
+				fmt.Print("\nPassphrase didn't match. Please retry...\n")
 				continue
 			}
 			passPhrase = pass
@@ -68,13 +69,21 @@ func createWallet(keyStoreDir, passphrase string) error {
 		return err
 	}
 
-	glog.Infof("Created an account with address: %s\n", acc.Address.Hex())
+	fmt.Println()
+	fmt.Println("OUTPUT:")
+	fmt.Printf("	Created an Ethereum account with address: %s\n", acc.Address.Hex())
+	fmt.Printf("	Wallet JSON file stored in directory: %s\n", keyStoreDir)
+	fmt.Println(`
+WARNING:
+	Please keep the generated JSON file and the passphrase safe and secure.
+	If you lose either of those, the funds in this account would be lost forever.
+`)
 	return nil
 }
 
 func readPassword(prompt string) string {
-	glog.Info(prompt)
-	p, err := terminal.ReadPassword(int(os.Stdin.Fd()))
+	fmt.Printf("\n%s", prompt)
+	p, err := term.ReadPassword(int(os.Stdin.Fd()))
 	if err != nil {
 		glog.Fatalf("Failed to get passphrase for wallet, %v", err)
 	}

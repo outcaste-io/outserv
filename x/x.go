@@ -23,7 +23,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -40,7 +39,6 @@ import (
 	"github.com/pkg/errors"
 	"go.opencensus.io/plugin/ocgrpc"
 	"go.opencensus.io/trace"
-	"golang.org/x/crypto/ssh/terminal"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/encoding/gzip"
@@ -959,35 +957,6 @@ func (a *authorizationCredentials) RequireTransportSecurity() bool {
 // This is mostly used by Slash GraphQL to authenticate requests
 func WithAuthorizationCredentials(authToken string) grpc.DialOption {
 	return grpc.WithPerRPCCredentials(&authorizationCredentials{authToken})
-}
-
-// AskUserPassword prompts the user to enter the password for the given user ID.
-func AskUserPassword(userid string, pwdType string, times int) (string, error) {
-	AssertTrue(times == 1 || times == 2)
-	AssertTrue(pwdType == "Current" || pwdType == "New")
-	// ask for the user's password
-	fmt.Printf("%s password for %v:", pwdType, userid)
-	pd, err := terminal.ReadPassword(int(syscall.Stdin))
-	if err != nil {
-		return "", errors.Wrapf(err, "while reading password")
-	}
-	fmt.Println()
-	password := string(pd)
-
-	if times == 2 {
-		fmt.Printf("Retype %s password for %v:", strings.ToLower(pwdType), userid)
-		pd2, err := terminal.ReadPassword(int(syscall.Stdin))
-		if err != nil {
-			return "", errors.Wrapf(err, "while reading password")
-		}
-		fmt.Println()
-
-		password2 := string(pd2)
-		if password2 != password {
-			return "", errors.Errorf("the two typed passwords do not match")
-		}
-	}
-	return password, nil
 }
 
 func IsGuardian(groups []string) bool {
