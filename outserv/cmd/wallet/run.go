@@ -1,3 +1,5 @@
+// Copyright 2022 Outcaste LLC. Licensed under the Smart License v1.0.
+
 package wallet
 
 import (
@@ -18,7 +20,6 @@ import (
 )
 
 var (
-	logger = log.New(os.Stderr, "", 0)
 	// Wallet is the sub-command invoked when running "outserv wallet".
 	Wallet x.SubCommand
 )
@@ -29,7 +30,7 @@ func init() {
 		Short: "Ethereum wallet to use with Outserv",
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := run(Wallet.Conf); err != nil {
-				logger.Fatalf("%v\n", err)
+				log.Fatalf("%v\n", err)
 			}
 		},
 		Annotations: map[string]string{"group": "tool"},
@@ -39,7 +40,7 @@ func init() {
 	flag := Wallet.Cmd.Flags()
 	flag.BoolP("create", "c", false, "Create a new wallet.")
 	flag.BoolP("test", "t", false, "Test the provided wallet.")
-	flag.StringP("password", "s", "", "Passphrase to encrypt the wallet.")
+	flag.StringP("password", "p", "", "Passphrase to encrypt the wallet.")
 	flag.StringP("dir", "d", "./wallet", "Directory of the wallet keystore.")
 }
 
@@ -49,11 +50,15 @@ func run(conf *viper.Viper) error {
 
 	if len(passPhrase) == 0 {
 		for {
-			pass := readPassword("Please enter passphrase for the wallet: ")
-			passVerify := readPassword("Please re-enter passphrase for the wallet: ")
+			pass := readPassword("Please enter password for the wallet: ")
+			if len(pass) == 0 {
+				fmt.Println()
+				return fmt.Errorf("Empty password")
+			}
+			passVerify := readPassword("Please re-enter password for the wallet: ")
 			fmt.Println()
 			if pass != passVerify {
-				fmt.Print("\nPassphrase didn't match. Please retry...\n")
+				fmt.Print("\n\tError: Password mismatch. Please retry...\n")
 				continue
 			}
 			passPhrase = pass

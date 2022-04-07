@@ -33,9 +33,8 @@ type EthWallet struct {
 }
 
 var (
-	wallet              *EthWallet
-	errMultipleAccounts = errors.New("Multiple eth account found")
-	ethToWei            = big.NewFloat(1e18)
+	wallet   *EthWallet
+	ethToWei = big.NewFloat(1e18)
 
 	EthKeyStorePath     string
 	EthKeyStorePassword string
