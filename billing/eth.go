@@ -25,7 +25,8 @@ import (
 )
 
 type EthWallet struct {
-	client  *ethclient.Client
+	endpoint string
+	// client   *ethclient.Client
 	account accounts.Account
 	secret  string
 	ks      *keystore.KeyStore
@@ -42,10 +43,8 @@ var (
 
 const (
 	WalletDefaults = `dir=; password=;`
-	// gasLimit       = uint64(42000) // Based on some online articles.
-	CloudEndpoint = "https://cloudflare-eth.com"
-	// MainEndpoint   = "https://mainnet.infura.io/v3/b03d4386493d4ce79ac8eddb29fb2d15"
-	TestEndpoint = "https://rinkeby.infura.io/v3/b03d4386493d4ce79ac8eddb29fb2d15"
+	CloudEndpoint  = "https://cloudflare-eth.com"
+	TestEndpoint   = "https://rinkeby.infura.io/v3/b03d4386493d4ce79ac8eddb29fb2d15"
 )
 
 func NewWallet(keyStorePath, password, ethEndpoint string) *EthWallet {
@@ -61,11 +60,20 @@ func NewWallet(keyStorePath, password, ethEndpoint string) *EthWallet {
 		glog.Fatalf("While dialing ETH endpoint: %v", err)
 	}
 
+	// The ETH address is registered in ENS via outcaste.io.
+	addr, err := ens.Resolve(client, "outcaste.io")
+	if err != nil {
+		glog.Errorf("While resolving ENS address for outcaste.io: %v", err)
+	} else {
+		glog.Infof("Found outcaste.io ETH address: %s", addr.Hex())
+	}
+	glog.Infof("Wallet is successfully initialized with keystore: %v", EthKeyStorePath)
+
 	return &EthWallet{
-		client:  client,
-		account: accs[0],
-		secret:  password,
-		ks:      ks,
+		endpoint: ethEndpoint,
+		account:  accs[0],
+		secret:   password,
+		ks:       ks,
 	}
 }
 
@@ -74,17 +82,7 @@ func initWallet() {
 		glog.Infof("Cannot initialize wallet because no key store is provided.")
 		return
 	}
-
 	wallet = NewWallet(EthKeyStorePath, EthKeyStorePassword, CloudEndpoint)
-
-	// The ETH address is registered in ENS via outcaste.io.
-	addr, err := ens.Resolve(wallet.client, "outcaste.io")
-	if err != nil {
-		glog.Errorf("While resolving ENS address for outcaste.io: %v", err)
-	} else {
-		glog.Infof("Found outcaste.io ETH address: %s", addr.Hex())
-	}
-	glog.Infof("Wallet is successfully initialized with keystore: %v", EthKeyStorePath)
 }
 
 func UsdToWei(usd float64) *big.Int {
@@ -154,8 +152,15 @@ func (w *EthWallet) Pay(ctx context.Context, usd float64) error {
 		return errors.New("Wallet is not initialized")
 	}
 
+	// It's better to dial just before paying, so we are sure to have a working
+	// connection.
+	client, err := ethclient.Dial(w.endpoint)
+	if err != nil {
+		return errors.Wrapf(err, "while dialing ETH endpoint")
+	}
+
 	// The ETH address is registered in ENS as outcaste.io.
-	addr, err := ens.Resolve(w.client, "outcaste.io")
+	addr, err := ens.Resolve(client, "outcaste.io")
 	if err != nil {
 		glog.Errorf("Error while trying to resolve outcaste.io: %v", err)
 		// Fall back on this hardcoded ETH address. Useful for testing.
@@ -163,12 +168,12 @@ func (w *EthWallet) Pay(ctx context.Context, usd float64) error {
 	}
 	glog.Infof("Found outcaste.io ETH address: %s", addr.Hex())
 
-	nonce, err := w.client.PendingNonceAt(ctx, w.account.Address)
+	nonce, err := client.PendingNonceAt(ctx, w.account.Address)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get pending nonce.")
 	}
 
-	gasPrice, err := w.client.SuggestGasPrice(ctx)
+	gasPrice, err := client.SuggestGasPrice(ctx)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get gas price")
 	}
@@ -176,7 +181,7 @@ func (w *EthWallet) Pay(ctx context.Context, usd float64) error {
 	wei := UsdToWei(usd)
 	glog.Infof("Charging %.2f USD using %.6f ETH (%d WEI)", usd, weiToEth(wei), wei)
 
-	estGas, err := w.client.EstimateGas(ctx, ethereum.CallMsg{
+	estGas, err := client.EstimateGas(ctx, ethereum.CallMsg{
 		From:     w.account.Address,
 		To:       &addr,
 		Value:    wei,
@@ -198,7 +203,7 @@ func (w *EthWallet) Pay(ctx context.Context, usd float64) error {
 	var data []byte
 	tx := types.NewTransaction(nonce, addr, updatedWei, gasLimit, gasPrice, data)
 
-	chainID, err := w.client.NetworkID(ctx)
+	chainID, err := client.NetworkID(ctx)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get chainID")
 	}
@@ -207,5 +212,5 @@ func (w *EthWallet) Pay(ctx context.Context, usd float64) error {
 		return errors.Wrap(err, "Failed to sign the transaction.")
 	}
 	glog.Infof("Attempting ETH txn: %s", signedTx.Hash().Hex())
-	return w.client.SendTransaction(ctx, signedTx)
+	return client.SendTransaction(ctx, signedTx)
 }
