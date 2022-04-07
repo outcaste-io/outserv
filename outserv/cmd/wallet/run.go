@@ -70,7 +70,6 @@ func run(conf *viper.Viper) error {
 }
 
 func testWallet(keyStoreDir, password string) error {
-	// wallet := billing.NewWallet(keyStoreDir, billing.TestEndpoint)
 	wallet := billing.NewWallet(keyStoreDir, password, billing.TestEndpoint)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()

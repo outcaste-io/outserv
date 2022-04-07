@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
@@ -41,9 +42,10 @@ var (
 
 const (
 	WalletDefaults = `keystore=; password=;`
-	gasLimit       = uint64(42000) // Based on some online articles.
-	MainEndpoint   = "https://mainnet.infura.io/v3/b03d4386493d4ce79ac8eddb29fb2d15"
-	TestEndpoint   = "https://rinkeby.infura.io/v3/b03d4386493d4ce79ac8eddb29fb2d15"
+	// gasLimit       = uint64(42000) // Based on some online articles.
+	CloudEndpoint = "https://cloudflare-eth.com"
+	// MainEndpoint   = "https://mainnet.infura.io/v3/b03d4386493d4ce79ac8eddb29fb2d15"
+	TestEndpoint = "https://rinkeby.infura.io/v3/b03d4386493d4ce79ac8eddb29fb2d15"
 )
 
 func NewWallet(keyStorePath, password, ethEndpoint string) *EthWallet {
@@ -73,7 +75,7 @@ func initWallet() {
 		return
 	}
 
-	wallet = NewWallet(EthKeyStorePath, EthKeyStorePassword, MainEndpoint)
+	wallet = NewWallet(EthKeyStorePath, EthKeyStorePassword, CloudEndpoint)
 
 	// The ETH address is registered in ENS via outcaste.io.
 	addr, err := ens.Resolve(wallet.client, "outcaste.io")
@@ -85,7 +87,7 @@ func initWallet() {
 	glog.Infof("Wallet is successfully initialized with keystore: %v", EthKeyStorePath)
 }
 
-func UsdToWei(usd float64) (*big.Int, float64) {
+func UsdToWei(usd float64) *big.Int {
 	type S struct {
 		Base     string `json:"base"`
 		Currency string `json:"currency"`
@@ -138,7 +140,13 @@ func UsdToWei(usd float64) (*big.Int, float64) {
 
 	weiFloat := new(big.Float).Mul(big.NewFloat(valInEth), ethToWei)
 	weis, _ := weiFloat.Int(nil)
-	return weis, valInEth
+	return weis
+}
+
+func weiToEth(a *big.Int) float64 {
+	pow12 := new(big.Int).SetUint64(1e12)
+	out := new(big.Int).Div(a, pow12)
+	return float64(out.Uint64()) / 1e6
 }
 
 func (w *EthWallet) Pay(ctx context.Context, usd float64) error {
@@ -165,11 +173,30 @@ func (w *EthWallet) Pay(ctx context.Context, usd float64) error {
 		return errors.Wrap(err, "Failed to get gas price")
 	}
 
-	wei, eth := UsdToWei(usd)
-	glog.Infof("Charging %.2f USD using %d WEI ~ %.6f ETH", usd, wei, eth)
+	wei := UsdToWei(usd)
+	glog.Infof("Charging %.2f USD using %.6f ETH (%d WEI)", usd, weiToEth(wei), wei)
+
+	estGas, err := w.client.EstimateGas(ctx, ethereum.CallMsg{
+		From:     w.account.Address,
+		To:       &addr,
+		Value:    wei,
+		GasPrice: gasPrice,
+	})
+	if err != nil {
+		glog.Warningf("While estimating gas, got error: %v . Setting to 21000 Wei.", err)
+		estGas = 21000
+	}
+	gasLimit := uint64(float64(estGas) * 1.5)
+	glog.Infof("Estimated gas: %d. Setting gas limit to %d.", estGas, gasLimit)
+
+	estGasWei := new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(estGas))
+	glog.Infof("Estimated cost of txn in ETH: %.6f", weiToEth(estGasWei))
+
+	updatedWei := new(big.Int).Sub(wei, estGasWei)
+	glog.Infof("Updating charge from %.6f ETH to %.6f ETH", weiToEth(wei), weiToEth(updatedWei))
 
 	var data []byte
-	tx := types.NewTransaction(nonce, addr, wei, gasLimit, gasPrice, data)
+	tx := types.NewTransaction(nonce, addr, updatedWei, gasLimit, gasPrice, data)
 
 	chainID, err := w.client.NetworkID(ctx)
 	if err != nil {
