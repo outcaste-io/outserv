@@ -1,13 +1,16 @@
 package wallet
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/golang/glog"
+	"github.com/outcaste-io/outserv/billing"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -22,8 +25,8 @@ var (
 
 func init() {
 	Wallet.Cmd = &cobra.Command{
-		Use:   "create-wallet",
-		Short: "Create Ethereum wallet with an anonymous account",
+		Use:   "wallet",
+		Short: "Ethereum wallet to use with Outserv",
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := run(Wallet.Conf); err != nil {
 				logger.Fatalf("%v\n", err)
@@ -34,8 +37,10 @@ func init() {
 	Wallet.Cmd.SetHelpTemplate(x.NonRootTemplate)
 
 	flag := Wallet.Cmd.Flags()
+	flag.BoolP("create", "c", false, "Create a new wallet.")
+	flag.BoolP("test", "t", false, "Test the provided wallet.")
 	flag.StringP("password", "s", "", "Passphrase to encrypt the wallet.")
-	flag.StringP("dir", "d", "./keystore", "Directory of the wallet keystore.")
+	flag.StringP("dir", "d", "./wallet", "Directory of the wallet keystore.")
 }
 
 func run(conf *viper.Viper) error {
@@ -46,6 +51,7 @@ func run(conf *viper.Viper) error {
 		for {
 			pass := readPassword("Please enter passphrase for the wallet: ")
 			passVerify := readPassword("Please re-enter passphrase for the wallet: ")
+			fmt.Println()
 			if pass != passVerify {
 				fmt.Print("\nPassphrase didn't match. Please retry...\n")
 				continue
@@ -54,7 +60,24 @@ func run(conf *viper.Viper) error {
 			break
 		}
 	}
-	return createWallet(dir, passPhrase)
+	if conf.GetBool("create") {
+		return createWallet(dir, passPhrase)
+	}
+	if conf.GetBool("test") {
+		return testWallet(dir, passPhrase)
+	}
+	return fmt.Errorf("Need one of --create or --test")
+}
+
+func testWallet(keyStoreDir, password string) error {
+	// wallet := billing.NewWallet(keyStoreDir, billing.TestEndpoint)
+	wallet := billing.NewWallet(keyStoreDir, password, billing.TestEndpoint)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	err := wallet.Pay(ctx, 10.0) // Send $10.
+	glog.Infof("ETH payment done with error: %v\n", err)
+	return err
 }
 
 func createWallet(keyStoreDir, passphrase string) error {
