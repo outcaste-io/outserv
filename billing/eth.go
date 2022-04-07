@@ -146,6 +146,16 @@ func weiToEth(a *big.Int) float64 {
 	return float64(out.Uint64()) / 1e6
 }
 
+// Pay method charges the provided USD amount using the Ethereum blockchain.
+// User must have Ether in the wallet for this to succeed.
+//
+// The way it works is:
+// 1. Resolve outcaste.io to the Ethereum address.
+// 2. Figure out the ETH -> USD conversion rate via Coinbase APIs.
+// 3. Calculate the ETH amount we need to charge.
+// 4. Estimate the gas fee.
+// 5. Deduct the fee from the amount to avoid the user paying it.
+// 6. Charge via blockchain.
 func (w *EthWallet) Pay(ctx context.Context, usd float64) error {
 	if w == nil {
 		return errors.New("Wallet is not initialized")
