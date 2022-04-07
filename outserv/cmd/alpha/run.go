@@ -775,7 +775,7 @@ func run() {
 	walletFlag := z.NewSuperFlag(Alpha.Conf.GetString("wallet")).MergeAndCheckDefault(
 		billing.WalletDefaults)
 
-	billing.EthKeyStorePath = walletFlag.GetPath("keystore")
+	billing.EthKeyStorePath = walletFlag.GetPath("dir")
 	billing.EthKeyStorePassword = walletFlag.GetString("password")
 
 	worker.SetConfiguration(&opts)

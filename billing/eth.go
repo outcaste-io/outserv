@@ -41,7 +41,7 @@ var (
 )
 
 const (
-	WalletDefaults = `keystore=; password=;`
+	WalletDefaults = `dir=; password=;`
 	// gasLimit       = uint64(42000) // Based on some online articles.
 	CloudEndpoint = "https://cloudflare-eth.com"
 	// MainEndpoint   = "https://mainnet.infura.io/v3/b03d4386493d4ce79ac8eddb29fb2d15"
