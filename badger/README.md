@@ -8,6 +8,7 @@ Core Maintainers (sorted alphabetically):
 - https://github.com/aman-bansal
 - https://github.com/jarifibrahim
 - https://github.com/manishrjain
+- https://github.com/namanjain8
 - https://github.com/poonai
 
 BadgerDB is an embeddable, persistent and fast key-value (KV) database written
