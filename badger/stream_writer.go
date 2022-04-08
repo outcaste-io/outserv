@@ -123,7 +123,7 @@ func (sw *StreamWriter) PrepareIncremental() error {
 		return nil
 	}
 	if sw.prevLevel == 0 {
-		return fmt.Errorf("Unable to do incremental writes because L0 has data")
+		return fmt.Errorf("unable to do incremental writes because L0 has data")
 	}
 	return nil
 }

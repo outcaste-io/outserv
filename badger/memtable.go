@@ -147,8 +147,6 @@ func (db *DB) openMemTable(fid, flags int) (*memTable, error) {
 	return mt, y.Wrapf(err, "while updating skiplist")
 }
 
-var errExpectingNewFile = errors.New("Expecting to create a new file, but found an existing file")
-
 func (db *DB) newMemTable() (*memTable, error) {
 	mt, err := db.openMemTable(db.nextMemFid, os.O_CREATE|os.O_RDWR)
 	if errors.Is(err, z.NewFile) {
@@ -280,7 +278,7 @@ type logFile struct {
 
 func (lf *logFile) Truncate(end int64) error {
 	if fi, err := lf.Fd.Stat(); err != nil {
-		return fmt.Errorf("while file.stat on file: %s, error: %v\n", lf.Fd.Name(), err)
+		return fmt.Errorf("while file.stat on file: %s, error: %v", lf.Fd.Name(), err)
 	} else if fi.Size() == end {
 		return nil
 	}
@@ -417,7 +415,7 @@ func (lf *logFile) read(p valuePointer) (buf []byte, err error) {
 func (lf *logFile) generateIV(offset uint32) []byte {
 	iv := make([]byte, aes.BlockSize)
 	// baseIV is of 12 bytes.
-	y.AssertTrue(12 == copy(iv[:12], lf.baseIV))
+	y.AssertTrue(copy(iv[:12], lf.baseIV) == 12)
 	// remaining 4 bytes is obtained from offset.
 	binary.BigEndian.PutUint32(iv[12:], offset)
 	return iv

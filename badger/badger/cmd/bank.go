@@ -147,7 +147,7 @@ func min(a, b uint64) uint64 {
 	return b
 }
 
-var errAbandoned = errors.New("Transaction abandonded due to insufficient balance")
+var errAbandoned = errors.New("transaction abandonded due to insufficient balance")
 
 func moveMoney(db *badger.DB, from, to int) error {
 	return db.Update(func(txn *badger.Txn) error {

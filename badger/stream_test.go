@@ -27,7 +27,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/outcaste-io/badger/v3/pb"
-	bpb "github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/ristretto/z"
 	"github.com/stretchr/testify/require"
@@ -49,7 +48,7 @@ func value(k int) []byte {
 }
 
 type collector struct {
-	kv []*bpb.KV
+	kv []*pb.KV
 }
 
 func (c *collector) Send(buf *z.Buffer) error {
@@ -61,7 +60,7 @@ func (c *collector) Send(buf *z.Buffer) error {
 		if kv.StreamDone == true {
 			return nil
 		}
-		cp := proto.Clone(kv).(*bpb.KV)
+		cp := proto.Clone(kv).(*pb.KV)
 		c.kv = append(c.kv, cp)
 	}
 	return err
@@ -192,7 +191,7 @@ func TestStreamWithThreadId(t *testing.T) {
 	stream := db.NewStreamAt(math.MaxUint64)
 	stream.LogPrefix = "Testing"
 	stream.KeyToList = func(key []byte, itr *Iterator) (
-		*bpb.KVList, error) {
+		*pb.KVList, error) {
 		require.Less(t, itr.ThreadId, stream.NumGo)
 		return stream.ToList(key, itr)
 	}

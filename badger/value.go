@@ -55,8 +55,6 @@ const (
 	bitTxn    byte = 1 << 6 // Set if the entry is part of a txn.
 	bitFinTxn byte = 1 << 7 // Set if the entry is to indicate end of txn in value log.
 
-	mi int64 = 1 << 20
-
 	// size of vlog header.
 	// +----------------+------------------+
 	// | keyID(8 bytes) |  baseIV(12 bytes)|
@@ -66,7 +64,6 @@ const (
 
 var errStop = errors.New("Stop iteration")
 var errTruncate = errors.New("Do truncate")
-var errDeleteVlogFile = errors.New("Delete vlog file")
 
 type logEntry func(e Entry, vp valuePointer) error
 
@@ -1065,12 +1062,6 @@ func discardEntry(e Entry, vs y.ValueStruct, db *DB) bool {
 		return true
 	}
 	return false
-}
-
-type reason struct {
-	total   float64
-	discard float64
-	count   int
 }
 
 func (vlog *valueLog) doRunGC(lf *logFile) error {
