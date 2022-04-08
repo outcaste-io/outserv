@@ -18,6 +18,7 @@ package badger
 
 import (
 	"encoding/binary"
+	"fmt"
 	"time"
 	"unsafe"
 )
@@ -171,6 +172,11 @@ func (e *Entry) skipVlogAndSetThreshold(threshold int64) bool {
 		e.valThreshold = threshold
 	}
 	return int64(len(e.Value)) < e.valThreshold
+}
+
+func (e Entry) String() {
+	fmt.Printf("Key: %s Meta: %d UserMeta: %d Offset: %d len(val)=%d",
+		e.Key, e.meta, e.UserMeta, e.offset, len(e.Value))
 }
 
 // NewEntry creates a new entry with key and value passed in args. This newly created entry can be
