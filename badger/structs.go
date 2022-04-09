@@ -174,9 +174,9 @@ func (e *Entry) skipVlogAndSetThreshold(threshold int64) bool {
 	return int64(len(e.Value)) < e.valThreshold
 }
 
-func (e Entry) print(prefix string) {
-	fmt.Printf("%s Key: %s Meta: %d UserMeta: %d Offset: %d len(val)=%d",
-		prefix, e.Key, e.meta, e.UserMeta, e.offset, len(e.Value))
+func (e Entry) String() {
+	fmt.Printf("Key: %s Meta: %d UserMeta: %d Offset: %d len(val)=%d",
+		e.Key, e.meta, e.UserMeta, e.offset, len(e.Value))
 }
 
 // NewEntry creates a new entry with key and value passed in args. This newly created entry can be

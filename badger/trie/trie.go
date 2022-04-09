@@ -66,7 +66,7 @@ func parseIgnoreBytes(ig string) ([]bool, error) {
 	for _, each := range strings.Split(strings.TrimSpace(ig), ",") {
 		r := strings.Split(strings.TrimSpace(each), "-")
 		if len(r) == 0 || len(r) > 2 {
-			return out, fmt.Errorf("Invalid range: %s", each)
+			return out, fmt.Errorf("invalid range: %s", each)
 		}
 		start, end := -1, -1
 		if len(r) == 2 {
@@ -85,7 +85,7 @@ func parseIgnoreBytes(ig string) ([]bool, error) {
 			start = idx
 		}
 		if start == -1 {
-			return out, fmt.Errorf("Invalid range: %s", each)
+			return out, fmt.Errorf("invalid range: %s", each)
 		}
 		for start >= len(out) {
 			out = append(out, false)
