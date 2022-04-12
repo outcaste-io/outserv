@@ -354,6 +354,7 @@ func UidsForObject(ctx context.Context, obj *pb.Object) (*sroar.Bitmap, error) {
 			// First: 3, // We can't just ask for the first 3, because we might have
 			// to intersect this result with others.
 		}
+		glog.Infof("running query: %+v\n", q)
 		result, err := ProcessTaskOverNetwork(ctx, q)
 		if err != nil {
 			return nil, errors.Wrapf(err, "while calling ProcessTaskOverNetwork")
@@ -377,8 +378,22 @@ func UidsForObject(ctx context.Context, obj *pb.Object) (*sroar.Bitmap, error) {
 
 func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.Txn) error {
 	// Deal with objects first.
+	resolved := make(map[string]uint64)
 	for _, obj := range m.NewObjects {
 		glog.Infof("Got object: %+v\n", obj)
+		bm, err := UidsForObject(ctx, obj)
+		glog.Infof("got uids: %d error: %v\n", bm.GetCardinality(), err)
+
+		card := bm.GetCardinality()
+		if card > 1 {
+			return fmt.Errorf("Found XID uniqueness violation while processing"+
+				" object with var: %q", obj.Var)
+		}
+		if card == 1 {
+			resolved[obj.Var] = bm.ToArray()[0]
+		} else {
+			resolved[obj.Var] = obj.Uid
+		}
 	}
 
 	// It is possible that the user gives us multiple versions of the same edge, one with no facets

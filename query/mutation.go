@@ -13,6 +13,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/gql"
+	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
@@ -142,7 +143,7 @@ func verifyUid(ctx context.Context, uid uint64) error {
 
 // TODO: Gotta pass the GQL field, so we can figure out the XID fields corresponding
 // to a type.
-func ToMutations(ctx context.Context, gmuList []*pb.Mutation) (*pb.Mutations, error) {
+func ToMutations(ctx context.Context, gmuList []*pb.Mutation, schema *schema.Schema) (*pb.Mutations, error) {
 	var nquads []*pb.NQuad
 	for _, gmu := range gmuList {
 		nquads = append(nquads, gmu.Nquads...)
@@ -167,39 +168,51 @@ func ToMutations(ctx context.Context, gmuList []*pb.Mutation) (*pb.Mutations, er
 
 	mu := &pb.Mutations{}
 	var obj *pb.Object
+
+	types := make(map[string]bool)
+	xids := make(map[string]bool)
 	for _, nq := range nquads {
 		if nq.Op == pb.NQuad_DEL {
 			mu.Nquads = append(mu.Nquads, nq)
 			obj = nil
 			continue
 		}
+		// attr := x.ParseAttr(nq.Predicate)
+		attr := nq.Predicate
+		if strings.HasPrefix(attr, "dgraph.") {
+			mu.Nquads = append(mu.Nquads, nq)
+			continue
+		}
+		gqlType := strings.Split(attr, ".")[0]
+		if _, done := types[gqlType]; !done {
+			typ := schema.Type(gqlType)
+			for _, xid := range typ.XIDFields() {
+				xids[xid.DgraphAlias()] = true
+				glog.Infof("Found xid: %q\n", xid.DgraphAlias())
+			}
+		}
+		_, isXid := xids[attr]
+		glog.Infof("nq.pred: %q attr: %q, typ: %q isXid: %v", nq.Predicate, attr, gqlType, isXid)
+		if !isXid {
+			mu.Nquads = append(mu.Nquads, nq)
+			continue
+		}
 		if obj != nil && obj.Var == nq.Subject {
 			// Subject matches an existing object, append to it.
-			// TODO: The predicate should also be considered.
-			if len(nq.ObjectId) > 0 {
-				// This is an edge, not part of the object itself.
-				mu.Nquads = append(mu.Nquads, nq)
-			} else {
-				obj.Nquads = append(obj.Nquads, nq)
-			}
+			obj.Nquads = append(obj.Nquads, nq)
 			continue
 		}
 		if strings.HasPrefix(nq.Subject, "_:") {
 			// Create a new object.
 			obj = &pb.Object{Var: nq.Subject}
 			mu.NewObjects = append(mu.NewObjects, obj)
-
-			if len(nq.ObjectId) > 0 {
-				// This is an edge, not part of the object itself.
-				mu.Nquads = append(mu.Nquads, nq)
-			} else {
-				obj.Nquads = append(obj.Nquads, nq)
-			}
+			obj.Nquads = append(obj.Nquads, nq)
 			continue
 		}
 		mu.Nquads = append(mu.Nquads, nq)
 		obj = nil
 	}
+	glog.Infof("Found xids: %+v\n", xids)
 
 	if num := len(mu.NewObjects); num > 0 {
 		var res *pb.AssignedIds

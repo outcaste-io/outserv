@@ -286,7 +286,7 @@ func handleAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		glog.Infof("Mutation Req JSON data: %s\n", data2)
 		glog.Infof("NQuads: %+v\n", mu.Nquads)
 	}
-	resp, err := edgraph.Query(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}})
+	resp, err := edgraph.QueryGraphQL(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}}, m)
 	if err != nil {
 		return nil, err
 	}

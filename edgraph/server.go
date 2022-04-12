@@ -648,7 +648,7 @@ func doMutate(ctx context.Context, qc *queryContext, resp *pb.Response) error {
 		return err
 	}
 
-	mu, err := query.ToMutations(ctx, qc.gmuList)
+	mu, err := query.ToMutations(ctx, qc.gmuList, qc.gqlField.Schema())
 	if err != nil {
 		return err
 	}
