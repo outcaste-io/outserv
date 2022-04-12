@@ -29,6 +29,7 @@ import (
 
 	"github.com/outcaste-io/badger/v3"
 	bpb "github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/outserv/codec"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -38,6 +39,7 @@ import (
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/outserv/zero"
 	"github.com/outcaste-io/ristretto/z"
+	"github.com/outcaste-io/sroar"
 )
 
 const (
@@ -280,10 +282,23 @@ func detectPendingTxns(attr string) error {
 	return errHasPendingTxns
 }
 
+func emptyMutation(mu *pb.Mutations) bool {
+	if len(mu.GetEdges()) > 0 {
+		return false
+	}
+	if len(mu.GetNquads()) > 0 {
+		return false
+	}
+	if len(mu.GetNewObjects()) > 0 {
+		return false
+	}
+	return true
+}
+
 func (n *node) mutationWorker(workerId int) {
 	handleEntry := func(p *pb.Proposal) {
 		x.AssertTrue(p.Key != 0)
-		x.AssertTrue(len(p.Mutations.GetEdges()) > 0)
+		x.AssertTrue(!emptyMutation(p.Mutations))
 
 		ctx := n.Ctx(p.Key)
 		x.AssertTrue(ctx != nil)
@@ -309,7 +324,63 @@ func (n *node) mutationWorker(workerId int) {
 	}
 }
 
+func UidsForObject(ctx context.Context, obj *pb.Object) (*sroar.Bitmap, error) {
+	var res *sroar.Bitmap
+	for _, nq := range obj.Nquads {
+		if nq.ObjectValue == nil {
+			return nil, fmt.Errorf("Unexpected nil object value for %+v", nq)
+		}
+
+		var strVal string
+		val := nq.ObjectValue
+		switch val.Val.(type) {
+		case *pb.Value_IntVal:
+			strVal = strconv.FormatInt(val.GetIntVal(), 10)
+		case *pb.Value_StrVal:
+			strVal = val.GetStrVal()
+		default:
+			return nil, fmt.Errorf("encountered an XID %s with invalid val: %+v", nq.Predicate, val)
+		}
+
+		q := &pb.Query{
+			ReadTs: posting.ReadTimestamp(), // What timestamp should we use?
+
+			// TODO(mrjn): Namespace 0 is hardcoded here. We should allow for other namespaces later.
+			Attr: x.NamespaceAttr(0, nq.Predicate),
+			SrcFunc: &pb.SrcFunction{
+				Name: "eq",
+				Args: []string{strVal},
+			},
+			// First: 3, // We can't just ask for the first 3, because we might have
+			// to intersect this result with others.
+		}
+		result, err := ProcessTaskOverNetwork(ctx, q)
+		if err != nil {
+			return nil, errors.Wrapf(err, "while calling ProcessTaskOverNetwork")
+		}
+		if len(result.UidMatrix) == 0 {
+			// No result found
+			return sroar.NewBitmap(), nil
+		}
+		bm := codec.FromList(result.UidMatrix[0])
+		if res == nil {
+			res = bm
+		} else {
+			res.And(bm)
+		}
+		if res.GetCardinality() == 0 {
+			return res, nil
+		}
+	}
+	return res, nil
+}
+
 func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.Txn) error {
+	// Deal with objects first.
+	for _, obj := range m.NewObjects {
+		glog.Infof("Got object: %+v\n", obj)
+	}
+
 	// It is possible that the user gives us multiple versions of the same edge, one with no facets
 	// and another with facets. In that case, use stable sort to maintain the ordering given to us
 	// by the user.
@@ -1439,7 +1510,8 @@ func (n *node) Run() {
 
 					props = append(props, p)
 
-					if len(p.Mutations.GetEdges()) == 0 {
+					if emptyMutation(p.Mutations) {
+						glog.Infof("Continuing for mutation: %+v\n", p.Mutations)
 						continue
 					}
 					var skip bool

@@ -135,6 +135,8 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 			// We need a counter with this variable to allow multiple such
 			// objects.
 			dst["uid"] = fmt.Sprintf("_:%s-%d", typ.Name(), atomic.AddUint64(&objCounter, 1))
+			// We could store the query in __outserv.q__, storing predicates and
+			// values in pairs.
 		}
 		// TODO(mrjn): We should overhaul this type system later.
 		dst["dgraph.type"] = typ.DgraphName()
@@ -745,12 +747,14 @@ func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 func UidsForXid(ctx context.Context, pred, value string) (*sroar.Bitmap, error) {
 	q := &pb.Query{
 		ReadTs: posting.ReadTimestamp(),
-		Attr:   x.NamespaceAttr(0, pred),
+		// TODO(mrjn): Namespace 0 is hardcoded here. We should allow for other namespaces later.
+		Attr: x.NamespaceAttr(0, pred),
 		SrcFunc: &pb.SrcFunction{
 			Name: "eq",
 			Args: []string{value},
 		},
-		First: 3,
+		// First: 3, // We can't just ask for the first 3, because we might have
+		// to intersect this result with others.
 	}
 	result, err := worker.ProcessTaskOverNetwork(ctx, q)
 	if err != nil {

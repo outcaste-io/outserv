@@ -185,17 +185,25 @@ message DirectedEdge {
   uint64 namespace = 11;
 }
 
+message Object {
+  string var = 1;
+  uint64 uid = 2;
+  repeated NQuad nquads = 3;
+}
+
 message Mutations {
   uint32 group_id = 1;
-  repeated DirectedEdge edges = 3;
-  repeated SchemaUpdate schema = 4;
+  repeated Object new_objects = 2;
+  repeated NQuad nquads = 3;
+  repeated DirectedEdge edges = 4; // Remove this
+  repeated SchemaUpdate schema = 5;
   enum DropOp {
     NONE = 0;
     ALL = 1;
     DATA = 2;
   }
-  DropOp drop_op = 7;
-  string drop_value = 8;
+  DropOp drop_op = 8;
+  string drop_value = 9;
 }
 
 message Snapshot {

@@ -648,35 +648,54 @@ func doMutate(ctx context.Context, qc *queryContext, resp *pb.Response) error {
 		return err
 	}
 
-	newUids, err := query.AssignUids(ctx, qc.gmuList)
+	mu, err := query.ToMutations(ctx, qc.gmuList)
 	if err != nil {
 		return err
 	}
+	_ = mu
+
+	// newUids, err := query.AssignUids(ctx, qc.gmuList)
+	// if err != nil {
+	// 	return err
+	// }
+	// glog.Infof("Got a map for newUids: %+v\n", newUids)
+
+	// TODO(mrjn): Add a verify pb.Mutations function, which can double check
+	// the UIDs used in the mutation.
+
+	//
+	// TODO: We could assign each of the new UIDs a query. If the query returns
+	// a valid result, the newUids map would get updated with the result UID.
+	// Otherwise, it would use the assigned UID.
 
 	// resp.Uids contains a map of the node name to the uid.
 	// 1. For a blank node, like _:foo, the key would be foo.
 	// 2. For a uid variable that is part of an upsert query,
 	//    like uid(foo), the key would be uid(foo).
-	resp.Uids = query.UidsToHex(query.StripBlankNode(newUids))
-	edges, err := query.ToDirectedEdges(qc.gmuList, newUids)
-	if err != nil {
-		return err
-	}
-	m := &pb.Mutations{
-		Edges: edges,
-	}
+	// resp.Uids = query.UidsToHex(query.StripBlankNode(newUids))
 
-	qc.span.Annotatef(nil, "Applying mutations: %+v", m)
-	resp.Txn, err = query.ApplyMutations(ctx, m)
+	// We could keep directed edges. But, just have Mutations keep a list of
+	// NQuads. The objects can be
+	// edges, err := query.ToDirectedEdges(qc.gmuList, newUids)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// m := &pb.Mutations{
+	// 	Edges: edges,
+	// }
+
+	qc.span.Annotatef(nil, "Applying mutations: %+v", mu)
+	resp.Txn, err = query.ApplyMutations(ctx, mu)
 	qc.span.Annotatef(nil, "Txn Context: %+v. Err=%v", resp.Txn, err)
 
 	// calculateMutationMetrics calculate cost for the mutation.
-	calculateMutationMetrics := func() {
-		cost := uint64(len(newUids) + len(edges))
-		resp.Metrics.NumUids["mutation_cost"] = cost
-		resp.Metrics.NumUids["_total"] = resp.Metrics.NumUids["_total"] + cost
-	}
-	calculateMutationMetrics()
+	// calculateMutationMetrics := func() {
+	// 	cost := uint64(len(newUids) + len(edges))
+	// 	resp.Metrics.NumUids["mutation_cost"] = cost
+	// 	resp.Metrics.NumUids["_total"] = resp.Metrics.NumUids["_total"] + cost
+	// }
+	// calculateMutationMetrics()
 	return err
 }
 
@@ -1262,6 +1281,7 @@ func doQuery(ctx context.Context, req *Request) (resp *pb.Response, rerr error) 
 		graphql:  isGraphQL,
 		gqlField: req.gqlField,
 	}
+	// parseRequest converts mutation JSON to NQuads.
 	if rerr = parseRequest(qc); rerr != nil {
 		return
 	}

@@ -526,6 +526,29 @@ func proposeOrSend(ctx context.Context, gid uint32, m *pb.Mutations, chr chan re
 // should be sent to that group.
 func populateMutationMap(src *pb.Mutations) (map[uint32]*pb.Mutations, error) {
 	mm := make(map[uint32]*pb.Mutations)
+	for _, nq := range src.Nquads {
+		gid, err := groups().BelongsTo(nq.Predicate)
+		if err != nil {
+			return nil, err
+		}
+
+		mu := mm[gid]
+		if mu == nil {
+			mu = &pb.Mutations{GroupId: gid}
+			mm[gid] = mu
+		}
+		mu.Nquads = append(mu.Nquads, nq)
+	}
+	for _, obj := range src.NewObjects {
+		// TODO(mrjn): Start distributing by type. Hard coding to one for now.
+		gid := uint32(1)
+		mu := mm[gid]
+		if mu == nil {
+			mu = &pb.Mutations{GroupId: gid}
+			mm[gid] = mu
+		}
+		mu.NewObjects = append(mu.NewObjects, obj)
+	}
 	for _, edge := range src.Edges {
 		gid, err := groups().BelongsTo(edge.Attr)
 		if err != nil {
