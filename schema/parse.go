@@ -55,7 +55,7 @@ func parseDirective(it *lex.ItemIterator, schema *pb.SchemaUpdate, t types.TypeI
 	case "upsert":
 		schema.Upsert = true
 	case "lang":
-		if t != types.StringID || schema.List {
+		if t != types.TypeString || schema.List {
 			return next.Errorf("@lang directive can only be specified for string type."+
 				" Got: [%v] for attr: [%v]", t.Name(), schema.Predicate)
 		}
@@ -107,7 +107,7 @@ func parseScalarPair(it *lex.ItemIterator, predicate string, ns uint64) (*pb.Sch
 		return nil, next.Errorf("Undefined Type")
 	}
 	if schema.List {
-		if uint32(t) == uint32(types.PasswordID) || uint32(t) == uint32(types.BoolID) {
+		if uint32(t) == uint32(types.TypePassword) || uint32(t) == uint32(types.TypeBool) {
 			return nil, next.Errorf("Unsupported type for list: [%s].", types.TypeID(t).Name())
 		}
 	}
@@ -158,7 +158,7 @@ func parseIndexDirective(it *lex.ItemIterator, predicate string,
 	var seen = make(map[string]bool)
 	var seenSortableTok bool
 
-	if typ == types.UidID || typ == types.DefaultID || typ == types.PasswordID {
+	if typ == types.TypeUid || typ == types.TypeDefault || typ == types.TypePassword {
 		return tokenizers, it.Item().Errorf("Indexing not allowed on predicate %s of type %s",
 			predicate, typ.Name())
 	}
@@ -229,13 +229,13 @@ func resolveTokenizers(updates []*pb.SchemaUpdate) error {
 	for _, schema := range updates {
 		typ := types.TypeID(schema.ValueType)
 
-		if (typ == types.UidID || typ == types.DefaultID || typ == types.PasswordID) &&
+		if (typ == types.TypeUid || typ == types.TypeDefault || typ == types.TypePassword) &&
 			schema.Directive == pb.SchemaUpdate_INDEX {
 			return errors.Errorf("Indexing not allowed on predicate %s of type %s",
 				x.ParseAttr(schema.Predicate), typ.Name())
 		}
 
-		if typ == types.UidID {
+		if typ == types.TypeUid {
 			continue
 		}
 

@@ -18,7 +18,6 @@ import (
 	bpb "github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/outserv/codec"
-	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/types"
@@ -227,14 +226,9 @@ func NewPosting(t *pb.Edge) (*pb.Posting, error) {
 		postingType = pb.Posting_REF
 	}
 
-	val, tid, err := gql.ByteVal(t)
-	if err != nil {
-		return nil, err
-	}
 	p := &pb.Posting{
 		Uid:         x.FromHex(t.ObjectId),
-		Value:       val,
-		ValType:     tid.Enum(),
+		Value:       t.ObjectValue,
 		PostingType: postingType,
 		Op:          op,
 	}
@@ -328,9 +322,12 @@ func (l *List) updateMutationLayer(mpost *pb.Posting, singleUidUpdate bool) erro
 // TypeID returns the typeid of destination vertex
 func TypeID(edge *pb.Edge) types.TypeID {
 	if len(edge.ObjectId) != 0 {
-		return types.UidID
+		return types.TypeUid
 	}
-	return gql.TypeValFrom(edge.ObjectValue).Tid
+	if len(edge.ObjectValue) == 0 {
+		return types.TypeUndefined
+	}
+	return types.TypeID(edge.ObjectValue[0])
 }
 
 func fingerprintEdge(t *pb.Edge) uint64 {
@@ -343,8 +340,7 @@ func fingerprintEdge(t *pb.Edge) uint64 {
 	var id uint64 = math.MaxUint64
 
 	if schema.State().IsList(t.Predicate) {
-		// TODO(mrjn): Ensure this is correct.
-		id = farm.Fingerprint64([]byte(t.ObjectValue.String()))
+		id = farm.Fingerprint64(t.ObjectValue)
 	}
 	return id
 }
@@ -1297,16 +1293,13 @@ func (l *List) Postings(opt ListOptions, postFn func(*pb.Posting) error) error {
 }
 
 // AllValues returns all the values in the posting list.
-func (l *List) AllValues(readTs uint64) ([]types.Val, error) {
+func (l *List) AllValues(readTs uint64) ([]types.Sval, error) {
 	l.RLock()
 	defer l.RUnlock()
 
-	var vals []types.Val
+	var vals []types.Sval
 	err := l.iterate(readTs, 0, func(p *pb.Posting) error {
-		vals = append(vals, types.Val{
-			Tid:   types.TypeID(p.ValType),
-			Value: p.Value,
-		})
+		vals = append(vals, types.Sval(p.Value))
 		return nil
 	})
 	return vals, errors.Wrapf(err, "cannot retrieve all values from list with key %s",
@@ -1329,7 +1322,7 @@ func (l *List) GetLangTags(readTs uint64) ([]string, error) {
 
 // Value returns the default value from the posting list. The default value is
 // defined as the value without a language tag.
-func (l *List) Value(readTs uint64) (rval types.Val, rerr error) {
+func (l *List) Value(readTs uint64) (rval types.Sval, rerr error) {
 	l.RLock()
 	defer l.RUnlock()
 	val, found, err := l.findValue(readTs, math.MaxUint64)
@@ -1344,14 +1337,14 @@ func (l *List) Value(readTs uint64) (rval types.Val, rerr error) {
 }
 
 // ValueFor returns a value from posting list.
-func (l *List) ValueFor(readTs uint64) (rval types.Val, rerr error) {
+func (l *List) ValueFor(readTs uint64) (rval types.Sval, rerr error) {
 	l.RLock() // All public methods should acquire locks, while private ones should assert them.
 	defer l.RUnlock()
 	p, err := l.postingFor(readTs)
 	if err != nil {
 		return rval, err
 	}
-	return valueToTypesVal(p), nil
+	return types.Sval(p.Value), nil
 }
 
 // PostingFor returns the posting according to the preferred language list.
@@ -1368,47 +1361,14 @@ func (l *List) postingFor(readTs uint64) (p *pb.Posting, rerr error) {
 	return pos, err
 }
 
-// ValueForTag returns the value in the posting list with the given language tag.
-func (l *List) ValueForTag(readTs uint64, tag string) (rval types.Val, rerr error) {
-	l.RLock()
-	defer l.RUnlock()
-	p, err := l.postingForTag(readTs, tag)
-	if err != nil {
-		return rval, err
-	}
-	return valueToTypesVal(p), nil
-}
-
-func valueToTypesVal(p *pb.Posting) (rval types.Val) {
-	// This is ok because we dont modify the value of a posting. We create a newPosting
-	// and add it to the PostingList to do a set.
-	rval.Value = p.Value
-	rval.Tid = types.TypeID(p.ValType)
-	return
-}
-
-func (l *List) postingForTag(readTs uint64, tag string) (p *pb.Posting, rerr error) {
-	l.AssertRLock()
-	uid := farm.Fingerprint64([]byte(tag))
-	found, p, err := l.findPosting(readTs, uid)
-	if err != nil {
-		return p, err
-	}
-	if !found {
-		return p, ErrNoValue
-	}
-
-	return p, nil
-}
-
-func (l *List) findValue(readTs, uid uint64) (rval types.Val, found bool, err error) {
+func (l *List) findValue(readTs, uid uint64) (rval types.Sval, found bool, err error) {
 	l.AssertRLock()
 	found, p, err := l.findPosting(readTs, uid)
 	if !found {
 		return rval, found, err
 	}
 
-	return valueToTypesVal(p), true, nil
+	return types.Sval(p.Value), true, nil
 }
 
 func (l *List) findPosting(readTs uint64, uid uint64) (found bool, pos *pb.Posting, err error) {

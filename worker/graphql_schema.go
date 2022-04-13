@@ -16,6 +16,7 @@ import (
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/schema"
+	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
@@ -106,9 +107,9 @@ func UpdateGQLSchemaOverNetwork(ctx context.Context, req *pb.UpdateGraphQLSchema
 	return c.UpdateGraphQLSchema(ctx, req)
 }
 
-func ParseAsSchemaAndScript(b []byte) (string, string) {
+func ParseAsSchemaAndScript(b types.Sval) (string, string) {
 	var data x.GQL
-	if err := json.Unmarshal(b, &data); err != nil {
+	if err := json.Unmarshal(b[1:], &data); err != nil {
 		glog.Warningf("Cannot unmarshal existing GQL schema into new format. Got err: %+v. "+
 			" Assuming old format.", err)
 		return string(b), ""
@@ -177,7 +178,7 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 			{
 				Subject:     x.ToHexString(SchemaNodeUid),
 				Predicate:   x.NamespaceAttr(namespace, GqlSchemaPred),
-				ObjectValue: &pb.Value{Val: &pb.Value_BytesVal{val}},
+				ObjectValue: append([]byte{byte(types.TypeBinary)}, val...),
 				Op:          pb.Edge_SET,
 			},
 			{
@@ -189,13 +190,13 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 				// only be one server which is able to successfully update the GraphQL schema.
 				Subject:     x.ToHexString(SchemaNodeUid),
 				Predicate:   x.NamespaceAttr(namespace, gqlSchemaXidPred),
-				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{gqlSchemaXidVal}},
+				ObjectValue: types.StringToBinary(gqlSchemaXidVal),
 				Op:          pb.Edge_SET,
 			},
 			{
 				Subject:     x.ToHexString(SchemaNodeUid),
 				Predicate:   x.NamespaceAttr(namespace, "dgraph.type"),
-				ObjectValue: &pb.Value{Val: &pb.Value_StrVal{"dgraph.graphql"}},
+				ObjectValue: types.StringToBinary("dgraph.graphql"),
 				Op:          pb.Edge_SET,
 			},
 		},

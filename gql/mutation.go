@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/outcaste-io/outserv/protos/pb"
-	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
@@ -33,48 +32,6 @@ func ParseUid(xid string) (uint64, error) {
 // NQuad is an alias for the NQuad type in the API protobuf library.
 type NQuad struct {
 	*pb.Edge
-}
-
-func TypeValFrom(val *pb.Value) types.Val {
-	switch val.Val.(type) {
-	case *pb.Value_BytesVal:
-		return types.Val{Tid: types.BinaryID, Value: val.GetBytesVal()}
-	case *pb.Value_IntVal:
-		return types.Val{Tid: types.IntID, Value: val.GetIntVal()}
-	case *pb.Value_StrVal:
-		return types.Val{Tid: types.StringID, Value: val.GetStrVal()}
-	case *pb.Value_BoolVal:
-		return types.Val{Tid: types.BoolID, Value: val.GetBoolVal()}
-	case *pb.Value_DoubleVal:
-		return types.Val{Tid: types.FloatID, Value: val.GetDoubleVal()}
-	case *pb.Value_GeoVal:
-		return types.Val{Tid: types.GeoID, Value: val.GetGeoVal()}
-	case *pb.Value_DatetimeVal:
-		return types.Val{Tid: types.DateTimeID, Value: val.GetDatetimeVal()}
-	case *pb.Value_PasswordVal:
-		return types.Val{Tid: types.PasswordID, Value: val.GetPasswordVal()}
-	case *pb.Value_DefaultVal:
-		return types.Val{Tid: types.DefaultID, Value: val.GetDefaultVal()}
-	}
-
-	return types.Val{Tid: types.StringID, Value: ""}
-}
-
-func ByteVal(nq *pb.Edge) ([]byte, types.TypeID, error) {
-	// We infer object type from type of value. We set appropriate type in parse
-	// function or the Go client has already set.
-	p := TypeValFrom(nq.ObjectValue)
-	// These three would have already been marshalled to bytes by the client or
-	// in parse function.
-	if p.Tid == types.GeoID || p.Tid == types.DateTimeID {
-		return p.Value.([]byte), p.Tid, nil
-	}
-
-	p1 := types.ValueForType(types.BinaryID)
-	if err := types.Marshal(p, &p1); err != nil {
-		return []byte{}, p.Tid, err
-	}
-	return []byte(p1.Value.([]byte)), p.Tid, nil
 }
 
 func toUid(subject string, newToUid map[string]uint64) (uid uint64, err error) {
@@ -106,83 +63,83 @@ func (nq NQuad) CreateUidEdge(subjectUid uint64, objectUid uint64) *pb.DirectedE
 	return out
 }
 
-// CreateValueEdge returns a DirectedEdge with the given subject. The predicate,
-// language, and facet values are derived from the NQuad.
-func (nq NQuad) CreateValueEdge(subjectUid uint64) (*pb.DirectedEdge, error) {
-	var err error
+// // CreateValueEdge returns a DirectedEdge with the given subject. The predicate,
+// // language, and facet values are derived from the NQuad.
+// func (nq NQuad) CreateValueEdge(subjectUid uint64) (*pb.DirectedEdge, error) {
+// 	var err error
 
-	out := nq.createEdgePrototype(subjectUid)
-	if err = copyValue(out, nq); err != nil {
-		return &emptyEdge, err
-	}
-	return out, nil
-}
+// 	out := nq.createEdgePrototype(subjectUid)
+// 	if err = copyValue(out, nq); err != nil {
+// 		return &emptyEdge, err
+// 	}
+// 	return out, nil
+// }
 
 // ToDeletePredEdge takes an NQuad of the form '* p *' and returns the equivalent
 // directed edge. Returns an error if the NQuad does not have the expected form.
-func (nq NQuad) ToDeletePredEdge() (*pb.DirectedEdge, error) {
-	if nq.Subject != x.Star && nq.ObjectValue.String() != x.Star {
-		return &emptyEdge, errors.Errorf("Subject and object both should be *. Got: %+v", nq)
-	}
+// func (nq NQuad) ToDeletePredEdge() (*pb.DirectedEdge, error) {
+// 	if nq.Subject != x.Star && !x.IsStarAll(nq.ObjectValue) {
+// 		return &emptyEdge, errors.Errorf("Subject and object both should be *. Got: %+v", nq)
+// 	}
 
-	out := &pb.DirectedEdge{
-		// This along with edge.ObjectValue == x.Star would indicate
-		// that we want to delete the predicate.
-		Entity:    0,
-		Attr:      nq.Predicate,
-		Namespace: nq.Namespace,
-		Op:        pb.DirectedEdge_DEL,
-	}
+// 	out := &pb.DirectedEdge{
+// 		// This along with edge.ObjectValue == x.Star would indicate
+// 		// that we want to delete the predicate.
+// 		Entity:    0,
+// 		Attr:      nq.Predicate,
+// 		Namespace: nq.Namespace,
+// 		Op:        pb.DirectedEdge_DEL,
+// 	}
 
-	if err := copyValue(out, nq); err != nil {
-		return &emptyEdge, err
-	}
-	return out, nil
-}
+// 	if err := copyValue(out, nq); err != nil {
+// 		return &emptyEdge, err
+// 	}
+// 	return out, nil
+// }
 
-// ToEdgeUsing determines the UIDs for the provided XIDs and populates the
-// xidToUid map.
-func (nq NQuad) ToEdgeUsing(newToUid map[string]uint64) (*pb.DirectedEdge, error) {
-	var edge *pb.DirectedEdge
-	sUid, err := toUid(nq.Subject, newToUid)
-	if err != nil {
-		return nil, err
-	}
+// // ToEdgeUsing determines the UIDs for the provided XIDs and populates the
+// // xidToUid map.
+// func (nq NQuad) ToEdgeUsing(newToUid map[string]uint64) (*pb.DirectedEdge, error) {
+// 	var edge *pb.DirectedEdge
+// 	sUid, err := toUid(nq.Subject, newToUid)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	if sUid == 0 {
-		return nil, errors.Errorf("Subject should be > 0 for nquad: %+v", nq)
-	}
+// 	if sUid == 0 {
+// 		return nil, errors.Errorf("Subject should be > 0 for nquad: %+v", nq)
+// 	}
 
-	switch nq.valueType() {
-	case x.ValueUid:
-		oUid, err := toUid(nq.ObjectId, newToUid)
-		if err != nil {
-			return nil, err
-		}
-		if oUid == 0 {
-			return nil, errors.Errorf("ObjectId should be > 0 for nquad: %+v", nq)
-		}
-		edge = nq.CreateUidEdge(sUid, oUid)
-	case x.ValuePlain, x.ValueMulti:
-		edge, err = nq.CreateValueEdge(sUid)
-	default:
-		return &emptyEdge, errors.Errorf("Unknown value type for nquad: %+v", nq)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return edge, nil
-}
+// 	switch nq.valueType() {
+// 	case x.ValueUid:
+// 		oUid, err := toUid(nq.ObjectId, newToUid)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		if oUid == 0 {
+// 			return nil, errors.Errorf("ObjectId should be > 0 for nquad: %+v", nq)
+// 		}
+// 		edge = nq.CreateUidEdge(sUid, oUid)
+// 	case x.ValuePlain, x.ValueMulti:
+// 		edge, err = nq.CreateValueEdge(sUid)
+// 	default:
+// 		return &emptyEdge, errors.Errorf("Unknown value type for nquad: %+v", nq)
+// 	}
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return edge, nil
+// }
 
-func copyValue(out *pb.DirectedEdge, nq NQuad) error {
-	var err error
-	var t types.TypeID
-	if out.Value, t, err = ByteVal(nq.Edge); err != nil {
-		return err
-	}
-	out.ValueType = t.Enum()
-	return nil
-}
+// func copyValue(out *pb.DirectedEdge, nq NQuad) error {
+// 	var err error
+// 	var t types.TypeID
+// 	if out.Value, t, err = ByteVal(nq.Edge); err != nil {
+// 		return err
+// 	}
+// 	out.ValueType = t.Enum()
+// 	return nil
+// }
 
 func (nq NQuad) valueType() x.ValueTypeInfo {
 	hasValue := nq.ObjectValue != nil

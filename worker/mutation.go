@@ -296,9 +296,9 @@ func createSchema(attr string, typ types.TypeID, ts uint64) error {
 		s.ValueType = typ.Enum()
 	} else {
 		s = pb.SchemaUpdate{ValueType: typ.Enum(), Predicate: attr}
-		// For type UidID, set List to true. This is done because previously
-		// all predicates of type UidID were implicitly considered lists.
-		if typ == types.UidID {
+		// For type TypeUid, set List to true. This is done because previously
+		// all predicates of type TypeUid were implicitly considered lists.
+		if typ == types.TypeUid {
 			s.List = true
 		}
 	}
@@ -355,7 +355,7 @@ func checkSchema(s *pb.SchemaUpdate) error {
 	}
 
 	typ := types.TypeID(s.ValueType)
-	if typ == types.UidID && s.Directive == pb.SchemaUpdate_INDEX {
+	if typ == types.TypeUid && s.Directive == pb.SchemaUpdate_INDEX {
 		// index on uid type
 		return errors.Errorf("Index not allowed on predicate of type uid on predicate %s",
 			x.ParseAttr(s.Predicate))
@@ -426,11 +426,11 @@ func ValidateAndConvert(edge *pb.Edge, su *pb.SchemaUpdate) error {
 			schemaType.Name(), storageType.Name(), x.ParseAttr(edge.Predicate), edge)
 
 	// The suggested storage type matches the schema, OK!
-	case storageType == schemaType && schemaType != types.DefaultID:
+	case storageType == schemaType && schemaType != types.TypeDefault:
 		return nil
 
 	// We accept the storage type iff we don't have a schema type and a storage type is specified.
-	case schemaType == types.DefaultID:
+	case schemaType == types.TypeDefault:
 		schemaType = storageType
 	}
 
@@ -439,7 +439,7 @@ func ValidateAndConvert(edge *pb.Edge, su *pb.SchemaUpdate) error {
 		err error
 	)
 
-	src := types.Val{Tid: types.TypeID(edge.ValueType), Value: edge.Value}
+	src := types.Sval(edge.ObjectValue)
 	// check compatibility of schema type and storage type
 	if dst, err = types.Convert(src, schemaType); err != nil {
 		return err

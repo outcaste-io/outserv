@@ -62,8 +62,8 @@ type exporter struct {
 var uidFmtStrJson = "\"%#x\""
 
 // valToStr converts a posting value to a string.
-func valToStr(v types.Val) (string, error) {
-	v2, err := types.Convert(v, types.StringID)
+func valToStr(v types.Sval) (string, error) {
+	v2, err := types.Convert(v, types.TypeString)
 	if err != nil {
 		return "", errors.Wrapf(err, "while converting %v to string", v2.Value)
 	}
@@ -107,8 +107,7 @@ func (e *exporter) toJSON() (*bpb.KVList, error) {
 			fmt.Fprint(bp, "}]")
 		} else {
 			fmt.Fprintf(bp, `,"%s":`, e.attr)
-			val := types.Val{Tid: types.TypeID(p.ValType), Value: p.Value}
-			str, err := valToStr(val)
+			str, err := valToStr(types.Sval(p.Value))
 			if err != nil {
 				// Copying this behavior from RDF exporter.
 				// TODO Investigate why returning here before before completely
@@ -117,7 +116,7 @@ func (e *exporter) toJSON() (*bpb.KVList, error) {
 				return nil
 			}
 
-			if !val.Tid.IsNumber() {
+			if !types.TypeID(p.Value[0]).IsNumber() {
 				str = escapedString(str)
 			}
 
@@ -285,22 +284,19 @@ func ToExportKvList(pk x.ParsedKey, pl *posting.List, in *pb.ExportRequest) (*bp
 		if len(vals) > 1 {
 			return emptyList, errors.Errorf("found multiple values for the GraphQL schema")
 		}
-		val, ok := vals[0].Value.([]byte)
-		if !ok {
-			return emptyList, errors.Errorf("cannot convert value of GraphQL schema to byte array")
-		}
 
-		schema, script := ParseAsSchemaAndScript(val)
+		schema, script := ParseAsSchemaAndScript(vals[0])
 		exported := x.ExportedGQLSchema{
 			Namespace: e.namespace,
 			Schema:    schema,
 			Script:    script,
 		}
-		if val, err = json.Marshal(exported); err != nil {
+		data, err := json.Marshal(exported)
+		if err != nil {
 			return emptyList, errors.Wrapf(err, "Error marshalling GraphQL schema to json")
 		}
 		kv := &bpb.KV{
-			Value:   val,
+			Value:   data,
 			Version: 2, // GraphQL schema value
 		}
 		return listWrap(kv), nil
@@ -322,11 +318,11 @@ func ToExportKvList(pk x.ParsedKey, pl *posting.List, in *pb.ExportRequest) (*bp
 				return emptyList, errors.Wrapf(err, "cannot read value of dgraph.type entry")
 			}
 			if len(vals) == 1 {
-				val, ok := vals[0].Value.([]byte)
-				if !ok {
+				val := vals[0]
+				if len(val) == 0 {
 					return emptyList, errors.Errorf("cannot read value of dgraph.type entry")
 				}
-				if string(val) == "dgraph.graphql" {
+				if string(val[1:]) == "dgraph.graphql" {
 					return emptyList, nil
 				}
 			}

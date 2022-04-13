@@ -28,7 +28,6 @@ message List {
 
 message TaskValue {
   bytes val = 1;
-  Posting.ValType val_type = 2;
 }
 
 message SrcFunction {
@@ -276,7 +275,7 @@ message Posting {
     STRING = 9;
     OBJECT = 10;
   }
-  ValType val_type = 3;
+  /* ValType val_type = 3; */
   enum PostingType {
     REF = 0;         // UID
     VALUE = 1;       // simple, plain value

@@ -59,6 +59,7 @@ const (
 	TypePassword
 	TypeString
 	TypeObject
+	TypeUndefined
 )
 
 // Enum takes a TypeID value and returns the corresponding ValType enum value.
@@ -92,6 +93,9 @@ func (t TypeID) Name() string {
 	}
 	return ""
 }
+
+// Serialized Value.
+type Sval []byte
 
 // Val is a value with type information.
 type Val struct {

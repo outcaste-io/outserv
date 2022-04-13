@@ -22,7 +22,6 @@ import (
 	"github.com/outcaste-io/badger/v3"
 	"github.com/outcaste-io/badger/v3/options"
 	bpb "github.com/outcaste-io/badger/v3/pb"
-	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/tok"
@@ -36,7 +35,7 @@ var emptyCountParams countParams
 type indexMutationInfo struct {
 	tokenizers []tok.Tokenizer
 	edge       *pb.Edge // Represents the original uid -> value edge.
-	val        types.Val
+	val        []byte
 	op         pb.Edge_Op
 }
 
@@ -131,11 +130,10 @@ func (l *List) handleDeleteAll(ctx context.Context, edge *pb.Edge, txn *Txn) err
 		switch {
 		case isIndexed:
 			// Delete index edge of each posting.
-			val := gql.TypeValFrom(edge.ObjectValue)
 			return txn.addIndexMutations(ctx, &indexMutationInfo{
 				tokenizers: schema.State().Tokenizer(ctx, edge.Predicate),
 				edge:       edge,
-				val:        val,
+				val:        edge.ObjectValue,
 				op:         pb.Edge_DEL,
 			})
 		default:
@@ -210,7 +208,7 @@ func countAfterMutation(countBefore int, found bool, op pb.Edge_Op) int {
 }
 
 func (txn *Txn) addMutationHelper(ctx context.Context, l *List, doUpdateIndex bool,
-	hasCountIndex bool, t *pb.Edge) (types.Val, bool, countParams, error) {
+	hasCountIndex bool, t *pb.Edge) ([]byte, bool, countParams, error) {
 
 	t1 := time.Now()
 	l.Lock()
@@ -234,7 +232,7 @@ func (txn *Txn) addMutationHelper(ctx context.Context, l *List, doUpdateIndex bo
 	// is true, we just need to get the posting for uid, hence calling l.findPosting().
 	countBefore, countAfter := 0, 0
 	var currPost *pb.Posting
-	var val types.Val
+	var val []byte
 	var found bool
 	var err error
 
@@ -269,7 +267,7 @@ func (txn *Txn) addMutationHelper(ctx context.Context, l *List, doUpdateIndex bo
 		// so even though they might be different the check in the doUpdateIndex block above would
 		// return found to be true.
 		if found && !(bytes.Equal(currPost.Value, newPost.Value) &&
-			types.TypeID(currPost.ValType) == types.TypeID(newPost.ValType)) {
+			types.TypeID(currPost.Value[0]) == types.TypeID(newPost.Value[0])) {
 			return val, false, emptyCountParams, nil
 		}
 	}
@@ -279,7 +277,7 @@ func (txn *Txn) addMutationHelper(ctx context.Context, l *List, doUpdateIndex bo
 	}
 
 	if found && doUpdateIndex {
-		val = valueToTypesVal(currPost)
+		val = currPost.Value
 	}
 
 	if hasCountIndex {
@@ -320,7 +318,7 @@ func (l *List) AddMutationWithIndex(ctx context.Context, edge *pb.Edge, txn *Txn
 	}
 	if doUpdateIndex {
 		// Exact matches.
-		if found && val.Value != nil {
+		if found && len(val) > 0 {
 			if err := txn.addIndexMutations(ctx, &indexMutationInfo{
 				tokenizers: schema.State().Tokenizer(ctx, edge.Predicate),
 				edge:       edge,
@@ -331,11 +329,10 @@ func (l *List) AddMutationWithIndex(ctx context.Context, edge *pb.Edge, txn *Txn
 			}
 		}
 		if edge.Op == pb.Edge_SET {
-			val = gql.TypeValFrom(edge.ObjectValue)
 			if err := txn.addIndexMutations(ctx, &indexMutationInfo{
 				tokenizers: schema.State().Tokenizer(ctx, edge.Predicate),
 				edge:       edge,
-				val:        val,
+				val:        edge.ObjectValue,
 				op:         pb.Edge_SET,
 			}); err != nil {
 				return err
@@ -767,16 +764,11 @@ func rebuildTokIndex(ctx context.Context, rb *IndexRebuild) error {
 		edge := pb.Edge{Predicate: rb.Attr, Subject: x.ToHexString(uid)}
 		return pl.Iterate(txn.StartTs, 0, func(p *pb.Posting) error {
 			// Add index entries based on p.
-			val := types.Val{
-				Value: p.Value,
-				Tid:   types.TypeID(p.ValType),
-			}
-
 			for {
 				err := txn.addIndexMutations(ctx, &indexMutationInfo{
 					tokenizers: tokenizers,
 					edge:       &edge,
-					val:        val,
+					val:        p.Value,
 					op:         pb.Edge_SET,
 				})
 				switch err {

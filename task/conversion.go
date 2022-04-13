@@ -21,6 +21,8 @@ import (
 	"math"
 
 	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/types"
+	"github.com/outcaste-io/outserv/x"
 )
 
 var (
@@ -32,15 +34,20 @@ var (
 
 // FromInt converts the given int value into a pb.TaskValue object.
 func FromInt(val int) *pb.TaskValue {
-	bs := make([]byte, 8)
-	binary.LittleEndian.PutUint64(bs, uint64(val))
-	return &pb.TaskValue{Val: []byte(bs), ValType: pb.Posting_INT}
+	bs := make([]byte, 9)
+	binary.LittleEndian.PutUint64(bs[1:], uint64(val))
+	bs[0] = byte(types.TypeInt64)
+	return &pb.TaskValue{Val: []byte(bs)}
 }
 
 // ToInt converts the given pb.TaskValue object into an integer.
 // Note, this panics if there are not enough bytes in val.Val
 func ToInt(val *pb.TaskValue) int64 {
-	result := binary.LittleEndian.Uint64(val.Val)
+	if len(val.Val) == 0 {
+		return 0
+	}
+	x.AssertTrue(val.Val[0] == byte(types.TypeInt64))
+	result := binary.LittleEndian.Uint64(val.Val[1:])
 	return int64(result)
 }
 
@@ -64,25 +71,27 @@ func ToBool(val *pb.TaskValue) bool {
 // FromString converts the given string in to a pb.TaskValue object.
 func FromString(val string) *pb.TaskValue {
 	return &pb.TaskValue{
-		Val:     []byte(val),
-		ValType: pb.Posting_STRING,
+		Val: append([]byte{byte(types.TypeString)}, []byte(val)...),
 	}
 }
 
 // ToString converts the given pb.TaskValue object into a string.
 func ToString(val *pb.TaskValue) string {
-	return string(val.Val)
+	x.AssertTrue(val.Val[0] == byte(types.TypeString))
+	return string(val.Val[1:])
 }
 
 // FromFloat converts the given float64 value into a pb.TaskValue object.
 func FromFloat(val float64) *pb.TaskValue {
-	bs := make([]byte, 8)
-	binary.LittleEndian.PutUint64(bs, math.Float64bits(val))
-	return &pb.TaskValue{Val: []byte(bs), ValType: pb.Posting_FLOAT}
+	bs := make([]byte, 9)
+	binary.LittleEndian.PutUint64(bs[1:], math.Float64bits(val))
+	bs[0] = byte(types.TypeFloat)
+	return &pb.TaskValue{Val: []byte(bs)}
 }
 
 // ToFloat converts the given pb.TaskValue object into an integer.
 // Note, this panics if there are not enough bytes in val.Val
 func ToFloat(val *pb.TaskValue) float64 {
-	return math.Float64frombits(binary.LittleEndian.Uint64(val.Val))
+	x.AssertTrue(val.Val[0] == byte(types.TypeFloat))
+	return math.Float64frombits(binary.LittleEndian.Uint64(val.Val[1:]))
 }

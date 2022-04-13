@@ -78,7 +78,7 @@ func isTernary(f string) bool {
 
 func isZero(f string, rval types.Val) bool {
 	switch rval.Tid {
-	case types.FloatID:
+	case types.TypeFloat:
 		g, ok := rval.Value.(float64)
 		if !ok {
 			return false
@@ -92,7 +92,7 @@ func isZero(f string, rval types.Val) bool {
 			return g == 1
 		}
 		return false
-	case types.IntID:
+	case types.TypeInt64:
 		g, ok := rval.Value.(int64)
 		if !ok {
 			return false
@@ -259,13 +259,13 @@ loop:
 					child.Var = item.Val
 				} else {
 					child.Const = types.Val{
-						Tid:   types.FloatID,
+						Tid:   types.TypeFloat,
 						Value: v,
 					}
 				}
 			} else {
 				child.Const = types.Val{
-					Tid:   types.IntID,
+					Tid:   types.TypeInt64,
 					Value: i,
 				}
 			}
@@ -368,10 +368,10 @@ func (t *MathTree) stringHelper(buf *bytes.Buffer) {
 		var leafStr int
 		var err error
 		switch t.Const.Tid {
-		case types.FloatID:
+		case types.TypeFloat:
 			leafStr, err = buf.WriteString(strconv.FormatFloat(
 				t.Const.Value.(float64), 'E', -1, 64))
-		case types.IntID:
+		case types.TypeInt64:
 			leafStr, err = buf.WriteString(strconv.FormatInt(t.Const.Value.(int64), 10))
 		}
 		x.Check2(leafStr, err)

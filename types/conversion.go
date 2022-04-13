@@ -7,11 +7,13 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"math"
 	"strconv"
 	"time"
 	"unsafe"
 
+	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	geom "github.com/twpayne/go-geom"
 	"github.com/twpayne/go-geom/encoding/geojson"
@@ -19,17 +21,15 @@ import (
 )
 
 // Convert converts the value to given scalar type.
-func Convert(from Val, toID TypeID) (Val, error) {
+func Convert(from Sval, toID TypeID) (Val, error) {
 	to := Val{Tid: toID}
-
-	// sanity: we expect a value
-	data, ok := from.Value.([]byte)
-	if !ok {
-		return to, errors.Errorf("Invalid data to convert to %s", toID.Name())
-	}
-
-	fromID := from.Tid
 	res := &to.Value
+
+	if len(from) == 0 {
+		return to, fmt.Errorf("Data of length zero")
+	}
+	fromID := TypeID(from[0])
+	data := from[1:]
 
 	// Convert from-type to to-type and store in the result interface.
 	switch fromID {
@@ -434,6 +434,20 @@ func ToBinary(id TypeID, b interface{}) ([]byte, error) {
 	out := []byte{byte(id)}
 	out = append(out, to.Value.([]byte)...)
 	return out, nil
+}
+
+func FromBinary(data []byte) (Val, error) {
+	id := TypeID(data[0])
+	to := ValueForType(id)
+	from := Val{Tid: TypeBinary, Value: data[1:]}
+	err := Marshal(from, &to)
+	return to, err
+}
+
+func StringToBinary(src string) []byte {
+	dst, err := ToBinary(TypeString, src)
+	x.Check(err)
+	return dst
 }
 
 func cantConvert(from TypeID, to TypeID) error {

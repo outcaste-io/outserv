@@ -322,20 +322,15 @@ func (n *node) mutationWorker(workerId int) {
 func UidsForObject(ctx context.Context, obj *pb.Object) (*sroar.Bitmap, error) {
 	var res *sroar.Bitmap
 	for _, nq := range obj.Edges {
-		if nq.ObjectValue == nil {
+		if len(nq.ObjectValue) == 0 {
 			return nil, fmt.Errorf("Unexpected nil object value for %+v", nq)
 		}
 
-		var strVal string
-		val := nq.ObjectValue
-		switch val.Val.(type) {
-		case *pb.Value_IntVal:
-			strVal = strconv.FormatInt(val.GetIntVal(), 10)
-		case *pb.Value_StrVal:
-			strVal = val.GetStrVal()
-		default:
-			return nil, fmt.Errorf("encountered an XID %s with invalid val: %+v", nq.Predicate, val)
+		val, err := types.Convert(nq.ObjectValue, types.TypeString)
+		if err != nil {
+			return nil, errors.Wrapf(err, "encountered an XID %s with invalid val", nq.Predicate)
 		}
+		valStr := val.Value.(string)
 
 		q := &pb.Query{
 			ReadTs: posting.ReadTimestamp(), // What timestamp should we use?
@@ -344,7 +339,7 @@ func UidsForObject(ctx context.Context, obj *pb.Object) (*sroar.Bitmap, error) {
 			Attr: x.NamespaceAttr(0, nq.Predicate),
 			SrcFunc: &pb.SrcFunction{
 				Name: "eq",
-				Args: []string{strVal},
+				Args: []string{valStr},
 			},
 			// First: 3, // We can't just ask for the first 3, because we might have
 			// to intersect this result with others.

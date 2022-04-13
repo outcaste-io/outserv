@@ -467,18 +467,14 @@ func Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, error) {
 				" dropped", x.ParseAttr(attr))
 		}
 
-		nq := &pb.NQuad{
+		val, err := types.ToBinary(types.TypeString, x.Star)
+		x.Check(err)
+		edge := &pb.Edge{
 			Subject:     x.Star,
 			Predicate:   x.ParseAttr(attr),
-			ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: x.Star}},
+			ObjectValue: val,
 		}
-		wnq := &gql.NQuad{NQuad: nq}
-		edge, err := wnq.ToDeletePredEdge()
-		if err != nil {
-			return empty, err
-		}
-		edges := []*pb.DirectedEdge{edge}
-		m.Edges = edges
+		m.Edges = []*pb.Edge{edge}
 		_, err = query.ApplyMutations(ctx, m)
 		if err != nil {
 			return empty, err

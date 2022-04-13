@@ -17,7 +17,6 @@
 package types
 
 import (
-	"bytes"
 	"strconv"
 	"strings"
 
@@ -419,16 +418,14 @@ func (q GeoQueryData) intersects(g geom.T) bool {
 // matches the query criteria.
 func MatchGeo(value *pb.TaskValue, q *GeoQueryData) bool {
 	valBytes := value.Val
-	if bytes.Equal(valBytes, nil) {
+	if len(valBytes) == 0 {
 		return false
 	}
-	vType := value.ValType
+	vType := valBytes[0]
 	if TypeID(vType) != TypeGeo {
 		return false
 	}
-	src := ValueForType(TypeBinary)
-	src.Value = valBytes
-	gc, err := Convert(src, TypeGeo)
+	gc, err := Convert(valBytes, TypeGeo)
 	if err != nil {
 		return false
 	}
