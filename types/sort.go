@@ -72,7 +72,7 @@ func (s byValue) Less(i, j int) bool {
 // IsSortable returns true, if tid is sortable. Otherwise it returns false.
 func IsSortable(tid TypeID) bool {
 	switch tid {
-	case DateTimeID, IntID, FloatID, StringID, DefaultID:
+	case TypeDatetime, TypeInt64, TypeFloat, TypeString, TypeDefault:
 		return true
 	default:
 		return false
@@ -111,7 +111,7 @@ func Less(a, b Val) (bool, error) {
 	}
 	typ := a.Tid
 	switch typ {
-	case DateTimeID, UidID, IntID, FloatID, StringID, DefaultID:
+	case TypeDatetime, TypeUid, TypeInt64, TypeFloat, TypeString, TypeDefault:
 		// Don't do anything, we can sort values of this type.
 	default:
 		return false, errors.Errorf("Compare not supported for type: %v", a.Tid)
@@ -124,15 +124,15 @@ func less(a, b Val, cl *collate.Collator) bool {
 		return mismatchedLess(a, b)
 	}
 	switch a.Tid {
-	case DateTimeID:
+	case TypeDatetime:
 		return a.Value.(time.Time).Before(b.Value.(time.Time))
-	case IntID:
+	case TypeInt64:
 		return (a.Value.(int64)) < (b.Value.(int64))
-	case FloatID:
+	case TypeFloat:
 		return (a.Value.(float64)) < (b.Value.(float64))
-	case UidID:
+	case TypeUid:
 		return (a.Value.(uint64) < b.Value.(uint64))
-	case StringID, DefaultID:
+	case TypeString, TypeDefault:
 		// Use language comparator.
 		if cl != nil {
 			return cl.CompareString(a.Safe().(string), b.Safe().(string)) < 0
@@ -144,7 +144,7 @@ func less(a, b Val, cl *collate.Collator) bool {
 
 func mismatchedLess(a, b Val) bool {
 	x.AssertTrue(a.Tid != b.Tid)
-	if (a.Tid != IntID && a.Tid != FloatID) || (b.Tid != IntID && b.Tid != FloatID) {
+	if (a.Tid != TypeInt64 && a.Tid != TypeFloat) || (b.Tid != TypeInt64 && b.Tid != TypeFloat) {
 		// Non-float/int are sorted arbitrarily by type.
 		return a.Tid < b.Tid
 	}
@@ -153,10 +153,10 @@ func mismatchedLess(a, b Val) bool {
 	// here isn't 100% correct, and will be wrong when dealing with ints and
 	// floats close to each other and greater in magnitude than 1<<53 (the
 	// point at which consecutive floats are more than 1 apart).
-	if a.Tid == FloatID {
+	if a.Tid == TypeFloat {
 		return a.Value.(float64) < float64(b.Value.(int64))
 	}
-	x.AssertTrue(b.Tid == FloatID)
+	x.AssertTrue(b.Tid == TypeFloat)
 	return float64(a.Value.(int64)) < b.Value.(float64)
 }
 
@@ -167,7 +167,7 @@ func Equal(a, b Val) (bool, error) {
 	}
 	typ := a.Tid
 	switch typ {
-	case DateTimeID, IntID, FloatID, StringID, DefaultID, BoolID:
+	case TypeDatetime, TypeInt64, TypeFloat, TypeString, TypeDefault, TypeBool:
 		// Don't do anything, we can sort values of this type.
 	default:
 		return false, errors.Errorf("Equal not supported for type: %v", a.Tid)
@@ -180,23 +180,23 @@ func equal(a, b Val) bool {
 		return false
 	}
 	switch a.Tid {
-	case DateTimeID:
+	case TypeDatetime:
 		aVal, aOk := a.Value.(time.Time)
 		bVal, bOk := b.Value.(time.Time)
 		return aOk && bOk && aVal.Equal(bVal)
-	case IntID:
+	case TypeInt64:
 		aVal, aOk := a.Value.(int64)
 		bVal, bOk := b.Value.(int64)
 		return aOk && bOk && aVal == bVal
-	case FloatID:
+	case TypeFloat:
 		aVal, aOk := a.Value.(float64)
 		bVal, bOk := b.Value.(float64)
 		return aOk && bOk && aVal == bVal
-	case StringID, DefaultID:
+	case TypeString, TypeDefault:
 		aVal, aOk := a.Value.(string)
 		bVal, bOk := b.Value.(string)
 		return aOk && bOk && aVal == bVal
-	case BoolID:
+	case TypeBool:
 		aVal, aOk := a.Value.(bool)
 		bVal, bOk := b.Value.(bool)
 		return aOk && bOk && aVal == bVal

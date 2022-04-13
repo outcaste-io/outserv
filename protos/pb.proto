@@ -484,7 +484,8 @@ message Edge {
   string subject = 1;
   string predicate = 2;
   string object_id = 3;
-  Value object_value = 4;
+  /* Value object_value = 4; */
+  bytes object_value = 4;
   uint64 namespace = 5;
 
   enum Op {
@@ -492,22 +493,6 @@ message Edge {
     DEL = 1;
   }
   Op op = 6;
-}
-
-message Value {
-  oneof val {
-    string default_val = 1;
-    bytes bytes_val = 2;
-    int64 int_val = 3;
-    bool bool_val = 4;
-    string str_val = 5;
-    double double_val = 6;
-    bytes geo_val = 7;  // Geo data in WKB format
-    bytes date_val = 8;
-    bytes datetime_val = 9;
-    string password_val = 10;
-    uint64 uid_val=11;
-  }
 }
 
 message LoginRequest {

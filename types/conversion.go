@@ -12,7 +12,6 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/pkg/errors"
 	geom "github.com/twpayne/go-geom"
 	"github.com/twpayne/go-geom/encoding/geojson"
@@ -34,27 +33,27 @@ func Convert(from Val, toID TypeID) (Val, error) {
 
 	// Convert from-type to to-type and store in the result interface.
 	switch fromID {
-	case BinaryID:
+	case TypeBinary:
 		{
 			// Unmarshal from Binary to type interfaces.
 			switch toID {
-			case BinaryID:
+			case TypeBinary:
 				*res = data
-			case StringID, DefaultID:
+			case TypeString, TypeDefault:
 				// We never modify from Val, so this should be safe.
 				*res = *(*string)(unsafe.Pointer(&data))
-			case IntID:
+			case TypeInt64:
 				if len(data) < 8 {
 					return to, errors.Errorf("Invalid data for int64 %v", data)
 				}
 				*res = int64(binary.LittleEndian.Uint64(data))
-			case FloatID:
+			case TypeFloat:
 				if len(data) < 8 {
 					return to, errors.Errorf("Invalid data for float %v", data)
 				}
 				i := binary.LittleEndian.Uint64(data)
 				*res = math.Float64frombits(i)
-			case BoolID:
+			case TypeBool:
 				if len(data) == 0 || data[0] == 0 {
 					*res = false
 					return to, nil
@@ -63,37 +62,37 @@ func Convert(from Val, toID TypeID) (Val, error) {
 					return to, nil
 				}
 				return to, errors.Errorf("Invalid value for bool %v", data[0])
-			case DateTimeID:
+			case TypeDatetime:
 				var t time.Time
 				if err := t.UnmarshalBinary(data); err != nil {
 					return to, err
 				}
 				*res = t
-			case GeoID:
+			case TypeGeo:
 				w, err := wkb.Unmarshal(data)
 				if err != nil {
 					return to, err
 				}
 				*res = w
-			case PasswordID:
+			case TypePassword:
 				*res = string(data)
 			default:
 				return to, cantConvert(fromID, toID)
 			}
 		}
-	case StringID, DefaultID:
+	case TypeString, TypeDefault:
 		{
 			vc := string(data)
 			switch toID {
-			case BinaryID:
+			case TypeBinary:
 				*res = []byte(vc)
-			case IntID:
+			case TypeInt64:
 				val, err := strconv.ParseInt(vc, 10, 64)
 				if err != nil {
 					return to, err
 				}
 				*res = val
-			case FloatID:
+			case TypeFloat:
 				val, err := strconv.ParseFloat(vc, 64)
 				if err != nil {
 					return to, err
@@ -102,21 +101,21 @@ func Convert(from Val, toID TypeID) (Val, error) {
 					return to, errors.Errorf("Got invalid value: NaN")
 				}
 				*res = val
-			case StringID, DefaultID:
+			case TypeString, TypeDefault:
 				*res = vc
-			case BoolID:
+			case TypeBool:
 				val, err := strconv.ParseBool(vc)
 				if err != nil {
 					return to, err
 				}
 				*res = val
-			case DateTimeID:
+			case TypeDatetime:
 				t, err := ParseTime(vc)
 				if err != nil {
 					return to, err
 				}
 				*res = t
-			case GeoID:
+			case TypeGeo:
 				var g geom.T
 				text := bytes.Replace([]byte(vc), []byte("'"), []byte("\""), -1)
 				if err := geojson.Unmarshal(text, &g); err != nil {
@@ -124,7 +123,7 @@ func Convert(from Val, toID TypeID) (Val, error) {
 						errors.Wrapf(err, "Error while unmarshalling: [%s] as geojson", vc)
 				}
 				*res = g
-			case PasswordID:
+			case TypePassword:
 				p, err := Encrypt(vc)
 				if err != nil {
 					return to, err
@@ -134,32 +133,32 @@ func Convert(from Val, toID TypeID) (Val, error) {
 				return to, cantConvert(fromID, toID)
 			}
 		}
-	case IntID:
+	case TypeInt64:
 		{
 			if len(data) < 8 {
 				return to, errors.Errorf("Invalid data for int64 %v", data)
 			}
 			vc := int64(binary.LittleEndian.Uint64(data))
 			switch toID {
-			case IntID:
+			case TypeInt64:
 				*res = vc
-			case BinaryID:
+			case TypeBinary:
 				var bs [8]byte
 				binary.LittleEndian.PutUint64(bs[:], uint64(vc))
 				*res = bs[:]
-			case FloatID:
+			case TypeFloat:
 				*res = float64(vc)
-			case BoolID:
+			case TypeBool:
 				*res = vc != 0
-			case StringID, DefaultID:
+			case TypeString, TypeDefault:
 				*res = strconv.FormatInt(vc, 10)
-			case DateTimeID:
+			case TypeDatetime:
 				*res = time.Unix(vc, 0).UTC()
 			default:
 				return to, cantConvert(fromID, toID)
 			}
 		}
-	case FloatID:
+	case TypeFloat:
 		{
 			if len(data) < 8 {
 				return to, errors.Errorf("Invalid data for float %v", data)
@@ -167,23 +166,23 @@ func Convert(from Val, toID TypeID) (Val, error) {
 			i := binary.LittleEndian.Uint64(data)
 			vc := math.Float64frombits(i)
 			switch toID {
-			case FloatID:
+			case TypeFloat:
 				*res = vc
-			case BinaryID:
+			case TypeBinary:
 				var bs [8]byte
 				u := math.Float64bits(vc)
 				binary.LittleEndian.PutUint64(bs[:], u)
 				*res = bs[:]
-			case IntID:
+			case TypeInt64:
 				if vc > math.MaxInt64 || vc < math.MinInt64 || math.IsNaN(vc) {
 					return to, errors.Errorf("Float out of int64 range")
 				}
 				*res = int64(vc)
-			case BoolID:
+			case TypeBool:
 				*res = vc != 0
-			case StringID, DefaultID:
+			case TypeString, TypeDefault:
 				*res = strconv.FormatFloat(vc, 'G', -1, 64)
-			case DateTimeID:
+			case TypeDatetime:
 				secs := int64(vc)
 				fracSecs := vc - float64(secs)
 				nsecs := int64(fracSecs * nanoSecondsInSec)
@@ -192,7 +191,7 @@ func Convert(from Val, toID TypeID) (Val, error) {
 				return to, cantConvert(fromID, toID)
 			}
 		}
-	case BoolID:
+	case TypeBool:
 		{
 			var vc bool
 			if len(data) == 0 || data[0] > 1 {
@@ -201,74 +200,74 @@ func Convert(from Val, toID TypeID) (Val, error) {
 			vc = data[0] == 1
 
 			switch toID {
-			case BoolID:
+			case TypeBool:
 				*res = vc
-			case BinaryID:
+			case TypeBinary:
 				*res = []byte{0}
 				if vc {
 					*res = []byte{1}
 				}
-			case IntID:
+			case TypeInt64:
 				*res = int64(0)
 				if vc {
 					*res = int64(1)
 				}
-			case FloatID:
+			case TypeFloat:
 				*res = float64(0)
 				if vc {
 					*res = float64(1)
 				}
-			case StringID, DefaultID:
+			case TypeString, TypeDefault:
 				*res = strconv.FormatBool(vc)
 			default:
 				return to, cantConvert(fromID, toID)
 			}
 		}
-	case DateTimeID:
+	case TypeDatetime:
 		{
 			var t time.Time
 			if err := t.UnmarshalBinary(data); err != nil {
 				return to, err
 			}
 			switch toID {
-			case DateTimeID:
+			case TypeDatetime:
 				*res = t
-			case BinaryID:
+			case TypeBinary:
 				r, err := t.MarshalBinary()
 				if err != nil {
 					return to, err
 				}
 				*res = r
-			case StringID, DefaultID:
+			case TypeString, TypeDefault:
 				val, err := t.MarshalText()
 				if err != nil {
 					return to, err
 				}
 				*res = string(val)
-			case IntID:
+			case TypeInt64:
 				*res = t.Unix()
-			case FloatID:
+			case TypeFloat:
 				*res = float64(t.UnixNano()) / float64(nanoSecondsInSec)
 			default:
 				return to, cantConvert(fromID, toID)
 			}
 		}
-	case GeoID:
+	case TypeGeo:
 		{
 			vc, err := wkb.Unmarshal(data)
 			if err != nil {
 				return to, err
 			}
 			switch toID {
-			case GeoID:
+			case TypeGeo:
 				*res = vc
-			case BinaryID:
+			case TypeBinary:
 				r, err := wkb.Marshal(vc, binary.LittleEndian)
 				if err != nil {
 					return to, err
 				}
 				*res = r
-			case StringID, DefaultID:
+			case TypeString, TypeDefault:
 				val, err := geojson.Marshal(vc)
 				if err != nil {
 					return to, nil
@@ -278,13 +277,13 @@ func Convert(from Val, toID TypeID) (Val, error) {
 				return to, cantConvert(fromID, toID)
 			}
 		}
-	case PasswordID:
+	case TypePassword:
 		{
 			vc := string(data)
 			switch toID {
-			case BinaryID:
+			case TypeBinary:
 				*res = []byte(vc)
-			case StringID, PasswordID:
+			case TypeString, TypePassword:
 				*res = vc
 			default:
 				return to, cantConvert(fromID, toID)
@@ -314,44 +313,44 @@ func Marshal(from Val, to *Val) error {
 	}
 
 	switch fromID {
-	case BinaryID:
+	case TypeBinary:
 		vc := val.([]byte)
 		switch toID {
-		case StringID, DefaultID:
+		case TypeString, TypeDefault:
 			*res = string(vc)
-		case BinaryID:
+		case TypeBinary:
 			*res = vc
 		default:
 			return cantConvert(fromID, toID)
 		}
-	case StringID, DefaultID:
+	case TypeString, TypeDefault:
 		vc := val.(string)
 		switch toID {
-		case StringID, DefaultID:
+		case TypeString, TypeDefault:
 			*res = vc
-		case BinaryID:
+		case TypeBinary:
 			*res = []byte(vc)
 		default:
 			return cantConvert(fromID, toID)
 		}
-	case IntID:
+	case TypeInt64:
 		vc := val.(int64)
 		switch toID {
-		case StringID, DefaultID:
+		case TypeString, TypeDefault:
 			*res = strconv.FormatInt(vc, 10)
-		case BinaryID:
+		case TypeBinary:
 			var bs [8]byte
 			binary.LittleEndian.PutUint64(bs[:], uint64(vc))
 			*res = bs[:]
 		default:
 			return cantConvert(fromID, toID)
 		}
-	case FloatID:
+	case TypeFloat:
 		vc := val.(float64)
 		switch toID {
-		case StringID, DefaultID:
+		case TypeString, TypeDefault:
 			*res = strconv.FormatFloat(vc, 'G', -1, 64)
-		case BinaryID:
+		case TypeBinary:
 			var bs [8]byte
 			u := math.Float64bits(vc)
 			binary.LittleEndian.PutUint64(bs[:], u)
@@ -359,12 +358,12 @@ func Marshal(from Val, to *Val) error {
 		default:
 			return cantConvert(fromID, toID)
 		}
-	case BoolID:
+	case TypeBool:
 		vc := val.(bool)
 		switch toID {
-		case StringID, DefaultID:
+		case TypeString, TypeDefault:
 			*res = strconv.FormatBool(vc)
-		case BinaryID:
+		case TypeBinary:
 			*res = []byte{0}
 			if vc {
 				*res = []byte{1}
@@ -372,16 +371,16 @@ func Marshal(from Val, to *Val) error {
 		default:
 			return cantConvert(fromID, toID)
 		}
-	case DateTimeID:
+	case TypeDatetime:
 		vc := val.(time.Time)
 		switch toID {
-		case StringID, DefaultID:
+		case TypeString, TypeDefault:
 			val, err := vc.MarshalText()
 			if err != nil {
 				return err
 			}
 			*res = string(val)
-		case BinaryID:
+		case TypeBinary:
 			r, err := vc.MarshalBinary()
 			if err != nil {
 				return err
@@ -390,19 +389,19 @@ func Marshal(from Val, to *Val) error {
 		default:
 			return cantConvert(fromID, toID)
 		}
-	case GeoID:
+	case TypeGeo:
 		vc, ok := val.(geom.T)
 		if !ok {
 			return errors.Errorf("Expected a Geo type")
 		}
 		switch toID {
-		case BinaryID:
+		case TypeBinary:
 			r, err := wkb.Marshal(vc, binary.LittleEndian)
 			if err != nil {
 				return err
 			}
 			*res = r
-		case StringID, DefaultID:
+		case TypeString, TypeDefault:
 			val, err := geojson.Marshal(vc)
 			if err != nil {
 				return nil
@@ -411,12 +410,12 @@ func Marshal(from Val, to *Val) error {
 		default:
 			return cantConvert(fromID, toID)
 		}
-	case PasswordID:
+	case TypePassword:
 		vc := val.(string)
 		switch toID {
-		case StringID:
+		case TypeString:
 			*res = vc
-		case BinaryID:
+		case TypeBinary:
 			*res = []byte(vc)
 		default:
 			return cantConvert(fromID, toID)
@@ -427,79 +426,14 @@ func Marshal(from Val, to *Val) error {
 	return nil
 }
 
-// ObjectValue converts into pb.Value.
-func ObjectValue(id TypeID, value interface{}) (*pb.Value, error) {
-	def := &pb.Value{Val: &pb.Value_StrVal{StrVal: ""}}
-	var ok bool
-	// Lets set the object value according to the storage type.
-	switch id {
-	case StringID:
-		var v string
-		if v, ok = value.(string); !ok {
-			return def, errors.Errorf("Expected value of type string. Got : %v", value)
-		}
-		return &pb.Value{Val: &pb.Value_StrVal{StrVal: v}}, nil
-	case DefaultID:
-		var v string
-		if v, ok = value.(string); !ok {
-			return def, errors.Errorf("Expected value of type string. Got : %v", value)
-		}
-		return &pb.Value{Val: &pb.Value_DefaultVal{DefaultVal: v}}, nil
-	case IntID:
-		var v int64
-		if v, ok = value.(int64); !ok {
-			return def, errors.Errorf("Expected value of type int64. Got : %v", value)
-		}
-		return &pb.Value{Val: &pb.Value_IntVal{IntVal: v}}, nil
-	case FloatID:
-		var v float64
-		if v, ok = value.(float64); !ok {
-			return def, errors.Errorf("Expected value of type float64. Got : %v", value)
-		}
-		return &pb.Value{Val: &pb.Value_DoubleVal{DoubleVal: v}}, nil
-	case BoolID:
-		var v bool
-		if v, ok = value.(bool); !ok {
-			return def, errors.Errorf("Expected value of type bool. Got : %v", value)
-		}
-		return &pb.Value{Val: &pb.Value_BoolVal{BoolVal: v}}, nil
-	case BinaryID:
-		var v []byte
-		if v, ok = value.([]byte); !ok {
-			return def, errors.Errorf("Expected value of type []byte. Got : %v", value)
-		}
-		return &pb.Value{Val: &pb.Value_BytesVal{BytesVal: v}}, nil
-	// Geo and datetime are stored in binary format in the N-Quad, so lets
-	// convert them here.
-	case GeoID:
-		b, err := toBinary(id, value)
-		if err != nil {
-			return def, err
-		}
-		return &pb.Value{Val: &pb.Value_GeoVal{GeoVal: b}}, nil
-	case DateTimeID:
-		b, err := toBinary(id, value)
-		if err != nil {
-			return def, err
-		}
-		return &pb.Value{Val: &pb.Value_DatetimeVal{DatetimeVal: b}}, nil
-	case PasswordID:
-		var v string
-		if v, ok = value.(string); !ok {
-			return def, errors.Errorf("Expected value of type password. Got : %v", value)
-		}
-		return &pb.Value{Val: &pb.Value_PasswordVal{PasswordVal: v}}, nil
-	default:
-		return def, errors.Errorf("ObjectValue not available for: %v", id)
-	}
-}
-
-func toBinary(id TypeID, b interface{}) ([]byte, error) {
-	p1 := ValueForType(BinaryID)
-	if err := Marshal(Val{id, b}, &p1); err != nil {
+func ToBinary(id TypeID, b interface{}) ([]byte, error) {
+	to := ValueForType(TypeBinary)
+	if err := Marshal(Val{id, b}, &to); err != nil {
 		return nil, err
 	}
-	return p1.Value.([]byte), nil
+	out := []byte{byte(id)}
+	out = append(out, to.Value.([]byte)...)
+	return out, nil
 }
 
 func cantConvert(from TypeID, to TypeID) error {
@@ -509,19 +443,19 @@ func cantConvert(from TypeID, to TypeID) error {
 // MarshalJSON makes Val satisfy the json.Marshaler interface.
 func (v Val) MarshalJSON() ([]byte, error) {
 	switch v.Tid {
-	case IntID:
+	case TypeInt64:
 		return json.Marshal(v.Value.(int64))
-	case BoolID:
+	case TypeBool:
 		return json.Marshal(v.Value.(bool))
-	case FloatID:
+	case TypeFloat:
 		return json.Marshal(v.Value.(float64))
-	case DateTimeID:
+	case TypeDatetime:
 		return json.Marshal(v.Value.(time.Time))
-	case GeoID:
+	case TypeGeo:
 		return geojson.Marshal(v.Value.(geom.T))
-	case StringID, DefaultID:
+	case TypeString, TypeDefault:
 		return json.Marshal(v.Safe().(string))
-	case PasswordID:
+	case TypePassword:
 		return json.Marshal(v.Value.(string))
 	}
 	return nil, errors.Errorf("Invalid type for MarshalJSON: %v", v.Tid)

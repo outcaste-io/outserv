@@ -32,7 +32,6 @@ import (
 	"github.com/outcaste-io/badger/v3"
 	bo "github.com/outcaste-io/badger/v3/options"
 	badgerpb "github.com/outcaste-io/badger/v3/pb"
-	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/ristretto/z"
 
 	"github.com/golang/glog"
@@ -1355,6 +1354,9 @@ func Timestamp(baseTs, raftIdx uint64) uint64 {
 	return baseTs + (2*raftIdx)&mask // Always return multiples of 2.
 }
 
-func IsStarAll(v *pb.Value) bool {
-	return v.GetStrVal() == Star
+func IsStarAll(v []byte) bool {
+	if len(v) == 0 {
+		return false
+	}
+	return string(v[1:]) == Star
 }

@@ -423,12 +423,12 @@ func MatchGeo(value *pb.TaskValue, q *GeoQueryData) bool {
 		return false
 	}
 	vType := value.ValType
-	if TypeID(vType) != GeoID {
+	if TypeID(vType) != TypeGeo {
 		return false
 	}
-	src := ValueForType(BinaryID)
+	src := ValueForType(TypeBinary)
 	src.Value = valBytes
-	gc, err := Convert(src, GeoID)
+	gc, err := Convert(src, TypeGeo)
 	if err != nil {
 		return false
 	}

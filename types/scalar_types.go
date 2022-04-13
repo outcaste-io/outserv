@@ -30,51 +30,36 @@ const dateFormatYMD = "2006-01-02"
 const dateFormatYMDZone = "2006-01-02 15:04:05 -0700 MST"
 const dateTimeFormat = "2006-01-02T15:04:05"
 
-// Note: These ids are stored in the posting lists to indicate the type
-// of the data. The order *cannot* be changed without breaking existing
-// data. When adding a new type *always* add to the end of this list.
-// Never delete anything from this list even if it becomes unused.
-const (
-	// DefaultID represents the default type.
-	DefaultID = TypeID(pb.Posting_DEFAULT)
-	// BinaryID represents the binary data type.
-	BinaryID = TypeID(pb.Posting_BINARY)
-	// IntID represents the integer type.
-	IntID = TypeID(pb.Posting_INT)
-	// FloatID represents the floating-point number type.
-	FloatID = TypeID(pb.Posting_FLOAT)
-	// FloatID represents the boolean type.
-	BoolID = TypeID(pb.Posting_BOOL)
-	// DateTimeID represents the datetime type.
-	DateTimeID = TypeID(pb.Posting_DATETIME)
-	// GeoID represents the geo-location data type.
-	GeoID = TypeID(pb.Posting_GEO)
-	// UidID represents the uid type.
-	UidID = TypeID(pb.Posting_UID)
-	// PasswordID represents the password type.
-	PasswordID = TypeID(pb.Posting_PASSWORD)
-	// StringID represents the string type.
-	StringID = TypeID(pb.Posting_STRING)
-	// UndefinedID represents the undefined type.
-	UndefinedID = TypeID(100)
-)
-
 var typeNameMap = map[string]TypeID{
-	"default":  DefaultID,
-	"binary":   BinaryID,
-	"int":      IntID,
-	"float":    FloatID,
-	"bool":     BoolID,
-	"datetime": DateTimeID,
-	"geo":      GeoID,
-	"uid":      UidID,
-	"string":   StringID,
-	"password": PasswordID,
-	"upload":   BinaryID,
+	"default":  TypeDefault,
+	"binary":   TypeBinary,
+	"int":      TypeInt64,
+	"float":    TypeFloat,
+	"bool":     TypeBool,
+	"datetime": TypeDatetime,
+	"geo":      TypeGeo,
+	"uid":      TypeUid,
+	"string":   TypeString,
+	"password": TypePassword,
+	"upload":   TypeBinary,
 }
 
 // TypeID represents the type of the data.
-type TypeID pb.Posting_ValType
+type TypeID byte
+
+const (
+	TypeDefault TypeID = iota
+	TypeBinary
+	TypeInt64
+	TypeFloat
+	TypeBool
+	TypeDatetime
+	TypeGeo
+	TypeUid
+	TypePassword
+	TypeString
+	TypeObject
+)
 
 // Enum takes a TypeID value and returns the corresponding ValType enum value.
 func (t TypeID) Enum() pb.Posting_ValType {
@@ -84,25 +69,25 @@ func (t TypeID) Enum() pb.Posting_ValType {
 // Name returns the name of the type.
 func (t TypeID) Name() string {
 	switch t {
-	case DefaultID:
+	case TypeDefault:
 		return "default"
-	case BinaryID:
+	case TypeBinary:
 		return "binary"
-	case IntID:
+	case TypeInt64:
 		return "int"
-	case FloatID:
+	case TypeFloat:
 		return "float"
-	case BoolID:
+	case TypeBool:
 		return "bool"
-	case DateTimeID:
+	case TypeDatetime:
 		return "datetime"
-	case GeoID:
+	case TypeGeo:
 		return "geo"
-	case UidID:
+	case TypeUid:
 		return "uid"
-	case StringID:
+	case TypeString:
 		return "string"
-	case PasswordID:
+	case TypePassword:
 		return "password"
 	}
 	return ""
@@ -137,56 +122,56 @@ func TypeForName(name string) (TypeID, bool) {
 
 // IsScalar returns whether the type is a scalar type.
 func (t TypeID) IsScalar() bool {
-	return t != UidID
+	return t != TypeUid
 }
 
 // IsNumber returns whether the type is a number type.
 func (t TypeID) IsNumber() bool {
-	return t == IntID || t == FloatID
+	return t == TypeInt64 || t == TypeFloat
 }
 
 // ValueForType returns the zero value for a type id
 func ValueForType(id TypeID) Val {
 	switch id {
-	case BinaryID:
+	case TypeBinary:
 		var b []byte
-		return Val{BinaryID, &b}
+		return Val{TypeBinary, &b}
 
-	case IntID:
+	case TypeInt64:
 		var i int64
-		return Val{IntID, &i}
+		return Val{TypeInt64, &i}
 
-	case FloatID:
+	case TypeFloat:
 		var f float64
-		return Val{FloatID, &f}
+		return Val{TypeFloat, &f}
 
-	case BoolID:
+	case TypeBool:
 		var b bool
-		return Val{BoolID, &b}
+		return Val{TypeBool, &b}
 
-	case DateTimeID:
+	case TypeDatetime:
 		var t time.Time
-		return Val{DateTimeID, &t}
+		return Val{TypeDatetime, &t}
 
-	case StringID:
+	case TypeString:
 		var s string
-		return Val{StringID, s}
+		return Val{TypeString, s}
 
-	case DefaultID:
+	case TypeDefault:
 		var s string
-		return Val{DefaultID, s}
+		return Val{TypeDefault, s}
 
-	case GeoID:
+	case TypeGeo:
 		var g geom.T
-		return Val{GeoID, &g}
+		return Val{TypeGeo, &g}
 
-	case UidID:
+	case TypeUid:
 		var i uint64
-		return Val{UidID, &i}
+		return Val{TypeUid, &i}
 
-	case PasswordID:
+	case TypePassword:
 		var p string
-		return Val{PasswordID, p}
+		return Val{TypePassword, p}
 
 	default:
 		return Val{}
