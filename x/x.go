@@ -31,8 +31,8 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/outcaste-io/badger/v3"
 	bo "github.com/outcaste-io/badger/v3/options"
-	"github.com/outcaste-io/badger/v3/pb"
 	badgerpb "github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/ristretto/z"
 
 	"github.com/golang/glog"
@@ -1246,10 +1246,10 @@ func KvWithMaxVersion(kvs *badgerpb.KVList, prefixes [][]byte) *badgerpb.KV {
 }
 
 // PrefixesToMatches converts the prefixes for subscription to a list of match.
-func PrefixesToMatches(prefixes [][]byte, ignore string) []*pb.Match {
-	matches := make([]*pb.Match, 0, len(prefixes))
+func PrefixesToMatches(prefixes [][]byte, ignore string) []*badgerpb.Match {
+	matches := make([]*badgerpb.Match, 0, len(prefixes))
 	for _, prefix := range prefixes {
-		matches = append(matches, &pb.Match{
+		matches = append(matches, &badgerpb.Match{
 			Prefix:      prefix,
 			IgnoreBytes: ignore,
 		})
@@ -1353,4 +1353,8 @@ const mask uint64 = 1<<32 - 1
 
 func Timestamp(baseTs, raftIdx uint64) uint64 {
 	return baseTs + (2*raftIdx)&mask // Always return multiples of 2.
+}
+
+func IsStarAll(v *pb.Value) bool {
+	return v.GetStrVal() == Star
 }

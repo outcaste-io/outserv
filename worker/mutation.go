@@ -4,7 +4,6 @@
 package worker
 
 import (
-	"bytes"
 	"context"
 	"math"
 	"sync"
@@ -37,24 +36,20 @@ var (
 // Default limit on number of simultaneous open files on unix systems
 const DefaultMaxOpenFileLimit = 1024
 
-func isStarAll(v []byte) bool {
-	return bytes.Equal(v, []byte(x.Star))
-}
-
-func isDeletePredicateEdge(edge *pb.DirectedEdge) bool {
-	return edge.Entity == 0 && isStarAll(edge.Value)
+func isDeletePredicateEdge(edge *pb.Edge) bool {
+	return len(edge.Subject) == 0 && x.IsStarAll(edge.ObjectValue)
 }
 
 // runMutation goes through all the edges and applies them.
-func runMutation(ctx context.Context, edge *pb.DirectedEdge, txn *posting.Txn) error {
+func runMutation(ctx context.Context, edge *pb.Edge, txn *posting.Txn) error {
 	ctx = schema.GetWriteContext(ctx)
 
 	// We shouldn't check whether this Alpha serves this predicate or not. Membership information
 	// isn't consistent across the entire cluster. We should just apply whatever is given to us.
-	su, ok := schema.State().Get(ctx, edge.Attr)
-	if edge.Op == pb.DirectedEdge_SET {
+	su, ok := schema.State().Get(ctx, edge.Predicate)
+	if edge.Op == pb.Edge_SET {
 		if !ok {
-			return errors.Errorf("runMutation: Unable to find schema for %s", edge.Attr)
+			return errors.Errorf("runMutation: Unable to find schema for %s", edge.Predicate)
 		}
 	}
 
@@ -69,7 +64,8 @@ func runMutation(ctx context.Context, edge *pb.DirectedEdge, txn *posting.Txn) e
 		return err
 	}
 
-	key := x.DataKey(edge.Attr, edge.Entity)
+	entity := x.FromHex(edge.Subject)
+	key := x.DataKey(edge.Predicate, entity)
 	// The following is a performance optimization which allows us to not read a posting list from
 	// disk. We calculate this based on how AddMutationWithIndex works. The general idea is that if
 	// we're not using the read posting list, we don't need to retrieve it. We need the posting list
@@ -84,7 +80,7 @@ func runMutation(ctx context.Context, edge *pb.DirectedEdge, txn *posting.Txn) e
 	case su.GetValueType() == pb.Posting_UID && !su.GetList():
 		// Single UID, not a list.
 		getFn = txn.Get
-	case edge.Op == pb.DirectedEdge_DEL:
+	case edge.Op == pb.Edge_DEL:
 		// Covers various delete cases to keep things simple.
 		getFn = txn.Get
 	default:
@@ -406,11 +402,8 @@ func checkSchema(s *pb.SchemaUpdate) error {
 
 // ValidateAndConvert checks compatibility or converts to the schema type if the storage type is
 // specified. If no storage type is specified then it converts to the schema type.
-func ValidateAndConvert(edge *pb.DirectedEdge, su *pb.SchemaUpdate) error {
+func ValidateAndConvert(edge *pb.Edge, su *pb.SchemaUpdate) error {
 	if isDeletePredicateEdge(edge) {
-		return nil
-	}
-	if types.TypeID(edge.ValueType) == types.DefaultID && isStarAll(edge.Value) {
 		return nil
 	}
 
@@ -425,12 +418,12 @@ func ValidateAndConvert(edge *pb.DirectedEdge, su *pb.SchemaUpdate) error {
 	case !schemaType.IsScalar() && storageType.IsScalar():
 		return errors.Errorf("Schema type: %q and Storage type: %q"+
 			" don't match for pred: %q edge: %v",
-			schemaType.Name(), storageType.Name(), x.ParseAttr(edge.Attr), edge)
+			schemaType.Name(), storageType.Name(), x.ParseAttr(edge.Predicate), edge)
 
 	case schemaType.IsScalar() && !storageType.IsScalar():
 		return errors.Errorf("Schema type: %q and Storage type: %q"+
 			" don't match for pred: %q edge: %v",
-			schemaType.Name(), storageType.Name(), x.ParseAttr(edge.Attr), edge)
+			schemaType.Name(), storageType.Name(), x.ParseAttr(edge.Predicate), edge)
 
 	// The suggested storage type matches the schema, OK!
 	case storageType == schemaType && schemaType != types.DefaultID:

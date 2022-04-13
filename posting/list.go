@@ -18,6 +18,7 @@ import (
 	bpb "github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/outserv/codec"
+	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/types"
@@ -207,12 +208,12 @@ type ListOptions struct {
 }
 
 // NewPosting takes the given edge and returns its equivalent representation as a posting.
-func NewPosting(t *pb.DirectedEdge) *pb.Posting {
+func NewPosting(t *pb.Edge) (*pb.Posting, error) {
 	var op uint32
 	switch t.Op {
-	case pb.DirectedEdge_SET:
+	case pb.Edge_SET:
 		op = Set
-	case pb.DirectedEdge_DEL:
+	case pb.Edge_DEL:
 		op = Del
 	default:
 		x.Fatalf("Unhandled operation: %+v", t)
@@ -220,20 +221,24 @@ func NewPosting(t *pb.DirectedEdge) *pb.Posting {
 
 	var postingType pb.Posting_PostingType
 	switch {
-	case t.ValueId == 0:
+	case len(t.ObjectId) == 0:
 		postingType = pb.Posting_VALUE
 	default:
 		postingType = pb.Posting_REF
 	}
 
+	val, tid, err := gql.ByteVal(t)
+	if err != nil {
+		return nil, err
+	}
 	p := &pb.Posting{
-		Uid:         t.ValueId,
-		Value:       t.Value,
-		ValType:     t.ValueType,
+		Uid:         x.FromHex(t.ObjectId),
+		Value:       val,
+		ValType:     tid.Enum(),
 		PostingType: postingType,
 		Op:          op,
 	}
-	return p
+	return p, nil
 }
 
 func hasDeleteAll(mpost *pb.Posting) bool {
@@ -321,14 +326,14 @@ func (l *List) updateMutationLayer(mpost *pb.Posting, singleUidUpdate bool) erro
 }
 
 // TypeID returns the typeid of destination vertex
-func TypeID(edge *pb.DirectedEdge) types.TypeID {
-	if edge.ValueId != 0 {
+func TypeID(edge *pb.Edge) types.TypeID {
+	if len(edge.ObjectId) != 0 {
 		return types.UidID
 	}
-	return types.TypeID(edge.ValueType)
+	return gql.TypeValFrom(edge.ObjectValue).Tid
 }
 
-func fingerprintEdge(t *pb.DirectedEdge) uint64 {
+func fingerprintEdge(t *pb.Edge) uint64 {
 	// There could be a collision if the user gives us a value with Lang = "en" and later gives
 	// us a value = "en" for the same predicate. We would end up overwriting his older lang
 	// value.
@@ -337,13 +342,14 @@ func fingerprintEdge(t *pb.DirectedEdge) uint64 {
 	// an (entity, attribute) can only have one untagged value.
 	var id uint64 = math.MaxUint64
 
-	if schema.State().IsList(t.Attr) {
-		id = farm.Fingerprint64(t.Value)
+	if schema.State().IsList(t.Predicate) {
+		// TODO(mrjn): Ensure this is correct.
+		id = farm.Fingerprint64([]byte(t.ObjectValue.String()))
 	}
 	return id
 }
 
-func (l *List) addMutation(ctx context.Context, txn *Txn, t *pb.DirectedEdge) error {
+func (l *List) addMutation(ctx context.Context, txn *Txn, t *pb.Edge) error {
 	l.Lock()
 	defer l.Unlock()
 	return l.addMutationInternal(ctx, txn, t)
@@ -401,14 +407,16 @@ func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.DirectedEdge) uint64 {
 	return conflictKey
 }
 
-func (l *List) addMutationInternal(ctx context.Context, txn *Txn, t *pb.DirectedEdge) error {
+func (l *List) addMutationInternal(ctx context.Context, txn *Txn, t *pb.Edge) error {
 	l.AssertLock()
 
-	mpost := NewPosting(t)
+	mpost, err := NewPosting(t)
+	if err != nil {
+		return err
+	}
 	mpost.StartTs = txn.StartTs
 	if mpost.PostingType != pb.Posting_REF {
-		t.ValueId = fingerprintEdge(t)
-		mpost.Uid = t.ValueId
+		mpost.Uid = fingerprintEdge(t)
 	}
 
 	// Check whether this mutation is an update for a predicate of type uid.
@@ -417,7 +425,7 @@ func (l *List) addMutationInternal(ctx context.Context, txn *Txn, t *pb.Directed
 		return errors.Wrapf(err, "cannot parse key when adding mutation to list with key %s",
 			hex.EncodeToString(l.key))
 	}
-	pred, ok := schema.State().Get(ctx, t.Attr)
+	pred, ok := schema.State().Get(ctx, t.Predicate)
 	isSingleUidUpdate := ok && !pred.GetList() && pred.GetValueType() == pb.Posting_UID &&
 		pk.IsData() && mpost.Op == Set && mpost.PostingType == pb.Posting_REF
 

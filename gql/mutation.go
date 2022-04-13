@@ -32,7 +32,7 @@ func ParseUid(xid string) (uint64, error) {
 
 // NQuad is an alias for the NQuad type in the API protobuf library.
 type NQuad struct {
-	*pb.NQuad
+	*pb.Edge
 }
 
 func TypeValFrom(val *pb.Value) types.Val {
@@ -60,7 +60,7 @@ func TypeValFrom(val *pb.Value) types.Val {
 	return types.Val{Tid: types.StringID, Value: ""}
 }
 
-func byteVal(nq NQuad) ([]byte, types.TypeID, error) {
+func ByteVal(nq *pb.Edge) ([]byte, types.TypeID, error) {
 	// We infer object type from type of value. We set appropriate type in parse
 	// function or the Go client has already set.
 	p := TypeValFrom(nq.ObjectValue)
@@ -177,7 +177,7 @@ func (nq NQuad) ToEdgeUsing(newToUid map[string]uint64) (*pb.DirectedEdge, error
 func copyValue(out *pb.DirectedEdge, nq NQuad) error {
 	var err error
 	var t types.TypeID
-	if out.Value, t, err = byteVal(nq); err != nil {
+	if out.Value, t, err = ByteVal(nq.Edge); err != nil {
 		return err
 	}
 	out.ValueType = t.Enum()

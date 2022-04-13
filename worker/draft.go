@@ -4,13 +4,11 @@
 package worker
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math"
-	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -286,9 +284,6 @@ func emptyMutation(mu *pb.Mutations) bool {
 	if len(mu.GetEdges()) > 0 {
 		return false
 	}
-	if len(mu.GetNquads()) > 0 {
-		return false
-	}
 	if len(mu.GetNewObjects()) > 0 {
 		return false
 	}
@@ -326,7 +321,7 @@ func (n *node) mutationWorker(workerId int) {
 
 func UidsForObject(ctx context.Context, obj *pb.Object) (*sroar.Bitmap, error) {
 	var res *sroar.Bitmap
-	for _, nq := range obj.Nquads {
+	for _, nq := range obj.Edges {
 		if nq.ObjectValue == nil {
 			return nil, fmt.Errorf("Unexpected nil object value for %+v", nq)
 		}
@@ -396,20 +391,6 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 		}
 	}
 
-	// It is possible that the user gives us multiple versions of the same edge, one with no facets
-	// and another with facets. In that case, use stable sort to maintain the ordering given to us
-	// by the user.
-	// TODO: Do this in a way, where we don't break multiple updates for the same Edge across
-	// different goroutines.
-	sort.SliceStable(m.Edges, func(i, j int) bool {
-		ei := m.Edges[i]
-		ej := m.Edges[j]
-		if ei.GetAttr() != ej.GetAttr() {
-			return ei.GetAttr() < ej.GetAttr()
-		}
-		return ei.GetEntity() < ej.GetEntity()
-	})
-
 	span := otrace.FromContext(ctx)
 	// Discard the posting lists from cache to release memory at the end.
 	defer func() {
@@ -427,7 +408,7 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 	// check if everything that we read is still valid, or was it changed. If
 	// it was indeed changed, we can re-do the work.
 
-	process := func(edges []*pb.DirectedEdge) error {
+	process := func(edges []*pb.Edge) error {
 		var retries int
 		for _, edge := range edges {
 			for {
@@ -570,23 +551,23 @@ func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr erro
 	// Stores a map of predicate and type of first mutation for each predicate.
 	schemaMap := make(map[string]types.TypeID)
 	for _, edge := range prop.Mutations.Edges {
-		if edge.Entity == 0 && bytes.Equal(edge.Value, []byte(x.Star)) {
+		if isDeletePredicateEdge(edge) {
 			// We should only drop the predicate if there is no pending
 			// transaction.
-			if err := detectPendingTxns(edge.Attr); err != nil {
+			if err := detectPendingTxns(edge.Predicate); err != nil {
 				span.Annotatef(nil, "Found pending transactions. Retry later.")
 				return err
 			}
-			span.Annotatef(nil, "Deleting predicate: %s", edge.Attr)
+			span.Annotatef(nil, "Deleting predicate: %s", edge.Predicate)
 			n.keysWritten.rejectBeforeIndex = prop.Index
-			return posting.DeletePredicate(ctx, edge.Attr, prop.CommitTs)
+			return posting.DeletePredicate(ctx, edge.Predicate, prop.CommitTs)
 		}
 		// Don't derive schema when doing deletion.
-		if edge.Op == pb.DirectedEdge_DEL {
+		if edge.Op == pb.Edge_DEL {
 			continue
 		}
-		if _, ok := schemaMap[edge.Attr]; !ok {
-			schemaMap[edge.Attr] = posting.TypeID(edge)
+		if _, ok := schemaMap[edge.Predicate]; !ok {
+			schemaMap[edge.Predicate] = posting.TypeID(edge)
 		}
 	}
 
@@ -1533,7 +1514,7 @@ func (n *node) Run() {
 					for _, e := range p.Mutations.GetEdges() {
 						// This is a drop predicate mutation. We should not try to execute it
 						// concurrently.
-						if e.Entity == 0 && bytes.Equal(e.Value, []byte(x.Star)) {
+						if isDeletePredicateEdge(e) {
 							skip = true
 							break
 						}

@@ -188,14 +188,13 @@ message DirectedEdge {
 message Object {
   string var = 1;
   uint64 uid = 2;
-  repeated NQuad nquads = 3;
+  repeated Edge edges = 3;
 }
 
 message Mutations {
   uint32 group_id = 1;
   repeated Object new_objects = 2;
-  repeated NQuad nquads = 3;
-  repeated DirectedEdge edges = 4; // Remove this
+  repeated Edge edges = 3;
   repeated SchemaUpdate schema = 5;
   enum DropOp {
     NONE = 0;
@@ -432,7 +431,7 @@ message Response {
 message Mutation {
   bytes set_json = 1;
   bytes delete_json = 2;
-  repeated NQuad nquads = 3;
+  repeated Edge edges = 3;
 
   // This is being used for upserts.
   string cond = 9;
@@ -481,7 +480,7 @@ message Metrics {
   map<string, uint64> num_uids = 1;
 }
 
-message NQuad {
+message Edge {
   string subject = 1;
   string predicate = 2;
   string object_id = 3;
