@@ -45,24 +45,6 @@ func toUid(subject string, newToUid map[string]uint64) (uid uint64, err error) {
 	return 0, errors.Errorf("UID not found/generated for xid %s\n", subject)
 }
 
-var emptyEdge pb.DirectedEdge
-
-func (nq NQuad) createEdgePrototype(subjectUid uint64) *pb.DirectedEdge {
-	return &pb.DirectedEdge{
-		Entity:    subjectUid,
-		Attr:      nq.Predicate,
-		Namespace: nq.Namespace,
-	}
-}
-
-// CreateUidEdge returns a Directed edge connecting the given subject and object UIDs.
-func (nq NQuad) CreateUidEdge(subjectUid uint64, objectUid uint64) *pb.DirectedEdge {
-	out := nq.createEdgePrototype(subjectUid)
-	out.ValueId = objectUid
-	out.ValueType = pb.Posting_UID
-	return out
-}
-
 // // CreateValueEdge returns a DirectedEdge with the given subject. The predicate,
 // // language, and facet values are derived from the NQuad.
 // func (nq NQuad) CreateValueEdge(subjectUid uint64) (*pb.DirectedEdge, error) {

@@ -169,21 +169,6 @@ message Tablet {
   int64 uncompressed_bytes = 11;
 }
 
-message DirectedEdge {
-  fixed64 entity = 1;              // Subject or source node / UID.
-  string attr = 2;                 // Attribute or predicate. Labels the edge.
-  bytes value = 3;                 // Edge points to a value.
-  Posting.ValType value_type = 4;  // The type of the value
-  fixed64 value_id = 5;            // Object or destination node / UID.
-  enum Op {
-    SET = 0;
-    DEL = 1;
-  }
-  Op op = 8;
-  repeated string allowedPreds = 10;
-  uint64 namespace = 11;
-}
-
 message Object {
   string var = 1;
   uint64 uid = 2;

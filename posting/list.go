@@ -351,7 +351,7 @@ func (l *List) addMutation(ctx context.Context, txn *Txn, t *pb.Edge) error {
 	return l.addMutationInternal(ctx, txn, t)
 }
 
-func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.DirectedEdge) uint64 {
+func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.Edge) uint64 {
 	getKey := func(key []byte, uid uint64) uint64 {
 		// Instead of creating a string first and then doing a fingerprint, let's do a fingerprint
 		// here to save memory allocations.
@@ -361,7 +361,7 @@ func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.DirectedEdge) uint64 {
 
 	var conflictKey uint64
 	switch {
-	case schema.State().HasUpsert(t.Attr):
+	case schema.State().HasUpsert(t.Predicate):
 		// Consider checking to see if a email id is unique. A user adds:
 		// <uid> <email> "email@email.org", and there's a string equal tokenizer
 		// and upsert directive on the schema.
@@ -371,7 +371,7 @@ func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.DirectedEdge) uint64 {
 		// that two users don't set the same email id.
 		conflictKey = getKey(key, 0)
 
-	case pk.IsData() && schema.State().IsList(t.Attr):
+	case pk.IsData() && schema.State().IsList(t.Predicate):
 		// Data keys, irrespective of whether they are UID or values, should be judged based on
 		// whether they are lists or not. For UID, t.ValueId = UID. For value, t.ValueId =
 		// fingerprint(value) or could be fingerprint(lang) or something else.
@@ -387,14 +387,14 @@ func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.DirectedEdge) uint64 {
 		// a -> "y"
 		// This should definitely have a conflict.
 		// But, if name: [string], then they can both succeed.
-		conflictKey = getKey(key, t.ValueId)
+		conflictKey = getKey(key, x.FromHex(t.ObjectId))
 
 	case pk.IsData(): // NOT a list. This case must happen after the above case.
 		conflictKey = getKey(key, 0)
 
 	case pk.IsIndex() || pk.IsCount():
 		// Index keys are by default of type [uid].
-		conflictKey = getKey(key, t.ValueId)
+		conflictKey = getKey(key, x.FromHex(t.ObjectId))
 
 	default:
 		// Don't assign a conflictKey.
