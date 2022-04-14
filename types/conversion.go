@@ -300,7 +300,7 @@ func Convert(from Sval, toID TypeID) (Val, error) {
 // if we can eliminate Marshal.
 func Marshal(from Val, to *Val) error {
 	if to == nil {
-		return errors.Errorf("Invalid conversion %s to nil", from.Tid.Name())
+		return errors.Errorf("Invalid conversion %s to nil", from.Tid)
 	}
 
 	fromID := from.Tid
@@ -454,7 +454,7 @@ func StringToBinary(src string) []byte {
 }
 
 func cantConvert(from TypeID, to TypeID) error {
-	return errors.Errorf("Cannot convert %s to type %s", from.Name(), to.Name())
+	return errors.Errorf("Cannot convert %s to type %s", from, to)
 }
 
 // MarshalJSON makes Val satisfy the json.Marshaler interface.

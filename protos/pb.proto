@@ -247,20 +247,6 @@ message KVS {
 message Posting {
   fixed64 uid = 1;
   bytes value = 2;
-  enum ValType {
-    DEFAULT = 0;
-    BINARY = 1;
-    INT = 2;  // We treat it as int64.
-    FLOAT = 3;
-    BOOL = 4;
-    DATETIME = 5;
-    GEO = 6;
-    UID = 7;
-    PASSWORD = 8;
-    STRING = 9;
-    OBJECT = 10;
-  }
-  /* ValType val_type = 3; */
   enum PostingType {
     REF = 0;         // UID
     VALUE = 1;       // simple, plain value
@@ -322,7 +308,7 @@ message SchemaResult {
 
 message SchemaUpdate {
   string predicate = 1;
-  Posting.ValType value_type = 2;
+  int32 value_type = 2;
   enum Directive {
     NONE = 0;
     INDEX = 1;

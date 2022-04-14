@@ -77,7 +77,7 @@ func runMutation(ctx context.Context, edge *pb.Edge, txn *posting.Txn) error {
 	case len(su.GetTokenizer()) > 0 || su.GetCount():
 		// Any index or count index.
 		getFn = txn.Get
-	case su.GetValueType() == pb.Posting_UID && !su.GetList():
+	case su.GetValueType() == int32(types.TypeUid) && !su.GetList():
 		// Single UID, not a list.
 		getFn = txn.Get
 	case edge.Op == pb.Edge_DEL:
@@ -293,9 +293,9 @@ func createSchema(attr string, typ types.TypeID, ts uint64) error {
 	// type is not present
 	s, ok := schema.State().Get(ctx, attr)
 	if ok {
-		s.ValueType = typ.Enum()
+		s.ValueType = typ.Int()
 	} else {
-		s = pb.SchemaUpdate{ValueType: typ.Enum(), Predicate: attr}
+		s = pb.SchemaUpdate{ValueType: typ.Int(), Predicate: attr}
 		// For type TypeUid, set List to true. This is done because previously
 		// all predicates of type TypeUid were implicitly considered lists.
 		if typ == types.TypeUid {
@@ -375,11 +375,11 @@ func checkSchema(s *pb.SchemaUpdate) error {
 
 	// schema was defined already
 	switch {
-	case t.IsScalar() && (t.Enum() == pb.Posting_PASSWORD || s.ValueType == pb.Posting_PASSWORD):
+	case t.IsScalar() && (t == types.TypePassword || s.ValueType == types.TypePassword.Int()):
 		// can't change password -> x, x -> password
-		if t.Enum() != s.ValueType {
+		if t.Int() != s.ValueType {
 			return errors.Errorf("Schema change not allowed from %s to %s",
-				t.Enum(), typ.Enum())
+				t, typ)
 		}
 
 	case t.IsScalar() == typ.IsScalar():
@@ -387,7 +387,7 @@ func checkSchema(s *pb.SchemaUpdate) error {
 		// has data.
 		if schema.State().IsList(s.Predicate) && !s.List && hasEdges(s.Predicate, math.MaxUint64) {
 			return errors.Errorf("Schema change not allowed from [%s] => %s without"+
-				" deleting pred: %s", t.Name(), typ.Name(), x.ParseAttr(s.Predicate))
+				" deleting pred: %s", t, typ, x.ParseAttr(s.Predicate))
 		}
 
 	default:
@@ -418,12 +418,12 @@ func ValidateAndConvert(edge *pb.Edge, su *pb.SchemaUpdate) error {
 	case !schemaType.IsScalar() && storageType.IsScalar():
 		return errors.Errorf("Schema type: %q and Storage type: %q"+
 			" don't match for pred: %q edge: %v",
-			schemaType.Name(), storageType.Name(), x.ParseAttr(edge.Predicate), edge)
+			schemaType, storageType, x.ParseAttr(edge.Predicate), edge)
 
 	case schemaType.IsScalar() && !storageType.IsScalar():
 		return errors.Errorf("Schema type: %q and Storage type: %q"+
 			" don't match for pred: %q edge: %v",
-			schemaType.Name(), storageType.Name(), x.ParseAttr(edge.Predicate), edge)
+			schemaType, storageType, x.ParseAttr(edge.Predicate), edge)
 
 	// The suggested storage type matches the schema, OK!
 	case storageType == schemaType && schemaType != types.TypeDefault:

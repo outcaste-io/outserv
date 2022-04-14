@@ -19,7 +19,6 @@ package types
 import (
 	"time"
 
-	"github.com/outcaste-io/outserv/protos/pb"
 	geom "github.com/twpayne/go-geom"
 )
 
@@ -62,13 +61,8 @@ const (
 	TypeUndefined
 )
 
-// Enum takes a TypeID value and returns the corresponding ValType enum value.
-func (t TypeID) Enum() pb.Posting_ValType {
-	return pb.Posting_ValType(t)
-}
-
 // Name returns the name of the type.
-func (t TypeID) Name() string {
+func (t TypeID) String() string {
 	switch t {
 	case TypeDefault:
 		return "default"
@@ -92,6 +86,17 @@ func (t TypeID) Name() string {
 		return "password"
 	}
 	return ""
+}
+
+func (t TypeID) Int() int32 {
+	return int32(t)
+}
+
+func FromInt(i int32) TypeID {
+	if i < 0 || i >= int32(TypeUndefined) {
+		return TypeUndefined
+	}
+	return TypeID(i)
 }
 
 // Serialized Value.

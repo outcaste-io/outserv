@@ -147,7 +147,7 @@ func toSchema(attr string, update *pb.SchemaUpdate) *bpb.KV {
 	if update.GetList() {
 		x.Check2(buf.WriteRune('['))
 	}
-	x.Check2(buf.WriteString(types.TypeID(update.GetValueType()).Name()))
+	x.Check2(buf.WriteString(types.TypeID(update.GetValueType()).String()))
 	if update.GetList() {
 		x.Check2(buf.WriteRune(']'))
 	}

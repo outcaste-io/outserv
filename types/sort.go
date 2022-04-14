@@ -88,7 +88,7 @@ func SortWithFacet(v [][]Val, ul *[]uint64, desc []bool) error {
 
 	for _, val := range v[0] {
 		if !IsSortable(val.Tid) {
-			return errors.Errorf("Value of type: %s isn't sortable", val.Tid.Name())
+			return errors.Errorf("Value of type: %s isn't sortable", val.Tid)
 		}
 	}
 

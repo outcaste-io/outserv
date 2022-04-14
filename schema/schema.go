@@ -132,7 +132,7 @@ func logUpdate(schema *pb.SchemaUpdate, pred string) string {
 		return ""
 	}
 
-	typ := types.TypeID(schema.ValueType).Name()
+	typ := types.TypeID(schema.ValueType).String()
 	if schema.List {
 		typ = fmt.Sprintf("[%s]", typ)
 	}
@@ -448,7 +448,7 @@ func loadFromDB(loadType int) error {
 			var s pb.SchemaUpdate
 			err := item.Value(func(val []byte) error {
 				if len(val) == 0 {
-					s = pb.SchemaUpdate{Predicate: pk.Attr, ValueType: pb.Posting_DEFAULT}
+					s = pb.SchemaUpdate{Predicate: pk.Attr, ValueType: int32(types.TypeDefault)}
 				}
 				x.Checkf(s.Unmarshal(val), "Error while loading schema from db")
 				glog.Infof("Setting schema: %+v\n", s)
@@ -485,25 +485,25 @@ func initialSchemaInternal(namespace uint64, all bool) []*pb.SchemaUpdate {
 	initialSchema = append(initialSchema,
 		&pb.SchemaUpdate{
 			Predicate: "dgraph.type",
-			ValueType: pb.Posting_STRING,
+			ValueType: types.TypeString.Int(),
 			Directive: pb.SchemaUpdate_INDEX,
 			Tokenizer: []string{"exact"},
 			List:      true,
 		}, &pb.SchemaUpdate{
 			Predicate: "dgraph.drop.op",
-			ValueType: pb.Posting_STRING,
+			ValueType: types.TypeString.Int(),
 		}, &pb.SchemaUpdate{
 			Predicate: "dgraph.graphql.schema",
-			ValueType: pb.Posting_STRING,
+			ValueType: types.TypeString.Int(),
 		}, &pb.SchemaUpdate{
 			Predicate: "dgraph.graphql.xid",
-			ValueType: pb.Posting_STRING,
+			ValueType: types.TypeString.Int(),
 			Directive: pb.SchemaUpdate_INDEX,
 			Tokenizer: []string{"exact"},
 			Upsert:    true,
 		}, &pb.SchemaUpdate{
 			Predicate: "dgraph.graphql.p_query",
-			ValueType: pb.Posting_STRING,
+			ValueType: types.TypeString.Int(),
 			Directive: pb.SchemaUpdate_INDEX,
 			Tokenizer: []string{"sha256"},
 		})
@@ -513,37 +513,37 @@ func initialSchemaInternal(namespace uint64, all bool) []*pb.SchemaUpdate {
 		initialSchema = append(initialSchema, []*pb.SchemaUpdate{
 			{
 				Predicate: "dgraph.xid",
-				ValueType: pb.Posting_STRING,
+				ValueType: types.TypeString.Int(),
 				Directive: pb.SchemaUpdate_INDEX,
 				Upsert:    true,
 				Tokenizer: []string{"exact"},
 			},
 			{
 				Predicate: "dgraph.password",
-				ValueType: pb.Posting_PASSWORD,
+				ValueType: types.TypePassword.Int(),
 			},
 			{
 				Predicate: "dgraph.user.group",
 				// Note: This was using a reverse directive. Instead, we should
 				// be handling this via GraphQL.
-				ValueType: pb.Posting_UID,
+				ValueType: types.TypeUid.Int(),
 				List:      true,
 			},
 			{
 				Predicate: "dgraph.acl.rule",
-				ValueType: pb.Posting_UID,
+				ValueType: types.TypeUid.Int(),
 				List:      true,
 			},
 			{
 				Predicate: "dgraph.rule.predicate",
-				ValueType: pb.Posting_STRING,
+				ValueType: types.TypeString.Int(),
 				Directive: pb.SchemaUpdate_INDEX,
 				Tokenizer: []string{"exact"},
 				Upsert:    true, // Not really sure if this will work.
 			},
 			{
 				Predicate: "dgraph.rule.permission",
-				ValueType: pb.Posting_INT,
+				ValueType: types.TypeInt64.Int(),
 			},
 		}...)
 	}

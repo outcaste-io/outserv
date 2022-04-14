@@ -327,7 +327,7 @@ func (qs *queryState) handleValuePostings(ctx context.Context, args funcArgs) er
 	}
 	if srcFn.fnType == passwordFn && srcFn.atype != types.TypePassword {
 		return errors.Errorf("checkpwd fn can only be used on attr: [%s] with schema type "+
-			"password. Got type: %s", x.ParseAttr(q.Attr), types.TypeID(srcFn.atype).Name())
+			"password. Got type: %s", x.ParseAttr(q.Attr), types.TypeID(srcFn.atype))
 	}
 	if srcFn.n == 0 {
 		return nil
@@ -897,7 +897,7 @@ func (qs *queryState) handleRegexFunction(ctx context.Context, arg funcArgs) err
 
 	attr := arg.q.Attr
 	typ, err := schema.State().TypeOf(attr)
-	span.Annotatef(nil, "Attr: %s. Type: %s", attr, typ.Name())
+	span.Annotatef(nil, "Attr: %s. Type: %s", attr, typ)
 	if err != nil || !typ.IsScalar() {
 		return errors.Errorf("Attribute not scalar: %s %v", x.ParseAttr(attr), typ)
 	}
@@ -1121,7 +1121,7 @@ func (qs *queryState) handleMatchFunction(ctx context.Context, arg funcArgs) err
 
 	attr := arg.q.Attr
 	typ := arg.srcFn.atype
-	span.Annotatef(nil, "Attr: %s. Type: %s", attr, typ.Name())
+	span.Annotatef(nil, "Attr: %s. Type: %s", attr, typ)
 	var uids *sroar.Bitmap
 	switch {
 	case !typ.IsScalar():
@@ -1447,7 +1447,7 @@ func parseSrcFn(ctx context.Context, q *pb.Query) (*functionContext, error) {
 	var err error
 
 	t, err := schema.State().TypeOf(attr)
-	if err == nil && fnType != notAFunction && t.Name() == types.TypeString.Name() {
+	if err == nil && fnType != notAFunction && t == types.TypeString {
 		fc.isStringFn = true
 	}
 

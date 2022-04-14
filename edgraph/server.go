@@ -560,8 +560,8 @@ func validateDQLSchemaForGraphQL(ctx context.Context,
 
 		// type (including list) must match exactly
 		if gqlPred.ValueType != dqlPred.ValueType || gqlPred.List != dqlPred.List {
-			gqlType := strings.ToLower(gqlPred.ValueType.String())
-			dqlType := strings.ToLower(dqlPred.ValueType.String())
+			gqlType := strings.ToLower(types.FromInt(gqlPred.ValueType).String())
+			dqlType := strings.ToLower(types.FromInt(dqlPred.ValueType).String())
 			if gqlPred.List {
 				gqlType = "[" + gqlType + "]"
 			}

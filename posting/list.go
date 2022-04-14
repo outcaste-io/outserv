@@ -422,7 +422,7 @@ func (l *List) addMutationInternal(ctx context.Context, txn *Txn, t *pb.Edge) er
 			hex.EncodeToString(l.key))
 	}
 	pred, ok := schema.State().Get(ctx, t.Predicate)
-	isSingleUidUpdate := ok && !pred.GetList() && pred.GetValueType() == pb.Posting_UID &&
+	isSingleUidUpdate := ok && !pred.GetList() && pred.GetValueType() == int32(types.TypeUid) &&
 		pk.IsData() && mpost.Op == Set && mpost.PostingType == pb.Posting_REF
 
 	if err != l.updateMutationLayer(mpost, isSingleUidUpdate) {
