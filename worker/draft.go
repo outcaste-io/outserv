@@ -331,12 +331,9 @@ func UidsForObject(ctx context.Context, obj *pb.Object) (*sroar.Bitmap, error) {
 			return nil, errors.Wrapf(err, "encountered an XID %s with invalid val", nq.Predicate)
 		}
 		valStr := val.Value.(string)
-
 		q := &pb.Query{
 			ReadTs: posting.ReadTimestamp(), // What timestamp should we use?
-
-			// TODO(mrjn): Namespace 0 is hardcoded here. We should allow for other namespaces later.
-			Attr: x.NamespaceAttr(0, nq.Predicate),
+			Attr:   nq.Predicate,
 			SrcFunc: &pb.SrcFunction{
 				Name: "eq",
 				Args: []string{valStr},
@@ -367,12 +364,20 @@ func UidsForObject(ctx context.Context, obj *pb.Object) (*sroar.Bitmap, error) {
 }
 
 func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.Txn) error {
+	// TODO(mrjn): If this concMutation is a retry, should we upgrade the read
+	// timestamp then? It would seem logical to do so.
+	//
 	// Deal with objects first.
-	resolved := make(map[string]uint64)
+	resolved := make(map[string]string)
 	for _, obj := range m.NewObjects {
 		glog.Infof("Got object: %+v\n", obj)
+
+		// Does the read timestamp need to be passed to UidsForObject?
 		bm, err := UidsForObject(ctx, obj)
-		glog.Infof("got uids: %d error: %v\n", bm.GetCardinality(), err)
+		if err != nil {
+			return errors.Wrapf(err, "when calling UidsForObject")
+		}
+		glog.Infof("got uids: %d\n", bm.GetCardinality())
 
 		card := bm.GetCardinality()
 		if card > 1 {
@@ -380,11 +385,26 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 				" object with var: %q", obj.Var)
 		}
 		if card == 1 {
-			resolved[obj.Var] = bm.ToArray()[0]
+			resolved[obj.Var] = x.ToHexString(bm.ToArray()[0])
+			// No need to write the attributes corresponding to the object. The
+			// object already have these attributes set.
 		} else {
-			resolved[obj.Var] = obj.Uid
+			resolved[obj.Var] = x.ToHexString(obj.Uid)
+			// Let's put these edges back into the main list to be executed.
+			m.Edges = append(m.Edges, obj.Edges...)
 		}
 	}
+
+	// Replace the UIDs in the edges.
+	for _, edge := range m.Edges {
+		if uid, has := resolved[edge.Subject]; has {
+			edge.Subject = uid
+		}
+		if uid, has := resolved[edge.ObjectId]; has {
+			edge.ObjectId = uid
+		}
+	}
+	glog.Infof("\nresolved: %+v\n\n Edges: %+v\n", resolved, m.Edges)
 
 	span := otrace.FromContext(ctx)
 	// Discard the posting lists from cache to release memory at the end.

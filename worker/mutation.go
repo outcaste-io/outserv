@@ -46,6 +46,7 @@ func runMutation(ctx context.Context, edge *pb.Edge, txn *posting.Txn) error {
 
 	// We shouldn't check whether this Alpha serves this predicate or not. Membership information
 	// isn't consistent across the entire cluster. We should just apply whatever is given to us.
+	glog.Infof("Looking for schema with: %s\n", edge.Predicate)
 	su, ok := schema.State().Get(ctx, edge.Predicate)
 	if edge.Op == pb.Edge_SET {
 		if !ok {

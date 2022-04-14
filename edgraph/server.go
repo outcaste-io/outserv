@@ -159,6 +159,7 @@ func getGQLSchema(namespace uint64) (*x.GQL, error) {
 	if err := json.Unmarshal(resp.GetJson(), &result); err != nil {
 		return nil, errors.Wrap(err, "Couldn't unmarshal response from Dgraph query")
 	}
+	glog.Infof("getGQLSchema result: %+v\n", result)
 
 	data := &x.GQL{}
 	res := result.ExistingGQLSchema

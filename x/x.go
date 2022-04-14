@@ -1153,6 +1153,9 @@ func ToHex(i uint64) []byte {
 }
 
 func FromHex(s string) uint64 {
+	if len(s) == 0 {
+		return 0
+	}
 	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
 		s = s[2:]
 	}

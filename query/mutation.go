@@ -33,7 +33,20 @@ func ApplyMutations(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, error
 	// }
 	// m.Edges = edges
 
-	err := checkIfDeletingAclOperation(ctx, m.Edges)
+	ns, err := x.ExtractNamespace(ctx)
+	if err != nil {
+		return nil, errors.Wrapf(err, "while extracting namespace")
+	}
+	for _, obj := range m.NewObjects {
+		for _, edge := range obj.Edges {
+			edge.Predicate = x.NamespaceAttr(ns, edge.Predicate)
+		}
+	}
+	for _, edge := range m.Edges {
+		edge.Predicate = x.NamespaceAttr(ns, edge.Predicate)
+	}
+
+	err = checkIfDeletingAclOperation(ctx, m.Edges)
 	if err != nil {
 		return nil, err
 	}

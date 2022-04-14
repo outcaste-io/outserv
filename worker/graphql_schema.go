@@ -107,9 +107,9 @@ func UpdateGQLSchemaOverNetwork(ctx context.Context, req *pb.UpdateGraphQLSchema
 	return c.UpdateGraphQLSchema(ctx, req)
 }
 
-func ParseAsSchemaAndScript(b types.Sval) (string, string) {
+func ParseAsSchemaAndScript(b []byte) (string, string) {
 	var data x.GQL
-	if err := json.Unmarshal(b[1:], &data); err != nil {
+	if err := json.Unmarshal(b, &data); err != nil {
 		glog.Warningf("Cannot unmarshal existing GQL schema into new format. Got err: %+v. "+
 			" Assuming old format.", err)
 		return string(b), ""
