@@ -119,8 +119,7 @@ func (d *dedup) addValue(attr string, value types.Val, uid uint64) {
 	if value.Tid == types.TypeUid {
 		strKey = strconv.FormatUint(value.Value.(uint64), 10)
 	} else {
-		valC := types.Val{Tid: types.TypeString, Value: ""}
-		err := types.Marshal(value, &valC)
+		valC, err := types.Marshal(value, types.TypeString)
 		if err != nil {
 			return
 		}

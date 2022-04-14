@@ -1610,7 +1610,8 @@ func (sg *SubGraph) replaceVarInFunc() error {
 		seenArgs := make(map[string]struct{})
 		for _, v := range sg.Params.UidToVal {
 			data := types.ValueForType(types.TypeString)
-			if err := types.Marshal(v, &data); err != nil {
+			data, err := types.Marshal(v, types.TypeString)
+			if err != nil {
 				return err
 			}
 			val := data.Value.(string)

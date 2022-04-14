@@ -20,7 +20,7 @@ import (
 	"github.com/twpayne/go-geom/encoding/wkb"
 )
 
-// Convert converts the value to given scalar type.
+// Convert takes a binary version of value, and converts it to given scalar type.
 func Convert(from Sval, toID TypeID) (Val, error) {
 	to := Val{Tid: toID}
 	res := &to.Value
@@ -295,63 +295,63 @@ func Convert(from Sval, toID TypeID) (Val, error) {
 	return to, nil
 }
 
-// Marshal converts from one Val to another. It's unclear why we need a Marshal
-// separate from a Convert. TODO(mrjn): Compare these and their usages and see
-// if we can eliminate Marshal.
-func Marshal(from Val, to *Val) error {
-	if to == nil {
-		return errors.Errorf("Invalid conversion %s to nil", from.Tid)
+// Marshal assumes that value is in its native form, and marshals it into one of
+// string or binary.
+func Marshal(from Val, toID TypeID) (Val, error) {
+	if toID != TypeString && toID != TypeBinary {
+		return Val{}, errors.Errorf("Invalid conversion to %s", toID)
 	}
 
 	fromID := from.Tid
-	toID := to.Tid
 	val := from.Value
+
+	to := Val{Tid: toID}
 	res := &to.Value
 
 	// This is a default value from sg.fillVars, don't convert it's empty.
 	// Fixes issue #2980.
 	if val == nil {
-		*to = ValueForType(toID)
-		return nil
+		to = ValueForType(toID)
+		return to, nil
 	}
 
 	switch fromID {
 	case TypeBinary:
 		vc := val.([]byte)
 		switch toID {
-		case TypeString, TypeDefault:
+		case TypeString:
 			*res = string(vc)
 		case TypeBinary:
 			*res = vc
 		default:
-			return cantConvert(fromID, toID)
+			return to, cantConvert(fromID, toID)
 		}
 	case TypeString, TypeDefault:
 		vc := val.(string)
 		switch toID {
-		case TypeString, TypeDefault:
+		case TypeString:
 			*res = vc
 		case TypeBinary:
 			*res = []byte(vc)
 		default:
-			return cantConvert(fromID, toID)
+			return to, cantConvert(fromID, toID)
 		}
 	case TypeInt64:
 		vc := val.(int64)
 		switch toID {
-		case TypeString, TypeDefault:
+		case TypeString:
 			*res = strconv.FormatInt(vc, 10)
 		case TypeBinary:
 			var bs [8]byte
 			binary.LittleEndian.PutUint64(bs[:], uint64(vc))
 			*res = bs[:]
 		default:
-			return cantConvert(fromID, toID)
+			return to, cantConvert(fromID, toID)
 		}
 	case TypeFloat:
 		vc := val.(float64)
 		switch toID {
-		case TypeString, TypeDefault:
+		case TypeString:
 			*res = strconv.FormatFloat(vc, 'G', -1, 64)
 		case TypeBinary:
 			var bs [8]byte
@@ -359,12 +359,12 @@ func Marshal(from Val, to *Val) error {
 			binary.LittleEndian.PutUint64(bs[:], u)
 			*res = bs[:]
 		default:
-			return cantConvert(fromID, toID)
+			return to, cantConvert(fromID, toID)
 		}
 	case TypeBool:
 		vc := val.(bool)
 		switch toID {
-		case TypeString, TypeDefault:
+		case TypeString:
 			*res = strconv.FormatBool(vc)
 		case TypeBinary:
 			*res = []byte{0}
@@ -372,46 +372,46 @@ func Marshal(from Val, to *Val) error {
 				*res = []byte{1}
 			}
 		default:
-			return cantConvert(fromID, toID)
+			return to, cantConvert(fromID, toID)
 		}
 	case TypeDatetime:
 		vc := val.(time.Time)
 		switch toID {
-		case TypeString, TypeDefault:
+		case TypeString:
 			val, err := vc.MarshalText()
 			if err != nil {
-				return err
+				return to, err
 			}
 			*res = string(val)
 		case TypeBinary:
 			r, err := vc.MarshalBinary()
 			if err != nil {
-				return err
+				return to, err
 			}
 			*res = r
 		default:
-			return cantConvert(fromID, toID)
+			return to, cantConvert(fromID, toID)
 		}
 	case TypeGeo:
 		vc, ok := val.(geom.T)
 		if !ok {
-			return errors.Errorf("Expected a Geo type")
+			return to, errors.Errorf("Expected a Geo type")
 		}
 		switch toID {
+		case TypeString:
+			val, err := geojson.Marshal(vc)
+			if err != nil {
+				return to, err
+			}
+			*res = string(bytes.Replace(val, []byte("\""), []byte("'"), -1))
 		case TypeBinary:
 			r, err := wkb.Marshal(vc, binary.LittleEndian)
 			if err != nil {
-				return err
+				return to, err
 			}
 			*res = r
-		case TypeString, TypeDefault:
-			val, err := geojson.Marshal(vc)
-			if err != nil {
-				return nil
-			}
-			*res = string(bytes.Replace(val, []byte("\""), []byte("'"), -1))
 		default:
-			return cantConvert(fromID, toID)
+			return to, cantConvert(fromID, toID)
 		}
 	case TypePassword:
 		vc := val.(string)
@@ -421,17 +421,17 @@ func Marshal(from Val, to *Val) error {
 		case TypeBinary:
 			*res = []byte(vc)
 		default:
-			return cantConvert(fromID, toID)
+			return to, cantConvert(fromID, toID)
 		}
 	default:
-		return cantConvert(fromID, toID)
+		return to, cantConvert(fromID, toID)
 	}
-	return nil
+	return to, nil
 }
 
 func ToBinary(id TypeID, b interface{}) ([]byte, error) {
-	to := ValueForType(TypeBinary)
-	if err := Marshal(Val{id, b}, &to); err != nil {
+	to, err := Marshal(Val{id, b}, TypeBinary)
+	if err != nil {
 		return nil, err
 	}
 	out := []byte{byte(id)}
@@ -440,11 +440,11 @@ func ToBinary(id TypeID, b interface{}) ([]byte, error) {
 }
 
 func FromBinary(data []byte) (Val, error) {
+	if len(data) == 0 {
+		return Val{}, nil
+	}
 	id := TypeID(data[0])
-	to := ValueForType(id)
-	from := Val{Tid: TypeBinary, Value: data[1:]}
-	err := Marshal(from, &to)
-	return to, err
+	return Convert(Sval(data), id)
 }
 
 func StringToBinary(src string) []byte {
