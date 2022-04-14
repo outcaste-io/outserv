@@ -3533,10 +3533,9 @@ func (m *Metrics) GetNumUids() map[string]uint64 {
 }
 
 type Edge struct {
-	Subject   string `protobuf:"bytes,1,opt,name=subject,proto3" json:"subject,omitempty"`
-	Predicate string `protobuf:"bytes,2,opt,name=predicate,proto3" json:"predicate,omitempty"`
-	ObjectId  string `protobuf:"bytes,3,opt,name=object_id,json=objectId,proto3" json:"object_id,omitempty"`
-	// Value object_value = 4;
+	Subject     string  `protobuf:"bytes,1,opt,name=subject,proto3" json:"subject,omitempty"`
+	Predicate   string  `protobuf:"bytes,2,opt,name=predicate,proto3" json:"predicate,omitempty"`
+	ObjectId    string  `protobuf:"bytes,3,opt,name=object_id,json=objectId,proto3" json:"object_id,omitempty"`
 	ObjectValue []byte  `protobuf:"bytes,4,opt,name=object_value,json=objectValue,proto3" json:"object_value,omitempty"`
 	Namespace   uint64  `protobuf:"varint,5,opt,name=namespace,proto3" json:"namespace,omitempty"`
 	Op          Edge_Op `protobuf:"varint,6,opt,name=op,proto3,enum=pb.Edge_Op" json:"op,omitempty"`

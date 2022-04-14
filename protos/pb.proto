@@ -454,7 +454,6 @@ message Edge {
   string subject = 1;
   string predicate = 2;
   string object_id = 3;
-  /* Value object_value = 4; */
   bytes object_value = 4;
   uint64 namespace = 5;
 
