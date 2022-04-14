@@ -445,13 +445,12 @@ func ValidateAndConvert(edge *pb.Edge, su *pb.SchemaUpdate) error {
 		return err
 	}
 
-	// convert to schema type
-	b := types.ValueForType(types.BinaryID)
-	if err = types.Marshal(dst, &b); err != nil {
+	edge.ObjectValue, err = dst.Marshal()
+	if err != nil {
 		return err
 	}
 
-	if x.WorkerConfig.AclEnabled && x.ParseAttr(edge.GetAttr()) == "dgraph.rule.permission" {
+	if x.WorkerConfig.AclEnabled && x.ParseAttr(edge.GetPredicate()) == "dgraph.rule.permission" {
 		perm, ok := dst.Value.(int64)
 		if !ok {
 			return errors.Errorf("Value for predicate <dgraph.rule.permission> should be of type int")
@@ -461,9 +460,6 @@ func ValidateAndConvert(edge *pb.Edge, su *pb.SchemaUpdate) error {
 				" predicate should be between 0 and 7", perm)
 		}
 	}
-
-	edge.ValueType = schemaType.Enum()
-	edge.Value = b.Value.([]byte)
 	return nil
 }
 
@@ -519,7 +515,7 @@ func proposeOrSend(ctx context.Context, gid uint32, m *pb.Mutations, chr chan re
 // should be sent to that group.
 func populateMutationMap(src *pb.Mutations) (map[uint32]*pb.Mutations, error) {
 	mm := make(map[uint32]*pb.Mutations)
-	for _, nq := range src.Nquads {
+	for _, nq := range src.Edges {
 		gid, err := groups().BelongsTo(nq.Predicate)
 		if err != nil {
 			return nil, err
@@ -530,7 +526,7 @@ func populateMutationMap(src *pb.Mutations) (map[uint32]*pb.Mutations, error) {
 			mu = &pb.Mutations{GroupId: gid}
 			mm[gid] = mu
 		}
-		mu.Nquads = append(mu.Nquads, nq)
+		mu.Edges = append(mu.Edges, nq)
 	}
 	for _, obj := range src.NewObjects {
 		// TODO(mrjn): Start distributing by type. Hard coding to one for now.
@@ -543,7 +539,7 @@ func populateMutationMap(src *pb.Mutations) (map[uint32]*pb.Mutations, error) {
 		mu.NewObjects = append(mu.NewObjects, obj)
 	}
 	for _, edge := range src.Edges {
-		gid, err := groups().BelongsTo(edge.Attr)
+		gid, err := groups().BelongsTo(edge.Predicate)
 		if err != nil {
 			return nil, err
 		}
@@ -629,7 +625,7 @@ func (w *grpcWorker) proposeAndWait(ctx context.Context, txnCtx *pb.TxnContext,
 	m *pb.Mutations) error {
 	if x.WorkerConfig.StrictMutations {
 		for _, edge := range m.Edges {
-			if _, err := schema.State().TypeOf(edge.Attr); err != nil {
+			if _, err := schema.State().TypeOf(edge.Predicate); err != nil {
 				return err
 			}
 		}

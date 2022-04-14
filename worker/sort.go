@@ -219,7 +219,7 @@ func sortWithIndex(ctx context.Context, ts *pb.SortMessage) *sortresult {
 	if tokenizer == nil {
 		// String type can have multiple tokenizers, only one of which is
 		// sortable.
-		if typ == types.StringID {
+		if typ == types.TypeString {
 			return resultWithError(errors.Errorf(
 				"Attribute %s does not have exact index for sorting.", order.Attr))
 		}
@@ -407,11 +407,9 @@ func multiSort(ctx context.Context, r *sortresult, ts *pb.SortMessage) error {
 				// Assign nil value which is sorted as greater than all other values.
 				sv.Value = nil
 			} else {
-				v := result.ValueMatrix[i].Values[0]
-				val := types.ValueForType(types.TypeID(v.ValType))
-				val.Value = v.Val
+				tv := result.ValueMatrix[i].Values[0]
 				var err error
-				sv, err = types.Convert(val, val.Tid)
+				sv, err = types.FromBinary(tv.Val)
 				if err != nil {
 					return err
 				}

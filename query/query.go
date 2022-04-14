@@ -340,14 +340,6 @@ func (sg *SubGraph) DebugPrint(prefix string) {
 	}
 }
 
-// getValue gets the value from the task.
-func getValue(tv *pb.TaskValue) (types.Val, error) {
-	vID := types.TypeID(tv.ValType)
-	val := types.ValueForType(vID)
-	val.Value = tv.Val
-	return val, nil
-}
-
 var (
 	// ErrEmptyVal is returned when a value is empty.
 	ErrEmptyVal = errors.New("Query: harmless error, e.g. task.Val is nil")

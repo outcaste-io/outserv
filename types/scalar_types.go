@@ -103,6 +103,10 @@ type Val struct {
 	Value interface{}
 }
 
+func (v Val) Marshal() ([]byte, error) {
+	return ToBinary(v.Tid, v.Value)
+}
+
 // Safe ensures that Val's Value is not nil. This is useful when doing type
 // assertions and default values might be involved.
 // This function won't change the original v.Value, may it be nil.

@@ -27,13 +27,14 @@ import (
 func ApplyMutations(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, error) {
 	// In expandEdges, for non * type prredicates, we prepend the namespace directly and for
 	// * type predicates, we fetch the predicates and prepend the namespace.
-	edges, err := expandEdges(ctx, m)
-	if err != nil {
-		return nil, errors.Wrapf(err, "While adding pb.edges")
-	}
-	m.Edges = edges
 
-	err = checkIfDeletingAclOperation(ctx, m.Edges)
+	// edges, err := expandEdges(ctx, m)
+	// if err != nil {
+	// 	return nil, errors.Wrapf(err, "While adding pb.edges")
+	// }
+	// m.Edges = edges
+
+	err := checkIfDeletingAclOperation(ctx, m.Edges)
 	if err != nil {
 		return nil, err
 	}

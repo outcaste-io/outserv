@@ -171,7 +171,7 @@ func processBinaryBoolean(mNode *mathTree) error {
 			return errors.Wrapf(err, "Wrong values in comparison function.")
 		}
 		destMap[k] = types.Val{
-			Tid:   types.BoolID,
+			Tid:   types.TypeBool,
 			Value: res,
 		}
 	}

@@ -107,7 +107,7 @@ func pickTokenizer(ctx context.Context, attr string, f string) (tok.Tokenizer, e
 
 	// If we didn't find a !isLossy() tokenizer for eq function on string type predicates,
 	// then let's see if we can find a non-trigram tokenizer
-	if typ, err := schema.State().TypeOf(attr); err == nil && typ == types.StringID {
+	if typ, err := schema.State().TypeOf(attr); err == nil && typ == types.TypeString {
 		for _, t := range tokenizers {
 			if t.Identifier() != tok.IdentTrigram {
 				return t, nil

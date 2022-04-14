@@ -51,7 +51,7 @@ func (grp *groupResult) aggregateChild(child *SubGraph) error {
 		grp.aggregates = append(grp.aggregates, groupPair{
 			attr: fieldName,
 			key: types.Val{
-				Tid:   types.IntID,
+				Tid:   types.TypeInt64,
 				Value: int64(len(grp.uids)),
 			},
 		})
@@ -116,10 +116,10 @@ func (d *dedup) addValue(attr string, value types.Val, uid uint64) {
 	cur := d.getGroup(attr)
 	// Create the string key.
 	var strKey string
-	if value.Tid == types.UidID {
+	if value.Tid == types.TypeUid {
 		strKey = strconv.FormatUint(value.Value.(uint64), 10)
 	} else {
-		valC := types.Val{Tid: types.StringID, Value: ""}
+		valC := types.Val{Tid: types.TypeString, Value: ""}
 		err := types.Marshal(value, &valC)
 		if err != nil {
 			return
@@ -233,7 +233,7 @@ func (sg *SubGraph) formResult(ul *pb.List) (*groupResults, error) {
 				}
 
 				for _, uid := range codec.GetUids(child.uidMatrix[i]) {
-					dedupMap.addValue(attr, types.Val{Tid: types.UidID, Value: uid}, srcUid)
+					dedupMap.addValue(attr, types.Val{Tid: types.TypeUid, Value: uid}, srcUid)
 				}
 			}
 		} else {
@@ -243,7 +243,7 @@ func (sg *SubGraph) formResult(ul *pb.List) (*groupResults, error) {
 				if len(v.Values) == 0 || !ur.Contains(srcUid) {
 					continue
 				}
-				val, err := convertTo(v.Values[0])
+				val, err := types.FromBinary(v.Values[0].GetVal())
 				if err != nil {
 					continue
 				}
@@ -315,7 +315,7 @@ func (sg *SubGraph) fillGroupedVars(doneVars map[string]varValue, path []*SubGra
 				ul := child.uidMatrix[i]
 				ulUids := codec.GetUids(ul)
 				for _, uid := range ulUids {
-					dedupMap.addValue(attr, types.Val{Tid: types.UidID, Value: uid}, srcUid)
+					dedupMap.addValue(attr, types.Val{Tid: types.TypeUid, Value: uid}, srcUid)
 				}
 			}
 			pathNode = child
@@ -343,7 +343,7 @@ func (sg *SubGraph) fillGroupedVars(doneVars map[string]varValue, path []*SubGra
 				if len(v.Values) == 0 {
 					continue
 				}
-				val, err := convertTo(v.Values[0])
+				val, err := types.FromBinary(v.Values[0].GetVal())
 				if err != nil {
 					continue
 				}
@@ -379,7 +379,7 @@ func (sg *SubGraph) fillGroupedVars(doneVars map[string]varValue, path []*SubGra
 				continue
 			}
 
-			if len(grp.keys) == 1 && grp.keys[0].key.Tid == types.UidID {
+			if len(grp.keys) == 1 && grp.keys[0].key.Tid == types.TypeUid {
 				uidVal := grp.keys[0].key.Value
 				uid, _ := uidVal.(uint64)
 				// grp.aggregates could be empty if schema conversion failed during aggregation

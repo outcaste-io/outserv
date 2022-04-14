@@ -165,18 +165,18 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 	if proposal.Mutations != nil {
 		span.Annotatef(nil, "Iterating over %d edges", len(proposal.Mutations.Edges))
 		for _, edge := range proposal.Mutations.Edges {
-			if err := checkTablet(edge.Attr); err != nil {
+			if err := checkTablet(edge.Predicate); err != nil {
 				return err
 			}
-			su, ok := schema.State().Get(ctx, edge.Attr)
+			su, ok := schema.State().Get(ctx, edge.Predicate)
 			if !ok {
 				// We don't allow mutations for reserved predicates if the schema for them doesn't
 				// already exist.
-				if x.IsReservedPredicate(edge.Attr) {
+				if x.IsReservedPredicate(edge.Predicate) {
 					return errors.Errorf("Can't store predicate `%s` as it is prefixed with "+
 						"`dgraph.` which is reserved as the namespace for dgraph's internal "+
 						"types/predicates.",
-						x.ParseAttr(edge.Attr))
+						x.ParseAttr(edge.Predicate))
 				}
 				continue
 			} else if err := ValidateAndConvert(edge, &su); err != nil {

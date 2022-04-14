@@ -295,6 +295,9 @@ func Convert(from Sval, toID TypeID) (Val, error) {
 	return to, nil
 }
 
+// Marshal converts from one Val to another. It's unclear why we need a Marshal
+// separate from a Convert. TODO(mrjn): Compare these and their usages and see
+// if we can eliminate Marshal.
 func Marshal(from Val, to *Val) error {
 	if to == nil {
 		return errors.Errorf("Invalid conversion %s to nil", from.Tid.Name())
