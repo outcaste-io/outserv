@@ -518,7 +518,7 @@ func checkIfDuplicateExists(ctx context.Context,
 	return fmt.Errorf("Duplicate entries exist for these unique ids: %v", xids)
 }
 
-func deletePreviousChild(ctx context.Context, uidStr string,
+func deletePreviousEdge(ctx context.Context, uidStr string,
 	f *schema.FieldDefinition) (*pb.Edge, error) {
 
 	if strings.HasPrefix(uidStr, "_:") {
@@ -598,7 +598,7 @@ func handleInverses(ctx context.Context, typ *schema.Type, objs []Object) ([]*pb
 				}
 				// If the parent can only have one child, we need to delete the edge
 				// from that previous child -> parent.
-				prevChildNq, err := deletePreviousChild(ctx, parentUid, f)
+				prevChildNq, err := deletePreviousEdge(ctx, parentUid, f)
 				if err != nil {
 					return nil, errors.Wrapf(err, "handleInverses.deletePreviousChild")
 				}
@@ -611,6 +611,14 @@ func handleInverses(ctx context.Context, typ *schema.Type, objs []Object) ([]*pb
 				} else {
 					nquads = append(nquads, nq)
 					nquads = append(nquads, prevChildNq)
+				}
+
+				prevParentNq, err := deletePreviousEdge(ctx, childUid, inv)
+				if err != nil {
+					return nil, errors.Wrapf(err, "handleInverses.deletePreviousChild.parent")
+				}
+				if prevParentNq != nil {
+					nquads = append(nquads, prevParentNq)
 				}
 			}
 		}

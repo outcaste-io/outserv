@@ -22,7 +22,7 @@
 [x] Addition works with inverse.
 [x] Deletion works with inverse.
 [x] Update works with inverse.
-[ ] A new user, assigned to an existing task doesn't correctly remove the task
+[x] A new user, assigned to an existing task doesn't correctly remove the task
     from the older user.
 
 ### Performance
