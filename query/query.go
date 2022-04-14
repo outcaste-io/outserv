@@ -379,24 +379,6 @@ func isEmptyIneqFnWithVar(sg *SubGraph) bool {
 		len(sg.Params.NeedsVar) > 0
 }
 
-// convert from task.Val to types.Value, based on schema appropriate type
-// is already set in api.Value
-func convertWithBestEffort(tv *pb.TaskValue, attr string) (types.Val, error) {
-	// value would be in binary format with appropriate type
-	tid := types.TypeID(tv.ValType)
-	if !tid.IsScalar() {
-		return types.Val{}, errors.Errorf("Leaf predicate:'%v' must be a scalar.", attr)
-	}
-
-	// creates appropriate type from binary format
-	sv, err := types.Convert(types.Val{Tid: types.BinaryID, Value: tv.Val}, tid)
-	if err != nil {
-		// This can happen when a mutation ingests corrupt data into the database.
-		return types.Val{}, errors.Wrapf(err, "error interpreting appropriate type for %v", attr)
-	}
-	return sv, nil
-}
-
 func mathCopy(dst *mathTree, src *gql.MathTree) error {
 	// Either we'll have an operation specified, or the function specified.
 	dst.Const = src.Const
@@ -1034,7 +1016,7 @@ func (fromNode *varValue) transformTo(toPath []*SubGraph) (map[uint64]types.Val,
 			if !ok || curVal.Value == nil {
 				continue
 			}
-			if curVal.Tid != types.IntID && curVal.Tid != types.FloatID {
+			if curVal.Tid != types.TypeInt64 && curVal.Tid != types.TypeFloat {
 				return nil, errors.Errorf("Encountered non int/float type for summing")
 			}
 			ulUids := codec.GetUids(ul)
@@ -1124,17 +1106,17 @@ func (sg *SubGraph) valueVarAggregation(doneVars map[string]varValue, path []*Su
 			it := doneVars[sg.Params.Var]
 			var isInt, isFloat bool
 			for _, v := range sg.MathExp.Val {
-				if v.Tid == types.FloatID {
+				if v.Tid == types.TypeFloat {
 					isFloat = true
 				}
-				if v.Tid == types.IntID {
+				if v.Tid == types.TypeInt64 {
 					isInt = true
 				}
 			}
 			if isInt && isFloat {
 				for k, v := range sg.MathExp.Val {
-					if v.Tid == types.IntID {
-						v.Tid = types.FloatID
+					if v.Tid == types.TypeInt64 {
+						v.Tid = types.TypeFloat
 						v.Value = float64(v.Value.(int64))
 					}
 					sg.MathExp.Val[k] = v
@@ -1361,7 +1343,7 @@ func (sg *SubGraph) populateUidValVar(doneVars map[string]varValue, sgPath []*Su
 		}
 		for idx, uid := range srcUids {
 			val := types.Val{
-				Tid:   types.IntID,
+				Tid:   types.TypeInt64,
 				Value: int64(sg.counts[idx]),
 			}
 			doneVars[sg.Params.Var].Vals[uid] = val
@@ -1381,7 +1363,7 @@ func (sg *SubGraph) populateUidValVar(doneVars map[string]varValue, sgPath []*Su
 		// Because we are counting the number of UIDs in parent
 		// we use the length of SrcUIDs instead of DestUIDs.
 		val := types.Val{
-			Tid:   types.IntID,
+			Tid:   types.TypeInt64,
 			Value: int64(len(srcUids)),
 		}
 		doneVars[sg.Params.Var].Vals[math.MaxUint64] = val
@@ -1441,7 +1423,7 @@ func (sg *SubGraph) populateUidValVar(doneVars map[string]varValue, sgPath []*Su
 			if len(sg.valueMatrix[idx].Values) == 0 {
 				continue
 			}
-			val, err := convertWithBestEffort(sg.valueMatrix[idx].Values[0], sg.Attr)
+			val, err := types.FromBinary(sg.valueMatrix[idx].Values[0].Val)
 			if err != nil {
 				continue
 			}
@@ -1627,7 +1609,7 @@ func (sg *SubGraph) replaceVarInFunc() error {
 		// There would be only one value var per subgraph as per current assumptions.
 		seenArgs := make(map[string]struct{})
 		for _, v := range sg.Params.UidToVal {
-			data := types.ValueForType(types.StringID)
+			data := types.ValueForType(types.TypeString)
 			if err := types.Marshal(v, &data); err != nil {
 				return err
 			}
@@ -1666,8 +1648,8 @@ func (sg *SubGraph) applyIneqFunc() error {
 		break
 	}
 	val := sg.SrcFunc.Args[0].Value
-	src := types.Val{Tid: types.StringID, Value: []byte(val)}
-	dst, err := types.Convert(src, typ)
+	// src := types.Val{Tid: types.TypeString, Value: []byte(val)}
+	dst, err := types.Convert(types.StringToBinary(val), typ)
 	if err != nil {
 		return errors.Errorf("Invalid argment %v. Comparing with different type", val)
 	}
@@ -1949,15 +1931,14 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 			// Safe to access 0th element here because if no variable was given, parser would throw
 			// an error.
 			val := sg.SrcFunc.Args[0].Value
-			src := types.Val{Tid: types.StringID, Value: []byte(val)}
-			dst, err := types.Convert(src, types.IntID)
+			dst, err := types.Convert(types.StringToBinary(val), types.TypeInt64)
 			if err != nil {
 				// TODO(Aman): needs to do parent check?
 				rch <- errors.Wrapf(err, "invalid argument %v. Comparing with different type", val)
 				return
 			}
 
-			curVal := types.Val{Tid: types.IntID, Value: int64(sg.DestMap.GetCardinality())}
+			curVal := types.Val{Tid: types.TypeInt64, Value: int64(sg.DestMap.GetCardinality())}
 			if types.CompareVals(sg.SrcFunc.Name, curVal, dst) {
 				sg.DestMap = codec.FromList(sg.SrcUIDs)
 			} else {

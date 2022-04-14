@@ -18,7 +18,6 @@ import (
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/outserv/zero"
-	"github.com/outcaste-io/sroar"
 	"github.com/pkg/errors"
 )
 
@@ -47,6 +46,7 @@ func ApplyMutations(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, error
 	return tctx, err
 }
 
+/*
 func expandEdges(ctx context.Context, m *pb.Mutations) ([]*pb.DirectedEdge, error) {
 	edges := make([]*pb.DirectedEdge, 0, 2*len(m.Edges))
 	namespace, err := x.ExtractNamespace(ctx)
@@ -61,7 +61,7 @@ func expandEdges(ctx context.Context, m *pb.Mutations) ([]*pb.DirectedEdge, erro
 	}(namespace)
 
 	for _, edge := range m.Edges {
-		x.AssertTrue(edge.Op == pb.DirectedEdge_DEL || edge.Op == pb.DirectedEdge_SET)
+		x.AssertTrue(edge.Op == pb.Edge_DEL || edge.Op == pb.DirectedEdge_SET)
 		if isGalaxyQuery {
 			// The caller should make sure that the directed edges contain the namespace we want
 			// to insert into. Now, attach the namespace in the context, so that further query
@@ -115,6 +115,7 @@ func expandEdges(ctx context.Context, m *pb.Mutations) ([]*pb.DirectedEdge, erro
 
 	return edges, nil
 }
+*/
 
 func verifyUid(ctx context.Context, uid uint64) error {
 	if uid <= worker.MaxLeaseId() {
@@ -145,9 +146,9 @@ func verifyUid(ctx context.Context, uid uint64) error {
 // TODO: Gotta pass the GQL field, so we can figure out the XID fields corresponding
 // to a type.
 func ToMutations(ctx context.Context, gmuList []*pb.Mutation, schema *schema.Schema) (*pb.Mutations, error) {
-	var nquads []*pb.NQuad
+	var nquads []*pb.Edge
 	for _, gmu := range gmuList {
-		nquads = append(nquads, gmu.Nquads...)
+		nquads = append(nquads, gmu.Edges...)
 	}
 
 	sort.Slice(nquads, func(i, j int) bool {
@@ -173,15 +174,15 @@ func ToMutations(ctx context.Context, gmuList []*pb.Mutation, schema *schema.Sch
 	types := make(map[string]bool)
 	xids := make(map[string]bool)
 	for _, nq := range nquads {
-		if nq.Op == pb.NQuad_DEL {
-			mu.Nquads = append(mu.Nquads, nq)
+		if nq.Op == pb.Edge_DEL {
+			mu.Edges = append(mu.Edges, nq)
 			obj = nil
 			continue
 		}
 		// attr := x.ParseAttr(nq.Predicate)
 		attr := nq.Predicate
 		if strings.HasPrefix(attr, "dgraph.") {
-			mu.Nquads = append(mu.Nquads, nq)
+			mu.Edges = append(mu.Edges, nq)
 			continue
 		}
 		gqlType := strings.Split(attr, ".")[0]
@@ -195,22 +196,22 @@ func ToMutations(ctx context.Context, gmuList []*pb.Mutation, schema *schema.Sch
 		_, isXid := xids[attr]
 		glog.Infof("nq.pred: %q attr: %q, typ: %q isXid: %v", nq.Predicate, attr, gqlType, isXid)
 		if !isXid {
-			mu.Nquads = append(mu.Nquads, nq)
+			mu.Edges = append(mu.Edges, nq)
 			continue
 		}
 		if obj != nil && obj.Var == nq.Subject {
 			// Subject matches an existing object, append to it.
-			obj.Nquads = append(obj.Nquads, nq)
+			obj.Edges = append(obj.Edges, nq)
 			continue
 		}
 		if strings.HasPrefix(nq.Subject, "_:") {
 			// Create a new object.
 			obj = &pb.Object{Var: nq.Subject}
 			mu.NewObjects = append(mu.NewObjects, obj)
-			obj.Nquads = append(obj.Nquads, nq)
+			obj.Edges = append(obj.Edges, nq)
 			continue
 		}
-		mu.Nquads = append(mu.Nquads, nq)
+		mu.Edges = append(mu.Edges, nq)
 		obj = nil
 	}
 	glog.Infof("Found xids: %+v\n", xids)
@@ -245,12 +246,12 @@ func AssignUids(ctx context.Context, gmuList []*pb.Mutation) (map[string]uint64,
 	newUids := make(map[string]uint64)
 	var err error
 	for _, gmu := range gmuList {
-		for _, nq := range gmu.Nquads {
-			if nq.Op != pb.NQuad_SET {
+		for _, nq := range gmu.Edges {
+			if nq.Op != pb.Edge_SET {
 				continue
 			}
 			// We dont want to assign uids to these.
-			if nq.Subject == x.Star && nq.ObjectValue.GetDefaultVal() == x.Star {
+			if nq.Subject == x.Star && x.IsStarAll(nq.ObjectValue) {
 				return newUids, errors.New("predicate deletion should be called via alter")
 			}
 
@@ -300,56 +301,7 @@ func AssignUids(ctx context.Context, gmuList []*pb.Mutation) (map[string]uint64,
 	return newUids, nil
 }
 
-// ToDirectedEdges converts the gql.Mutation input into a set of directed edges.
-func ToDirectedEdges(gmuList []*pb.Mutation, newUids map[string]uint64) (
-	edges []*pb.DirectedEdge, err error) {
-
-	// Wrapper for a pointer to protos.Nquad
-	var wnq *gql.NQuad
-
-	parse := func(nq *pb.NQuad, op pb.DirectedEdge_Op) error {
-		wnq = &gql.NQuad{NQuad: nq}
-		if len(nq.Subject) == 0 {
-			return nil
-		}
-		// Get edge from nquad using newUids.
-		var edge *pb.DirectedEdge
-		edge, err = wnq.ToEdgeUsing(newUids)
-		if err != nil {
-			return errors.Wrap(err, "")
-		}
-		edge.Op = op
-		edges = append(edges, edge)
-		return nil
-	}
-
-	for _, gmu := range gmuList {
-		// We delete first and then we set. Order of the mutation is important.
-		for _, nq := range gmu.Nquads {
-			if nq.Op != pb.NQuad_DEL {
-				continue
-			}
-			if nq.Subject == x.Star && nq.ObjectValue.GetDefaultVal() == x.Star {
-				return edges, errors.New("Predicate deletion should be called via alter")
-			}
-			if err := parse(nq, pb.DirectedEdge_DEL); err != nil {
-				return edges, err
-			}
-		}
-		for _, nq := range gmu.Nquads {
-			if nq.Op != pb.NQuad_SET {
-				continue
-			}
-			if err := parse(nq, pb.DirectedEdge_SET); err != nil {
-				return edges, err
-			}
-		}
-	}
-
-	return edges, nil
-}
-
-func checkIfDeletingAclOperation(ctx context.Context, edges []*pb.DirectedEdge) error {
+func checkIfDeletingAclOperation(ctx context.Context, edges []*pb.Edge) error {
 	// Don't need to make any checks if ACL is not enabled
 	if !x.WorkerConfig.AclEnabled {
 		return nil
@@ -373,12 +325,12 @@ func checkIfDeletingAclOperation(ctx context.Context, edges []*pb.DirectedEdge) 
 	isDeleteAclOperation := false
 	for _, edge := range edges {
 		// Disallow deleting of guardians group
-		if edge.Entity == guardianUid && edge.Op == pb.DirectedEdge_DEL {
+		if edge.Subject == guardianUid && edge.Op == pb.Edge_DEL {
 			isDeleteAclOperation = true
 			break
 		}
 		// Disallow deleting of groot user
-		if edge.Entity == grootsUid && edge.Op == pb.DirectedEdge_DEL {
+		if edge.Subject == grootsUid && edge.Op == pb.Edge_DEL {
 			isDeleteAclOperation = true
 			break
 		}

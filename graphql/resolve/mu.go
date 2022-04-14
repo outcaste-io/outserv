@@ -20,6 +20,7 @@ import (
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/sroar"
@@ -278,13 +279,13 @@ func handleAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	x.Check(err)
 	mu := &pb.Mutation{
 		SetJson: data,
-		Nquads:  nquads,
+		Edges:   nquads,
 	}
 
 	if glog.V(2) {
 		data2, _ := json.MarshalIndent(res, " ", " ")
 		glog.Infof("Mutation Req JSON data: %s\n", data2)
-		glog.Infof("NQuads: %+v\n", mu.Nquads)
+		glog.Infof("NQuads: %+v\n", mu.Edges)
 	}
 	resp, err := edgraph.QueryGraphQL(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}}, m)
 	if err != nil {
@@ -406,11 +407,11 @@ func handleDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			return
 		}
 		for _, childUid := range cuids {
-			mu.Nquads = append(mu.Nquads, &pb.NQuad{
+			mu.Edges = append(mu.Edges, &pb.Edge{
 				Subject:   childUid,
 				Predicate: inv.DgraphAlias(),
 				ObjectId:  uidHex,
-				Op:        pb.NQuad_DEL,
+				Op:        pb.Edge_DEL,
 			})
 		}
 	}
@@ -419,18 +420,18 @@ func handleDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		uidHex := x.ToHexString(uid)
 		for _, f := range m.MutatedType().Fields() {
 			accountForInverse(uidHex, f)
-			mu.Nquads = append(mu.Nquads, &pb.NQuad{
+			mu.Edges = append(mu.Edges, &pb.Edge{
 				Subject:     uidHex,
 				Predicate:   f.DgraphAlias(),
-				ObjectValue: &pb.Value{&pb.Value_DefaultVal{x.Star}},
-				Op:          pb.NQuad_DEL,
+				ObjectValue: types.StringToBinary(x.Star),
+				Op:          pb.Edge_DEL,
 			})
 		}
-		mu.Nquads = append(mu.Nquads, &pb.NQuad{
+		mu.Edges = append(mu.Edges, &pb.Edge{
 			Subject:     uidHex,
 			Predicate:   "dgraph.type",
-			ObjectValue: &pb.Value{&pb.Value_StrVal{m.MutatedType().DgraphName()}},
-			Op:          pb.NQuad_DEL,
+			ObjectValue: types.StringToBinary(m.MutatedType().DgraphName()),
+			Op:          pb.Edge_DEL,
 		})
 	}
 
@@ -518,7 +519,7 @@ func checkIfDuplicateExists(ctx context.Context,
 }
 
 func deletePreviousChild(ctx context.Context, uidStr string,
-	f *schema.FieldDefinition) (*pb.NQuad, error) {
+	f *schema.FieldDefinition) (*pb.Edge, error) {
 
 	if strings.HasPrefix(uidStr, "_:") {
 		// It's a new object. So, it can't have an previous child.
@@ -543,11 +544,11 @@ func deletePreviousChild(ctx context.Context, uidStr string,
 	}
 	// len(cuids) == 1
 	inv := f.Inverse()
-	return &pb.NQuad{
+	return &pb.Edge{
 		Subject:   cuids[0],
 		Predicate: inv.DgraphAlias(),
 		ObjectId:  uidStr,
-		Op:        pb.NQuad_DEL,
+		Op:        pb.Edge_DEL,
 	}, nil
 }
 
@@ -556,8 +557,8 @@ func deletePreviousChild(ctx context.Context, uidStr string,
 // creates reverse edges. If the parent can only have one child, it queries what
 // the previous child was, and creates delete reverse edges for the previous
 // child.
-func handleInverses(ctx context.Context, typ *schema.Type, objs []Object) ([]*pb.NQuad, error) {
-	var nquads []*pb.NQuad
+func handleInverses(ctx context.Context, typ *schema.Type, objs []Object) ([]*pb.Edge, error) {
+	var nquads []*pb.Edge
 	for _, f := range typ.Fields() {
 		inv := f.Inverse()
 		if inv == nil {
@@ -589,11 +590,11 @@ func handleInverses(ctx context.Context, typ *schema.Type, objs []Object) ([]*pb
 				childUid := childObj["uid"].(string)
 
 				// Add an edge from new child -> parent.
-				nq := &pb.NQuad{
+				nq := &pb.Edge{
 					Subject:   childUid,
 					Predicate: inv.DgraphAlias(),
 					ObjectId:  parentUid,
-					Op:        pb.NQuad_SET,
+					Op:        pb.Edge_SET,
 				}
 				// If the parent can only have one child, we need to delete the edge
 				// from that previous child -> parent.
@@ -701,11 +702,11 @@ func handleUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		} else {
 			mu.DeleteJson = data
 		}
-		mu.Nquads = append(mu.Nquads, nquads...)
+		mu.Edges = append(mu.Edges, nquads...)
 		if glog.V(2) {
 			data2, _ := json.MarshalIndent(dstObjs, " ", " ")
 			glog.Infof("Mutation Req JSON data: %s\n", data2)
-			glog.Infof("NQuads: %+v\n", mu.Nquads)
+			glog.Infof("NQuads: %+v\n", mu.Edges)
 		}
 		return nil
 	}

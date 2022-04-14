@@ -337,10 +337,10 @@ func InsertDropRecord(ctx context.Context, dropOp string) error {
 	_, err := doQuery(context.WithValue(ctx, IsGraphql, true), &Request{
 		req: &pb.Request{
 			Mutations: []*pb.Mutation{{
-				Nquads: []*pb.NQuad{{
+				Edges: []*pb.Edge{{
 					Subject:     "_:r",
 					Predicate:   "dgraph.drop.op",
-					ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: dropOp}},
+					ObjectValue: types.StringToBinary(dropOp),
 				}},
 			}},
 			CommitNow: true,
@@ -749,7 +749,7 @@ func updateMutations(qc *queryContext) error {
 		if condVar != "" {
 			uids, ok := qc.uidRes[condVar]
 			if !(ok && len(uids) == 1) {
-				gmu.Nquads = nil
+				gmu.Edges = nil
 				continue
 			}
 		}
@@ -779,7 +779,7 @@ func findMutationVars(qc *queryContext) []string {
 	}
 
 	for _, gmu := range qc.gmuList {
-		for _, nq := range gmu.Nquads {
+		for _, nq := range gmu.Edges {
 			updateVars(nq.Subject)
 			updateVars(nq.ObjectId)
 		}
@@ -800,7 +800,7 @@ func findMutationVars(qc *queryContext) []string {
 // Assumption is that Subject can contain UID, whereas Object can contain Val
 // If val(variable) exists in a query, but the values are not there for the variable,
 // it will ignore the mutation silently.
-func updateValInNQuads(nquads []*pb.NQuad, qc *queryContext) []*pb.NQuad {
+func updateValInNQuads(nquads []*pb.Edge, qc *queryContext) []*pb.Edge {
 	getNewVals := func(s string) (map[uint64]types.Val, bool) {
 		if strings.HasPrefix(s, "val(") {
 			varName := s[4 : len(s)-1]
@@ -834,7 +834,7 @@ func updateValInNQuads(nquads []*pb.NQuad, qc *queryContext) []*pb.NQuad {
 			continue
 		}
 
-		isSet := nq.Op == pb.NQuad_SET
+		isSet := nq.Op == pb.Edge_SET
 		// uid(u) <amount> val(amt)
 		// For each NQuad, we need to convert the val(variable_name)
 		// to *pb.Value before applying the mutation. For that, first
@@ -868,7 +868,7 @@ func updateValInNQuads(nquads []*pb.NQuad, qc *queryContext) []*pb.NQuad {
 		}
 
 		// Convert the value from types.Val to *pb.Value
-		nq.ObjectValue, err = types.ObjectValue(val.Tid, val.Value)
+		nq.ObjectValue, err = types.ToBinary(val.Tid, val.Value)
 		if err != nil {
 			// Value conversion failed, ignoring the nquad. Ideally,
 			// it shouldn't happen as this is the result of a query.
@@ -886,7 +886,7 @@ func updateValInNQuads(nquads []*pb.NQuad, qc *queryContext) []*pb.NQuad {
 // updateValInMutations does following transformations:
 // 0x123 <amount> val(v) -> 0x123 <amount> 13.0
 func updateValInMutations(gmu *pb.Mutation, qc *queryContext) error {
-	gmu.Nquads = updateValInNQuads(gmu.Nquads, qc)
+	gmu.Edges = updateValInNQuads(gmu.Edges, qc)
 	if qc.nquadsCount > x.Config.LimitMutationsNquad {
 		return errors.Errorf("NQuad count in the request: %d, is more that threshold: %d",
 			qc.nquadsCount, int(x.Config.LimitMutationsNquad))
@@ -912,7 +912,7 @@ func updateUIDInMutations(gmu *pb.Mutation, qc *queryContext) error {
 		return []string{s}
 	}
 
-	getNewNQuad := func(nq *pb.NQuad, s, o string) *pb.NQuad {
+	getNewNQuad := func(nq *pb.Edge, s, o string) *pb.Edge {
 		// The following copy is fine because we only modify Subject and ObjectId.
 		// The pointer values are not modified across different copies of NQuad.
 		n := *nq
@@ -923,9 +923,9 @@ func updateUIDInMutations(gmu *pb.Mutation, qc *queryContext) error {
 	}
 
 	// Remove the mutations from gmu.Del when no UID was found.
-	nquads := make([]*pb.NQuad, 0, len(gmu.Nquads))
-	for _, nq := range gmu.Nquads {
-		if nq.Op != pb.NQuad_DEL {
+	nquads := make([]*pb.Edge, 0, len(gmu.Edges))
+	for _, nq := range gmu.Edges {
+		if nq.Op != pb.Edge_DEL {
 			continue
 		}
 		// if Subject or/and Object are variables, each NQuad can result
@@ -952,8 +952,8 @@ func updateUIDInMutations(gmu *pb.Mutation, qc *queryContext) error {
 	}
 
 	// Update the values in mutation block from the query block.
-	for _, nq := range gmu.Nquads {
-		if nq.Op != pb.NQuad_SET {
+	for _, nq := range gmu.Edges {
+		if nq.Op != pb.Edge_SET {
 			continue
 		}
 		newSubs := getNewVals(nq.Subject)
@@ -971,7 +971,7 @@ func updateUIDInMutations(gmu *pb.Mutation, qc *queryContext) error {
 			}
 		}
 	}
-	gmu.Nquads = nquads
+	gmu.Edges = nquads
 	return nil
 }
 
@@ -1608,7 +1608,7 @@ func parseMutationObject(mu *pb.Mutation, qc *queryContext) (*pb.Mutation, error
 		if err != nil {
 			return nil, err
 		}
-		res.Nquads = append(res.Nquads, nqs...)
+		res.Edges = append(res.Edges, nqs...)
 	}
 	if len(mu.DeleteJson) > 0 {
 		// The metadata is not currently needed for delete operations so it can be safely ignored.
@@ -1617,19 +1617,19 @@ func parseMutationObject(mu *pb.Mutation, qc *queryContext) (*pb.Mutation, error
 			return nil, err
 		}
 		for _, nq := range nqs {
-			nq.Op = pb.NQuad_DEL
+			nq.Op = pb.Edge_DEL
 		}
-		res.Nquads = append(res.Nquads, nqs...)
+		res.Edges = append(res.Edges, nqs...)
 	}
-	res.Nquads = append(res.Nquads, mu.Nquads...)
-	if err := validateNQuads(res.Nquads, qc); err != nil {
+	res.Edges = append(res.Edges, mu.Edges...)
+	if err := validateNQuads(res.Edges, qc); err != nil {
 		return nil, err
 	}
 	return res, nil
 }
 
 // validateForGraphql validate nquads for graphql
-func validateForGraphql(nq *pb.NQuad, isGraphql bool) error {
+func validateForGraphql(nq *pb.Edge, isGraphql bool) error {
 	// Check whether the incoming predicate is graphql reserved predicate or not.
 	if !isGraphql && x.IsGraphqlReservedPredicate(nq.Predicate) {
 		return errors.Errorf("Cannot mutate graphql reserved predicate %s", nq.Predicate)
@@ -1637,18 +1637,15 @@ func validateForGraphql(nq *pb.NQuad, isGraphql bool) error {
 	return nil
 }
 
-func validateNQuads(nquads []*pb.NQuad, qc *queryContext) error {
+func validateNQuads(nquads []*pb.Edge, qc *queryContext) error {
 	for _, nq := range nquads {
-		if nq.Op != pb.NQuad_SET {
+		if nq.Op != pb.Edge_SET {
 			continue
 		}
 		if err := validatePredName(nq.Predicate); err != nil {
 			return err
 		}
-		var ostar bool
-		if o, ok := nq.ObjectValue.GetVal().(*pb.Value_DefaultVal); ok {
-			ostar = o.DefaultVal == x.Star
-		}
+		ostar := x.IsStarAll(nq.ObjectValue)
 		if nq.Subject == x.Star || nq.Predicate == x.Star || ostar {
 			return errors.Errorf("Cannot use star in set n-quad: %+v", nq)
 		}
@@ -1660,16 +1657,13 @@ func validateNQuads(nquads []*pb.NQuad, qc *queryContext) error {
 		}
 	}
 	for _, nq := range nquads {
-		if nq.Op != pb.NQuad_DEL {
+		if nq.Op != pb.Edge_DEL {
 			continue
 		}
 		if err := validatePredName(nq.Predicate); err != nil {
 			return err
 		}
-		var ostar bool
-		if o, ok := nq.ObjectValue.GetVal().(*pb.Value_DefaultVal); ok {
-			ostar = o.DefaultVal == x.Star
-		}
+		ostar := x.IsStarAll(nq.ObjectValue)
 		if nq.Subject == x.Star || (nq.Predicate == x.Star && !ostar) {
 			return errors.Errorf("Only valid wildcard delete patterns are 'S * *' and 'S P *': %v", nq)
 		}
@@ -1695,7 +1689,7 @@ func validateKey(key string) error {
 }
 
 // validateKeys checks predicate and facet keys in N-Quad for syntax errors.
-func validateKeys(nq *pb.NQuad) error {
+func validateKeys(nq *pb.Edge) error {
 	if err := validateKey(nq.Predicate); err != nil {
 		return errors.Wrapf(err, "predicate %q", nq.Predicate)
 	}

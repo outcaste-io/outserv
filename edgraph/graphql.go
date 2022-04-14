@@ -13,6 +13,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
@@ -98,17 +99,17 @@ func ProcessPersistedQuery(ctx context.Context, gqlReq *schema.Request) error {
 			req: &pb.Request{
 				Mutations: []*pb.Mutation{
 					{
-						Nquads: []*pb.NQuad{
+						Edges: []*pb.Edge{
 							{
 								Subject:     "_:a",
 								Predicate:   "dgraph.graphql.p_query",
-								ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: join}},
+								ObjectValue: types.StringToBinary(join),
 							},
 							{
 								Subject:   "_:a",
 								Predicate: "dgraph.type",
-								ObjectValue: &pb.Value{Val: &pb.Value_StrVal{
-									StrVal: "dgraph.graphql.persisted_query"}},
+								ObjectValue: types.StringToBinary(
+									"dgraph.graphql.persisted_query"),
 							},
 						},
 					},
