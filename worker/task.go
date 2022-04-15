@@ -162,32 +162,26 @@ func convertValue(attr, data string) (types.Val, error) {
 		return types.Val{}, errors.Errorf("Attribute %s is not valid scalar type",
 			x.ParseAttr(attr))
 	}
-	src := types.Val{Tid: types.StringID, Value: []byte(data)}
-	dst, err := types.Convert(src, t)
-	return dst, err
+	return types.Convert(types.StringToBinary(data), t)
 }
 
 // Returns nil byte on error
-func convertToType(v types.Val, typ types.TypeID) (*pb.TaskValue, error) {
-	result := &pb.TaskValue{ValType: typ.Enum(), Val: x.Nilbyte}
-	if v.Tid == typ {
-		result.Val = v.Value.([]byte)
-		return result, nil
+func convertToType(v types.Sval, typ types.TypeID) (*pb.TaskValue, error) {
+	if len(v) == 0 {
+		return &pb.TaskValue{Val: x.Nilbyte}, nil
 	}
-
-	// convert data from binary to appropriate format
+	if types.TypeID(v[0]) == typ {
+		return &pb.TaskValue{Val: v}, nil
+	}
 	val, err := types.Convert(v, typ)
 	if err != nil {
-		return result, err
+		return nil, err
 	}
-	// Marshal
-	data := types.ValueForType(types.BinaryID)
-	err = types.Marshal(val, &data)
+	data, err := val.Marshal()
 	if err != nil {
-		return result, errors.Errorf("Failed convertToType during Marshal")
+		return nil, err
 	}
-	result.Val = data.Value.([]byte)
-	return result, nil
+	return &pb.TaskValue{Val: data}, nil
 }
 
 // FuncType represents the type of a query function (aggregation, has, etc).
@@ -327,13 +321,13 @@ func (qs *queryState) handleValuePostings(ctx context.Context, args funcArgs) er
 		return errors.Errorf("Unhandled function in handleValuePostings: %s", srcFn.fname)
 	}
 
-	if srcFn.atype == types.PasswordID && srcFn.fnType != passwordFn {
+	if srcFn.atype == types.TypePassword && srcFn.fnType != passwordFn {
 		// Silently skip if the user is trying to fetch an attribute of type password.
 		return nil
 	}
-	if srcFn.fnType == passwordFn && srcFn.atype != types.PasswordID {
+	if srcFn.fnType == passwordFn && srcFn.atype != types.TypePassword {
 		return errors.Errorf("checkpwd fn can only be used on attr: [%s] with schema type "+
-			"password. Got type: %s", x.ParseAttr(q.Attr), types.TypeID(srcFn.atype).Name())
+			"password. Got type: %s", x.ParseAttr(q.Attr), types.TypeID(srcFn.atype))
 	}
 	if srcFn.n == 0 {
 		return nil
@@ -412,23 +406,24 @@ func (qs *queryState) handleValuePostings(ctx context.Context, args funcArgs) er
 				// intersecting. Lets compare the value and add filter the uid.
 				if srcFn.fnType == compareAttrFn {
 					// Lets convert the val to its type.
-					if val, err = types.Convert(val, srcFn.atype); err != nil {
+					cval, err := types.Convert(val, srcFn.atype)
+					if err != nil {
 						return err
 					}
 					switch srcFn.fname {
 					case "eq":
 						for _, eqToken := range srcFn.eqTokens {
-							if types.CompareVals(srcFn.fname, val, eqToken) {
+							if types.CompareVals(srcFn.fname, cval, eqToken) {
 								res.Set(uid)
 								break
 							}
 						}
 					case "between":
-						if types.CompareBetween(val, srcFn.eqTokens[0], srcFn.eqTokens[1]) {
+						if types.CompareBetween(cval, srcFn.eqTokens[0], srcFn.eqTokens[1]) {
 							res.Set(uid)
 						}
 					default:
-						if types.CompareVals(srcFn.fname, val, srcFn.eqTokens[0]) {
+						if types.CompareVals(srcFn.fname, cval, srcFn.eqTokens[0]) {
 							res.Set(uid)
 						}
 					}
@@ -528,14 +523,11 @@ func countForValuePostings(args funcArgs, pl *posting.List,
 }
 
 func retrieveValuesAndFacets(args funcArgs, pl *posting.List,
-	listType bool) ([]types.Val, error) {
-	var vals []types.Val
+	listType bool) ([]types.Sval, error) {
+	var vals []types.Sval
 
 	err := facetsFilterValuePostingList(args, pl, listType, func(p *pb.Posting) {
-		vals = append(vals, types.Val{
-			Tid:   types.TypeID(p.ValType),
-			Value: p.Value,
-		})
+		vals = append(vals, types.Sval(p.Value))
 	})
 	if err != nil {
 		return nil, err
@@ -797,7 +789,7 @@ func (qs *queryState) helpProcessTask(ctx context.Context, q *pb.Query, gid uint
 		// convert it to schema type before returning.
 		// Schema type won't be present only if there is no data for that predicate
 		// or if we load through bulk loader.
-		typ = types.DefaultID
+		typ = types.TypeDefault
 	}
 	out.List = schema.State().IsList(attr)
 	srcFn.atype = typ
@@ -905,11 +897,11 @@ func (qs *queryState) handleRegexFunction(ctx context.Context, arg funcArgs) err
 
 	attr := arg.q.Attr
 	typ, err := schema.State().TypeOf(attr)
-	span.Annotatef(nil, "Attr: %s. Type: %s", attr, typ.Name())
+	span.Annotatef(nil, "Attr: %s. Type: %s", attr, typ)
 	if err != nil || !typ.IsScalar() {
 		return errors.Errorf("Attribute not scalar: %s %v", x.ParseAttr(attr), typ)
 	}
-	if typ != types.StringID {
+	if typ != types.TypeString {
 		return errors.Errorf("Got non-string type. Regex match is allowed only on string type.")
 	}
 	useIndex := schema.State().HasTokenizer(ctx, tok.IdentTrigram, attr)
@@ -965,7 +957,7 @@ func (qs *queryState) handleRegexFunction(ctx context.Context, arg funcArgs) err
 			return err
 		}
 
-		vals := make([]types.Val, 1)
+		vals := make([]types.Sval, 1)
 		switch {
 		case isList:
 			vals, err = pl.AllValues(arg.q.ReadTs)
@@ -982,7 +974,7 @@ func (qs *queryState) handleRegexFunction(ctx context.Context, arg funcArgs) err
 
 		for _, val := range vals {
 			// convert data from binary to appropriate format
-			strVal, err := types.Convert(val, types.StringID)
+			strVal, err := types.Convert(val, types.TypeString)
 			if err == nil && matchRegex(strVal, arg.srcFn.regex) {
 				filtered.Set(uid)
 				// NOTE: We only add the uid once.
@@ -1129,13 +1121,13 @@ func (qs *queryState) handleMatchFunction(ctx context.Context, arg funcArgs) err
 
 	attr := arg.q.Attr
 	typ := arg.srcFn.atype
-	span.Annotatef(nil, "Attr: %s. Type: %s", attr, typ.Name())
+	span.Annotatef(nil, "Attr: %s. Type: %s", attr, typ)
 	var uids *sroar.Bitmap
 	switch {
 	case !typ.IsScalar():
 		return errors.Errorf("Attribute not scalar: %s %v", attr, typ)
 
-	case typ != types.StringID:
+	case typ != types.TypeString:
 		return errors.Errorf("Got non-string type. Fuzzy match is allowed only on string type.")
 
 	case arg.q.UidList != nil && codec.ListCardinality(arg.q.UidList) != 0:
@@ -1174,7 +1166,7 @@ func (qs *queryState) handleMatchFunction(ctx context.Context, arg funcArgs) err
 			return err
 		}
 
-		vals := make([]types.Val, 1)
+		vals := make([]types.Sval, 1)
 		switch {
 		case isList:
 			vals, err = pl.AllValues(arg.q.ReadTs)
@@ -1192,7 +1184,7 @@ func (qs *queryState) handleMatchFunction(ctx context.Context, arg funcArgs) err
 		max := int(arg.srcFn.threshold[0])
 		for _, val := range vals {
 			// convert data from binary to appropriate format
-			strVal, err := types.Convert(val, types.StringID)
+			strVal, err := types.Convert(val, types.TypeString)
 			if err == nil && matchFuzzy(matchQuery, strVal.Value.(string), max) {
 				filtered.Set(uid)
 				// NOTE: We only add the uid once.
@@ -1246,7 +1238,6 @@ func (qs *queryState) filterGeoFunction(ctx context.Context, arg funcArgs) error
 			}
 			var tv pb.TaskValue
 			err = pl.Iterate(arg.q.ReadTs, 0, func(p *pb.Posting) error {
-				tv.ValType = p.ValType
 				tv.Val = p.Value
 				if types.MatchGeo(&tv, arg.srcFn.geoQuery) {
 					out.Set(uid)
@@ -1353,7 +1344,7 @@ func (qs *queryState) filterStringFunction(arg funcArgs) error {
 		var strVals []types.Val
 		for _, v := range vals {
 			// convert data from binary to appropriate format
-			strVal, err := types.Convert(v, types.StringID)
+			strVal, err := types.Convert(v, types.TypeString)
 			if err != nil {
 				continue
 			}
@@ -1372,15 +1363,15 @@ func (qs *queryState) filterStringFunction(arg funcArgs) error {
 	return nil
 }
 
-func (qs *queryState) getValsForUID(attr string, uid, ReadTs uint64) ([]types.Val, error) {
+func (qs *queryState) getValsForUID(attr string, uid, ReadTs uint64) ([]types.Sval, error) {
 	key := x.DataKey(attr, uid)
 	pl, err := qs.cache.Get(key)
 	if err != nil {
 		return nil, err
 	}
 
-	var vals []types.Val
-	var val types.Val
+	var vals []types.Sval
+	var val types.Sval
 	if schema.State().IsList(attr) {
 		vals, err = pl.AllValues(ReadTs)
 	} else {
@@ -1456,7 +1447,7 @@ func parseSrcFn(ctx context.Context, q *pb.Query) (*functionContext, error) {
 	var err error
 
 	t, err := schema.State().TypeOf(attr)
-	if err == nil && fnType != notAFunction && t.Name() == types.StringID.Name() {
+	if err == nil && fnType != notAFunction && t == types.TypeString {
 		fc.isStringFn = true
 	}
 
@@ -1790,8 +1781,8 @@ func filterOnStandardFn(fname string, fcTokens []string, argTokens []string) (bo
 
 // commonTypeIDs is list of type ids which are more common. In preprocessFilter() we keep converted
 // values for these typeIDs at every function node.
-var commonTypeIDs = [...]types.TypeID{types.StringID, types.IntID, types.FloatID,
-	types.DateTimeID, types.BoolID, types.DefaultID}
+var commonTypeIDs = [...]types.TypeID{types.TypeString, types.TypeInt64, types.TypeFloat,
+	types.TypeDatetime, types.TypeBool, types.TypeDefault}
 
 type countParams struct {
 	readTs uint64

@@ -38,30 +38,30 @@ func TypeForValue(v []byte) (TypeID, interface{}) {
 		switch s {
 		case "true", "TRUE", "True":
 			b = true
-			return BoolID, b
+			return TypeBool, b
 		case "false", "FALSE", "False":
-			return BoolID, b
+			return TypeBool, b
 		}
 
 	// Possible datetime. Unfortunately, year-only value will fallthrough as int.
 	case checkDateTime(s):
 		if t, err := ParseTime(s); err == nil {
-			return DateTimeID, t
+			return TypeDatetime, t
 		}
 
 	// Possible int.
 	case checkInt(s):
 		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-			return IntID, i
+			return TypeInt64, i
 		}
 
 	// Possible float.
 	case checkFloat(s):
 		if f, err := strconv.ParseFloat(s, 64); err == nil {
-			return FloatID, f
+			return TypeFloat, f
 		}
 	}
-	return DefaultID, nil
+	return TypeDefault, nil
 }
 
 func isSign(d byte) bool {

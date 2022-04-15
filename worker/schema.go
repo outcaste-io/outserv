@@ -82,7 +82,7 @@ func populateSchema(attr string, fields []string) *pb.SchemaNode {
 	for _, field := range fields {
 		switch field {
 		case "type":
-			schemaNode.Type = typ.Name()
+			schemaNode.Type = typ.String()
 		case "index":
 			schemaNode.Index = len(pred.GetTokenizer()) > 0
 		case "tokenizer":

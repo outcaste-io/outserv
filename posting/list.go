@@ -207,12 +207,12 @@ type ListOptions struct {
 }
 
 // NewPosting takes the given edge and returns its equivalent representation as a posting.
-func NewPosting(t *pb.DirectedEdge) *pb.Posting {
+func NewPosting(t *pb.Edge) (*pb.Posting, error) {
 	var op uint32
 	switch t.Op {
-	case pb.DirectedEdge_SET:
+	case pb.Edge_SET:
 		op = Set
-	case pb.DirectedEdge_DEL:
+	case pb.Edge_DEL:
 		op = Del
 	default:
 		x.Fatalf("Unhandled operation: %+v", t)
@@ -220,20 +220,19 @@ func NewPosting(t *pb.DirectedEdge) *pb.Posting {
 
 	var postingType pb.Posting_PostingType
 	switch {
-	case t.ValueId == 0:
+	case len(t.ObjectId) == 0:
 		postingType = pb.Posting_VALUE
 	default:
 		postingType = pb.Posting_REF
 	}
 
 	p := &pb.Posting{
-		Uid:         t.ValueId,
-		Value:       t.Value,
-		ValType:     t.ValueType,
+		Uid:         x.FromHex(t.ObjectId),
+		Value:       t.ObjectValue,
 		PostingType: postingType,
 		Op:          op,
 	}
-	return p
+	return p, nil
 }
 
 func hasDeleteAll(mpost *pb.Posting) bool {
@@ -321,14 +320,17 @@ func (l *List) updateMutationLayer(mpost *pb.Posting, singleUidUpdate bool) erro
 }
 
 // TypeID returns the typeid of destination vertex
-func TypeID(edge *pb.DirectedEdge) types.TypeID {
-	if edge.ValueId != 0 {
-		return types.UidID
+func TypeID(edge *pb.Edge) types.TypeID {
+	if len(edge.ObjectId) != 0 {
+		return types.TypeUid
 	}
-	return types.TypeID(edge.ValueType)
+	if len(edge.ObjectValue) == 0 {
+		return types.TypeUndefined
+	}
+	return types.TypeID(edge.ObjectValue[0])
 }
 
-func fingerprintEdge(t *pb.DirectedEdge) uint64 {
+func fingerprintEdge(t *pb.Edge) uint64 {
 	// There could be a collision if the user gives us a value with Lang = "en" and later gives
 	// us a value = "en" for the same predicate. We would end up overwriting his older lang
 	// value.
@@ -337,19 +339,19 @@ func fingerprintEdge(t *pb.DirectedEdge) uint64 {
 	// an (entity, attribute) can only have one untagged value.
 	var id uint64 = math.MaxUint64
 
-	if schema.State().IsList(t.Attr) {
-		id = farm.Fingerprint64(t.Value)
+	if schema.State().IsList(t.Predicate) {
+		id = farm.Fingerprint64(t.ObjectValue)
 	}
 	return id
 }
 
-func (l *List) addMutation(ctx context.Context, txn *Txn, t *pb.DirectedEdge) error {
+func (l *List) addMutation(ctx context.Context, txn *Txn, t *pb.Edge) error {
 	l.Lock()
 	defer l.Unlock()
 	return l.addMutationInternal(ctx, txn, t)
 }
 
-func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.DirectedEdge) uint64 {
+func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.Edge) uint64 {
 	getKey := func(key []byte, uid uint64) uint64 {
 		// Instead of creating a string first and then doing a fingerprint, let's do a fingerprint
 		// here to save memory allocations.
@@ -359,7 +361,7 @@ func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.DirectedEdge) uint64 {
 
 	var conflictKey uint64
 	switch {
-	case schema.State().HasUpsert(t.Attr):
+	case schema.State().HasUpsert(t.Predicate):
 		// Consider checking to see if a email id is unique. A user adds:
 		// <uid> <email> "email@email.org", and there's a string equal tokenizer
 		// and upsert directive on the schema.
@@ -369,7 +371,7 @@ func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.DirectedEdge) uint64 {
 		// that two users don't set the same email id.
 		conflictKey = getKey(key, 0)
 
-	case pk.IsData() && schema.State().IsList(t.Attr):
+	case pk.IsData() && schema.State().IsList(t.Predicate):
 		// Data keys, irrespective of whether they are UID or values, should be judged based on
 		// whether they are lists or not. For UID, t.ValueId = UID. For value, t.ValueId =
 		// fingerprint(value) or could be fingerprint(lang) or something else.
@@ -385,14 +387,14 @@ func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.DirectedEdge) uint64 {
 		// a -> "y"
 		// This should definitely have a conflict.
 		// But, if name: [string], then they can both succeed.
-		conflictKey = getKey(key, t.ValueId)
+		conflictKey = getKey(key, x.FromHex(t.ObjectId))
 
 	case pk.IsData(): // NOT a list. This case must happen after the above case.
 		conflictKey = getKey(key, 0)
 
 	case pk.IsIndex() || pk.IsCount():
 		// Index keys are by default of type [uid].
-		conflictKey = getKey(key, t.ValueId)
+		conflictKey = getKey(key, x.FromHex(t.ObjectId))
 
 	default:
 		// Don't assign a conflictKey.
@@ -401,14 +403,16 @@ func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.DirectedEdge) uint64 {
 	return conflictKey
 }
 
-func (l *List) addMutationInternal(ctx context.Context, txn *Txn, t *pb.DirectedEdge) error {
+func (l *List) addMutationInternal(ctx context.Context, txn *Txn, t *pb.Edge) error {
 	l.AssertLock()
 
-	mpost := NewPosting(t)
+	mpost, err := NewPosting(t)
+	if err != nil {
+		return err
+	}
 	mpost.StartTs = txn.StartTs
 	if mpost.PostingType != pb.Posting_REF {
-		t.ValueId = fingerprintEdge(t)
-		mpost.Uid = t.ValueId
+		mpost.Uid = fingerprintEdge(t)
 	}
 
 	// Check whether this mutation is an update for a predicate of type uid.
@@ -417,8 +421,8 @@ func (l *List) addMutationInternal(ctx context.Context, txn *Txn, t *pb.Directed
 		return errors.Wrapf(err, "cannot parse key when adding mutation to list with key %s",
 			hex.EncodeToString(l.key))
 	}
-	pred, ok := schema.State().Get(ctx, t.Attr)
-	isSingleUidUpdate := ok && !pred.GetList() && pred.GetValueType() == pb.Posting_UID &&
+	pred, ok := schema.State().Get(ctx, t.Predicate)
+	isSingleUidUpdate := ok && !pred.GetList() && pred.GetValueType() == types.TypeUid.Int() &&
 		pk.IsData() && mpost.Op == Set && mpost.PostingType == pb.Posting_REF
 
 	if err != l.updateMutationLayer(mpost, isSingleUidUpdate) {
@@ -1289,16 +1293,13 @@ func (l *List) Postings(opt ListOptions, postFn func(*pb.Posting) error) error {
 }
 
 // AllValues returns all the values in the posting list.
-func (l *List) AllValues(readTs uint64) ([]types.Val, error) {
+func (l *List) AllValues(readTs uint64) ([]types.Sval, error) {
 	l.RLock()
 	defer l.RUnlock()
 
-	var vals []types.Val
+	var vals []types.Sval
 	err := l.iterate(readTs, 0, func(p *pb.Posting) error {
-		vals = append(vals, types.Val{
-			Tid:   types.TypeID(p.ValType),
-			Value: p.Value,
-		})
+		vals = append(vals, types.Sval(p.Value))
 		return nil
 	})
 	return vals, errors.Wrapf(err, "cannot retrieve all values from list with key %s",
@@ -1321,7 +1322,7 @@ func (l *List) GetLangTags(readTs uint64) ([]string, error) {
 
 // Value returns the default value from the posting list. The default value is
 // defined as the value without a language tag.
-func (l *List) Value(readTs uint64) (rval types.Val, rerr error) {
+func (l *List) Value(readTs uint64) (rval types.Sval, rerr error) {
 	l.RLock()
 	defer l.RUnlock()
 	val, found, err := l.findValue(readTs, math.MaxUint64)
@@ -1336,14 +1337,14 @@ func (l *List) Value(readTs uint64) (rval types.Val, rerr error) {
 }
 
 // ValueFor returns a value from posting list.
-func (l *List) ValueFor(readTs uint64) (rval types.Val, rerr error) {
+func (l *List) ValueFor(readTs uint64) (rval types.Sval, rerr error) {
 	l.RLock() // All public methods should acquire locks, while private ones should assert them.
 	defer l.RUnlock()
 	p, err := l.postingFor(readTs)
 	if err != nil {
 		return rval, err
 	}
-	return valueToTypesVal(p), nil
+	return types.Sval(p.Value), nil
 }
 
 // PostingFor returns the posting according to the preferred language list.
@@ -1360,47 +1361,14 @@ func (l *List) postingFor(readTs uint64) (p *pb.Posting, rerr error) {
 	return pos, err
 }
 
-// ValueForTag returns the value in the posting list with the given language tag.
-func (l *List) ValueForTag(readTs uint64, tag string) (rval types.Val, rerr error) {
-	l.RLock()
-	defer l.RUnlock()
-	p, err := l.postingForTag(readTs, tag)
-	if err != nil {
-		return rval, err
-	}
-	return valueToTypesVal(p), nil
-}
-
-func valueToTypesVal(p *pb.Posting) (rval types.Val) {
-	// This is ok because we dont modify the value of a posting. We create a newPosting
-	// and add it to the PostingList to do a set.
-	rval.Value = p.Value
-	rval.Tid = types.TypeID(p.ValType)
-	return
-}
-
-func (l *List) postingForTag(readTs uint64, tag string) (p *pb.Posting, rerr error) {
-	l.AssertRLock()
-	uid := farm.Fingerprint64([]byte(tag))
-	found, p, err := l.findPosting(readTs, uid)
-	if err != nil {
-		return p, err
-	}
-	if !found {
-		return p, ErrNoValue
-	}
-
-	return p, nil
-}
-
-func (l *List) findValue(readTs, uid uint64) (rval types.Val, found bool, err error) {
+func (l *List) findValue(readTs, uid uint64) (rval types.Sval, found bool, err error) {
 	l.AssertRLock()
 	found, p, err := l.findPosting(readTs, uid)
 	if !found {
 		return rval, found, err
 	}
 
-	return valueToTypesVal(p), true, nil
+	return types.Sval(p.Value), true, nil
 }
 
 func (l *List) findPosting(readTs uint64, uid uint64) (found bool, pos *pb.Posting, err error) {

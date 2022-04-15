@@ -34,15 +34,15 @@ var emptyCountParams countParams
 
 type indexMutationInfo struct {
 	tokenizers []tok.Tokenizer
-	edge       *pb.DirectedEdge // Represents the original uid -> value edge.
-	val        types.Val
-	op         pb.DirectedEdge_Op
+	edge       *pb.Edge // Represents the original uid -> value edge.
+	val        types.Sval
+	op         pb.Edge_Op
 }
 
 // indexTokens return tokens, without the predicate prefix and
 // index rune, for specific tokenizers.
 func indexTokens(ctx context.Context, info *indexMutationInfo) ([]string, error) {
-	attr := info.edge.Attr
+	attr := info.edge.Predicate
 	schemaType, err := schema.State().TypeOf(attr)
 	if err != nil || !schemaType.IsScalar() {
 		return nil, errors.Errorf("Cannot index attribute %s of type object.", attr)
@@ -72,12 +72,10 @@ func indexTokens(ctx context.Context, info *indexMutationInfo) ([]string, error)
 // TODO - See if we need to pass op as argument as t should already have Op.
 func (txn *Txn) addIndexMutations(ctx context.Context, info *indexMutationInfo) error {
 	if info.tokenizers == nil {
-		info.tokenizers = schema.State().Tokenizer(ctx, info.edge.Attr)
+		info.tokenizers = schema.State().Tokenizer(ctx, info.edge.Predicate)
 	}
 
-	attr := info.edge.Attr
-	uid := info.edge.Entity
-	if uid == 0 {
+	if uid := x.FromHex(info.edge.Subject); uid == 0 {
 		return errors.New("invalid UID with value 0")
 	}
 	tokens, err := indexTokens(ctx, info)
@@ -87,10 +85,10 @@ func (txn *Txn) addIndexMutations(ctx context.Context, info *indexMutationInfo) 
 	}
 
 	// Create a value token -> uid edge.
-	edge := &pb.DirectedEdge{
-		ValueId: uid,
-		Attr:    attr,
-		Op:      info.op,
+	edge := &pb.Edge{
+		ObjectId:  info.edge.Subject,
+		Predicate: info.edge.Predicate,
+		Op:        info.op,
 	}
 
 	for _, token := range tokens {
@@ -101,8 +99,8 @@ func (txn *Txn) addIndexMutations(ctx context.Context, info *indexMutationInfo) 
 	return nil
 }
 
-func (txn *Txn) addIndexMutation(ctx context.Context, edge *pb.DirectedEdge, token string) error {
-	key := x.IndexKey(edge.Attr, token)
+func (txn *Txn) addIndexMutation(ctx context.Context, edge *pb.Edge, token string) error {
+	key := x.IndexKey(edge.Predicate, token)
 	plist, err := txn.cache.GetFromDelta(key)
 	if err != nil {
 		return err
@@ -119,28 +117,24 @@ type countParams struct {
 	attr        string
 	countBefore int
 	countAfter  int
-	entity      uint64
+	entity      string
 	reverse     bool
 }
 
-func (l *List) handleDeleteAll(ctx context.Context, edge *pb.DirectedEdge, txn *Txn) error {
-	isIndexed := schema.State().IsIndexed(ctx, edge.Attr)
-	hasCount := schema.State().HasCount(ctx, edge.Attr)
+func (l *List) handleDeleteAll(ctx context.Context, edge *pb.Edge, txn *Txn) error {
+	isIndexed := schema.State().IsIndexed(ctx, edge.Predicate)
+	hasCount := schema.State().HasCount(ctx, edge.Predicate)
 	// To calculate length of posting list. Used for deletion of count index.
 	plen := l.Length(txn.StartTs, 0)
 	err := l.IterateAll(txn.StartTs, 0, func(p *pb.Posting) error {
 		switch {
 		case isIndexed:
 			// Delete index edge of each posting.
-			val := types.Val{
-				Tid:   types.TypeID(p.ValType),
-				Value: p.Value,
-			}
 			return txn.addIndexMutations(ctx, &indexMutationInfo{
-				tokenizers: schema.State().Tokenizer(ctx, edge.Attr),
+				tokenizers: schema.State().Tokenizer(ctx, edge.Predicate),
 				edge:       edge,
-				val:        val,
-				op:         pb.DirectedEdge_DEL,
+				val:        edge.ObjectValue,
+				op:         pb.Edge_DEL,
 			})
 		default:
 			return nil
@@ -153,10 +147,10 @@ func (l *List) handleDeleteAll(ctx context.Context, edge *pb.DirectedEdge, txn *
 		// Delete uid from count index. Deletion of reverses is taken care by addReverseMutation
 		// above.
 		if err := txn.updateCount(ctx, countParams{
-			attr:        edge.Attr,
+			attr:        edge.Predicate,
 			countBefore: plen,
 			countAfter:  0,
-			entity:      edge.Entity,
+			entity:      edge.Subject,
 		}); err != nil {
 			return err
 		}
@@ -165,24 +159,23 @@ func (l *List) handleDeleteAll(ctx context.Context, edge *pb.DirectedEdge, txn *
 	return l.addMutation(ctx, txn, edge)
 }
 
-func (txn *Txn) addCountMutation(ctx context.Context, t *pb.DirectedEdge, count uint32,
+func (txn *Txn) addCountMutation(ctx context.Context, t *pb.Edge, count uint32,
 	reverse bool) error {
-	key := x.CountKey(t.Attr, count)
+	key := x.CountKey(t.Predicate, count)
 	plist, err := txn.cache.GetFromDelta(key)
 	if err != nil {
 		return err
 	}
 
-	x.AssertTruef(plist != nil, "plist is nil [%s] %d",
-		t.Attr, t.ValueId)
+	x.AssertTruef(plist != nil, "plist is nil [%s] %d", t.Predicate, t.ObjectId)
 	return plist.addMutation(ctx, txn, t)
 }
 
 func (txn *Txn) updateCount(ctx context.Context, params countParams) error {
-	edge := pb.DirectedEdge{
-		ValueId: params.entity,
-		Attr:    params.attr,
-		Op:      pb.DirectedEdge_DEL,
+	edge := pb.Edge{
+		ObjectId:  params.entity,
+		Predicate: params.attr,
+		Op:        pb.Edge_DEL,
 	}
 	if params.countBefore > 0 {
 		if err := txn.addCountMutation(ctx, &edge, uint32(params.countBefore),
@@ -192,7 +185,7 @@ func (txn *Txn) updateCount(ctx context.Context, params countParams) error {
 	}
 
 	if params.countAfter > 0 {
-		edge.Op = pb.DirectedEdge_SET
+		edge.Op = pb.Edge_SET
 		if err := txn.addCountMutation(ctx, &edge, uint32(params.countAfter),
 			params.reverse); err != nil {
 			return err
@@ -201,10 +194,10 @@ func (txn *Txn) updateCount(ctx context.Context, params countParams) error {
 	return nil
 }
 
-func countAfterMutation(countBefore int, found bool, op pb.DirectedEdge_Op) int {
-	if !found && op == pb.DirectedEdge_SET {
+func countAfterMutation(countBefore int, found bool, op pb.Edge_Op) int {
+	if !found && op == pb.Edge_SET {
 		return countBefore + 1
-	} else if found && op == pb.DirectedEdge_DEL {
+	} else if found && op == pb.Edge_DEL {
 		return countBefore - 1
 	}
 
@@ -214,7 +207,7 @@ func countAfterMutation(countBefore int, found bool, op pb.DirectedEdge_Op) int 
 }
 
 func (txn *Txn) addMutationHelper(ctx context.Context, l *List, doUpdateIndex bool,
-	hasCountIndex bool, t *pb.DirectedEdge) (types.Val, bool, countParams, error) {
+	hasCountIndex bool, t *pb.Edge) (types.Sval, bool, countParams, error) {
 
 	t1 := time.Now()
 	l.Lock()
@@ -223,12 +216,12 @@ func (txn *Txn) addMutationHelper(ctx context.Context, l *List, doUpdateIndex bo
 	if dur := time.Since(t1); dur > time.Millisecond {
 		span := otrace.FromContext(ctx)
 		span.Annotatef([]otrace.Attribute{otrace.BoolAttribute("slow-lock", true)},
-			"Acquired lock %v %v %v", dur, t.Attr, t.Entity)
+			"Acquired lock %v %v %v", dur, t.Predicate, t.Subject)
 	}
 
-	getUID := func(t *pb.DirectedEdge) uint64 {
-		if t.ValueType == pb.Posting_UID {
-			return t.ValueId
+	getUID := func(t *pb.Edge) uint64 {
+		if len(t.ObjectId) > 0 {
+			return x.FromHex(t.ObjectId)
 		}
 		return fingerprintEdge(t)
 	}
@@ -238,30 +231,32 @@ func (txn *Txn) addMutationHelper(ctx context.Context, l *List, doUpdateIndex bo
 	// is true, we just need to get the posting for uid, hence calling l.findPosting().
 	countBefore, countAfter := 0, 0
 	var currPost *pb.Posting
-	var val types.Val
 	var found bool
 	var err error
 
-	delNonListPredicate := !schema.State().IsList(t.Attr) &&
-		t.Op == pb.DirectedEdge_DEL && string(t.Value) != x.Star
+	delNonListPredicate := !schema.State().IsList(t.Predicate) &&
+		t.Op == pb.Edge_DEL && !x.IsStarAll(t.ObjectValue)
 
 	switch {
 	case hasCountIndex:
 		countBefore, found, currPost = l.getPostingAndLength(txn.StartTs, 0, getUID(t))
 		if countBefore == -1 {
-			return val, false, emptyCountParams, ErrTsTooOld
+			return nil, false, emptyCountParams, ErrTsTooOld
 		}
 	case doUpdateIndex || delNonListPredicate:
 		found, currPost, err = l.findPosting(txn.StartTs, fingerprintEdge(t))
 		if err != nil {
-			return val, found, emptyCountParams, err
+			return nil, found, emptyCountParams, err
 		}
 	}
 
 	// If the predicate schema is not a list, ignore delete triples whose object is not a star or
 	// a value that does not match the existing value.
 	if delNonListPredicate {
-		newPost := NewPosting(t)
+		newPost, err := NewPosting(t)
+		if err != nil {
+			return nil, found, emptyCountParams, err
+		}
 
 		// This is a scalar value of non-list type and a delete edge mutation, so if the value
 		// given by the user doesn't match the value we have, we return found to be false, to avoid
@@ -270,26 +265,27 @@ func (txn *Txn) addMutationHelper(ctx context.Context, l *List, doUpdateIndex bo
 		// so even though they might be different the check in the doUpdateIndex block above would
 		// return found to be true.
 		if found && !(bytes.Equal(currPost.Value, newPost.Value) &&
-			types.TypeID(currPost.ValType) == types.TypeID(newPost.ValType)) {
-			return val, false, emptyCountParams, nil
+			types.TypeID(currPost.Value[0]) == types.TypeID(newPost.Value[0])) {
+			return nil, false, emptyCountParams, nil
 		}
 	}
 
 	if err = l.addMutationInternal(ctx, txn, t); err != nil {
-		return val, found, emptyCountParams, err
+		return nil, found, emptyCountParams, err
 	}
 
+	var val types.Sval
 	if found && doUpdateIndex {
-		val = valueToTypesVal(currPost)
+		val = currPost.Value
 	}
 
 	if hasCountIndex {
 		countAfter = countAfterMutation(countBefore, found, t.Op)
 		return val, found, countParams{
-			attr:        t.Attr,
+			attr:        t.Predicate,
 			countBefore: countBefore,
 			countAfter:  countAfter,
-			entity:      t.Entity,
+			entity:      t.Subject,
 		}, nil
 	}
 	return val, found, emptyCountParams, nil
@@ -297,18 +293,18 @@ func (txn *Txn) addMutationHelper(ctx context.Context, l *List, doUpdateIndex bo
 
 // AddMutationWithIndex is addMutation with support for indexing. It also
 // supports reverse edges.
-func (l *List) AddMutationWithIndex(ctx context.Context, edge *pb.DirectedEdge, txn *Txn) error {
-	if edge.Attr == "" {
+func (l *List) AddMutationWithIndex(ctx context.Context, edge *pb.Edge, txn *Txn) error {
+	if edge.Predicate == "" {
 		return errors.Errorf("Predicate cannot be empty for edge with subject: [%v], object: [%v]"+
-			" and value: [%v]", edge.Entity, edge.ValueId, edge.Value)
+			" and value: [%v]", edge.Subject, edge.ObjectId, edge.ObjectValue)
 	}
 
-	if edge.Op == pb.DirectedEdge_DEL && string(edge.Value) == x.Star {
+	if edge.Op == pb.Edge_DEL && x.IsStarAll(edge.ObjectValue) {
 		return l.handleDeleteAll(ctx, edge, txn)
 	}
 
-	doUpdateIndex := pstore != nil && schema.State().IsIndexed(ctx, edge.Attr)
-	hasCountIndex := schema.State().HasCount(ctx, edge.Attr)
+	doUpdateIndex := pstore != nil && schema.State().IsIndexed(ctx, edge.Predicate)
+	hasCountIndex := schema.State().HasCount(ctx, edge.Predicate)
 
 	val, found, cp, err := txn.addMutationHelper(ctx, l, doUpdateIndex, hasCountIndex, edge)
 	if err != nil {
@@ -321,26 +317,22 @@ func (l *List) AddMutationWithIndex(ctx context.Context, edge *pb.DirectedEdge, 
 	}
 	if doUpdateIndex {
 		// Exact matches.
-		if found && val.Value != nil {
+		if found && len(val) > 0 {
 			if err := txn.addIndexMutations(ctx, &indexMutationInfo{
-				tokenizers: schema.State().Tokenizer(ctx, edge.Attr),
+				tokenizers: schema.State().Tokenizer(ctx, edge.Predicate),
 				edge:       edge,
 				val:        val,
-				op:         pb.DirectedEdge_DEL,
+				op:         pb.Edge_DEL,
 			}); err != nil {
 				return err
 			}
 		}
-		if edge.Op == pb.DirectedEdge_SET {
-			val = types.Val{
-				Tid:   types.TypeID(edge.ValueType),
-				Value: edge.Value,
-			}
+		if edge.Op == pb.Edge_SET {
 			if err := txn.addIndexMutations(ctx, &indexMutationInfo{
-				tokenizers: schema.State().Tokenizer(ctx, edge.Attr),
+				tokenizers: schema.State().Tokenizer(ctx, edge.Predicate),
 				edge:       edge,
-				val:        val,
-				op:         pb.DirectedEdge_SET,
+				val:        edge.ObjectValue,
+				op:         pb.Edge_SET,
 			}); err != nil {
 				return err
 			}
@@ -455,7 +447,7 @@ func (r *rebuilder) Run(ctx context.Context) error {
 		}
 
 		// Convert data into deltas.
-		txn.Update(ctx)
+		txn.Update(ctx, nil)
 
 		// txn.cache.Lock() is not required because we are the only one making changes to txn.
 		kvs := make([]*bpb.KV, 0, len(txn.cache.deltas))
@@ -768,20 +760,15 @@ func rebuildTokIndex(ctx context.Context, rb *IndexRebuild) error {
 	pk := x.ParsedKey{Attr: rb.Attr}
 	builder := rebuilder{attr: rb.Attr, prefix: pk.DataPrefix(), startTs: rb.StartTs}
 	builder.fn = func(uid uint64, pl *List, txn *Txn) error {
-		edge := pb.DirectedEdge{Attr: rb.Attr, Entity: uid}
+		edge := pb.Edge{Predicate: rb.Attr, Subject: x.ToHexString(uid)}
 		return pl.Iterate(txn.StartTs, 0, func(p *pb.Posting) error {
 			// Add index entries based on p.
-			val := types.Val{
-				Value: p.Value,
-				Tid:   types.TypeID(p.ValType),
-			}
-
 			for {
 				err := txn.addIndexMutations(ctx, &indexMutationInfo{
 					tokenizers: tokenizers,
 					edge:       &edge,
-					val:        val,
-					op:         pb.DirectedEdge_SET,
+					val:        p.Value,
+					op:         pb.Edge_SET,
 				})
 				switch err {
 				case ErrRetry:
@@ -850,10 +837,10 @@ func rebuildCountIndex(ctx context.Context, rb *IndexRebuild) error {
 	glog.Infof("Rebuilding count index for %s", rb.Attr)
 	var reverse bool
 	fn := func(uid uint64, pl *List, txn *Txn) error {
-		t := &pb.DirectedEdge{
-			ValueId: uid,
-			Attr:    rb.Attr,
-			Op:      pb.DirectedEdge_SET,
+		t := &pb.Edge{
+			ObjectId:  x.ToHexString(uid),
+			Predicate: rb.Attr,
+			Op:        pb.Edge_SET,
 		}
 		sz := pl.Length(rb.StartTs, 0)
 		if sz == -1 {
@@ -922,10 +909,10 @@ func rebuildListType(ctx context.Context, rb *IndexRebuild) error {
 			return nil
 		}
 		// Delete the old edge corresponding to ValueId math.MaxUint64
-		t := &pb.DirectedEdge{
-			ValueId: mpost.Uid,
-			Attr:    rb.Attr,
-			Op:      pb.DirectedEdge_DEL,
+		t := &pb.Edge{
+			ObjectId:  x.ToHexString(mpost.Uid),
+			Predicate: rb.Attr,
+			Op:        pb.Edge_DEL,
 		}
 
 		// Ensure that list is in the cache run by txn. Otherwise, nothing would
@@ -935,11 +922,10 @@ func rebuildListType(ctx context.Context, rb *IndexRebuild) error {
 			return err
 		}
 		// Add the new edge with the fingerprinted value id.
-		newEdge := &pb.DirectedEdge{
-			Attr:      rb.Attr,
-			Value:     mpost.Value,
-			ValueType: mpost.ValType,
-			Op:        pb.DirectedEdge_SET,
+		newEdge := &pb.Edge{
+			Predicate:   rb.Attr,
+			ObjectValue: mpost.Value,
+			Op:          pb.Edge_SET,
 		}
 		return pl.addMutation(ctx, txn, newEdge)
 	}

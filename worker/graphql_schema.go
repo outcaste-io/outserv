@@ -16,6 +16,7 @@ import (
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/schema"
+	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
@@ -173,13 +174,12 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 
 	// prepare GraphQL schema mutation
 	m := &pb.Mutations{
-		Edges: []*pb.DirectedEdge{
+		Edges: []*pb.Edge{
 			{
-				Entity:    SchemaNodeUid,
-				Attr:      x.NamespaceAttr(namespace, GqlSchemaPred),
-				Value:     val,
-				ValueType: pb.Posting_STRING,
-				Op:        pb.DirectedEdge_SET,
+				Subject:     x.ToHexString(SchemaNodeUid),
+				Predicate:   x.NamespaceAttr(namespace, GqlSchemaPred),
+				ObjectValue: append([]byte{byte(types.TypeBinary)}, val...),
+				Op:          pb.Edge_SET,
 			},
 			{
 				// if this server is no more the Group-1 leader and is mutating the GraphQL
@@ -188,18 +188,16 @@ func (w *grpcWorker) UpdateGraphQLSchema(ctx context.Context,
 				// same value will cause one of the mutations to abort, because of the upsert
 				// directive on xid. So, this way we make sure that even in this rare case there can
 				// only be one server which is able to successfully update the GraphQL schema.
-				Entity:    SchemaNodeUid,
-				Attr:      x.NamespaceAttr(namespace, gqlSchemaXidPred),
-				Value:     []byte(gqlSchemaXidVal),
-				ValueType: pb.Posting_STRING,
-				Op:        pb.DirectedEdge_SET,
+				Subject:     x.ToHexString(SchemaNodeUid),
+				Predicate:   x.NamespaceAttr(namespace, gqlSchemaXidPred),
+				ObjectValue: types.StringToBinary(gqlSchemaXidVal),
+				Op:          pb.Edge_SET,
 			},
 			{
-				Entity:    SchemaNodeUid,
-				Attr:      x.NamespaceAttr(namespace, "dgraph.type"),
-				Value:     []byte("dgraph.graphql"),
-				ValueType: pb.Posting_STRING,
-				Op:        pb.DirectedEdge_SET,
+				Subject:     x.ToHexString(SchemaNodeUid),
+				Predicate:   x.NamespaceAttr(namespace, "dgraph.type"),
+				ObjectValue: types.StringToBinary("dgraph.graphql"),
+				Op:          pb.Edge_SET,
 			},
 		},
 	}

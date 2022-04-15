@@ -4,7 +4,6 @@
 package worker
 
 import (
-	"bytes"
 	"context"
 	"math"
 	"sync"
@@ -37,24 +36,20 @@ var (
 // Default limit on number of simultaneous open files on unix systems
 const DefaultMaxOpenFileLimit = 1024
 
-func isStarAll(v []byte) bool {
-	return bytes.Equal(v, []byte(x.Star))
-}
-
-func isDeletePredicateEdge(edge *pb.DirectedEdge) bool {
-	return edge.Entity == 0 && isStarAll(edge.Value)
+func isDeletePredicateEdge(edge *pb.Edge) bool {
+	return len(edge.Subject) == 0 && x.IsStarAll(edge.ObjectValue)
 }
 
 // runMutation goes through all the edges and applies them.
-func runMutation(ctx context.Context, edge *pb.DirectedEdge, txn *posting.Txn) error {
+func runMutation(ctx context.Context, edge *pb.Edge, txn *posting.Txn) error {
 	ctx = schema.GetWriteContext(ctx)
 
 	// We shouldn't check whether this Alpha serves this predicate or not. Membership information
 	// isn't consistent across the entire cluster. We should just apply whatever is given to us.
-	su, ok := schema.State().Get(ctx, edge.Attr)
-	if edge.Op == pb.DirectedEdge_SET {
+	su, ok := schema.State().Get(ctx, edge.Predicate)
+	if edge.Op == pb.Edge_SET {
 		if !ok {
-			return errors.Errorf("runMutation: Unable to find schema for %s", edge.Attr)
+			return errors.Errorf("runMutation: Unable to find schema for %s", edge.Predicate)
 		}
 	}
 
@@ -69,7 +64,8 @@ func runMutation(ctx context.Context, edge *pb.DirectedEdge, txn *posting.Txn) e
 		return err
 	}
 
-	key := x.DataKey(edge.Attr, edge.Entity)
+	entity := x.FromHex(edge.Subject)
+	key := x.DataKey(edge.Predicate, entity)
 	// The following is a performance optimization which allows us to not read a posting list from
 	// disk. We calculate this based on how AddMutationWithIndex works. The general idea is that if
 	// we're not using the read posting list, we don't need to retrieve it. We need the posting list
@@ -81,10 +77,10 @@ func runMutation(ctx context.Context, edge *pb.DirectedEdge, txn *posting.Txn) e
 	case len(su.GetTokenizer()) > 0 || su.GetCount():
 		// Any index or count index.
 		getFn = txn.Get
-	case su.GetValueType() == pb.Posting_UID && !su.GetList():
+	case su.GetValueType() == types.TypeUid.Int() && !su.GetList():
 		// Single UID, not a list.
 		getFn = txn.Get
-	case edge.Op == pb.DirectedEdge_DEL:
+	case edge.Op == pb.Edge_DEL:
 		// Covers various delete cases to keep things simple.
 		getFn = txn.Get
 	default:
@@ -297,12 +293,12 @@ func createSchema(attr string, typ types.TypeID, ts uint64) error {
 	// type is not present
 	s, ok := schema.State().Get(ctx, attr)
 	if ok {
-		s.ValueType = typ.Enum()
+		s.ValueType = typ.Int()
 	} else {
-		s = pb.SchemaUpdate{ValueType: typ.Enum(), Predicate: attr}
-		// For type UidID, set List to true. This is done because previously
-		// all predicates of type UidID were implicitly considered lists.
-		if typ == types.UidID {
+		s = pb.SchemaUpdate{ValueType: typ.Int(), Predicate: attr}
+		// For type TypeUid, set List to true. This is done because previously
+		// all predicates of type TypeUid were implicitly considered lists.
+		if typ == types.TypeUid {
 			s.List = true
 		}
 	}
@@ -359,7 +355,7 @@ func checkSchema(s *pb.SchemaUpdate) error {
 	}
 
 	typ := types.TypeID(s.ValueType)
-	if typ == types.UidID && s.Directive == pb.SchemaUpdate_INDEX {
+	if typ == types.TypeUid && s.Directive == pb.SchemaUpdate_INDEX {
 		// index on uid type
 		return errors.Errorf("Index not allowed on predicate of type uid on predicate %s",
 			x.ParseAttr(s.Predicate))
@@ -379,11 +375,10 @@ func checkSchema(s *pb.SchemaUpdate) error {
 
 	// schema was defined already
 	switch {
-	case t.IsScalar() && (t.Enum() == pb.Posting_PASSWORD || s.ValueType == pb.Posting_PASSWORD):
+	case t.IsScalar() && (t == types.TypePassword || s.ValueType == types.TypePassword.Int()):
 		// can't change password -> x, x -> password
-		if t.Enum() != s.ValueType {
-			return errors.Errorf("Schema change not allowed from %s to %s",
-				t.Enum(), typ.Enum())
+		if t.Int() != s.ValueType {
+			return errors.Errorf("Schema change not allowed from %s to %s", t, typ)
 		}
 
 	case t.IsScalar() == typ.IsScalar():
@@ -391,7 +386,7 @@ func checkSchema(s *pb.SchemaUpdate) error {
 		// has data.
 		if schema.State().IsList(s.Predicate) && !s.List && hasEdges(s.Predicate, math.MaxUint64) {
 			return errors.Errorf("Schema change not allowed from [%s] => %s without"+
-				" deleting pred: %s", t.Name(), typ.Name(), x.ParseAttr(s.Predicate))
+				" deleting pred: %s", t, typ, x.ParseAttr(s.Predicate))
 		}
 
 	default:
@@ -406,11 +401,8 @@ func checkSchema(s *pb.SchemaUpdate) error {
 
 // ValidateAndConvert checks compatibility or converts to the schema type if the storage type is
 // specified. If no storage type is specified then it converts to the schema type.
-func ValidateAndConvert(edge *pb.DirectedEdge, su *pb.SchemaUpdate) error {
+func ValidateAndConvert(edge *pb.Edge, su *pb.SchemaUpdate) error {
 	if isDeletePredicateEdge(edge) {
-		return nil
-	}
-	if types.TypeID(edge.ValueType) == types.DefaultID && isStarAll(edge.Value) {
 		return nil
 	}
 
@@ -425,19 +417,19 @@ func ValidateAndConvert(edge *pb.DirectedEdge, su *pb.SchemaUpdate) error {
 	case !schemaType.IsScalar() && storageType.IsScalar():
 		return errors.Errorf("Schema type: %q and Storage type: %q"+
 			" don't match for pred: %q edge: %v",
-			schemaType.Name(), storageType.Name(), x.ParseAttr(edge.Attr), edge)
+			schemaType, storageType, x.ParseAttr(edge.Predicate), edge)
 
 	case schemaType.IsScalar() && !storageType.IsScalar():
 		return errors.Errorf("Schema type: %q and Storage type: %q"+
 			" don't match for pred: %q edge: %v",
-			schemaType.Name(), storageType.Name(), x.ParseAttr(edge.Attr), edge)
+			schemaType, storageType, x.ParseAttr(edge.Predicate), edge)
 
 	// The suggested storage type matches the schema, OK!
-	case storageType == schemaType && schemaType != types.DefaultID:
+	case storageType == schemaType && schemaType != types.TypeDefault:
 		return nil
 
 	// We accept the storage type iff we don't have a schema type and a storage type is specified.
-	case schemaType == types.DefaultID:
+	case schemaType == types.TypeDefault:
 		schemaType = storageType
 	}
 
@@ -446,41 +438,29 @@ func ValidateAndConvert(edge *pb.DirectedEdge, su *pb.SchemaUpdate) error {
 		err error
 	)
 
-	src := types.Val{Tid: types.TypeID(edge.ValueType), Value: edge.Value}
+	src := types.Sval(edge.ObjectValue)
 	// check compatibility of schema type and storage type
 	if dst, err = types.Convert(src, schemaType); err != nil {
 		return err
 	}
 
-	// convert to schema type
-	b := types.ValueForType(types.BinaryID)
-	if err = types.Marshal(dst, &b); err != nil {
+	edge.ObjectValue, err = dst.Marshal()
+	if err != nil {
 		return err
 	}
 
-	if x.WorkerConfig.AclEnabled && x.ParseAttr(edge.GetAttr()) == "dgraph.rule.permission" {
+	if x.WorkerConfig.AclEnabled && x.ParseAttr(edge.GetPredicate()) == "dgraph.rule.permission" {
 		perm, ok := dst.Value.(int64)
 		if !ok {
-			return errors.Errorf("Value for predicate <dgraph.rule.permission> should be of type int")
+			return errors.Errorf("Value for predicate <dgraph.rule.permission>" +
+				" should be of type int")
 		}
 		if perm < 0 || perm > 7 {
 			return errors.Errorf("Can't set <dgraph.rule.permission> to %d, Value for this"+
 				" predicate should be between 0 and 7", perm)
 		}
 	}
-
-	edge.ValueType = schemaType.Enum()
-	edge.Value = b.Value.([]byte)
 	return nil
-}
-
-// TODO: Do we need fillTxnContext?
-func fillTxnContext(tctx *pb.TxnContext, startTs uint64) {
-	if txn := posting.GetTxn(startTs); txn != nil {
-		txn.FillContext(tctx, groups().groupId())
-	}
-	// We do not need to fill linread mechanism anymore, because transaction
-	// start ts is sufficient to wait for, to achieve lin reads.
 }
 
 // proposeOrSend either proposes the mutation if the node serves the group gid or sends it to
@@ -526,8 +506,8 @@ func proposeOrSend(ctx context.Context, gid uint32, m *pb.Mutations, chr chan re
 // should be sent to that group.
 func populateMutationMap(src *pb.Mutations) (map[uint32]*pb.Mutations, error) {
 	mm := make(map[uint32]*pb.Mutations)
-	for _, edge := range src.Edges {
-		gid, err := groups().BelongsTo(edge.Attr)
+	for _, nq := range src.Edges {
+		gid, err := groups().BelongsTo(nq.Predicate)
 		if err != nil {
 			return nil, err
 		}
@@ -537,9 +517,26 @@ func populateMutationMap(src *pb.Mutations) (map[uint32]*pb.Mutations, error) {
 			mu = &pb.Mutations{GroupId: gid}
 			mm[gid] = mu
 		}
-		mu.Edges = append(mu.Edges, edge)
+		mu.Edges = append(mu.Edges, nq)
 	}
-
+	for _, obj := range src.NewObjects {
+		if len(obj.Edges) == 0 {
+			continue
+		}
+		// All edges for a type should belong to the same group. So, we can just
+		// look at any one of them, and find the group it belongs to.
+		edge := obj.Edges[0]
+		gid, err := groups().BelongsTo(edge.Predicate)
+		if err != nil {
+			return nil, err
+		}
+		mu := mm[gid]
+		if mu == nil {
+			mu = &pb.Mutations{GroupId: gid}
+			mm[gid] = mu
+		}
+		mu.NewObjects = append(mu.NewObjects, obj)
+	}
 	for _, schema := range src.Schema {
 		gid, err := groups().BelongsTo(schema.Predicate)
 		if err != nil {
@@ -580,10 +577,9 @@ func MutateOverNetwork(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, er
 	ctx, span := otrace.StartSpan(ctx, "worker.MutateOverNetwork")
 	defer span.End()
 
-	tctx := &pb.TxnContext{}
 	mutationMap, err := populateMutationMap(m)
 	if err != nil {
-		return tctx, err
+		return nil, err
 	}
 	span.Annotate(nil, "mutation map populated")
 
@@ -591,18 +587,27 @@ func MutateOverNetwork(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, er
 	for gid, mu := range mutationMap {
 		if gid == 0 {
 			span.Annotatef(nil, "Group id zero for mutation: %+v", mu)
-			return tctx, errNonExistentTablet
+			return nil, errNonExistentTablet
 		}
 		go proposeOrSend(ctx, gid, mu, resCh)
 	}
 
 	// Wait for all the goroutines to reply back.
 	// We return if an error was returned or the parent called ctx.Done()
+	var tctx *pb.TxnContext
 	var e error
 	for i := 0; i < len(mutationMap); i++ {
 		res := <-resCh
 		if res.err != nil {
 			e = res.err
+		} else {
+			if tctx == nil {
+				tctx = res.ctx
+			} else {
+				for k, v := range res.ctx.GetUids() {
+					tctx.Uids[k] = v
+				}
+			}
 		}
 	}
 	close(resCh)
@@ -613,7 +618,7 @@ func (w *grpcWorker) proposeAndWait(ctx context.Context, txnCtx *pb.TxnContext,
 	m *pb.Mutations) error {
 	if x.WorkerConfig.StrictMutations {
 		for _, edge := range m.Edges {
-			if _, err := schema.State().TypeOf(edge.Attr); err != nil {
+			if _, err := schema.State().TypeOf(edge.Predicate); err != nil {
 				return err
 			}
 		}
@@ -623,8 +628,9 @@ func (w *grpcWorker) proposeAndWait(ctx context.Context, txnCtx *pb.TxnContext,
 	// the re-arranging of mutations post Raft proposals to ensure that they get run after server's
 	// MaxAssignedTs >= m.StartTs.
 	node := groups().Node
-	err := node.proposeAndWait(ctx, &pb.Proposal{Mutations: m})
-	fillTxnContext(txnCtx, 0)
+	data, err := node.proposeAndWait(ctx, &pb.Proposal{Mutations: m})
+	txn := data.(*posting.Txn)
+	txn.FillContext(txnCtx)
 	return err
 }
 

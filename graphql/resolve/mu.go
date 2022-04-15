@@ -20,6 +20,7 @@ import (
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/sroar"
@@ -276,22 +277,22 @@ func handleAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	x.Check(err)
 	mu := &pb.Mutation{
 		SetJson: data,
-		Nquads:  nquads,
+		Edges:   nquads,
 	}
 
 	if glog.V(2) {
 		data2, _ := json.MarshalIndent(res, " ", " ")
 		glog.Infof("Mutation Req JSON data: %s\n", data2)
-		glog.Infof("NQuads: %+v\n", mu.Nquads)
+		glog.Infof("NQuads: %+v\n", mu.Edges)
 	}
-	resp, err := edgraph.Query(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}})
+	resp, err := edgraph.QueryGraphQL(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}}, m)
 	if err != nil {
 		return nil, err
 	}
-	glog.V(2).Infof("Got response: %s\n", resp.Json)
+	glog.V(2).Infof("Got response: %s\nTxnContext: %+v\n", resp.Json, resp.Txn)
 
-	for key, uid := range resp.Uids {
-		if strings.HasPrefix(key, typ.Name()+"-") {
+	for key, uid := range resp.Txn.GetUids() {
+		if strings.HasPrefix(key, "_:"+typ.Name()+"-") {
 			resultUids = append(resultUids, x.FromHex(uid))
 		}
 	}
@@ -404,11 +405,11 @@ func handleDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 			return
 		}
 		for _, childUid := range cuids {
-			mu.Nquads = append(mu.Nquads, &pb.NQuad{
+			mu.Edges = append(mu.Edges, &pb.Edge{
 				Subject:   childUid,
 				Predicate: inv.DgraphAlias(),
 				ObjectId:  uidHex,
-				Op:        pb.NQuad_DEL,
+				Op:        pb.Edge_DEL,
 			})
 		}
 	}
@@ -417,25 +418,25 @@ func handleDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		uidHex := x.ToHexString(uid)
 		for _, f := range m.MutatedType().Fields() {
 			accountForInverse(uidHex, f)
-			mu.Nquads = append(mu.Nquads, &pb.NQuad{
+			mu.Edges = append(mu.Edges, &pb.Edge{
 				Subject:     uidHex,
 				Predicate:   f.DgraphAlias(),
-				ObjectValue: &pb.Value{&pb.Value_DefaultVal{x.Star}},
-				Op:          pb.NQuad_DEL,
+				ObjectValue: types.StringToBinary(x.Star),
+				Op:          pb.Edge_DEL,
 			})
 		}
-		mu.Nquads = append(mu.Nquads, &pb.NQuad{
+		mu.Edges = append(mu.Edges, &pb.Edge{
 			Subject:     uidHex,
 			Predicate:   "dgraph.type",
-			ObjectValue: &pb.Value{&pb.Value_StrVal{m.MutatedType().DgraphName()}},
-			Op:          pb.NQuad_DEL,
+			ObjectValue: types.StringToBinary(m.MutatedType().DgraphName()),
+			Op:          pb.Edge_DEL,
 		})
 	}
 
 	req := &pb.Request{}
 	req.Mutations = append(req.Mutations, mu)
 
-	resp, err := edgraph.Query(ctx, req)
+	resp, err := edgraph.QueryGraphQL(ctx, req, m)
 	if err != nil {
 		return nil, errors.Wrapf(err, "while executing deletions")
 	}
@@ -515,8 +516,8 @@ func checkIfDuplicateExists(ctx context.Context,
 	return fmt.Errorf("Duplicate entries exist for these unique ids: %v", xids)
 }
 
-func deletePreviousChild(ctx context.Context, uidStr string,
-	f *schema.FieldDefinition) (*pb.NQuad, error) {
+func deletePreviousEdge(ctx context.Context, uidStr string,
+	f *schema.FieldDefinition) (*pb.Edge, error) {
 
 	if strings.HasPrefix(uidStr, "_:") {
 		// It's a new object. So, it can't have an previous child.
@@ -541,11 +542,11 @@ func deletePreviousChild(ctx context.Context, uidStr string,
 	}
 	// len(cuids) == 1
 	inv := f.Inverse()
-	return &pb.NQuad{
+	return &pb.Edge{
 		Subject:   cuids[0],
 		Predicate: inv.DgraphAlias(),
 		ObjectId:  uidStr,
-		Op:        pb.NQuad_DEL,
+		Op:        pb.Edge_DEL,
 	}, nil
 }
 
@@ -554,8 +555,8 @@ func deletePreviousChild(ctx context.Context, uidStr string,
 // creates reverse edges. If the parent can only have one child, it queries what
 // the previous child was, and creates delete reverse edges for the previous
 // child.
-func handleInverses(ctx context.Context, typ *schema.Type, objs []Object) ([]*pb.NQuad, error) {
-	var nquads []*pb.NQuad
+func handleInverses(ctx context.Context, typ *schema.Type, objs []Object) ([]*pb.Edge, error) {
+	var nquads []*pb.Edge
 	for _, f := range typ.Fields() {
 		inv := f.Inverse()
 		if inv == nil {
@@ -587,15 +588,15 @@ func handleInverses(ctx context.Context, typ *schema.Type, objs []Object) ([]*pb
 				childUid := childObj["uid"].(string)
 
 				// Add an edge from new child -> parent.
-				nq := &pb.NQuad{
+				nq := &pb.Edge{
 					Subject:   childUid,
 					Predicate: inv.DgraphAlias(),
 					ObjectId:  parentUid,
-					Op:        pb.NQuad_SET,
+					Op:        pb.Edge_SET,
 				}
 				// If the parent can only have one child, we need to delete the edge
 				// from that previous child -> parent.
-				prevChildNq, err := deletePreviousChild(ctx, parentUid, f)
+				prevChildNq, err := deletePreviousEdge(ctx, parentUid, f)
 				if err != nil {
 					return nil, errors.Wrapf(err, "handleInverses.deletePreviousChild")
 				}
@@ -608,6 +609,14 @@ func handleInverses(ctx context.Context, typ *schema.Type, objs []Object) ([]*pb
 				} else {
 					nquads = append(nquads, nq)
 					nquads = append(nquads, prevChildNq)
+				}
+
+				prevParentNq, err := deletePreviousEdge(ctx, childUid, inv)
+				if err != nil {
+					return nil, errors.Wrapf(err, "handleInverses.deletePreviousChild.parent")
+				}
+				if prevParentNq != nil {
+					nquads = append(nquads, prevParentNq)
 				}
 			}
 		}
@@ -699,11 +708,11 @@ func handleUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		} else {
 			mu.DeleteJson = data
 		}
-		mu.Nquads = append(mu.Nquads, nquads...)
+		mu.Edges = append(mu.Edges, nquads...)
 		if glog.V(2) {
 			data2, _ := json.MarshalIndent(dstObjs, " ", " ")
 			glog.Infof("Mutation Req JSON data: %s\n", data2)
-			glog.Infof("NQuads: %+v\n", mu.Nquads)
+			glog.Infof("NQuads: %+v\n", mu.Edges)
 		}
 		return nil
 	}
@@ -721,7 +730,7 @@ func handleUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		}
 	}
 
-	resp, err := edgraph.Query(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}})
+	resp, err := edgraph.QueryGraphQL(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}}, m)
 	if err != nil {
 		return nil, errors.Wrapf(err, "while executing updates")
 	}
@@ -745,12 +754,14 @@ func rewriteQueries(ctx context.Context, m *schema.Field) ([]uint64, error) {
 func UidsForXid(ctx context.Context, pred, value string) (*sroar.Bitmap, error) {
 	q := &pb.Query{
 		ReadTs: posting.ReadTimestamp(),
-		Attr:   x.NamespaceAttr(0, pred),
+		// TODO(mrjn): Namespace 0 is hardcoded here. We should allow for other namespaces later.
+		Attr: x.NamespaceAttr(0, pred),
 		SrcFunc: &pb.SrcFunction{
 			Name: "eq",
 			Args: []string{value},
 		},
-		First: 3,
+		// First: 3, // We can't just ask for the first 3, because we might have
+		// to intersect this result with others.
 	}
 	result, err := worker.ProcessTaskOverNetwork(ctx, q)
 	if err != nil {

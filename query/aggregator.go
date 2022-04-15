@@ -1,23 +1,9 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package query
 
 import (
-	"bytes"
 	"math"
 	"time"
 
@@ -52,32 +38,19 @@ func isBinary(f string) bool {
 		f == "max" || f == "min" || f == "logbase" || f == "pow"
 }
 
-func convertTo(from *pb.TaskValue) (types.Val, error) {
-	vh, _ := getValue(from)
-	if bytes.Equal(from.Val, x.Nilbyte) {
-		return vh, ErrEmptyVal
-	}
-	va, err := types.Convert(vh, vh.Tid)
-	if err != nil {
-		return vh, errors.Wrapf(err, "Fail to convert from api.Value to types.Val")
-	}
-	return va, err
-}
-
 func compareValues(ag string, va, vb types.Val) (bool, error) {
 	if !isBinaryBoolean(ag) {
 		x.Fatalf("Function %v is not binary boolean", ag)
 	}
 
-	_, err := types.Less(va, vb)
-	if err != nil {
-		//Try to convert values.
+	if _, err := types.Less(va, vb); err != nil {
+		// Try to convert values.
 		switch {
-		case va.Tid == types.IntID:
-			va.Tid = types.FloatID
+		case va.Tid == types.TypeInt64:
+			va.Tid = types.TypeFloat
 			va.Value = float64(va.Value.(int64))
-		case vb.Tid == types.IntID:
-			vb.Tid = types.FloatID
+		case vb.Tid == types.TypeInt64:
+			vb.Tid = types.TypeFloat
 			vb.Value = float64(vb.Value.(int64))
 		default:
 			return false, err
@@ -225,7 +198,7 @@ func applyPow(a, b, c *types.Val) error {
 	switch vBase {
 	case INT:
 		c.Value = math.Pow(float64(a.Value.(int64)), float64(b.Value.(int64)))
-		c.Tid = types.FloatID
+		c.Tid = types.TypeFloat
 
 	case FLOAT:
 		// Fractional power of -ve numbers should not be returned.
@@ -251,7 +224,7 @@ func applyLog(a, b, c *types.Val) error {
 			return ErrorDivisionByZero
 		}
 		c.Value = math.Log(float64(a.Value.(int64))) / math.Log(float64(b.Value.(int64)))
-		c.Tid = types.FloatID
+		c.Tid = types.TypeFloat
 
 	case FLOAT:
 		if a.Value.(float64) < 0 || b.Value.(float64) < 0 {
@@ -301,7 +274,7 @@ func applyLn(a, res *types.Val) error {
 			return ErrorNegativeLog
 		}
 		res.Value = math.Log(float64(a.Value.(int64)))
-		res.Tid = types.FloatID
+		res.Tid = types.TypeFloat
 
 	case FLOAT:
 		if a.Value.(float64) < 0 {
@@ -320,7 +293,7 @@ func applyExp(a, res *types.Val) error {
 	switch vBase {
 	case INT:
 		res.Value = math.Exp(float64(a.Value.(int64)))
-		res.Tid = types.FloatID
+		res.Tid = types.TypeFloat
 
 	case FLOAT:
 		res.Value = math.Exp(a.Value.(float64))
@@ -358,7 +331,7 @@ func applySqrt(a, res *types.Val) error {
 			return ErrorNegativeRoot
 		}
 		res.Value = math.Sqrt(float64(a.Value.(int64)))
-		res.Tid = types.FloatID
+		res.Tid = types.TypeFloat
 
 	case FLOAT:
 		if a.Value.(float64) < 0 {
@@ -403,9 +376,9 @@ func applyCeil(a, res *types.Val) error {
 }
 
 func applySince(a, res *types.Val) error {
-	if a.Tid == types.DateTimeID {
+	if a.Tid == types.TypeDatetime {
 		a.Value = float64(time.Since(a.Value.(time.Time))) / 1000000000.0
-		a.Tid = types.FloatID
+		a.Tid = types.TypeFloat
 		*res = *a
 		return nil
 	}
@@ -448,9 +421,9 @@ const (
 func getValType(v *types.Val) valType {
 	var vBase valType
 	switch v.Tid {
-	case types.IntID:
+	case types.TypeInt64:
 		vBase = INT
-	case types.FloatID:
+	case types.TypeFloat:
 		vBase = FLOAT
 	default:
 		vBase = DEFAULT
@@ -472,12 +445,12 @@ func (ag *aggregator) matchType(v, va *types.Val) error {
 
 	// One of them is int and one is float
 	if vBase == INT {
-		v.Tid = types.FloatID
+		v.Tid = types.TypeFloat
 		v.Value = float64(v.Value.(int64))
 	}
 
 	if vaBase == INT {
-		va.Tid = types.FloatID
+		va.Tid = types.TypeFloat
 		va.Value = float64(va.Value.(int64))
 	}
 
@@ -488,7 +461,7 @@ func (ag *aggregator) ApplyVal(v types.Val) error {
 	if v.Value == nil {
 		// If the value is missing, treat it as 0.
 		v.Value = int64(0)
-		v.Tid = types.IntID
+		v.Tid = types.TypeInt64
 	}
 
 	var res types.Val
@@ -553,9 +526,9 @@ func (ag *aggregator) Apply(val types.Val) {
 		}
 	case "sum", "avg":
 		switch {
-		case va.Tid == types.IntID && vb.Tid == types.IntID:
+		case va.Tid == types.TypeInt64 && vb.Tid == types.TypeInt64:
 			va.Value = va.Value.(int64) + vb.Value.(int64)
-		case va.Tid == types.FloatID && vb.Tid == types.FloatID:
+		case va.Tid == types.TypeFloat && vb.Tid == types.TypeFloat:
 			va.Value = va.Value.(float64) + vb.Value.(float64)
 		}
 		// Skipping the else case since that means the pair cannot be summed.
@@ -568,19 +541,16 @@ func (ag *aggregator) Apply(val types.Val) {
 }
 
 func (ag *aggregator) ValueMarshalled() (*pb.TaskValue, error) {
-	data := types.ValueForType(types.BinaryID)
 	ag.divideByCount()
-	res := &pb.TaskValue{ValType: ag.result.Tid.Enum(), Val: x.Nilbyte}
 	if ag.result.Value == nil {
-		return res, nil
+		return &pb.TaskValue{}, nil
 	}
-	// We'll divide it by the count if it's an avg aggregator.
-	err := types.Marshal(ag.result, &data)
+	src := ag.result
+	data, err := types.ToBinary(src.Tid, src.Value)
 	if err != nil {
-		return res, err
+		return &pb.TaskValue{}, err
 	}
-	res.Val = data.Value.([]byte)
-	return res, nil
+	return &pb.TaskValue{Val: data}, nil
 }
 
 func (ag *aggregator) divideByCount() {
@@ -589,13 +559,13 @@ func (ag *aggregator) divideByCount() {
 	}
 	var v float64
 	switch ag.result.Tid {
-	case types.IntID:
+	case types.TypeInt64:
 		v = float64(ag.result.Value.(int64))
-	case types.FloatID:
+	case types.TypeFloat:
 		v = ag.result.Value.(float64)
 	}
 
-	ag.result.Tid = types.FloatID
+	ag.result.Tid = types.TypeFloat
 	ag.result.Value = v / float64(ag.count)
 }
 
@@ -604,7 +574,7 @@ func (ag *aggregator) Value() (types.Val, error) {
 		return ag.result, ErrEmptyVal
 	}
 	ag.divideByCount()
-	if ag.result.Tid == types.FloatID {
+	if ag.result.Tid == types.TypeFloat {
 		switch {
 		case math.IsInf(ag.result.Value.(float64), 1):
 			ag.result.Value = math.MaxFloat64

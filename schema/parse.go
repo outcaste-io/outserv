@@ -54,11 +54,6 @@ func parseDirective(it *lex.ItemIterator, schema *pb.SchemaUpdate, t types.TypeI
 		schema.Count = true
 	case "upsert":
 		schema.Upsert = true
-	case "lang":
-		if t != types.StringID || schema.List {
-			return next.Errorf("@lang directive can only be specified for string type."+
-				" Got: [%v] for attr: [%v]", t.Name(), schema.Predicate)
-		}
 	default:
 		return next.Errorf("Invalid index specification")
 	}
@@ -107,11 +102,11 @@ func parseScalarPair(it *lex.ItemIterator, predicate string, ns uint64) (*pb.Sch
 		return nil, next.Errorf("Undefined Type")
 	}
 	if schema.List {
-		if uint32(t) == uint32(types.PasswordID) || uint32(t) == uint32(types.BoolID) {
-			return nil, next.Errorf("Unsupported type for list: [%s].", types.TypeID(t).Name())
+		if uint32(t) == uint32(types.TypePassword) || uint32(t) == uint32(types.TypeBool) {
+			return nil, next.Errorf("Unsupported type for list: [%s].", types.TypeID(t))
 		}
 	}
-	schema.ValueType = t.Enum()
+	schema.ValueType = t.Int()
 
 	// Check for index / reverse.
 	it.Next()
@@ -158,9 +153,9 @@ func parseIndexDirective(it *lex.ItemIterator, predicate string,
 	var seen = make(map[string]bool)
 	var seenSortableTok bool
 
-	if typ == types.UidID || typ == types.DefaultID || typ == types.PasswordID {
+	if typ == types.TypeUid || typ == types.TypeDefault || typ == types.TypePassword {
 		return tokenizers, it.Item().Errorf("Indexing not allowed on predicate %s of type %s",
-			predicate, typ.Name())
+			predicate, typ)
 	}
 	if !it.Next() {
 		// Nothing to read.
@@ -204,7 +199,7 @@ func parseIndexDirective(it *lex.ItemIterator, predicate string,
 		if tokenizerType != typ {
 			return tokenizers,
 				next.Errorf("Tokenizer: %s isn't valid for predicate: %s of type: %s",
-					tokenizer.Name(), x.ParseAttr(predicate), typ.Name())
+					tokenizer.Name(), x.ParseAttr(predicate), typ)
 		}
 		if _, found := seen[tokenizer.Name()]; found {
 			return tokenizers, next.Errorf("Duplicate tokenizers defined for pred %v",
@@ -229,19 +224,19 @@ func resolveTokenizers(updates []*pb.SchemaUpdate) error {
 	for _, schema := range updates {
 		typ := types.TypeID(schema.ValueType)
 
-		if (typ == types.UidID || typ == types.DefaultID || typ == types.PasswordID) &&
+		if (typ == types.TypeUid || typ == types.TypeDefault || typ == types.TypePassword) &&
 			schema.Directive == pb.SchemaUpdate_INDEX {
 			return errors.Errorf("Indexing not allowed on predicate %s of type %s",
-				x.ParseAttr(schema.Predicate), typ.Name())
+				x.ParseAttr(schema.Predicate), typ)
 		}
 
-		if typ == types.UidID {
+		if typ == types.TypeUid {
 			continue
 		}
 
 		if len(schema.Tokenizer) == 0 && schema.Directive == pb.SchemaUpdate_INDEX {
 			return errors.Errorf("Require type of tokenizer for pred: %s of type: %s for indexing.",
-				schema.Predicate, typ.Name())
+				schema.Predicate, typ)
 		} else if len(schema.Tokenizer) > 0 && schema.Directive != pb.SchemaUpdate_INDEX {
 			return errors.Errorf("Tokenizers present without indexing on attr %s", x.ParseAttr(schema.Predicate))
 		}
@@ -257,7 +252,7 @@ func resolveTokenizers(updates []*pb.SchemaUpdate) error {
 			x.AssertTrue(ok) // Type is validated during tokenizer loading.
 			if tokenizerType != typ {
 				return errors.Errorf("Tokenizer: %s isn't valid for predicate: %s of type: %s",
-					tokenizer.Name(), x.ParseAttr(schema.Predicate), typ.Name())
+					tokenizer.Name(), x.ParseAttr(schema.Predicate), typ)
 			}
 			if _, ok := seen[tokenizer.Name()]; !ok {
 				seen[tokenizer.Name()] = true

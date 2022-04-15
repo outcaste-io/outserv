@@ -28,7 +28,6 @@ message List {
 
 message TaskValue {
   bytes val = 1;
-  Posting.ValType val_type = 2;
 }
 
 message SrcFunction {
@@ -170,32 +169,24 @@ message Tablet {
   int64 uncompressed_bytes = 11;
 }
 
-message DirectedEdge {
-  fixed64 entity = 1;              // Subject or source node / UID.
-  string attr = 2;                 // Attribute or predicate. Labels the edge.
-  bytes value = 3;                 // Edge points to a value.
-  Posting.ValType value_type = 4;  // The type of the value
-  fixed64 value_id = 5;            // Object or destination node / UID.
-  enum Op {
-    SET = 0;
-    DEL = 1;
-  }
-  Op op = 8;
-  repeated string allowedPreds = 10;
-  uint64 namespace = 11;
+message Object {
+  string var = 1;
+  uint64 uid = 2;
+  repeated Edge edges = 3;
 }
 
 message Mutations {
   uint32 group_id = 1;
-  repeated DirectedEdge edges = 3;
-  repeated SchemaUpdate schema = 4;
+  repeated Object new_objects = 2;
+  repeated Edge edges = 3;
+  repeated SchemaUpdate schema = 5;
   enum DropOp {
     NONE = 0;
     ALL = 1;
     DATA = 2;
   }
-  DropOp drop_op = 7;
-  string drop_value = 8;
+  DropOp drop_op = 8;
+  string drop_value = 9;
 }
 
 message Snapshot {
@@ -256,20 +247,6 @@ message KVS {
 message Posting {
   fixed64 uid = 1;
   bytes value = 2;
-  enum ValType {
-    DEFAULT = 0;
-    BINARY = 1;
-    INT = 2;  // We treat it as int64.
-    FLOAT = 3;
-    BOOL = 4;
-    DATETIME = 5;
-    GEO = 6;
-    UID = 7;
-    PASSWORD = 8;
-    STRING = 9;
-    OBJECT = 10;
-  }
-  ValType val_type = 3;
   enum PostingType {
     REF = 0;         // UID
     VALUE = 1;       // simple, plain value
@@ -331,7 +308,7 @@ message SchemaResult {
 
 message SchemaUpdate {
   string predicate = 1;
-  Posting.ValType value_type = 2;
+  int32 value_type = 2;
   enum Directive {
     NONE = 0;
     INDEX = 1;
@@ -377,8 +354,9 @@ message Payload {
 
 message TxnContext {
   uint64 start_ts = 1;
-  uint64 commit_ts = 2;
-  bool aborted = 3;
+  // uids contains a mapping of blank_node => uid for the node. It only returns uids
+  // that were created as part of a mutation.
+  map<string, string> uids = 2;
   string hash = 6;
 }
 
@@ -414,9 +392,6 @@ message Response {
   Latency latency = 3;
   // Metrics contains all metrics related to the query.
   Metrics metrics = 4;
-  // uids contains a mapping of blank_node => uid for the node. It only returns uids
-  // that were created as part of a mutation.
-  map<string, string> uids = 12;
   bytes rdf = 13;
   map<string, ListOfString> hdrs = 14;
 }
@@ -424,7 +399,7 @@ message Response {
 message Mutation {
   bytes set_json = 1;
   bytes delete_json = 2;
-  repeated NQuad nquads = 3;
+  repeated Edge edges = 3;
 
   // This is being used for upserts.
   string cond = 9;
@@ -473,11 +448,11 @@ message Metrics {
   map<string, uint64> num_uids = 1;
 }
 
-message NQuad {
+message Edge {
   string subject = 1;
   string predicate = 2;
   string object_id = 3;
-  Value object_value = 4;
+  bytes object_value = 4;
   uint64 namespace = 5;
 
   enum Op {
@@ -485,22 +460,6 @@ message NQuad {
     DEL = 1;
   }
   Op op = 6;
-}
-
-message Value {
-  oneof val {
-    string default_val = 1;
-    bytes bytes_val = 2;
-    int64 int_val = 3;
-    bool bool_val = 4;
-    string str_val = 5;
-    double double_val = 6;
-    bytes geo_val = 7;  // Geo data in WKB format
-    bytes date_val = 8;
-    bytes datetime_val = 9;
-    string password_val = 10;
-    uint64 uid_val=11;
-  }
 }
 
 message LoginRequest {

@@ -31,7 +31,6 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/outcaste-io/badger/v3"
 	bo "github.com/outcaste-io/badger/v3/options"
-	"github.com/outcaste-io/badger/v3/pb"
 	badgerpb "github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/ristretto/z"
 
@@ -1154,6 +1153,9 @@ func ToHex(i uint64) []byte {
 }
 
 func FromHex(s string) uint64 {
+	if len(s) == 0 {
+		return 0
+	}
 	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
 		s = s[2:]
 	}
@@ -1164,6 +1166,22 @@ func FromHex(s string) uint64 {
 		Check(err)
 	}
 	return u
+}
+
+var errInvalidUID = errors.New("UID must to be greater than 0")
+
+// ParseUid parses the given string into an UID. This method returns with an error
+// if the string cannot be parsed or the parsed UID is zero.
+func ParseUid(xid string) (uint64, error) {
+	// If string represents a UID, convert to uint64 and return.
+	uid, err := strconv.ParseUint(xid, 0, 64)
+	if err != nil {
+		return 0, err
+	}
+	if uid == 0 {
+		return 0, errInvalidUID
+	}
+	return uid, nil
 }
 
 func ToHexString(i uint64) string {
@@ -1246,10 +1264,10 @@ func KvWithMaxVersion(kvs *badgerpb.KVList, prefixes [][]byte) *badgerpb.KV {
 }
 
 // PrefixesToMatches converts the prefixes for subscription to a list of match.
-func PrefixesToMatches(prefixes [][]byte, ignore string) []*pb.Match {
-	matches := make([]*pb.Match, 0, len(prefixes))
+func PrefixesToMatches(prefixes [][]byte, ignore string) []*badgerpb.Match {
+	matches := make([]*badgerpb.Match, 0, len(prefixes))
 	for _, prefix := range prefixes {
-		matches = append(matches, &pb.Match{
+		matches = append(matches, &badgerpb.Match{
 			Prefix:      prefix,
 			IgnoreBytes: ignore,
 		})
@@ -1353,4 +1371,11 @@ const mask uint64 = 1<<32 - 1
 
 func Timestamp(baseTs, raftIdx uint64) uint64 {
 	return baseTs + (2*raftIdx)&mask // Always return multiples of 2.
+}
+
+func IsStarAll(v []byte) bool {
+	if len(v) == 0 {
+		return false
+	}
+	return string(v[1:]) == Star
 }

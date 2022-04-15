@@ -4,13 +4,11 @@
 package worker
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math"
-	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -29,6 +27,7 @@ import (
 
 	"github.com/outcaste-io/badger/v3"
 	bpb "github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/outserv/codec"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -38,6 +37,7 @@ import (
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/outserv/zero"
 	"github.com/outcaste-io/ristretto/z"
+	"github.com/outcaste-io/sroar"
 )
 
 const (
@@ -280,10 +280,20 @@ func detectPendingTxns(attr string) error {
 	return errHasPendingTxns
 }
 
+func emptyMutation(mu *pb.Mutations) bool {
+	if len(mu.GetEdges()) > 0 {
+		return false
+	}
+	if len(mu.GetNewObjects()) > 0 {
+		return false
+	}
+	return true
+}
+
 func (n *node) mutationWorker(workerId int) {
 	handleEntry := func(p *pb.Proposal) {
 		x.AssertTrue(p.Key != 0)
-		x.AssertTrue(len(p.Mutations.GetEdges()) > 0)
+		x.AssertTrue(!emptyMutation(p.Mutations))
 
 		ctx := n.Ctx(p.Key)
 		x.AssertTrue(ctx != nil)
@@ -309,25 +319,95 @@ func (n *node) mutationWorker(workerId int) {
 	}
 }
 
-func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.Txn) error {
-	// It is possible that the user gives us multiple versions of the same edge, one with no facets
-	// and another with facets. In that case, use stable sort to maintain the ordering given to us
-	// by the user.
-	// TODO: Do this in a way, where we don't break multiple updates for the same Edge across
-	// different goroutines.
-	sort.SliceStable(m.Edges, func(i, j int) bool {
-		ei := m.Edges[i]
-		ej := m.Edges[j]
-		if ei.GetAttr() != ej.GetAttr() {
-			return ei.GetAttr() < ej.GetAttr()
+func UidsForObject(ctx context.Context, obj *pb.Object) (*sroar.Bitmap, error) {
+	var res *sroar.Bitmap
+	for _, nq := range obj.Edges {
+		if len(nq.ObjectValue) == 0 {
+			return nil, fmt.Errorf("Unexpected nil object value for %+v", nq)
 		}
-		return ei.GetEntity() < ej.GetEntity()
-	})
+
+		val, err := types.Convert(nq.ObjectValue, types.TypeString)
+		if err != nil {
+			return nil, errors.Wrapf(err, "encountered an XID %s with invalid val", nq.Predicate)
+		}
+		valStr := val.Value.(string)
+		q := &pb.Query{
+			ReadTs: posting.ReadTimestamp(), // What timestamp should we use?
+			Attr:   nq.Predicate,
+			SrcFunc: &pb.SrcFunction{
+				Name: "eq",
+				Args: []string{valStr},
+			},
+			// First: 3, // We can't just ask for the first 3, because we might have
+			// to intersect this result with others.
+		}
+		glog.Infof("running query: %+v\n", q)
+		result, err := ProcessTaskOverNetwork(ctx, q)
+		if err != nil {
+			return nil, errors.Wrapf(err, "while calling ProcessTaskOverNetwork")
+		}
+		if len(result.UidMatrix) == 0 {
+			// No result found
+			return sroar.NewBitmap(), nil
+		}
+		bm := codec.FromList(result.UidMatrix[0])
+		if res == nil {
+			res = bm
+		} else {
+			res.And(bm)
+		}
+		if res.GetCardinality() == 0 {
+			return res, nil
+		}
+	}
+	return res, nil
+}
+
+func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.Txn) error {
+	// TODO(mrjn): If this concMutation is a retry, should we upgrade the read
+	// timestamp then? It would seem logical to do so.
+	//
+	// Deal with objects first.
+	resolved := make(map[string]string)
+	for _, obj := range m.NewObjects {
+		glog.Infof("Got object: %+v\n", obj)
+
+		// Does the read timestamp need to be passed to UidsForObject?
+		bm, err := UidsForObject(ctx, obj)
+		if err != nil {
+			return errors.Wrapf(err, "when calling UidsForObject")
+		}
+
+		card := bm.GetCardinality()
+		if card > 1 {
+			return fmt.Errorf("Found XID uniqueness violation while processing"+
+				" object with var: %q", obj.Var)
+		}
+		if card == 1 {
+			resolved[obj.Var] = x.ToHexString(bm.ToArray()[0])
+			// No need to write the attributes corresponding to the object. The
+			// object already have these attributes set.
+		} else {
+			resolved[obj.Var] = x.ToHexString(obj.Uid)
+			// Let's put these edges back into the main list to be executed.
+			m.Edges = append(m.Edges, obj.Edges...)
+		}
+	}
+
+	// Replace the UIDs in the edges.
+	for _, edge := range m.Edges {
+		if uid, has := resolved[edge.Subject]; has {
+			edge.Subject = uid
+		}
+		if uid, has := resolved[edge.ObjectId]; has {
+			edge.ObjectId = uid
+		}
+	}
 
 	span := otrace.FromContext(ctx)
 	// Discard the posting lists from cache to release memory at the end.
 	defer func() {
-		txn.Update(ctx)
+		txn.Update(ctx, resolved)
 		span.Annotate(nil, "update done")
 	}()
 
@@ -341,7 +421,7 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 	// check if everything that we read is still valid, or was it changed. If
 	// it was indeed changed, we can re-do the work.
 
-	process := func(edges []*pb.DirectedEdge) error {
+	process := func(edges []*pb.Edge) error {
 		var retries int
 		for _, edge := range edges {
 			for {
@@ -484,23 +564,23 @@ func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr erro
 	// Stores a map of predicate and type of first mutation for each predicate.
 	schemaMap := make(map[string]types.TypeID)
 	for _, edge := range prop.Mutations.Edges {
-		if edge.Entity == 0 && bytes.Equal(edge.Value, []byte(x.Star)) {
+		if isDeletePredicateEdge(edge) {
 			// We should only drop the predicate if there is no pending
 			// transaction.
-			if err := detectPendingTxns(edge.Attr); err != nil {
+			if err := detectPendingTxns(edge.Predicate); err != nil {
 				span.Annotatef(nil, "Found pending transactions. Retry later.")
 				return err
 			}
-			span.Annotatef(nil, "Deleting predicate: %s", edge.Attr)
+			span.Annotatef(nil, "Deleting predicate: %s", edge.Predicate)
 			n.keysWritten.rejectBeforeIndex = prop.Index
-			return posting.DeletePredicate(ctx, edge.Attr, prop.CommitTs)
+			return posting.DeletePredicate(ctx, edge.Predicate, prop.CommitTs)
 		}
 		// Don't derive schema when doing deletion.
-		if edge.Op == pb.DirectedEdge_DEL {
+		if edge.Op == pb.Edge_DEL {
 			continue
 		}
-		if _, ok := schemaMap[edge.Attr]; !ok {
-			schemaMap[edge.Attr] = posting.TypeID(edge)
+		if _, ok := schemaMap[edge.Predicate]; !ok {
+			schemaMap[edge.Predicate] = posting.TypeID(edge)
 		}
 	}
 
@@ -732,7 +812,9 @@ func (n *node) processApplyCh() {
 			}
 		}
 
-		n.Proposals.Done(prop.Key, propResult(perr))
+		txn := posting.GetTxn(prop.CommitTs)
+		n.Proposals.Done(prop.Key, conn.ProposalResult{Err: perr, Data: txn})
+
 		n.Applied.Done(prop.Index)
 		posting.DoneTimestamp(prop.CommitTs)
 		ostats.Record(context.Background(), x.RaftAppliedIndex.M(int64(n.Applied.DoneUntil())))
@@ -1037,7 +1119,8 @@ func (n *node) proposeBaseTimestamp() {
 		now = now << 32 // Make space for lower 32 bits.
 		prop := &pb.Proposal{BaseTimestamp: now}
 		err := x.RetryUntilSuccess(10, time.Second, func() error {
-			return n.proposeAndWait(n.closer.Ctx(), prop)
+			_, err := n.proposeAndWait(n.closer.Ctx(), prop)
+			return err
 		})
 		if err != nil {
 			glog.Warningf("Unable to propose base timestamp: %v", err)
@@ -1439,14 +1522,15 @@ func (n *node) Run() {
 
 					props = append(props, p)
 
-					if len(p.Mutations.GetEdges()) == 0 {
+					if emptyMutation(p.Mutations) {
+						glog.Infof("Continuing for mutation: %+v\n", p.Mutations)
 						continue
 					}
 					var skip bool
 					for _, e := range p.Mutations.GetEdges() {
 						// This is a drop predicate mutation. We should not try to execute it
 						// concurrently.
-						if e.Entity == 0 && bytes.Equal(e.Value, []byte(x.Star)) {
+						if isDeletePredicateEdge(e) {
 							skip = true
 							break
 						}
