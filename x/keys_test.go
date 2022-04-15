@@ -212,20 +212,6 @@ func TestSchemaKey(t *testing.T) {
 	}
 }
 
-func TestTypeKey(t *testing.T) {
-	var uid uint64
-	for uid = 0; uid < 1001; uid++ {
-		sattr := fmt.Sprintf("attr:%d", uid)
-
-		key := TypeKey(GalaxyAttr(sattr))
-		pk, err := Parse(key)
-		require.NoError(t, err)
-
-		require.True(t, pk.IsType())
-		require.Equal(t, sattr, ParseAttr(pk.Attr))
-	}
-}
-
 func TestBadStartUid(t *testing.T) {
 	testKey := func(key []byte) {
 		key, err := SplitKey(key, 10)
