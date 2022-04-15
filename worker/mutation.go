@@ -46,7 +46,6 @@ func runMutation(ctx context.Context, edge *pb.Edge, txn *posting.Txn) error {
 
 	// We shouldn't check whether this Alpha serves this predicate or not. Membership information
 	// isn't consistent across the entire cluster. We should just apply whatever is given to us.
-	glog.Infof("Looking for schema with: %s\n", edge.Predicate)
 	su, ok := schema.State().Get(ctx, edge.Predicate)
 	if edge.Op == pb.Edge_SET {
 		if !ok {
@@ -78,7 +77,7 @@ func runMutation(ctx context.Context, edge *pb.Edge, txn *posting.Txn) error {
 	case len(su.GetTokenizer()) > 0 || su.GetCount():
 		// Any index or count index.
 		getFn = txn.Get
-	case su.GetValueType() == int32(types.TypeUid) && !su.GetList():
+	case su.GetValueType() == types.TypeUid.Int() && !su.GetList():
 		// Single UID, not a list.
 		getFn = txn.Get
 	case edge.Op == pb.Edge_DEL:
@@ -379,8 +378,7 @@ func checkSchema(s *pb.SchemaUpdate) error {
 	case t.IsScalar() && (t == types.TypePassword || s.ValueType == types.TypePassword.Int()):
 		// can't change password -> x, x -> password
 		if t.Int() != s.ValueType {
-			return errors.Errorf("Schema change not allowed from %s to %s",
-				t, typ)
+			return errors.Errorf("Schema change not allowed from %s to %s", t, typ)
 		}
 
 	case t.IsScalar() == typ.IsScalar():
@@ -454,7 +452,8 @@ func ValidateAndConvert(edge *pb.Edge, su *pb.SchemaUpdate) error {
 	if x.WorkerConfig.AclEnabled && x.ParseAttr(edge.GetPredicate()) == "dgraph.rule.permission" {
 		perm, ok := dst.Value.(int64)
 		if !ok {
-			return errors.Errorf("Value for predicate <dgraph.rule.permission> should be of type int")
+			return errors.Errorf("Value for predicate <dgraph.rule.permission>" +
+				" should be of type int")
 		}
 		if perm < 0 || perm > 7 {
 			return errors.Errorf("Can't set <dgraph.rule.permission> to %d, Value for this"+
@@ -521,8 +520,16 @@ func populateMutationMap(src *pb.Mutations) (map[uint32]*pb.Mutations, error) {
 		mu.Edges = append(mu.Edges, nq)
 	}
 	for _, obj := range src.NewObjects {
-		// TODO(mrjn): Start distributing by type. Hard coding to one for now.
-		gid := uint32(1)
+		if len(obj.Edges) == 0 {
+			continue
+		}
+		// All edges for a type should belong to the same group. So, we can just
+		// look at any one of them, and find the group it belongs to.
+		edge := obj.Edges[0]
+		gid, err := groups().BelongsTo(edge.Predicate)
+		if err != nil {
+			return nil, err
+		}
 		mu := mm[gid]
 		if mu == nil {
 			mu = &pb.Mutations{GroupId: gid}
@@ -530,20 +537,6 @@ func populateMutationMap(src *pb.Mutations) (map[uint32]*pb.Mutations, error) {
 		}
 		mu.NewObjects = append(mu.NewObjects, obj)
 	}
-	for _, edge := range src.Edges {
-		gid, err := groups().BelongsTo(edge.Predicate)
-		if err != nil {
-			return nil, err
-		}
-
-		mu := mm[gid]
-		if mu == nil {
-			mu = &pb.Mutations{GroupId: gid}
-			mm[gid] = mu
-		}
-		mu.Edges = append(mu.Edges, edge)
-	}
-
 	for _, schema := range src.Schema {
 		gid, err := groups().BelongsTo(schema.Predicate)
 		if err != nil {
@@ -605,7 +598,6 @@ func MutateOverNetwork(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, er
 	var e error
 	for i := 0; i < len(mutationMap); i++ {
 		res := <-resCh
-		glog.Infof("got res.err: %+v res.ctx: %+v\n", res.err, res.ctx)
 		if res.err != nil {
 			e = res.err
 		} else {
@@ -638,7 +630,6 @@ func (w *grpcWorker) proposeAndWait(ctx context.Context, txnCtx *pb.TxnContext,
 	node := groups().Node
 	data, err := node.proposeAndWait(ctx, &pb.Proposal{Mutations: m})
 	txn := data.(*posting.Txn)
-	glog.Infof("got txn: %+v\n", txn)
 	txn.FillContext(txnCtx)
 	return err
 }

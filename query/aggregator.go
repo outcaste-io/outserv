@@ -1,18 +1,5 @@
-/*
- * Copyright 2017-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2017-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package query
 
@@ -56,9 +43,8 @@ func compareValues(ag string, va, vb types.Val) (bool, error) {
 		x.Fatalf("Function %v is not binary boolean", ag)
 	}
 
-	_, err := types.Less(va, vb)
-	if err != nil {
-		//Try to convert values.
+	if _, err := types.Less(va, vb); err != nil {
+		// Try to convert values.
 		switch {
 		case va.Tid == types.TypeInt64:
 			va.Tid = types.TypeFloat
@@ -555,10 +541,10 @@ func (ag *aggregator) Apply(val types.Val) {
 }
 
 func (ag *aggregator) ValueMarshalled() (*pb.TaskValue, error) {
+	ag.divideByCount()
 	if ag.result.Value == nil {
 		return &pb.TaskValue{}, nil
 	}
-	ag.divideByCount()
 	src := ag.result
 	data, err := types.ToBinary(src.Tid, src.Value)
 	if err != nil {

@@ -5,6 +5,8 @@ package query
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -12,7 +14,6 @@ import (
 	otrace "go.opencensus.io/trace"
 
 	"github.com/golang/glog"
-	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/worker"
@@ -24,15 +25,6 @@ import (
 // ApplyMutations performs the required edge expansions and forwards the results to the
 // worker to perform the mutations.
 func ApplyMutations(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, error) {
-	// In expandEdges, for non * type prredicates, we prepend the namespace directly and for
-	// * type predicates, we fetch the predicates and prepend the namespace.
-
-	// edges, err := expandEdges(ctx, m)
-	// if err != nil {
-	// 	return nil, errors.Wrapf(err, "While adding pb.edges")
-	// }
-	// m.Edges = edges
-
 	ns, err := x.ExtractNamespace(ctx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "while extracting namespace")
@@ -58,77 +50,6 @@ func ApplyMutations(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, error
 	}
 	return tctx, err
 }
-
-/*
-func expandEdges(ctx context.Context, m *pb.Mutations) ([]*pb.DirectedEdge, error) {
-	edges := make([]*pb.DirectedEdge, 0, 2*len(m.Edges))
-	namespace, err := x.ExtractNamespace(ctx)
-	if err != nil {
-		return nil, errors.Wrapf(err, "While expanding edges")
-	}
-	isGalaxyQuery := x.IsGalaxyOperation(ctx)
-
-	// Reset the namespace to the original.
-	defer func(ns uint64) {
-		x.AttachNamespace(ctx, ns)
-	}(namespace)
-
-	for _, edge := range m.Edges {
-		x.AssertTrue(edge.Op == pb.Edge_DEL || edge.Op == pb.DirectedEdge_SET)
-		if isGalaxyQuery {
-			// The caller should make sure that the directed edges contain the namespace we want
-			// to insert into. Now, attach the namespace in the context, so that further query
-			// proceeds as if made from the user of 'namespace'.
-			namespace = edge.GetNamespace()
-			x.AttachNamespace(ctx, namespace)
-		}
-
-		var preds []string
-		if edge.Attr != x.Star {
-			preds = []string{x.NamespaceAttr(namespace, edge.Attr)}
-		} else {
-			sg := &SubGraph{}
-			sg.DestMap = sroar.NewBitmap()
-			sg.DestMap.Set(edge.GetEntity())
-			types, err := getNodeTypes(ctx, sg)
-			if err != nil {
-				return nil, err
-			}
-			// TODO: Implement getPredicatesFromTypes
-			preds = append(preds, getPredicatesFromTypes(namespace, types)...)
-			preds = append(preds, x.StarAllPredicates(namespace)...)
-			// AllowedPreds are used only with ACL. Do not delete all predicates but
-			// delete predicates to which the mutation has access
-			if edge.AllowedPreds != nil {
-				// Take intersection of preds and AllowedPreds
-				intersectPreds := make([]string, 0)
-				hashMap := make(map[string]bool)
-				for _, allowedPred := range edge.AllowedPreds {
-					hashMap[allowedPred] = true
-				}
-				for _, pred := range preds {
-					if _, found := hashMap[pred]; found {
-						intersectPreds = append(intersectPreds, pred)
-					}
-				}
-				preds = intersectPreds
-			}
-		}
-
-		for _, pred := range preds {
-			// Do not return reverse edges.
-			if x.ParseAttr(pred)[0] == '~' {
-				continue
-			}
-			edgeCopy := *edge
-			edgeCopy.Attr = pred
-			edges = append(edges, &edgeCopy)
-		}
-	}
-
-	return edges, nil
-}
-*/
 
 func verifyUid(ctx context.Context, uid uint64) error {
 	if uid <= worker.MaxLeaseId() {
@@ -156,20 +77,21 @@ func verifyUid(ctx context.Context, uid uint64) error {
 	}
 }
 
-func ToMutations(ctx context.Context, gmuList []*pb.Mutation, schema *schema.Schema) (*pb.Mutations, error) {
-	var nquads []*pb.Edge
+func ToMutations(ctx context.Context, gmuList []*pb.Mutation,
+	schema *schema.Schema) (*pb.Mutations, error) {
+
+	var edges []*pb.Edge
 	for _, gmu := range gmuList {
-		nquads = append(nquads, gmu.Edges...)
+		edges = append(edges, gmu.Edges...)
 	}
 
-	sort.Slice(nquads, func(i, j int) bool {
-		left, right := nquads[i], nquads[j]
+	sort.Slice(edges, func(i, j int) bool {
+		left, right := edges[i], edges[j]
 		if left.Op != right.Op {
 			return left.Op < right.Op
 		}
-		if left.Namespace != right.Namespace {
-			return left.Namespace < right.Namespace
-		}
+		// We don't consider Namespace here, because it should be the same for
+		// all Edges. We check that later.
 		if left.Subject != right.Subject {
 			return left.Subject < right.Subject
 		}
@@ -184,16 +106,24 @@ func ToMutations(ctx context.Context, gmuList []*pb.Mutation, schema *schema.Sch
 
 	types := make(map[string]bool)
 	xids := make(map[string]bool)
-	for _, nq := range nquads {
-		if nq.Op == pb.Edge_DEL {
-			mu.Edges = append(mu.Edges, nq)
+	ns := uint64(math.MaxUint64)
+	for _, edge := range edges {
+		if ns < math.MaxUint64 {
+			if edge.Namespace != ns {
+				return nil, fmt.Errorf("Multiple namespaces found in the same mutation")
+			}
+		} else {
+			ns = edge.Namespace
+		}
+
+		if edge.Op == pb.Edge_DEL {
+			mu.Edges = append(mu.Edges, edge)
 			obj = nil
 			continue
 		}
-		// attr := x.ParseAttr(nq.Predicate)
-		attr := nq.Predicate
+		attr := edge.Predicate
 		if strings.HasPrefix(attr, "dgraph.") {
-			mu.Edges = append(mu.Edges, nq)
+			mu.Edges = append(mu.Edges, edge)
 			continue
 		}
 		gqlType := strings.Split(attr, ".")[0]
@@ -201,31 +131,28 @@ func ToMutations(ctx context.Context, gmuList []*pb.Mutation, schema *schema.Sch
 			typ := schema.Type(gqlType)
 			for _, xid := range typ.XIDFields() {
 				xids[xid.DgraphAlias()] = true
-				glog.Infof("Found xid: %q\n", xid.DgraphAlias())
 			}
 		}
 		_, isXid := xids[attr]
-		glog.Infof("nq.pred: %q attr: %q, typ: %q isXid: %v", nq.Predicate, attr, gqlType, isXid)
 		if !isXid {
-			mu.Edges = append(mu.Edges, nq)
+			mu.Edges = append(mu.Edges, edge)
 			continue
 		}
-		if obj != nil && obj.Var == nq.Subject {
+		if obj != nil && obj.Var == edge.Subject {
 			// Subject matches an existing object, append to it.
-			obj.Edges = append(obj.Edges, nq)
+			obj.Edges = append(obj.Edges, edge)
 			continue
 		}
-		if strings.HasPrefix(nq.Subject, "_:") {
+		if strings.HasPrefix(edge.Subject, "_:") {
 			// Create a new object.
-			obj = &pb.Object{Var: nq.Subject}
+			obj = &pb.Object{Var: edge.Subject}
 			mu.NewObjects = append(mu.NewObjects, obj)
-			obj.Edges = append(obj.Edges, nq)
+			obj.Edges = append(obj.Edges, edge)
 			continue
 		}
-		mu.Edges = append(mu.Edges, nq)
+		mu.Edges = append(mu.Edges, edge)
 		obj = nil
 	}
-	glog.Infof("Found xids: %+v\n", xids)
 
 	if num := len(mu.NewObjects); num > 0 {
 		var res *pb.AssignedIds
@@ -272,7 +199,7 @@ func AssignUids(ctx context.Context, gmuList []*pb.Mutation) (map[string]uint64,
 			var uid uint64
 			if strings.HasPrefix(nq.Subject, "_:") {
 				newUids[nq.Subject] = 0
-			} else if uid, err = gql.ParseUid(nq.Subject); err != nil {
+			} else if uid, err = x.ParseUid(nq.Subject); err != nil {
 				return newUids, err
 			}
 			if err = verifyUid(ctx, uid); err != nil {
@@ -283,7 +210,7 @@ func AssignUids(ctx context.Context, gmuList []*pb.Mutation) (map[string]uint64,
 				var uid uint64
 				if strings.HasPrefix(nq.ObjectId, "_:") {
 					newUids[nq.ObjectId] = 0
-				} else if uid, err = gql.ParseUid(nq.ObjectId); err != nil {
+				} else if uid, err = x.ParseUid(nq.ObjectId); err != nil {
 					return newUids, err
 				}
 				if err = verifyUid(ctx, uid); err != nil {

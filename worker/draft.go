@@ -377,7 +377,6 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 		if err != nil {
 			return errors.Wrapf(err, "when calling UidsForObject")
 		}
-		glog.Infof("got uids: %d\n", bm.GetCardinality())
 
 		card := bm.GetCardinality()
 		if card > 1 {
@@ -404,7 +403,6 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 			edge.ObjectId = uid
 		}
 	}
-	glog.Infof("\nresolved: %+v\n\n Edges: %+v\n", resolved, m.Edges)
 
 	span := otrace.FromContext(ctx)
 	// Discard the posting lists from cache to release memory at the end.
@@ -815,7 +813,6 @@ func (n *node) processApplyCh() {
 		}
 
 		txn := posting.GetTxn(prop.CommitTs)
-		glog.Infof("returning txn: %+v\n", txn)
 		n.Proposals.Done(prop.Key, conn.ProposalResult{Err: perr, Data: txn})
 
 		n.Applied.Done(prop.Index)

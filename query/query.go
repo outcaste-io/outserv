@@ -1649,7 +1649,6 @@ func (sg *SubGraph) applyIneqFunc() error {
 		break
 	}
 	val := sg.SrcFunc.Args[0].Value
-	// src := types.Val{Tid: types.TypeString, Value: []byte(val)}
 	dst, err := types.Convert(types.StringToBinary(val), typ)
 	if err != nil {
 		return errors.Errorf("Invalid argment %v. Comparing with different type", val)

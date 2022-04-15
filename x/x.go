@@ -1168,6 +1168,22 @@ func FromHex(s string) uint64 {
 	return u
 }
 
+var errInvalidUID = errors.New("UID must to be greater than 0")
+
+// ParseUid parses the given string into an UID. This method returns with an error
+// if the string cannot be parsed or the parsed UID is zero.
+func ParseUid(xid string) (uint64, error) {
+	// If string represents a UID, convert to uint64 and return.
+	uid, err := strconv.ParseUint(xid, 0, 64)
+	if err != nil {
+		return 0, err
+	}
+	if uid == 0 {
+		return 0, errInvalidUID
+	}
+	return uid, nil
+}
+
 func ToHexString(i uint64) string {
 	return "0x" + strconv.FormatUint(i, 16)
 }

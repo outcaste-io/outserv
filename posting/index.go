@@ -35,7 +35,7 @@ var emptyCountParams countParams
 type indexMutationInfo struct {
 	tokenizers []tok.Tokenizer
 	edge       *pb.Edge // Represents the original uid -> value edge.
-	val        []byte
+	val        types.Sval
 	op         pb.Edge_Op
 }
 
@@ -167,8 +167,7 @@ func (txn *Txn) addCountMutation(ctx context.Context, t *pb.Edge, count uint32,
 		return err
 	}
 
-	x.AssertTruef(plist != nil, "plist is nil [%s] %d",
-		t.Predicate, t.ObjectId)
+	x.AssertTruef(plist != nil, "plist is nil [%s] %d", t.Predicate, t.ObjectId)
 	return plist.addMutation(ctx, txn, t)
 }
 
@@ -208,7 +207,7 @@ func countAfterMutation(countBefore int, found bool, op pb.Edge_Op) int {
 }
 
 func (txn *Txn) addMutationHelper(ctx context.Context, l *List, doUpdateIndex bool,
-	hasCountIndex bool, t *pb.Edge) ([]byte, bool, countParams, error) {
+	hasCountIndex bool, t *pb.Edge) (types.Sval, bool, countParams, error) {
 
 	t1 := time.Now()
 	l.Lock()
@@ -232,7 +231,6 @@ func (txn *Txn) addMutationHelper(ctx context.Context, l *List, doUpdateIndex bo
 	// is true, we just need to get the posting for uid, hence calling l.findPosting().
 	countBefore, countAfter := 0, 0
 	var currPost *pb.Posting
-	var val []byte
 	var found bool
 	var err error
 
@@ -243,12 +241,12 @@ func (txn *Txn) addMutationHelper(ctx context.Context, l *List, doUpdateIndex bo
 	case hasCountIndex:
 		countBefore, found, currPost = l.getPostingAndLength(txn.StartTs, 0, getUID(t))
 		if countBefore == -1 {
-			return val, false, emptyCountParams, ErrTsTooOld
+			return nil, false, emptyCountParams, ErrTsTooOld
 		}
 	case doUpdateIndex || delNonListPredicate:
 		found, currPost, err = l.findPosting(txn.StartTs, fingerprintEdge(t))
 		if err != nil {
-			return val, found, emptyCountParams, err
+			return nil, found, emptyCountParams, err
 		}
 	}
 
@@ -257,7 +255,7 @@ func (txn *Txn) addMutationHelper(ctx context.Context, l *List, doUpdateIndex bo
 	if delNonListPredicate {
 		newPost, err := NewPosting(t)
 		if err != nil {
-			return val, found, emptyCountParams, err
+			return nil, found, emptyCountParams, err
 		}
 
 		// This is a scalar value of non-list type and a delete edge mutation, so if the value
@@ -268,14 +266,15 @@ func (txn *Txn) addMutationHelper(ctx context.Context, l *List, doUpdateIndex bo
 		// return found to be true.
 		if found && !(bytes.Equal(currPost.Value, newPost.Value) &&
 			types.TypeID(currPost.Value[0]) == types.TypeID(newPost.Value[0])) {
-			return val, false, emptyCountParams, nil
+			return nil, false, emptyCountParams, nil
 		}
 	}
 
 	if err = l.addMutationInternal(ctx, txn, t); err != nil {
-		return val, found, emptyCountParams, err
+		return nil, found, emptyCountParams, err
 	}
 
+	var val types.Sval
 	if found && doUpdateIndex {
 		val = currPost.Value
 	}
@@ -923,12 +922,10 @@ func rebuildListType(ctx context.Context, rb *IndexRebuild) error {
 			return err
 		}
 		// Add the new edge with the fingerprinted value id.
-		return fmt.Errorf("TODO(mrjn): Fix rebuildListType")
 		newEdge := &pb.Edge{
-			Predicate: rb.Attr,
-			// Value:     mpost.Value, // This needs to be fixed up.
-			// ValueType: mpost.ValType,
-			Op: pb.Edge_SET,
+			Predicate:   rb.Attr,
+			ObjectValue: mpost.Value,
+			Op:          pb.Edge_SET,
 		}
 		return pl.addMutation(ctx, txn, newEdge)
 	}

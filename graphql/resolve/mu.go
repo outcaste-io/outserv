@@ -136,8 +136,6 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 			// We need a counter with this variable to allow multiple such
 			// objects.
 			dst["uid"] = fmt.Sprintf("_:%s-%d", typ.Name(), atomic.AddUint64(&objCounter, 1))
-			// We could store the query in __outserv.q__, storing predicates and
-			// values in pairs.
 		}
 		// TODO(mrjn): We should overhaul this type system later.
 		dst["dgraph.type"] = typ.DgraphName()
@@ -291,8 +289,7 @@ func handleAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	if err != nil {
 		return nil, err
 	}
-	glog.V(2).Infof("Got response: %s\n", resp.Json)
-	glog.V(2).Infof("Got txncontext: %s\n", resp.Txn)
+	glog.V(2).Infof("Got response: %s\nTxnContext: %+v\n", resp.Json, resp.Txn)
 
 	for key, uid := range resp.Txn.GetUids() {
 		if strings.HasPrefix(key, "_:"+typ.Name()+"-") {
