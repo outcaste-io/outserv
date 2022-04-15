@@ -156,8 +156,6 @@ func verifyUid(ctx context.Context, uid uint64) error {
 	}
 }
 
-// TODO: Gotta pass the GQL field, so we can figure out the XID fields corresponding
-// to a type.
 func ToMutations(ctx context.Context, gmuList []*pb.Mutation, schema *schema.Schema) (*pb.Mutations, error) {
 	var nquads []*pb.Edge
 	for _, gmu := range gmuList {

@@ -464,15 +464,6 @@ func ValidateAndConvert(edge *pb.Edge, su *pb.SchemaUpdate) error {
 	return nil
 }
 
-// TODO: Do we need fillTxnContext?
-func fillTxnContext(tctx *pb.TxnContext, startTs uint64) {
-	if txn := posting.GetTxn(startTs); txn != nil {
-		txn.FillContext(tctx, groups().groupId())
-	}
-	// We do not need to fill linread mechanism anymore, because transaction
-	// start ts is sufficient to wait for, to achieve lin reads.
-}
-
 // proposeOrSend either proposes the mutation if the node serves the group gid or sends it to
 // the leader of the group gid for proposing.
 func proposeOrSend(ctx context.Context, gid uint32, m *pb.Mutations, chr chan res) {
@@ -593,10 +584,9 @@ func MutateOverNetwork(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, er
 	ctx, span := otrace.StartSpan(ctx, "worker.MutateOverNetwork")
 	defer span.End()
 
-	tctx := &pb.TxnContext{}
 	mutationMap, err := populateMutationMap(m)
 	if err != nil {
-		return tctx, err
+		return nil, err
 	}
 	span.Annotate(nil, "mutation map populated")
 
@@ -604,18 +594,28 @@ func MutateOverNetwork(ctx context.Context, m *pb.Mutations) (*pb.TxnContext, er
 	for gid, mu := range mutationMap {
 		if gid == 0 {
 			span.Annotatef(nil, "Group id zero for mutation: %+v", mu)
-			return tctx, errNonExistentTablet
+			return nil, errNonExistentTablet
 		}
 		go proposeOrSend(ctx, gid, mu, resCh)
 	}
 
 	// Wait for all the goroutines to reply back.
 	// We return if an error was returned or the parent called ctx.Done()
+	var tctx *pb.TxnContext
 	var e error
 	for i := 0; i < len(mutationMap); i++ {
 		res := <-resCh
+		glog.Infof("got res.err: %+v res.ctx: %+v\n", res.err, res.ctx)
 		if res.err != nil {
 			e = res.err
+		} else {
+			if tctx == nil {
+				tctx = res.ctx
+			} else {
+				for k, v := range res.ctx.GetUids() {
+					tctx.Uids[k] = v
+				}
+			}
 		}
 	}
 	close(resCh)
@@ -636,8 +636,10 @@ func (w *grpcWorker) proposeAndWait(ctx context.Context, txnCtx *pb.TxnContext,
 	// the re-arranging of mutations post Raft proposals to ensure that they get run after server's
 	// MaxAssignedTs >= m.StartTs.
 	node := groups().Node
-	err := node.proposeAndWait(ctx, &pb.Proposal{Mutations: m})
-	fillTxnContext(txnCtx, 0)
+	data, err := node.proposeAndWait(ctx, &pb.Proposal{Mutations: m})
+	txn := data.(*posting.Txn)
+	glog.Infof("got txn: %+v\n", txn)
+	txn.FillContext(txnCtx)
 	return err
 }
 

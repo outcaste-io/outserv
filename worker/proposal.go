@@ -120,7 +120,7 @@ var errUnableToServe = errors.New("Server overloaded with pending proposals. Ple
 
 // proposeAndWait sends a proposal through RAFT. It waits on a channel for the proposal
 // to be applied(written to WAL) to all the nodes in the group.
-func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr error) {
+func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (txn interface{}, perr error) {
 	startTime := time.Now()
 	ctx = x.WithMethod(ctx, "n.proposeAndWait")
 	defer func() {
@@ -134,10 +134,10 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 	}()
 
 	if n.Raft() == nil {
-		return errors.Errorf("Raft isn't initialized yet")
+		return nil, errors.Errorf("Raft isn't initialized yet")
 	}
 	if ctx.Err() != nil {
-		return ctx.Err()
+		return nil, ctx.Err()
 	}
 	// Set this to disable retrying mechanism, and using the user-specified
 	// timeout.
@@ -166,30 +166,30 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 		span.Annotatef(nil, "Iterating over %d edges", len(proposal.Mutations.Edges))
 		for _, edge := range proposal.Mutations.Edges {
 			if err := checkTablet(edge.Predicate); err != nil {
-				return err
+				return nil, err
 			}
 			su, ok := schema.State().Get(ctx, edge.Predicate)
 			if !ok {
 				// We don't allow mutations for reserved predicates if the schema for them doesn't
 				// already exist.
 				if x.IsReservedPredicate(edge.Predicate) {
-					return errors.Errorf("Can't store predicate `%s` as it is prefixed with "+
+					return nil, errors.Errorf("Can't store predicate `%s` as it is prefixed with "+
 						"`dgraph.` which is reserved as the namespace for dgraph's internal "+
 						"types/predicates.",
 						x.ParseAttr(edge.Predicate))
 				}
 				continue
 			} else if err := ValidateAndConvert(edge, &su); err != nil {
-				return err
+				return nil, err
 			}
 		}
 
 		for _, schema := range proposal.Mutations.Schema {
 			if err := checkTablet(schema.Predicate); err != nil {
-				return err
+				return nil, err
 			}
 			if err := checkSchema(schema); err != nil {
-				return err
+				return nil, err
 			}
 			noTimeout = true
 		}
@@ -203,7 +203,7 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 	binary.BigEndian.PutUint64(data, key)
 	sz, err := proposal.MarshalToSizedBuffer(data[8:])
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Trim data to the new size after Marshal.
@@ -212,7 +212,7 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 	stop := x.SpanTimer(span, "n.proposeAndWait")
 	defer stop()
 
-	propose := func(timeout time.Duration) error {
+	propose := func(timeout time.Duration) (interface{}, error) {
 		cctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
@@ -227,7 +227,7 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 		span.Annotatef(nil, "Proposing with key: %d. Timeout: %v", key, timeout)
 
 		if err = n.Raft().Propose(cctx, data); err != nil {
-			return errors.Wrapf(err, "While proposing")
+			return nil, errors.Wrapf(err, "While proposing")
 		}
 
 		timer := time.NewTimer(timeout)
@@ -237,9 +237,9 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 			select {
 			case pres := <-resCh:
 				// We arrived here by a call to n.Proposals.Done().
-				return pres.Err
+				return pres.Data, pres.Err
 			case <-ctx.Done():
-				return ctx.Err()
+				return nil, ctx.Err()
 			case <-timer.C:
 				if atomic.LoadUint32(&pctx.Found) > 0 {
 					// We found the proposal in CommittedEntries. No need to retry.
@@ -248,7 +248,7 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 					cancel()
 				}
 			case <-cctx.Done():
-				return errInternalRetry
+				return nil, errInternalRetry
 			}
 		}
 	}
@@ -272,7 +272,7 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 	//
 	// Let's try 3 times before giving up.
 
-	proposeWithLimit := func(i int) error {
+	proposeWithLimit := func(i int) (interface{}, error) {
 		// Each retry creates a new proposal, which adds to the number of pending proposals. We
 		// should consider this into account, when adding new proposals to the system.
 		switch {
@@ -283,7 +283,7 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 		default:
 			span.Annotatef(nil, "incr with %d", i)
 			if err := limiter.incr(ctx, i); err != nil {
-				return err
+				return nil, err
 			}
 			// We have now acquired slots in limiter. We MUST release them before we retry this
 			// proposal, otherwise we end up with dining philosopher problem.
@@ -293,9 +293,10 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 	}
 
 	for i := 0; i < 3; i++ {
-		if err := proposeWithLimit(i); err != errInternalRetry {
-			return err
+		data, err := proposeWithLimit(i)
+		if err != errInternalRetry {
+			return data, err
 		}
 	}
-	return errUnableToServe
+	return nil, errUnableToServe
 }

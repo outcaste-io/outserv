@@ -408,7 +408,7 @@ func mutationHandler(w http.ResponseWriter, r *http.Request) {
 	mp := map[string]interface{}{}
 	mp["code"] = x.Success
 	mp["message"] = "Done"
-	mp["uids"] = resp.Uids
+	mp["uids"] = resp.Txn.GetUids()
 	mp["queries"] = json.RawMessage(resp.Json)
 	response["data"] = mp
 

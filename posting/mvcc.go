@@ -218,10 +218,22 @@ func (txn *Txn) Cache() *LocalCache {
 }
 
 // FillContext updates the given transaction context with data from this transaction.
-func (txn *Txn) FillContext(ctx *pb.TxnContext, gid uint32) {
+func (txn *Txn) FillContext(ctx *pb.TxnContext) {
+	if txn == nil {
+		return
+	}
 	txn.Lock()
+	defer txn.Unlock()
 	ctx.StartTs = txn.StartTs
-	txn.Unlock()
+	if txn.Uids == nil {
+		return
+	}
+	if ctx.Uids == nil {
+		ctx.Uids = make(map[string]string)
+	}
+	for k, v := range txn.Uids {
+		ctx.Uids[k] = v
+	}
 }
 
 // ToSkiplist replaces CommitToDisk. ToSkiplist creates a Badger usable Skiplist from the Txn, so

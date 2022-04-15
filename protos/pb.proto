@@ -354,8 +354,9 @@ message Payload {
 
 message TxnContext {
   uint64 start_ts = 1;
-  uint64 commit_ts = 2;
-  bool aborted = 3;
+  // uids contains a mapping of blank_node => uid for the node. It only returns uids
+  // that were created as part of a mutation.
+  map<string, string> uids = 2;
   string hash = 6;
 }
 
@@ -391,9 +392,6 @@ message Response {
   Latency latency = 3;
   // Metrics contains all metrics related to the query.
   Metrics metrics = 4;
-  // uids contains a mapping of blank_node => uid for the node. It only returns uids
-  // that were created as part of a mutation.
-  map<string, string> uids = 12;
   bytes rdf = 13;
   map<string, ListOfString> hdrs = 14;
 }

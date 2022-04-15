@@ -42,7 +42,6 @@ import (
 	"github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/testutil"
 	"github.com/outcaste-io/outserv/types"
-	"github.com/outcaste-io/outserv/types/facets"
 	"github.com/outcaste-io/outserv/x"
 )
 
@@ -109,8 +108,8 @@ func populateGraphExport(t *testing.T) {
 		nq, err := chunker.ParseRDF(edge, l)
 		require.NoError(t, err)
 		rnq := gql.NQuad{NQuad: &nq}
-		err = facets.SortAndValidate(rnq.Facets)
-		require.NoError(t, err)
+		// err = facets.SortAndValidate(rnq.Facets)
+		// require.NoError(t, err)
 		e, err := rnq.ToEdgeUsing(idMap)
 		e.Attr = x.NamespaceAttr(nq.Namespace, e.Attr)
 		require.NoError(t, err)

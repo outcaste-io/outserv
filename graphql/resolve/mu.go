@@ -292,9 +292,10 @@ func handleAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		return nil, err
 	}
 	glog.V(2).Infof("Got response: %s\n", resp.Json)
+	glog.V(2).Infof("Got txncontext: %s\n", resp.Txn)
 
-	for key, uid := range resp.Uids {
-		if strings.HasPrefix(key, typ.Name()+"-") {
+	for key, uid := range resp.Txn.GetUids() {
+		if strings.HasPrefix(key, "_:"+typ.Name()+"-") {
 			resultUids = append(resultUids, x.FromHex(uid))
 		}
 	}
@@ -438,7 +439,7 @@ func handleDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	req := &pb.Request{}
 	req.Mutations = append(req.Mutations, mu)
 
-	resp, err := edgraph.Query(ctx, req)
+	resp, err := edgraph.QueryGraphQL(ctx, req, m)
 	if err != nil {
 		return nil, errors.Wrapf(err, "while executing deletions")
 	}
@@ -732,7 +733,7 @@ func handleUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		}
 	}
 
-	resp, err := edgraph.Query(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}})
+	resp, err := edgraph.QueryGraphQL(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}}, m)
 	if err != nil {
 		return nil, errors.Wrapf(err, "while executing updates")
 	}

@@ -36,6 +36,7 @@ type Txn struct {
 	CommitTs         uint64
 	MaxAssignedSeen  uint64 // atomic
 	AppliedIndexSeen uint64 // atomic
+	Uids             map[string]string
 
 	// Fields which can changed after init
 	sync.Mutex
@@ -72,7 +73,7 @@ func (txn *Txn) Skiplist() *skl.Skiplist {
 }
 
 // Update calls UpdateDeltasAndDiscardLists on the local cache.
-func (txn *Txn) Update(ctx context.Context) {
+func (txn *Txn) Update(ctx context.Context, resolved map[string]string) {
 	txn.Lock()
 	defer txn.Unlock()
 	txn.cache.UpdateDeltasAndDiscardLists()
@@ -81,6 +82,7 @@ func (txn *Txn) Update(ctx context.Context) {
 	// overwriting the skiplist that we generate here.
 	txn.slWait.Wait()
 	txn.slWait.Add(1)
+	txn.Uids = resolved
 	go func() {
 		if err := txn.ToSkiplist(); err != nil {
 			glog.Errorf("While creating skiplist: %v\n", err)

@@ -409,7 +409,7 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 	span := otrace.FromContext(ctx)
 	// Discard the posting lists from cache to release memory at the end.
 	defer func() {
-		txn.Update(ctx)
+		txn.Update(ctx, resolved)
 		span.Annotate(nil, "update done")
 	}()
 
@@ -814,7 +814,10 @@ func (n *node) processApplyCh() {
 			}
 		}
 
-		n.Proposals.Done(prop.Key, propResult(perr))
+		txn := posting.GetTxn(prop.CommitTs)
+		glog.Infof("returning txn: %+v\n", txn)
+		n.Proposals.Done(prop.Key, conn.ProposalResult{Err: perr, Data: txn})
+
 		n.Applied.Done(prop.Index)
 		posting.DoneTimestamp(prop.CommitTs)
 		ostats.Record(context.Background(), x.RaftAppliedIndex.M(int64(n.Applied.DoneUntil())))
@@ -1119,7 +1122,8 @@ func (n *node) proposeBaseTimestamp() {
 		now = now << 32 // Make space for lower 32 bits.
 		prop := &pb.Proposal{BaseTimestamp: now}
 		err := x.RetryUntilSuccess(10, time.Second, func() error {
-			return n.proposeAndWait(n.closer.Ctx(), prop)
+			_, err := n.proposeAndWait(n.closer.Ctx(), prop)
+			return err
 		})
 		if err != nil {
 			glog.Warningf("Unable to propose base timestamp: %v", err)
