@@ -32,6 +32,7 @@ import (
 	"github.com/outcaste-io/badger/v3"
 	bo "github.com/outcaste-io/badger/v3/options"
 	badgerpb "github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/ristretto/z"
 
 	"github.com/golang/glog"
@@ -1378,4 +1379,15 @@ func IsStarAll(v []byte) bool {
 		return false
 	}
 	return string(v[1:]) == Star
+}
+
+func ReplaceUidsIn(edges []*pb.Edge, resolved map[string]string) {
+	for _, edge := range edges {
+		if uid, has := resolved[edge.Subject]; has {
+			edge.Subject = uid
+		}
+		if uid, has := resolved[edge.ObjectId]; has {
+			edge.ObjectId = uid
+		}
+	}
 }

@@ -360,6 +360,7 @@ func UidsForObject(ctx context.Context, obj *pb.Object) (*sroar.Bitmap, error) {
 			return res, nil
 		}
 	}
+	glog.V(2).Infof("Uids for %+v are: %+v\n", obj, res.ToArray())
 	return res, nil
 }
 
@@ -394,15 +395,8 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 		}
 	}
 
-	// Replace the UIDs in the edges.
-	for _, edge := range m.Edges {
-		if uid, has := resolved[edge.Subject]; has {
-			edge.Subject = uid
-		}
-		if uid, has := resolved[edge.ObjectId]; has {
-			edge.ObjectId = uid
-		}
-	}
+	// Replace all the resolved UIDs.
+	x.ReplaceUidsIn(m.Edges, resolved)
 
 	span := otrace.FromContext(ctx)
 	// Discard the posting lists from cache to release memory at the end.

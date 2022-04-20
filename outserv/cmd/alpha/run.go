@@ -75,7 +75,7 @@ var jsLambda embed.FS
 
 func init() {
 	Alpha.Cmd = &cobra.Command{
-		Use:   "alpha",
+		Use:   "graphql",
 		Short: "Run Outserv GraphQL server",
 		Run: func(cmd *cobra.Command, args []string) {
 			defer x.StartProfile(Alpha.Conf).Stop()
@@ -83,7 +83,7 @@ func init() {
 		},
 		Annotations: map[string]string{"group": "core"},
 	}
-	Alpha.EnvPrefix = "DGRAPH_ALPHA"
+	Alpha.EnvPrefix = "OUTSERV_GRAPHQL"
 	Alpha.Cmd.SetHelpTemplate(x.NonRootTemplate)
 
 	// If you change any of the flags below, you must also update run() to call Alpha.Conf.Get
@@ -109,7 +109,7 @@ func init() {
 		String())
 
 	flag.String("peer", "",
-		"Comma separated list of Dgraph Peer addresses of the form IP_ADDRESS:PORT.")
+		"Comma separated list of Outserv Peer addresses of the form IP_ADDRESS:PORT.")
 
 	// Useful for running multiple servers on the same machine.
 	flag.IntP("port_offset", "o", 0,
@@ -136,7 +136,7 @@ func init() {
 	flag.String("cache", worker.CacheDefaults, z.NewSuperFlagHelp(worker.CacheDefaults).
 		Head("Cache options").
 		Flag("size-mb",
-			"Total size of cache (in MB) to be used in Dgraph.").
+			"Total size of cache (in MB) to be used in Outserv.").
 		Flag("percentage",
 			"Cache percentages summing up to 100 for various caches (FORMAT: PostingListCache,"+
 				"PstoreBlockCache,PstoreIndexCache)").
@@ -165,7 +165,7 @@ func init() {
 	flag.String("security", worker.SecurityDefaults, z.NewSuperFlagHelp(worker.SecurityDefaults).
 		Head("Security options").
 		Flag("token",
-			"If set, all Admin requests to Dgraph will need to have this token. The token can be "+
+			"If set, all Admin requests to Outserv will need to have this token. The token can be "+
 				"passed as follows: for HTTP requests, in the X-Dgraph-AuthToken header. For Grpc, "+
 				"in auth-token key in the context.").
 		Flag("whitelist",
@@ -183,8 +183,8 @@ func init() {
 		Flag("normalize-node",
 			"The maximum number of nodes that can be returned in a query that uses the normalize "+
 				"directive.").
-		Flag("mutations",
-			"[allow, disallow, strict] The mutations mode to use.").
+		Flag("disallow-mutations",
+			"Set disallow-mutations to true to block mutations.").
 		Flag("mutations-nquad",
 			"The maximum number of nquads that can be inserted in a mutation request.").
 		Flag("disallow-drop",
@@ -198,8 +198,6 @@ func init() {
 		Flag("max-retries",
 			"Commits to disk will give up after these number of retries to prevent locking the "+
 				"worker in a failed state. Use -1 to retry infinitely.").
-		Flag("txn-abort-after", "Abort any pending transactions older than this duration."+
-			" The liveness of a transaction is determined by its last mutation.").
 		Flag("shared-instance", "When set to true, it disables ACLs for non-galaxy users. "+
 			"It expects the access JWT to be constructed outside dgraph for those users as even "+
 			"login is denied to them. Additionally, this disables access to environment variables"+
@@ -741,7 +739,7 @@ func run() {
 		CacheMb:         totalCache,
 		CachePercentage: cachePercentage,
 
-		MutationsMode:  worker.AllowMutations,
+		MutationsMode:  worker.StrictMutations,
 		AuthToken:      security.GetString("token"),
 		Audit:          conf,
 		ChangeDataConf: Alpha.Conf.GetString("cdc"),
@@ -759,17 +757,8 @@ func run() {
 
 	x.Config.Limit = z.NewSuperFlag(Alpha.Conf.GetString("limit")).MergeAndCheckDefault(
 		worker.LimitDefaults)
-	abortDur := x.Config.Limit.GetDuration("txn-abort-after")
-	switch strings.ToLower(x.Config.Limit.GetString("mutations")) {
-	case "allow":
-		opts.MutationsMode = worker.AllowMutations
-	case "disallow":
+	if x.Config.Limit.GetBool("disallow-mutations") {
 		opts.MutationsMode = worker.DisallowMutations
-	case "strict":
-		opts.MutationsMode = worker.StrictMutations
-	default:
-		glog.Error(`--limit "mutations=<mode>;" must be one of allow, disallow, or strict`)
-		os.Exit(1)
 	}
 
 	walletFlag := z.NewSuperFlag(Alpha.Conf.GetString("wallet")).MergeAndCheckDefault(
@@ -795,7 +784,6 @@ func run() {
 		WhiteListedIPRanges: ips,
 		StrictMutations:     opts.MutationsMode == worker.StrictMutations,
 		AclEnabled:          keys.AclKey != nil,
-		AbortOlderThan:      abortDur,
 		StartTime:           startTime,
 		Security:            security,
 		TLSClientConfig:     tlsClientConf,

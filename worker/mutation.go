@@ -629,8 +629,9 @@ func (w *grpcWorker) proposeAndWait(ctx context.Context, txnCtx *pb.TxnContext,
 	// MaxAssignedTs >= m.StartTs.
 	node := groups().Node
 	data, err := node.proposeAndWait(ctx, &pb.Proposal{Mutations: m})
-	txn := data.(*posting.Txn)
-	txn.FillContext(txnCtx)
+	if txn, ok := data.(*posting.Txn); ok {
+		txn.FillContext(txnCtx)
+	}
 	return err
 }
 

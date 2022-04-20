@@ -128,8 +128,6 @@ type WorkerOptions struct {
 	AclEnabled bool
 	// HmacSecret stores the secret used to sign JSON Web Tokens (JWT).
 	HmacSecret Sensitive
-	// AbortOlderThan tells Dgraph to discard transactions that are older than this duration.
-	AbortOlderThan time.Duration
 	// StartTime is the start time of the alpha
 	StartTime time.Time
 	// Security options:
