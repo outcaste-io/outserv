@@ -154,6 +154,24 @@ func ToMutations(ctx context.Context, gmuList []*pb.Mutation,
 		obj = nil
 	}
 
+	objMap := make(map[string]*pb.Object)
+	objs := mu.NewObjects
+	mu.NewObjects = objs[:0]
+	for _, cur := range objs {
+		var key string
+		for _, edge := range cur.Edges {
+			key += fmt.Sprintf("%q|%q|", edge.Predicate, edge.ObjectValue)
+		}
+		if prev, has := objMap[key]; !has {
+			mu.NewObjects = append(mu.NewObjects, cur)
+			objMap[key] = cur
+		} else {
+			// cur == prev. We should replace all the edges to point to the prev
+			// object's var and not include cur in the list of new objects.
+			x.ReplaceUidsIn(mu.Edges, map[string]string{cur.Var: prev.Var})
+		}
+	}
+
 	if num := len(mu.NewObjects); num > 0 {
 		var res *pb.AssignedIds
 		var err error
@@ -171,7 +189,7 @@ func ToMutations(ctx context.Context, gmuList []*pb.Mutation,
 			curId++
 		}
 	}
-	glog.Infof("Found %d objects. Mu: %+v\n", len(mu.NewObjects), mu)
+	glog.V(2).Infof("Found %d objects. Mu: %+v\n", len(mu.NewObjects), mu)
 
 	// TODO(mrjn): Now run verifications.
 	return mu, nil

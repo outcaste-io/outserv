@@ -126,7 +126,7 @@ func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 
 	switch {
 	case len(uids) > 1:
-		return nil, fmt.Errorf("Found %d UIDs", len(uids))
+		return nil, fmt.Errorf("Found %d UIDs from %+v", len(uids), src)
 	case len(uids) == 0:
 		// No object with the given XIDs exists. This is an insert.
 		if idVal > 0 {
@@ -838,8 +838,11 @@ func (mr *dgraphResolver) Resolve(ctx context.Context, m *schema.Field) (*Resolv
 		span.Annotatef(nil, "mutation alias: [%s] type: [%s]", m.Alias(), m.MutationType())
 	}
 
-	field := m.QueryField()
 	calculateResponse := func(uids []uint64) (*pb.Response, error) {
+		field := m.QueryField()
+		if field == nil {
+			return &pb.Response{}, nil
+		}
 		dgQuery := []*gql.GraphQuery{{
 			Attr: field.DgraphAlias(),
 		}}
@@ -862,7 +865,7 @@ func (mr *dgraphResolver) Resolve(ctx context.Context, m *schema.Field) (*Resolv
 		resp, err2 = calculateResponse(uids)
 	}
 	res := &Resolved{Field: m}
-	if resp != nil && len(resp.Json) > 0 {
+	if resp != nil {
 		res.Data = completeMutationResult(m, resp.Json, len(uids))
 	} else {
 		res.Data = m.NullResponse()
