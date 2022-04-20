@@ -16,7 +16,7 @@ const (
 	// StrictMutations is the mode that allows mutations if and only if they contain known preds.
 	StrictMutations int = iota
 	// DisallowMutations is the mode that disallows all mutations.
-	DisallowMutations int = iota
+	DisallowMutations
 )
 
 // Options contains options for the Dgraph server.
