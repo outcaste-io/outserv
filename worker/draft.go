@@ -360,7 +360,7 @@ func UidsForObject(ctx context.Context, obj *pb.Object) (*sroar.Bitmap, error) {
 			return res, nil
 		}
 	}
-	glog.Infof("Uids for %+v are: %+v\n", obj, res.ToArray())
+	glog.V(2).Infof("Uids for %+v are: %+v\n", obj, res.ToArray())
 	return res, nil
 }
 
