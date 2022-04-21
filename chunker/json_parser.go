@@ -38,7 +38,7 @@ type mapResponse struct {
 	namespace uint64 // namespace to which the node belongs.
 }
 
-func handleBasicType(k string, v interface{}, op int, nq *pb.NQuad) error {
+func handleBasicType(k string, v interface{}, op int, nq *pb.Edge) error {
 	switch v := v.(type) {
 	case json.Number:
 		if strings.ContainsAny(v.String(), ".Ee") {
@@ -46,28 +46,39 @@ func handleBasicType(k string, v interface{}, op int, nq *pb.NQuad) error {
 			if err != nil {
 				return err
 			}
-			nq.ObjectValue = &pb.Value{Val: &pb.Value_DoubleVal{DoubleVal: f}}
+			nq.ObjectValue, err = types.ToBinary(types.TypeFloat, f)
+			if err != nil {
+				return err
+			}
 			return nil
 		}
 		i, err := v.Int64()
 		if err != nil {
 			return err
 		}
-		nq.ObjectValue = &pb.Value{Val: &pb.Value_IntVal{IntVal: i}}
+		nq.ObjectValue, err = types.ToBinary(types.TypeInt64, i)
+		if err != nil {
+			return err
+		}
 
 	// this int64 case is needed for FastParseJSON, which doesn't use json.Number
 	case int64:
+		var err error
 		if v == 0 && op == DeleteNquads {
-			nq.ObjectValue = &pb.Value{Val: &pb.Value_IntVal{IntVal: v}}
-			return nil
+			nq.ObjectValue, err = types.ToBinary(types.TypeInt64, v)
+			return err
 		}
-		nq.ObjectValue = &pb.Value{Val: &pb.Value_IntVal{IntVal: v}}
+		nq.ObjectValue, err = types.ToBinary(types.TypeInt64, v)
+		if err != nil {
+			return err
+		}
 
 	case string:
+		var err error
 		// Default value is considered as S P * deletion.
 		if v == "" && op == DeleteNquads {
-			nq.ObjectValue = &pb.Value{Val: &pb.Value_DefaultVal{DefaultVal: x.Star}}
-			return nil
+			nq.ObjectValue, err = types.ToBinary(types.TypeString, x.Star)
+			return err
 		}
 
 		// Handle the uid function in upsert block
@@ -83,21 +94,32 @@ func handleBasicType(k string, v interface{}, op int, nq *pb.NQuad) error {
 		// In RDF, we assume everything is default (types.DefaultID), but in JSON we assume string
 		// (StringID). But this value will be checked against the schema so we don't overshadow a
 		// password value (types.PasswordID) - Issue#2623
-		nq.ObjectValue = &pb.Value{Val: &pb.Value_StrVal{StrVal: v}}
+		nq.ObjectValue, err = types.ToBinary(types.TypeString, v)
+		if err != nil {
+			return err
+		}
 
 	case float64:
+		var err error
 		if v == 0 && op == DeleteNquads {
-			nq.ObjectValue = &pb.Value{Val: &pb.Value_DefaultVal{DefaultVal: x.Star}}
-			return nil
+			nq.ObjectValue, err = types.ToBinary(types.TypeString, x.Star)
+			return err
 		}
-		nq.ObjectValue = &pb.Value{Val: &pb.Value_DoubleVal{DoubleVal: v}}
+		nq.ObjectValue, err = types.ToBinary(types.TypeFloat, v)
+		if err != nil {
+			return err
+		}
 
 	case bool:
+		var err error
 		if !v && op == DeleteNquads {
-			nq.ObjectValue = &pb.Value{Val: &pb.Value_DefaultVal{DefaultVal: x.Star}}
-			return nil
+			nq.ObjectValue, err = types.ToBinary(types.TypeString, x.Star)
+			return err
 		}
-		nq.ObjectValue = &pb.Value{Val: &pb.Value_BoolVal{BoolVal: v}}
+		nq.ObjectValue, err = types.ToBinary(types.TypeBool, v)
+		if err != nil {
+			return err
+		}
 
 	default:
 		return errors.Errorf("Unexpected type for val for attr: %s while converting to nquad", k)
@@ -109,16 +131,18 @@ func handleBasicType(k string, v interface{}, op int, nq *pb.NQuad) error {
 func (buf *NQuadBuffer) checkForDeletion(mr mapResponse, m map[string]interface{}, op int) {
 	// Since uid is the only key, this must be S * * deletion.
 	if op == DeleteNquads && len(mr.uid) > 0 && len(m) == 1 {
-		buf.Push(&pb.NQuad{
+		val, err := types.ToBinary(types.TypeString, x.Star)
+		x.Check(err)
+		buf.Push(&pb.Edge{
 			Subject:     mr.uid,
 			Predicate:   x.Star,
 			Namespace:   mr.namespace,
-			ObjectValue: &pb.Value{Val: &pb.Value_DefaultVal{DefaultVal: x.Star}},
+			ObjectValue: val,
 		})
 	}
 }
 
-func handleGeoType(val map[string]interface{}, nq *pb.NQuad) (bool, error) {
+func handleGeoType(val map[string]interface{}, nq *pb.Edge) (bool, error) {
 	_, hasType := val["type"]
 	_, hasCoordinates := val["coordinates"]
 	if len(val) == 2 && hasType && hasCoordinates {
@@ -137,14 +161,14 @@ func handleGeoType(val map[string]interface{}, nq *pb.NQuad) (bool, error) {
 	return false, nil
 }
 
-func tryParseAsGeo(b []byte, nq *pb.NQuad) (bool, error) {
+func tryParseAsGeo(b []byte, nq *pb.Edge) (bool, error) {
 	var g geom.T
 	err := geojson.Unmarshal(b, &g)
 	if err != nil {
 		return false, nil
 	}
 
-	geo, err := types.ObjectValue(types.GeoID, g)
+	geo, err := types.ToBinary(types.TypeGeo, g)
 	if err != nil {
 		return false, errors.Errorf("Couldn't convert value: %s to geo type", string(b))
 	}
@@ -157,34 +181,34 @@ func tryParseAsGeo(b []byte, nq *pb.NQuad) (bool, error) {
 // negative, it only does one push to Ch() during Flush.
 type NQuadBuffer struct {
 	batchSize int
-	nquads    []*pb.NQuad
-	nqCh      chan []*pb.NQuad
+	nquads    []*pb.Edge
+	nqCh      chan []*pb.Edge
 }
 
 // NewNQuadBuffer returns a new NQuadBuffer instance with the specified batch size.
 func NewNQuadBuffer(batchSize int) *NQuadBuffer {
 	buf := &NQuadBuffer{
 		batchSize: batchSize,
-		nqCh:      make(chan []*pb.NQuad, 10),
+		nqCh:      make(chan []*pb.Edge, 10),
 	}
 	if buf.batchSize > 0 {
-		buf.nquads = make([]*pb.NQuad, 0, batchSize)
+		buf.nquads = make([]*pb.Edge, 0, batchSize)
 	}
 	return buf
 }
 
 // Ch returns a channel containing slices of NQuads which can be consumed by the caller.
-func (buf *NQuadBuffer) Ch() <-chan []*pb.NQuad {
+func (buf *NQuadBuffer) Ch() <-chan []*pb.Edge {
 	return buf.nqCh
 }
 
 // Push can be passed one or more NQuad pointers, which get pushed to the buffer.
-func (buf *NQuadBuffer) Push(nqs ...*pb.NQuad) {
+func (buf *NQuadBuffer) Push(nqs ...*pb.Edge) {
 	for _, nq := range nqs {
 		buf.nquads = append(buf.nquads, nq)
 		if buf.batchSize > 0 && len(buf.nquads) >= buf.batchSize {
 			buf.nqCh <- buf.nquads
-			buf.nquads = make([]*pb.NQuad, 0, buf.batchSize)
+			buf.nquads = make([]*pb.Edge, 0, buf.batchSize)
 		}
 	}
 }
@@ -217,7 +241,6 @@ func getNextBlank() string {
 	return fmt.Sprintf("_:dg.%d.%d", randomID, id)
 }
 
-// TODO - Abstract these parameters to a struct.
 func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred string) (
 	mapResponse, error) {
 	var mr mapResponse
@@ -253,7 +276,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 			}
 		}
 		if uid > 0 {
-			mr.uid = fmt.Sprintf("%d", uid)
+			mr.uid = x.ToHexString(uid)
 		}
 	}
 
@@ -303,11 +326,13 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 		if v == nil {
 			if op == DeleteNquads {
 				// This corresponds to edge deletion.
-				nq := &pb.NQuad{
+				val, err := types.ToBinary(types.TypeString, x.Star)
+				x.Check(err)
+				nq := &pb.Edge{
 					Subject:     mr.uid,
 					Predicate:   pred,
 					Namespace:   namespace,
-					ObjectValue: &pb.Value{Val: &pb.Value_DefaultVal{DefaultVal: x.Star}},
+					ObjectValue: val,
 				}
 				buf.Push(nq)
 				continue
@@ -317,7 +342,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 			continue
 		}
 
-		nq := pb.NQuad{
+		nq := pb.Edge{
 			Subject:   mr.uid,
 			Predicate: pred,
 			Namespace: namespace,
@@ -369,7 +394,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 					}
 				}
 
-				nq := pb.NQuad{
+				nq := pb.Edge{
 					Subject:   mr.uid,
 					Predicate: pred,
 					Namespace: namespace,
@@ -544,7 +569,7 @@ func (buf *NQuadBuffer) ParseJSON(b []byte, op int) error {
 
 // ParseJSON is a convenience wrapper function to get all NQuads in one call. This can however, lead
 // to high memory usage. So be careful using this.
-func ParseJSON(b []byte, op int) ([]*pb.NQuad, error) {
+func ParseJSON(b []byte, op int) ([]*pb.Edge, error) {
 	buf := NewNQuadBuffer(-1)
 	err := buf.FastParseJSON(b, op)
 	if err != nil {

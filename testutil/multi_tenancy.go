@@ -27,7 +27,6 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/outcaste-io/dgo/v210"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
@@ -321,20 +320,6 @@ func DgClientWithLogin(t *testing.T, id, password string, ns uint64) *dgo.Dgraph
 		return userClient.LoginIntoNamespace(context.Background(), id, password, ns)
 	}))
 	return userClient
-}
-
-func AddData(t *testing.T, dg *dgo.Dgraph) {
-	mutation := &api.Mutation{
-		SetNquads: []byte(`
-			_:a <name> "guy1" .
-			_:a <nickname> "RG" .
-			_:b <name> "guy2" .
-			_:b <nickname> "RG2" .
-		`),
-		CommitNow: true,
-	}
-	_, err := dg.NewTxn().Mutate(context.Background(), mutation)
-	require.NoError(t, err)
 }
 
 func QueryData(t *testing.T, dg *dgo.Dgraph, query string) []byte {

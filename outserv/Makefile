@@ -57,7 +57,7 @@ ifneq ($(strip $(BUILD_RACE)),)
 endif
 
 # jemalloc stuff
-HAS_JEMALLOC = $(shell test -f /usr/local/lib/libjemalloc.a && echo "jemalloc")
+HAS_JEMALLOC = $(shell test -f /usr/local/lib/libjemalloc_outcaste.a && echo "jemalloc")
 JEMALLOC_URL = "https://github.com/jemalloc/jemalloc/releases/download/5.2.1/jemalloc-5.2.1.tar.bz2"
 
 # nodejs
@@ -88,13 +88,13 @@ jemalloc:
 		curl -s -L ${JEMALLOC_URL} -o jemalloc.tar.bz2 ; \
 		tar xjf ./jemalloc.tar.bz2 ; \
 		cd jemalloc-5.2.1 ; \
-		./configure --with-jemalloc-prefix='je_' --with-malloc-conf='background_thread:true,metadata_thp:auto'; \
+		./configure --with-install-suffix='_outcaste' --with-jemalloc-prefix='je_' --with-malloc-conf='background_thread:true,metadata_thp:auto'; \
 		make ; \
 		if [ "$(USER_ID)" = "0" ]; then \
-			make install ; \
+			make install_lib install_include ; \
 		else \
 			echo "==== Need sudo access to install jemalloc" ; \
-			sudo make install ; \
+			sudo make install_lib install_include ; \
 		fi \
 	fi
 

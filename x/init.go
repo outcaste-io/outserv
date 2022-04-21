@@ -20,11 +20,11 @@ var (
 	isTest   bool
 
 	// These variables are set using -ldflags
-	dgraphVersion  string
-	dgraphCodename string
-	gitBranch      string
-	lastCommitSHA  string
-	lastCommitTime string
+	outservVersion  string
+	outservCodename string
+	gitBranch       string
+	lastCommitSHA   string
+	lastCommitTime  string
 )
 
 // SetTestRun sets a variable to indicate that the current execution is a test.
@@ -57,7 +57,7 @@ func Init() {
 	}
 }
 
-// BuildDetails returns a string containing details about the Dgraph binary.
+// BuildDetails returns a string containing details about the Outserv binary.
 func BuildDetails() string {
 	buf := z.CallocNoRef(1, "X.BuildDetails")
 	jem := len(buf) > 0
@@ -76,7 +76,7 @@ jemalloc enabled  : %v
 Licensed under Smart License v1.0. Copyright 2022 Outcaste LLC.
 
 `,
-		dgraphVersion, dgraphCodename, ExecutableChecksum(), lastCommitSHA, lastCommitTime, gitBranch,
+		outservVersion, outservCodename, ExecutableChecksum(), lastCommitSHA, lastCommitTime, gitBranch,
 		runtime.Version(), jem)
 }
 
@@ -85,9 +85,9 @@ func PrintVersion() {
 	glog.Infof("\n%s\n", BuildDetails())
 }
 
-// Version returns a string containing the dgraphVersion.
+// Version returns a string containing the outservVersion.
 func Version() string {
-	return dgraphVersion
+	return outservVersion
 }
 
 // pattern for  dev version = min. 7 hex digits of commit-hash.
@@ -98,7 +98,7 @@ var versionRe *regexp.Regexp = regexp.MustCompile(`-g[[:xdigit:]]{7,}`)
 //  1. v2.0.0-rc1-127-gd20a768b3 => dev version
 //  2. v2.0.0 => prod version
 func DevVersion() (matched bool) {
-	return (versionRe.MatchString(dgraphVersion))
+	return (versionRe.MatchString(outservVersion))
 }
 
 // ExecutableChecksum returns a byte slice containing the SHA256 checksum of the executable.

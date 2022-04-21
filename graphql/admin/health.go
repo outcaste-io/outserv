@@ -17,7 +17,7 @@ import (
 func resolveHealth(ctx context.Context, q *schema.Field) *resolve.Resolved {
 	glog.Info("Got health request")
 
-	resp, err := (&edgraph.Server{}).Health(ctx, true)
+	resp, err := edgraph.Health(ctx, true)
 	if err != nil {
 		return resolve.EmptyResult(q, errors.Errorf("%s: %s", x.Error, err.Error()))
 	}

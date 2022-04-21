@@ -132,7 +132,7 @@ func logUpdate(schema *pb.SchemaUpdate, pred string) string {
 		return ""
 	}
 
-	typ := types.TypeID(schema.ValueType).Name()
+	typ := types.TypeID(schema.ValueType).String()
 	if schema.List {
 		typ = fmt.Sprintf("[%s]", typ)
 	}
@@ -210,7 +210,7 @@ func (s *state) TypeOf(pred string) (types.TypeID, error) {
 	if schema, ok := s.predicate[pred]; ok {
 		return types.TypeID(schema.ValueType), nil
 	}
-	return types.UndefinedID, errors.Errorf("Schema not defined for predicate: %v.", pred)
+	return types.TypeUndefined, errors.Errorf("Schema not defined for predicate: %v.", pred)
 }
 
 // IsIndexed returns whether the predicate is indexed or not
@@ -320,22 +320,6 @@ func (s *state) HasTokenizer(ctx context.Context, id byte, pred string) bool {
 		if t.Identifier() == id {
 			return true
 		}
-	}
-	return false
-}
-
-// IsReversed returns whether the predicate has reverse edge or not
-func (s *state) IsReversed(ctx context.Context, pred string) bool {
-	isWrite, _ := ctx.Value(isWrite).(bool)
-	s.RLock()
-	defer s.RUnlock()
-	if isWrite {
-		if schema, ok := s.mutSchema[pred]; ok && schema.Directive == pb.SchemaUpdate_REVERSE {
-			return true
-		}
-	}
-	if schema, ok := s.predicate[pred]; ok {
-		return schema.Directive == pb.SchemaUpdate_REVERSE
 	}
 	return false
 }
@@ -464,9 +448,10 @@ func loadFromDB(loadType int) error {
 			var s pb.SchemaUpdate
 			err := item.Value(func(val []byte) error {
 				if len(val) == 0 {
-					s = pb.SchemaUpdate{Predicate: pk.Attr, ValueType: pb.Posting_DEFAULT}
+					s = pb.SchemaUpdate{Predicate: pk.Attr, ValueType: int32(types.TypeDefault)}
 				}
 				x.Checkf(s.Unmarshal(val), "Error while loading schema from db")
+				glog.Infof("Setting schema: %+v\n", s)
 				State().Set(pk.Attr, &s)
 				return nil
 			})
@@ -500,25 +485,25 @@ func initialSchemaInternal(namespace uint64, all bool) []*pb.SchemaUpdate {
 	initialSchema = append(initialSchema,
 		&pb.SchemaUpdate{
 			Predicate: "dgraph.type",
-			ValueType: pb.Posting_STRING,
+			ValueType: types.TypeString.Int(),
 			Directive: pb.SchemaUpdate_INDEX,
 			Tokenizer: []string{"exact"},
 			List:      true,
 		}, &pb.SchemaUpdate{
 			Predicate: "dgraph.drop.op",
-			ValueType: pb.Posting_STRING,
+			ValueType: types.TypeString.Int(),
 		}, &pb.SchemaUpdate{
 			Predicate: "dgraph.graphql.schema",
-			ValueType: pb.Posting_STRING,
+			ValueType: types.TypeString.Int(),
 		}, &pb.SchemaUpdate{
 			Predicate: "dgraph.graphql.xid",
-			ValueType: pb.Posting_STRING,
+			ValueType: types.TypeString.Int(),
 			Directive: pb.SchemaUpdate_INDEX,
 			Tokenizer: []string{"exact"},
 			Upsert:    true,
 		}, &pb.SchemaUpdate{
 			Predicate: "dgraph.graphql.p_query",
-			ValueType: pb.Posting_STRING,
+			ValueType: types.TypeString.Int(),
 			Directive: pb.SchemaUpdate_INDEX,
 			Tokenizer: []string{"sha256"},
 		})
@@ -528,36 +513,37 @@ func initialSchemaInternal(namespace uint64, all bool) []*pb.SchemaUpdate {
 		initialSchema = append(initialSchema, []*pb.SchemaUpdate{
 			{
 				Predicate: "dgraph.xid",
-				ValueType: pb.Posting_STRING,
+				ValueType: types.TypeString.Int(),
 				Directive: pb.SchemaUpdate_INDEX,
 				Upsert:    true,
 				Tokenizer: []string{"exact"},
 			},
 			{
 				Predicate: "dgraph.password",
-				ValueType: pb.Posting_PASSWORD,
+				ValueType: types.TypePassword.Int(),
 			},
 			{
 				Predicate: "dgraph.user.group",
-				Directive: pb.SchemaUpdate_REVERSE,
-				ValueType: pb.Posting_UID,
+				// Note: This was using a reverse directive. Instead, we should
+				// be handling this via GraphQL.
+				ValueType: types.TypeUid.Int(),
 				List:      true,
 			},
 			{
 				Predicate: "dgraph.acl.rule",
-				ValueType: pb.Posting_UID,
+				ValueType: types.TypeUid.Int(),
 				List:      true,
 			},
 			{
 				Predicate: "dgraph.rule.predicate",
-				ValueType: pb.Posting_STRING,
+				ValueType: types.TypeString.Int(),
 				Directive: pb.SchemaUpdate_INDEX,
 				Tokenizer: []string{"exact"},
 				Upsert:    true, // Not really sure if this will work.
 			},
 			{
 				Predicate: "dgraph.rule.permission",
-				ValueType: pb.Posting_INT,
+				ValueType: types.TypeInt64.Int(),
 			},
 		}...)
 	}

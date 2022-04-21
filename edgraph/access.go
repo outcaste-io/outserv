@@ -16,7 +16,7 @@ import (
 
 // Login handles login requests from clients. This version rejects all requests
 // since ACL is only supported in the enterprise version.
-func (s *Server) Login(ctx context.Context,
+func Login(ctx context.Context,
 	request *pb.LoginRequest) (*pb.Response, error) {
 	if err := x.HealthCheck(); err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ func authorizeAlter(ctx context.Context, op *pb.Operation) error {
 	return nil
 }
 
-func authorizeMutation(ctx context.Context, gmu *gql.Mutation) error {
+func authorizeMutation(ctx context.Context, gmu *pb.Mutation) error {
 	return nil
 }
 

@@ -360,230 +360,13 @@ func TestParseIRIRefInvalidChar(t *testing.T) {
 	require.Contains(t, err.Error(), "Unexpected character '^' while parsing IRI")
 }
 
-func TestLangs(t *testing.T) {
-	query := `
-	query {
-		me(func: uid(1)) {
-			name@en,name@en:ru:hu
-		}
-	}
-	`
-
-	gq, err := Parse(Request{Str: query})
-	require.NoError(t, err)
-	require.Equal(t, 2, len(gq.Query[0].Children))
-	require.Equal(t, "name", gq.Query[0].Children[0].Attr)
-	require.Equal(t, []string{"en"}, gq.Query[0].Children[0].Langs)
-	require.Equal(t, "name", gq.Query[0].Children[1].Attr)
-	require.Equal(t, []string{"en", "ru", "hu"}, gq.Query[0].Children[1].Langs)
-}
-
-func TestAllLangs(t *testing.T) {
-	query := `
-	query {
-		me(func: uid(1)) {
-			name@*
-		}
-	}
-	`
-
-	gq, err := Parse(Request{Str: query})
-	require.NoError(t, err)
-	require.Equal(t, 1, len(gq.Query[0].Children))
-	require.Equal(t, "name", gq.Query[0].Children[0].Attr)
-	require.Equal(t, []string{"*"}, gq.Query[0].Children[0].Langs)
-}
-
-func TestLangsInvalid1(t *testing.T) {
-	query := `
-	query {
-		me(func: uid(1)) {
-			name@en@ru
-		}
-	}
-	`
-
-	_, err := Parse(Request{Str: query})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "Expected directive or language list, got @ru")
-}
-
-func TestLangsInvalid2(t *testing.T) {
-	query := `
-	query {
-		me(func: uid(1)) {
-			@en:ru
-		}
-	}
-	`
-
-	_, err := Parse(Request{Str: query})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "Invalid use of directive.")
-}
-
-func TestLangsInvalid3(t *testing.T) {
-	query := `
-	query {
-		me(func: uid(1)) {
-			name@en:ru, @en:ru
-		}
-	}
-	`
-
-	_, err := Parse(Request{Str: query})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "Expected directive or language list, got @en")
-}
-
-func TestLangsInvalid4(t *testing.T) {
-	query := `
-	query {
-		me(func: uid(1)) {
-			name@
-		}
-	}
-	`
-
-	_, err := Parse(Request{Str: query})
-	require.Error(t, err)
-	require.Contains(t, err.Error(),
-		"Unrecognized character in lexDirective: U+000A")
-}
-
-func TestLangsInvalid5(t *testing.T) {
-	query := `
-	query {
-		me(func: uid(1)) {
-			name@<something.wrong>
-		}
-	}
-	`
-
-	_, err := Parse(Request{Str: query})
-	require.Error(t, err)
-	require.Contains(t, err.Error(),
-		"Unrecognized character in lexDirective: U+003C '<'")
-}
-
-func TestLangsInvalid6(t *testing.T) {
-	query := `
-		{
-			me(func: uid(0x1004)) {
-				name@hi:cn:...
-			}
-		}
-	`
-
-	_, err := Parse(Request{Str: query})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "Expected only one dot(.) while parsing language list.")
-}
-
-func TestLangsInvalid7(t *testing.T) {
-	query := `
-		{
-			me(func: uid(0x1004)) {
-				name@...
-			}
-		}
-	`
-
-	_, err := Parse(Request{Str: query})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "Expected only one dot(.) while parsing language list.")
-}
-
-func TestLangsInvalid8(t *testing.T) {
-	query := `
-	query {
-		me(func: uid(1)) {
-			name@*:en
-		}
-	}
-	`
-
-	_, err := Parse(Request{Str: query})
-	require.Error(t, err)
-	require.Contains(t, err.Error(),
-		"If * is used, no other languages are allowed in the language list")
-}
-
-func TestLangsInvalid9(t *testing.T) {
-	query := `
-	query {
-		me(func: eqs(name@*, "Amir")) {
-			name@en
-		}
-	}
-	`
-
-	_, err := Parse(Request{Str: query})
-	require.Error(t, err)
-	require.Contains(t, err.Error(),
-		"The * symbol cannot be used as a valid language inside functions")
-}
-
-func TestLangsInvalid10(t *testing.T) {
-	query := `
-	query {
-		me(func: uid(1)) {
-			name@.:*
-		}
-	}
-	`
-
-	_, err := Parse(Request{Str: query})
-	require.Error(t, err)
-	require.Contains(t, err.Error(),
-		"If * is used, no other languages are allowed in the language list")
-}
-
-func TestLangsFunction(t *testing.T) {
-	query := `
-	query {
-		me(func:alloftext(descr@en, "something")) {
-			friends {
-				name
-			}
-			gender,age
-			hometown
-		}
-	}
-`
-	res, err := Parse(Request{Str: query})
-	require.NoError(t, err)
-	require.NotNil(t, res.Query[0])
-	require.NotNil(t, res.Query[0].Func)
-	require.Equal(t, "descr", res.Query[0].Func.Attr)
-	require.Equal(t, "en", res.Query[0].Func.Lang)
-}
-
-func TestLangsFunctionMultipleLangs(t *testing.T) {
-	query := `
-	query {
-		me(func:alloftext(descr@hi:en, "something")) {
-			friends {
-				name
-			}
-			gender,age
-			hometown
-		}
-	}
-`
-	_, err := Parse(Request{Str: query})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "Expected arg after func [alloftext]")
-	require.Contains(t, err.Error(), "\":\"")
-}
-
 func TestParseRegexp1(t *testing.T) {
 	query := `
 	{
 	  me(func: uid(0x1)) {
 	    name
-		friend @filter(regexp(name@en, /case INSENSITIVE regexp with \/ escaped value/i)) {
-	      name@en
+		friend @filter(regexp(name, /case INSENSITIVE regexp with \/ escaped value/i)) {
+	      name
 	    }
 	  }
     }
@@ -600,7 +383,7 @@ func TestParseRegexp1(t *testing.T) {
 func TestParseRegexp2(t *testing.T) {
 	query := `
 	{
-	  me(func:regexp(name@en, /another\/compilicated ("") regexp('')/)) {
+	  me(func:regexp(name, /another\/compilicated ("") regexp('')/)) {
 	    name
 	  }
     }
@@ -633,7 +416,7 @@ func TestParseRegexp3(t *testing.T) {
 func TestParseRegexp4(t *testing.T) {
 	query := `
 	{
-	  me(func:regexp(name@en, /pattern/123)) {
+	  me(func:regexp(name, /pattern/123)) {
 	    name
 	  }
     }
@@ -641,13 +424,13 @@ func TestParseRegexp4(t *testing.T) {
 	_, err := Parse(Request{Str: query})
 	// only [a-zA-Z] characters can be used as flags
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "Expected comma or language but got: 123")
+	require.Contains(t, err.Error(), "Expected comma but got: 123")
 }
 
 func TestParseRegexp5(t *testing.T) {
 	query := `
 	{
-	  me(func:regexp(name@en, /pattern/flag123)) {
+	  me(func:regexp(name, /pattern/flag123)) {
 	    name
 	  }
     }
@@ -655,13 +438,13 @@ func TestParseRegexp5(t *testing.T) {
 	_, err := Parse(Request{Str: query})
 	// only [a-zA-Z] characters can be used as flags
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "Expected comma or language but got: 123")
+	require.Contains(t, err.Error(), "Expected comma but got: 123")
 }
 
 func TestParseRegexp6(t *testing.T) {
 	query := `
 	{
-	  me(func:regexp(name@en, /pattern\/)) {
+	  me(func:regexp(name, /pattern\/)) {
 	    name
 	  }
     }
@@ -738,17 +521,6 @@ func TestMultipleOrderError2(t *testing.T) {
 	require.Contains(t, err.Error(), "Sorting by an attribute: [alias] can only be done once")
 }
 
-func TestLangWithDash(t *testing.T) {
-	query := `{
-		q(func: uid(1)) {
-			text@en-us
-		}
-	}`
-
-	gql, err := Parse(Request{Str: query})
-	require.NoError(t, err)
-	require.Equal(t, []string{"en-us"}, gql.Query[0].Children[0].Langs)
-}
 func TestOrderWithMultipleLangFail(t *testing.T) {
 	query := `
 	{
@@ -760,39 +532,4 @@ func TestOrderWithMultipleLangFail(t *testing.T) {
 	_, err := Parse(Request{Str: query})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Sorting by an attribute: [name@en:fr] can only be done on one language")
-}
-
-func TestOrderWithLang(t *testing.T) {
-	query := `
-	{
-		me(func: uid(0x1), orderasc: name@en, orderdesc: lastname@ci, orderasc: salary) {
-			name
-		}
-	}
-`
-	res, err := Parse(Request{Str: query})
-	require.NoError(t, err)
-	require.NotNil(t, res.Query)
-	require.Equal(t, 1, len(res.Query))
-	orders := res.Query[0].Order
-	require.Equal(t, "name", orders[0].Attr)
-	require.Equal(t, []string{"en"}, orders[0].Langs)
-	require.Equal(t, "lastname", orders[1].Attr)
-	require.Equal(t, []string{"ci"}, orders[1].Langs)
-	require.Equal(t, "salary", orders[2].Attr)
-	require.Equal(t, 0, len(orders[2].Langs))
-}
-
-func TestParseLangTagAfterStringInRoot(t *testing.T) {
-	// This is a fix for #1499.
-	query := `
-		{
-			q(func: anyofterms(name, "Hello"@en)) {
-				uid
-			}
-		}
-	`
-	_, err := Parse(Request{Str: query})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "Invalid usage of '@' in function argument")
 }

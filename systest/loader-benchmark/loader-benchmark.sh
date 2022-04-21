@@ -14,7 +14,7 @@ function Info {
 }
 
 function DockerCompose {
-    docker-compose -p dgraph "$@"
+    docker-compose -p outserv "$@"
 }
 
 if [[ $BENCHMARK_SIZE != small && $BENCHMARK_SIZE != big ]]; then
@@ -47,22 +47,22 @@ DockerCompose logs -f zero1 | grep -q -m1 "I've become the leader"
 
 if [[ $DGRAPH_LOADER == bulk ]]; then
     Info "bulk loading 21million data set"
-    DockerCompose run --rm dg1 \
+    DockerCompose run --rm alpha1 \
         bash -s <<EOF
-            /gobin/dgraph bulk --schema=<(curl -LSs $SCHEMA_URL) --files=<(curl -LSs $DATA_URL) \
-                               --format=rdf --zero=zero1:5180 --out=/data/dg1/bulk
-            mv /data/dg1/bulk/0/p /data/dg1
+            outserv bulk --schema=<(curl -LSs $SCHEMA_URL) --files=<(curl -LSs $DATA_URL) \
+                               --format=rdf --zero=zero1:5180 --out=/data/alpha1/bulk
+            mv /data/alpha1/bulk/0/p /data/alpha1
 EOF
 fi
 
 Info "bringing up alpha container"
-DockerCompose up -d --remove-orphans dg1
+DockerCompose up -d --remove-orphans alpha1
 
 Info "waiting for alpha to be ready"
-DockerCompose logs -f dg1 | grep -q -m1 "Server is ready"
+DockerCompose logs -f alpha1 | grep -q -m1 "Server is ready"
 
 if [[ $DGRAPH_LOADER == live ]]; then
     Info "live loading 21million data set"
-    dgraph live --schema=<(curl -LSs $SCHEMA_URL) --files=<(curl -LSs $DATA_URL) \
+    outserv live --schema=<(curl -LSs $SCHEMA_URL) --files=<(curl -LSs $DATA_URL) \
                 --format=rdf --zero=:5180 --alpha=:9180 --logtostderr
 fi

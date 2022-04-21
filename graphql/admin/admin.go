@@ -198,9 +198,6 @@ func NewServers(withIntrospection bool, globalEpoch map[uint64]*uint64,
 
 	fns := &resolve.ResolverFns{
 		Qrw: resolve.NewQueryRewriter(),
-		Arw: resolve.NewAddRewriter,
-		Urw: resolve.NewUpdateRewriter,
-		Drw: resolve.NewDeleteRewriter(),
 		Ex:  resolve.NewDgraphExecutor(),
 	}
 	adminResolvers := newAdminResolver(mainServer, fns, withIntrospection, globalEpoch, closer)
@@ -404,12 +401,12 @@ func newAdminResolverFactory() *resolve.ResolverFactory {
 }
 
 func getCurrentGraphQLSchema(namespace uint64) (*worker.GqlSchema, error) {
-	uid, graphQLSchema, err := edgraph.GetGQLSchema(namespace)
+	graphQLSchema, err := edgraph.GetGQLSchema(namespace)
 	if err != nil {
 		return nil, err
 	}
 
-	return &worker.GqlSchema{ID: uid, Schema: graphQLSchema}, nil
+	return &worker.GqlSchema{Schema: graphQLSchema}, nil
 }
 
 func generateGQLSchema(sch *worker.GqlSchema, ns uint64) (*schema.Schema, error) {
@@ -437,19 +434,11 @@ func (as *adminServer) initServer() {
 	as.mux.Lock()
 	defer as.mux.Unlock()
 
-	// It takes a few seconds for the Dgraph cluster to be up and running.
-	// Before that, trying to read the GraphQL schema will result in error:
-	// "Please retry again, server is not ready to accept requests."
-	// 5 seconds is a pretty reliable wait for a fresh instance to read the
-	// schema on a first try.
-	waitFor := 5 * time.Second
-
 	for {
-		<-time.After(waitFor)
-
 		sch, err := getCurrentGraphQLSchema(x.GalaxyNamespace)
 		if err != nil {
 			glog.Errorf("namespace: %d. Error reading GraphQL schema: %s.", x.GalaxyNamespace, err)
+			time.Sleep(time.Second)
 			continue
 		}
 		sch.Loaded = true
@@ -462,31 +451,26 @@ func (as *adminServer) initServer() {
 		if sch.Schema == "" {
 			glog.Infof("namespace: %d. No GraphQL schema in Dgraph; serving empty GraphQL API",
 				x.GalaxyNamespace)
-			break
+			return
 		}
 
 		generatedSchema, err := generateGQLSchema(sch, x.GalaxyNamespace)
 		if err != nil {
 			glog.Errorf("namespace: %d. Error processing GraphQL schema: %s.",
 				x.GalaxyNamespace, err)
-			break
+			return
 		}
 		as.incrementSchemaUpdateCounter(x.GalaxyNamespace)
 		as.resetSchema(x.GalaxyNamespace, generatedSchema)
 
-		glog.Infof("namespace: %d. Successfully loaded GraphQL schema.  Serving GraphQL API.",
-			x.GalaxyNamespace)
-
-		break
+		glog.Infof("namespace: %d. Successfully loaded GraphQL schema: \n---\n%s\n---\n",
+			x.GalaxyNamespace, sch.Schema)
+		return
 	}
 }
 
 // addConnectedAdminResolvers sets up the real resolvers
 func (as *adminServer) addConnectedAdminResolvers() {
-
-	qryRw := resolve.NewQueryRewriter()
-	dgEx := resolve.NewDgraphExecutor()
-
 	as.rf.WithMutationResolver("updateGQLSchema",
 		func(m *schema.Field) resolve.MutationResolver {
 			return &updateSchemaResolver{admin: as}
@@ -494,50 +478,6 @@ func (as *adminServer) addConnectedAdminResolvers() {
 		WithQueryResolver("getGQLSchema",
 			func(q *schema.Field) resolve.QueryResolver {
 				return &getSchemaResolver{admin: as}
-			}).
-		WithQueryResolver("queryGroup",
-			func(q *schema.Field) resolve.QueryResolver {
-				return resolve.NewQueryResolver(qryRw, dgEx)
-			}).
-		WithQueryResolver("queryUser",
-			func(q *schema.Field) resolve.QueryResolver {
-				return resolve.NewQueryResolver(qryRw, dgEx)
-			}).
-		WithQueryResolver("getGroup",
-			func(q *schema.Field) resolve.QueryResolver {
-				return resolve.NewQueryResolver(qryRw, dgEx)
-			}).
-		WithQueryResolver("getCurrentUser",
-			func(q *schema.Field) resolve.QueryResolver {
-				return resolve.NewQueryResolver(&currentUserResolver{baseRewriter: qryRw}, dgEx)
-			}).
-		WithQueryResolver("getUser",
-			func(q *schema.Field) resolve.QueryResolver {
-				return resolve.NewQueryResolver(qryRw, dgEx)
-			}).
-		WithMutationResolver("addUser",
-			func(m *schema.Field) resolve.MutationResolver {
-				return resolve.NewDgraphResolver(resolve.NewAddRewriter(), dgEx)
-			}).
-		WithMutationResolver("addGroup",
-			func(m *schema.Field) resolve.MutationResolver {
-				return resolve.NewDgraphResolver(NewAddGroupRewriter(), dgEx)
-			}).
-		WithMutationResolver("updateUser",
-			func(m *schema.Field) resolve.MutationResolver {
-				return resolve.NewDgraphResolver(resolve.NewUpdateRewriter(), dgEx)
-			}).
-		WithMutationResolver("updateGroup",
-			func(m *schema.Field) resolve.MutationResolver {
-				return resolve.NewDgraphResolver(NewUpdateGroupRewriter(), dgEx)
-			}).
-		WithMutationResolver("deleteUser",
-			func(m *schema.Field) resolve.MutationResolver {
-				return resolve.NewDgraphResolver(resolve.NewDeleteRewriter(), dgEx)
-			}).
-		WithMutationResolver("deleteGroup",
-			func(m *schema.Field) resolve.MutationResolver {
-				return resolve.NewDgraphResolver(resolve.NewDeleteRewriter(), dgEx)
 			})
 }
 
@@ -668,13 +608,12 @@ func lazyLoadScript(namespace uint64) error {
 		return nil
 	}
 	// Otherwise, fetch it from disk.
-	uid, script, err := edgraph.GetLambdaScript(namespace)
+	script, err := edgraph.GetLambdaScript(namespace)
 	if err != nil {
 		glog.Errorf("namespace: %d. Error reading Lambda Script: %s.", namespace, err)
 		return errors.Wrap(err, "failed to lazy-load Lambda Script")
 	}
 	worker.Lambda().Set(namespace, &worker.LambdaScript{
-		ID:     uid,
 		Script: script,
 	})
 	return nil

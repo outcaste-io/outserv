@@ -789,7 +789,7 @@ func TestParseGraphQLMixedVarArray(t *testing.T) {
 func TestParseVarAfterCountQry(t *testing.T) {
 	query := `
 		{
-			q(func: allofterms(name@en, "steven spielberg")) {
+			q(func: allofterms(name, "steven spielberg")) {
 				director.film {
 					u1 as count(uid)
 					genre {

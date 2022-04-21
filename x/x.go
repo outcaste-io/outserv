@@ -23,7 +23,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -32,15 +31,14 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/outcaste-io/badger/v3"
 	bo "github.com/outcaste-io/badger/v3/options"
-	"github.com/outcaste-io/badger/v3/pb"
 	badgerpb "github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/ristretto/z"
 
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"go.opencensus.io/plugin/ocgrpc"
 	"go.opencensus.io/trace"
-	"golang.org/x/crypto/ssh/terminal"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/encoding/gzip"
@@ -118,7 +116,7 @@ const (
 	ManifestVersion = 2105
 
 	// MagicVersion is a unique uint16 number. Badger won't start if this magic number doesn't match
-	// with the one present in the manifest. It prevents starting up dgraph with new data format
+	// with the one present in the manifest. It prevents starting up outserv with new data format
 	// (eg. the change in 21.09 by using roaring bitmap) on older p directory.
 	MagicVersion = 1
 )
@@ -427,7 +425,7 @@ func AttachJWTNamespace(ctx context.Context) context.Context {
 	if err == nil {
 		// Attach the namespace only if we got one from JWT.
 		// This preserves any namespace directly present in the context which is needed for
-		// requests originating from dgraph internal code like server.go::GetGQLSchema() where
+		// requests originating from outserv internal code like server.go::GetGQLSchema() where
 		// context is created by hand.
 		ctx = AttachNamespace(ctx, ns)
 	}
@@ -961,35 +959,6 @@ func WithAuthorizationCredentials(authToken string) grpc.DialOption {
 	return grpc.WithPerRPCCredentials(&authorizationCredentials{authToken})
 }
 
-// AskUserPassword prompts the user to enter the password for the given user ID.
-func AskUserPassword(userid string, pwdType string, times int) (string, error) {
-	AssertTrue(times == 1 || times == 2)
-	AssertTrue(pwdType == "Current" || pwdType == "New")
-	// ask for the user's password
-	fmt.Printf("%s password for %v:", pwdType, userid)
-	pd, err := terminal.ReadPassword(int(syscall.Stdin))
-	if err != nil {
-		return "", errors.Wrapf(err, "while reading password")
-	}
-	fmt.Println()
-	password := string(pd)
-
-	if times == 2 {
-		fmt.Printf("Retype %s password for %v:", strings.ToLower(pwdType), userid)
-		pd2, err := terminal.ReadPassword(int(syscall.Stdin))
-		if err != nil {
-			return "", errors.Wrapf(err, "while reading password")
-		}
-		fmt.Println()
-
-		password2 := string(pd2)
-		if password2 != password {
-			return "", errors.Errorf("the two typed passwords do not match")
-		}
-	}
-	return password, nil
-}
-
 func IsGuardian(groups []string) bool {
 	for _, group := range groups {
 		if group == GuardiansId {
@@ -1184,6 +1153,42 @@ func ToHex(i uint64) []byte {
 	return out
 }
 
+func FromHex(s string) uint64 {
+	if len(s) == 0 {
+		return 0
+	}
+	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
+		s = s[2:]
+	}
+	// Base 16 is assumed.
+	u, err := strconv.ParseUint(s, 16, 64)
+	if err != nil {
+		glog.Infof("Unable to parse %s to hex\n", s)
+		Check(err)
+	}
+	return u
+}
+
+var errInvalidUID = errors.New("UID must to be greater than 0")
+
+// ParseUid parses the given string into an UID. This method returns with an error
+// if the string cannot be parsed or the parsed UID is zero.
+func ParseUid(xid string) (uint64, error) {
+	// If string represents a UID, convert to uint64 and return.
+	uid, err := strconv.ParseUint(xid, 0, 64)
+	if err != nil {
+		return 0, err
+	}
+	if uid == 0 {
+		return 0, errInvalidUID
+	}
+	return uid, nil
+}
+
+func ToHexString(i uint64) string {
+	return "0x" + strconv.FormatUint(i, 16)
+}
+
 // TODO: Fix this all up.
 // RootTemplate defines the help template for dgraph command.
 var RootTemplate string = `Dgraph is a horizontally scalable and distributed graph database,
@@ -1201,19 +1206,19 @@ Generic: {{range .Commands}} {{if (or (and .IsAvailableCommand (eq .Annotations.
 
 Available Commands:
 
-Dgraph Core: {{range .Commands}} {{if (and .IsAvailableCommand (eq .Annotations.group "core"))}}
+Outserv Core: {{range .Commands}} {{if (and .IsAvailableCommand (eq .Annotations.group "core"))}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
 
 Data Loading: {{range .Commands}} {{if (and .IsAvailableCommand (eq .Annotations.group "data-load"))}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
 
-Dgraph Security: {{range .Commands}} {{if (and .IsAvailableCommand (eq .Annotations.group "security"))}}
+Outserv Security: {{range .Commands}} {{if (and .IsAvailableCommand (eq .Annotations.group "security"))}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
 
-Dgraph Debug: {{range .Commands}} {{if (and .IsAvailableCommand (eq .Annotations.group "debug"))}}
+Outserv Debug: {{range .Commands}} {{if (and .IsAvailableCommand (eq .Annotations.group "debug"))}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
 
-Dgraph Tools: {{range .Commands}} {{if (and .IsAvailableCommand (eq .Annotations.group "tool"))}}
+Outserv Tools: {{range .Commands}} {{if (and .IsAvailableCommand (eq .Annotations.group "tool"))}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
 ` +
 	// uncomment this part when new availalble commands are added
@@ -1228,7 +1233,7 @@ Flags:
 Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
 `
 
-// NonRootTemplate defines the help template for dgraph sub-command.
+// NonRootTemplate defines the help template for outserv sub-command.
 var NonRootTemplate string = `{{if .Long}} {{.Long}} {{else}} {{.Short}} {{end}}
 Usage:{{if .Runnable}}
   {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
@@ -1260,10 +1265,10 @@ func KvWithMaxVersion(kvs *badgerpb.KVList, prefixes [][]byte) *badgerpb.KV {
 }
 
 // PrefixesToMatches converts the prefixes for subscription to a list of match.
-func PrefixesToMatches(prefixes [][]byte, ignore string) []*pb.Match {
-	matches := make([]*pb.Match, 0, len(prefixes))
+func PrefixesToMatches(prefixes [][]byte, ignore string) []*badgerpb.Match {
+	matches := make([]*badgerpb.Match, 0, len(prefixes))
 	for _, prefix := range prefixes {
-		matches = append(matches, &pb.Match{
+		matches = append(matches, &badgerpb.Match{
 			Prefix:      prefix,
 			IgnoreBytes: ignore,
 		})
@@ -1367,4 +1372,22 @@ const mask uint64 = 1<<32 - 1
 
 func Timestamp(baseTs, raftIdx uint64) uint64 {
 	return baseTs + (2*raftIdx)&mask // Always return multiples of 2.
+}
+
+func IsStarAll(v []byte) bool {
+	if len(v) == 0 {
+		return false
+	}
+	return string(v[1:]) == Star
+}
+
+func ReplaceUidsIn(edges []*pb.Edge, resolved map[string]string) {
+	for _, edge := range edges {
+		if uid, has := resolved[edge.Subject]; has {
+			edge.Subject = uid
+		}
+		if uid, has := resolved[edge.ObjectId]; has {
+			edge.ObjectId = uid
+		}
+	}
 }

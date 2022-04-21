@@ -13,7 +13,7 @@ SUBDIRS = outserv
 
 ###############
 
-.PHONY: $(SUBDIRS) all oss version install install_oss oss_install uninstall test help image
+.PHONY: $(SUBDIRS) all oss version install install_oss oss_install uninstall test help image tools
 all: $(SUBDIRS)
 
 $(SUBDIRS):
@@ -43,12 +43,11 @@ test:
 	@echo Running ./test.sh
 	./test.sh
 
+tools:
+	go install github.com/outcaste-io/outserv/compose
+
 image:
-	@GOOS=linux $(MAKE) outserv
-	@mkdir -p linux
-	@mv ./outserv/outserv ./linux/outserv
-	@docker build -f contrib/Dockerfile -t dgraph/dgraph:$(subst /,-,${BUILD_BRANCH}) .
-	@rm -r linux
+	docker build -f contrib/Dockerfile --build-arg BUILD_RACE=$(BUILD_RACE) --target final -t outcaste/outserv:$(subst /,-,${BUILD_BRANCH}) .
 
 help:
 	@echo

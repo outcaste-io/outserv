@@ -42,7 +42,7 @@ Then clone the Outserv repository and use `make install` to install the Dgraph b
 ```bash
 git clone https://github.com/outcaste-io/outserv.git
 cd ./outserv
-make install
+make install # or `make image` to build a Docker image
 ```
 
 ### Run

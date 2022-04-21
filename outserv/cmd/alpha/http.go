@@ -231,7 +231,7 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Core processing happens here.
-	resp, err := (&edgraph.Server{}).Query(ctx, &req)
+	resp, err := edgraph.Query(ctx, &req)
 	if err != nil {
 		x.SetStatusWithData(w, x.ErrorInvalidRequest, err.Error())
 		return
@@ -389,7 +389,7 @@ func mutationHandler(w http.ResponseWriter, r *http.Request) {
 	req.CommitNow = commitNow
 
 	ctx := x.AttachAccessJwt(context.Background(), r)
-	resp, err := (&edgraph.Server{}).Query(ctx, req)
+	resp, err := edgraph.Query(ctx, req)
 	if err != nil {
 		x.SetStatusWithData(w, x.ErrorInvalidRequest, err.Error())
 		return
@@ -408,7 +408,7 @@ func mutationHandler(w http.ResponseWriter, r *http.Request) {
 	mp := map[string]interface{}{}
 	mp["code"] = x.Success
 	mp["message"] = "Done"
-	mp["uids"] = resp.Uids
+	mp["uids"] = resp.Txn.GetUids()
 	mp["queries"] = json.RawMessage(resp.Json)
 	response["data"] = mp
 
@@ -453,7 +453,7 @@ func alterHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := x.AttachAuthToken(context.Background(), r)
 	ctx = x.AttachAccessJwt(ctx, r)
 	ctx = x.AttachRemoteIP(ctx, r)
-	if _, err := (&edgraph.Server{}).Alter(ctx, op); err != nil {
+	if _, err := edgraph.Alter(ctx, op); err != nil {
 		x.SetStatus(w, x.Error, err.Error())
 		return
 	}

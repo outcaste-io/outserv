@@ -1,23 +1,9 @@
-/*
- * Copyright 2016-2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2016-2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
 
 package types
 
 import (
-	"bytes"
 	"strconv"
 	"strings"
 
@@ -419,16 +405,14 @@ func (q GeoQueryData) intersects(g geom.T) bool {
 // matches the query criteria.
 func MatchGeo(value *pb.TaskValue, q *GeoQueryData) bool {
 	valBytes := value.Val
-	if bytes.Equal(valBytes, nil) {
+	if len(valBytes) == 0 {
 		return false
 	}
-	vType := value.ValType
-	if TypeID(vType) != GeoID {
+	vType := valBytes[0]
+	if TypeID(vType) != TypeGeo {
 		return false
 	}
-	src := ValueForType(BinaryID)
-	src.Value = valBytes
-	gc, err := Convert(src, GeoID)
+	gc, err := Convert(valBytes, TypeGeo)
 	if err != nil {
 		return false
 	}

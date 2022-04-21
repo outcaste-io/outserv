@@ -3,6 +3,7 @@
 package billing
 
 import (
+	"context"
 	"os"
 	"sync/atomic"
 	"time"
@@ -14,6 +15,7 @@ import (
 )
 
 func Run(closer *z.Closer) {
+	initWallet()
 	go trackCPU(closer)
 }
 
@@ -27,8 +29,10 @@ func minOne(a float64) float64 {
 
 var microCpuHour int64
 
-const USDPerCpuHour = 0.03 // 3 cents per cpu-hour.
-const Minute = time.Minute // Using this indirection for debugging.
+const (
+	USDPerCpuHour = 0.03        // 3 cents per cpu-hour.
+	Minute        = time.Minute // Using this indirection for debugging.
+)
 
 func CPUHours() float64 {
 	mch := atomic.LoadInt64(&microCpuHour)
@@ -76,8 +80,11 @@ func trackCPU(closer *z.Closer) {
 
 // Charge returns the amount charged for in dollars, and error if any.
 func Charge(cpuHours float64) error {
-	// TODO: Fill out this function to charge
 	usd := cpuHours * USDPerCpuHour
+
+	if err := wallet.Pay(context.Background(), usd); err != nil {
+		return err
+	}
 	glog.Infof("Charged $%.3f for %.3f CPU hours\n", usd, cpuHours)
 	return nil
 }

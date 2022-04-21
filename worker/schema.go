@@ -42,8 +42,9 @@ func getSchema(ctx context.Context, s *pb.SchemaRequest) (*pb.SchemaResult, erro
 	if len(s.Fields) > 0 {
 		fields = s.Fields
 	} else {
-		fields = []string{"type", "index", "tokenizer", "reverse", "count", "list", "upsert",
-			"lang", "noconflict"}
+		// TODO: Perhaps remove upsert as well.
+		fields = []string{"type", "index", "tokenizer", "count", "list", "upsert",
+			"noconflict"}
 	}
 
 	myGid := groups().groupId()
@@ -81,15 +82,13 @@ func populateSchema(attr string, fields []string) *pb.SchemaNode {
 	for _, field := range fields {
 		switch field {
 		case "type":
-			schemaNode.Type = typ.Name()
+			schemaNode.Type = typ.String()
 		case "index":
 			schemaNode.Index = len(pred.GetTokenizer()) > 0
 		case "tokenizer":
 			if len(pred.GetTokenizer()) > 0 {
 				schemaNode.Tokenizer = schema.State().TokenizerNames(ctx, attr)
 			}
-		case "reverse":
-			schemaNode.Reverse = pred.GetDirective() == pb.SchemaUpdate_REVERSE
 		case "count":
 			schemaNode.Count = pred.GetCount()
 		case "list":
@@ -124,11 +123,11 @@ func addToSchemaMap(schemaMap map[uint32]*pb.SchemaRequest, schema *pb.SchemaReq
 		s.Predicates = append(s.Predicates, attr)
 	}
 	if len(schema.Predicates) > 0 {
+		// If the req had asked for specific predicates, then just return.
 		return nil
 	}
-	// TODO: Janardhan - node shouldn't serve any request until membership
-	// information is synced, should we fail health check till then ?
-	gids := groups().KnownGroups()
+	// No specific predicates asked for. Fetch all the predicates we know about.
+	gids := KnownGroups()
 	for _, gid := range gids {
 		if gid == 0 {
 			continue

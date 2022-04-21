@@ -79,9 +79,6 @@ var (
 	errIndexingInProgress = errors.New("errIndexingInProgress. Please retry")
 )
 
-// Server implements protos.DgraphServer
-type Server struct{}
-
 // graphQLSchemaNode represents the node which contains GraphQL schema
 type graphQLSchemaNode struct {
 	Uid    string `json:"uid"`
@@ -124,75 +121,58 @@ func PeriodicallyPostTelemetry() {
 	}
 }
 
-func GetLambdaScript(namespace uint64) (uid, script string, err error) {
-	uid, gql, err := getGQLSchema(namespace)
+func GetLambdaScript(namespace uint64) (script string, err error) {
+	gql, err := getGQLSchema(namespace)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
-	return uid, gql.Script, nil
+	return gql.Script, nil
 }
 
-func GetGQLSchema(namespace uint64) (uid, graphQLSchema string, err error) {
-	uid, gql, err := getGQLSchema(namespace)
+func GetGQLSchema(namespace uint64) (graphQLSchema string, err error) {
+	gql, err := getGQLSchema(namespace)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
-	return uid, gql.Schema, nil
+	return gql.Schema, nil
 }
 
 // getGQLSchema queries for the GraphQL schema node, and returns the uid and the GraphQL schema and
 // lambda script.
 // If multiple schema nodes were found, it returns an error.
-func getGQLSchema(namespace uint64) (string, *x.GQL, error) {
+func getGQLSchema(namespace uint64) (*x.GQL, error) {
 	ctx := context.WithValue(context.Background(), Authorize, false)
 	ctx = x.AttachNamespace(ctx, namespace)
-	resp, err := (&Server{}).Query(ctx,
+	resp, err := Query(ctx,
 		&pb.Request{
-			Query: `
+			Query: fmt.Sprintf(`
 			query {
-			  ExistingGQLSchema(func: has(dgraph.graphql.schema)) {
-				uid
+			  ExistingGQLSchema(func: uid(%#x)) {
 				dgraph.graphql.schema
 			  }
-			}`})
+			}`, worker.SchemaNodeUid)})
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
 	var result existingGQLSchemaQryResp
 	if err := json.Unmarshal(resp.GetJson(), &result); err != nil {
-		return "", nil, errors.Wrap(err, "Couldn't unmarshal response from Dgraph query")
+		return nil, errors.Wrap(err, "Couldn't unmarshal response from Dgraph query")
 	}
 
 	data := &x.GQL{}
 	res := result.ExistingGQLSchema
 	if len(res) == 0 {
 		// no schema has been stored yet in Dgraph
-		return "", data, nil
-	} else if len(res) == 1 {
+		return data, nil
+	}
+	if len(res) == 1 {
 		// we found an existing GraphQL schema
 		gqlSchemaNode := res[0]
 		data.Schema, data.Script = worker.ParseAsSchemaAndScript([]byte(gqlSchemaNode.Schema))
-		return gqlSchemaNode.Uid, data, nil
+		return data, nil
 	}
-
-	// found multiple GraphQL schema nodes, this should never happen
-	// returning the schema node which is added last
-	for i := range res {
-		iUid, err := gql.ParseUid(res[i].Uid)
-		if err != nil {
-			return "", nil, err
-		}
-		res[i].UidInt = iUid
-	}
-
-	sort.Slice(res, func(i, j int) bool {
-		return res[i].UidInt < res[j].UidInt
-	})
-	glog.Errorf("namespace: %d. Multiple schema nodes found, using the last one", namespace)
-	resLast := res[len(res)-1]
-	data.Schema, data.Script = worker.ParseAsSchemaAndScript([]byte(resLast.Schema))
-	return resLast.Uid, data, nil
+	panic(fmt.Sprintf("Not expecting multiple schemas. Found: %s\n", res))
 }
 
 // UpdateGQLSchema updates the GraphQL and Dgraph schemas using the given inputs.
@@ -219,13 +199,15 @@ func UpdateGQLSchema(ctx context.Context, gqlSchema,
 		}
 	}
 
-	return worker.UpdateGQLSchemaOverNetwork(ctx, &pb.UpdateGraphQLSchemaRequest{
+	resp, err := worker.UpdateGQLSchemaOverNetwork(ctx, &pb.UpdateGraphQLSchemaRequest{
 		// TODO: Understand this better and see what timestamp should be set.
 		StartTs:       posting.ReadTimestamp(),
 		GraphqlSchema: gqlSchema,
 		DgraphPreds:   parsedDgraphSchema.Preds,
 		Op:            pb.UpdateGraphQLSchemaRequest_SCHEMA,
 	})
+	glog.Infof("UpdateGQLSchemaOverNetwork returned with error: %v\n", err)
+	return resp, err
 }
 
 // UpdateLambdaScript updates the Lambda Script using the given inputs.
@@ -352,13 +334,13 @@ func parseSchemaFromAlterOperation(ctx context.Context, op *pb.Operation) (*sche
 // then restoring from the incremental backup of such a DB would restore even the dropped
 // data back. This is also used to capture the delete namespace operation during backup.
 func InsertDropRecord(ctx context.Context, dropOp string) error {
-	_, err := (&Server{}).doQuery(context.WithValue(ctx, IsGraphql, true), &Request{
+	_, err := doQuery(context.WithValue(ctx, IsGraphql, true), &Request{
 		req: &pb.Request{
 			Mutations: []*pb.Mutation{{
-				Set: []*pb.NQuad{{
+				Edges: []*pb.Edge{{
 					Subject:     "_:r",
 					Predicate:   "dgraph.drop.op",
-					ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: dropOp}},
+					ObjectValue: types.StringToBinary(dropOp),
 				}},
 			}},
 			CommitNow: true,
@@ -367,7 +349,7 @@ func InsertDropRecord(ctx context.Context, dropOp string) error {
 }
 
 // Alter handles requests to change the schema or remove parts or all of the data.
-func (s *Server) Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, error) {
+func Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, error) {
 	ctx, span := otrace.StartSpan(ctx, "Server.Alter")
 	defer span.End()
 
@@ -433,11 +415,11 @@ func (s *Server) Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, erro
 		}
 
 		// query the GraphQL schema and keep it in memory, so it can be inserted again
-		_, graphQLSchema, err := GetGQLSchema(namespace)
+		graphQLSchema, err := GetGQLSchema(namespace)
 		if err != nil {
 			return empty, err
 		}
-		_, lambdaScript, err := GetLambdaScript(namespace)
+		lambdaScript, err := GetLambdaScript(namespace)
 		if err != nil {
 			return empty, err
 		}
@@ -485,18 +467,14 @@ func (s *Server) Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, erro
 				" dropped", x.ParseAttr(attr))
 		}
 
-		nq := &pb.NQuad{
+		val, err := types.ToBinary(types.TypeString, x.Star)
+		x.Check(err)
+		edge := &pb.Edge{
 			Subject:     x.Star,
 			Predicate:   x.ParseAttr(attr),
-			ObjectValue: &pb.Value{Val: &pb.Value_StrVal{StrVal: x.Star}},
+			ObjectValue: val,
 		}
-		wnq := &gql.NQuad{NQuad: nq}
-		edge, err := wnq.ToDeletePredEdge()
-		if err != nil {
-			return empty, err
-		}
-		edges := []*pb.DirectedEdge{edge}
-		m.Edges = edges
+		m.Edges = []*pb.Edge{edge}
 		_, err = query.ApplyMutations(ctx, m)
 		if err != nil {
 			return empty, err
@@ -546,7 +524,7 @@ func (s *Server) Alter(ctx context.Context, op *pb.Operation) (*pb.Payload, erro
 func validateDQLSchemaForGraphQL(ctx context.Context,
 	dqlSch *schema.ParsedSchema, ns uint64) error {
 	// fetch the GraphQL schema for this namespace from disk
-	_, existingGQLSch, err := GetGQLSchema(ns)
+	existingGQLSch, err := GetGQLSchema(ns)
 	if err != nil || existingGQLSch == "" {
 		return err
 	}
@@ -582,8 +560,8 @@ func validateDQLSchemaForGraphQL(ctx context.Context,
 
 		// type (including list) must match exactly
 		if gqlPred.ValueType != dqlPred.ValueType || gqlPred.List != dqlPred.List {
-			gqlType := strings.ToLower(gqlPred.ValueType.String())
-			dqlType := strings.ToLower(dqlPred.ValueType.String())
+			gqlType := strings.ToLower(types.FromInt(gqlPred.ValueType).String())
+			dqlType := strings.ToLower(types.FromInt(dqlPred.ValueType).String())
 			if gqlPred.List {
 				gqlType = "[" + gqlType + "]"
 			}
@@ -617,14 +595,6 @@ func validateDQLSchemaForGraphQL(ctx context.Context,
 					strings.Join(dqlPred.Tokenizer, ","))
 			}
 		}
-		// if gqlSchema had @reverse, then dqlSchema must have it. dqlSchema can't remove @reverse.
-		// if gqlSchema didn't had @reverse, it is allowed to dqlSchema to add it.
-		if gqlPred.Directive == pb.SchemaUpdate_REVERSE && dqlPred.Directive != pb.
-			SchemaUpdate_REVERSE {
-			return errors.Errorf("can't alter predicate %s as it is used by the GraphQL API, "+
-				"and is missing @reverse that is expected by the GraphQL API.",
-				x.ParseAttr(gqlPred.Predicate))
-		}
 		// if gqlSchema had @count, then dqlSchema must have it. dqlSchema can't remove @count.
 		// if gqlSchema didn't had @count, it is allowed to dqlSchema to add it.
 		if gqlPred.Count && !dqlPred.Count {
@@ -652,7 +622,7 @@ func annotateStartTs(span *otrace.Span, ts uint64) {
 	span.AddAttributes(otrace.Int64Attribute("startTs", int64(ts)))
 }
 
-func (s *Server) doMutate(ctx context.Context, qc *queryContext, resp *pb.Response) error {
+func doMutate(ctx context.Context, qc *queryContext, resp *pb.Response) error {
 	if len(qc.gmuList) == 0 {
 		return nil
 	}
@@ -674,35 +644,21 @@ func (s *Server) doMutate(ctx context.Context, qc *queryContext, resp *pb.Respon
 		return err
 	}
 
-	newUids, err := query.AssignUids(ctx, qc.gmuList)
+	mu, err := query.ToMutations(ctx, qc.gmuList, qc.gqlField.Schema())
 	if err != nil {
 		return err
 	}
 
-	// resp.Uids contains a map of the node name to the uid.
-	// 1. For a blank node, like _:foo, the key would be foo.
-	// 2. For a uid variable that is part of an upsert query,
-	//    like uid(foo), the key would be uid(foo).
-	resp.Uids = query.UidsToHex(query.StripBlankNode(newUids))
-	edges, err := query.ToDirectedEdges(qc.gmuList, newUids)
-	if err != nil {
-		return err
-	}
-	m := &pb.Mutations{
-		Edges: edges,
-	}
-
-	qc.span.Annotatef(nil, "Applying mutations: %+v", m)
-	resp.Txn, err = query.ApplyMutations(ctx, m)
+	qc.span.Annotatef(nil, "Applying mutations: %+v", mu)
+	resp.Txn, err = query.ApplyMutations(ctx, mu)
+	glog.Infof("ApplyMutations returned: %+v %v\n", resp.Txn, err)
 	qc.span.Annotatef(nil, "Txn Context: %+v. Err=%v", resp.Txn, err)
 
 	// calculateMutationMetrics calculate cost for the mutation.
-	calculateMutationMetrics := func() {
-		cost := uint64(len(newUids) + len(edges))
-		resp.Metrics.NumUids["mutation_cost"] = cost
-		resp.Metrics.NumUids["_total"] = resp.Metrics.NumUids["_total"] + cost
-	}
-	calculateMutationMetrics()
+	newUids := resp.Txn.GetUids()
+	cost := uint64(len(newUids) + len(mu.Edges)) // Doesn't consider the edges in objects.
+	resp.Metrics.NumUids["mutation_cost"] = cost
+	resp.Metrics.NumUids["_total"] = resp.Metrics.NumUids["_total"] + cost
 	return err
 }
 
@@ -760,8 +716,7 @@ func updateMutations(qc *queryContext) error {
 		if condVar != "" {
 			uids, ok := qc.uidRes[condVar]
 			if !(ok && len(uids) == 1) {
-				gmu.Set = nil
-				gmu.Del = nil
+				gmu.Edges = nil
 				continue
 			}
 		}
@@ -791,11 +746,7 @@ func findMutationVars(qc *queryContext) []string {
 	}
 
 	for _, gmu := range qc.gmuList {
-		for _, nq := range gmu.Set {
-			updateVars(nq.Subject)
-			updateVars(nq.ObjectId)
-		}
-		for _, nq := range gmu.Del {
+		for _, nq := range gmu.Edges {
 			updateVars(nq.Subject)
 			updateVars(nq.ObjectId)
 		}
@@ -816,7 +767,7 @@ func findMutationVars(qc *queryContext) []string {
 // Assumption is that Subject can contain UID, whereas Object can contain Val
 // If val(variable) exists in a query, but the values are not there for the variable,
 // it will ignore the mutation silently.
-func updateValInNQuads(nquads []*pb.NQuad, qc *queryContext, isSet bool) []*pb.NQuad {
+func updateValInNQuads(nquads []*pb.Edge, qc *queryContext) []*pb.Edge {
 	getNewVals := func(s string) (map[uint64]types.Val, bool) {
 		if strings.HasPrefix(s, "val(") {
 			varName := s[4 : len(s)-1]
@@ -850,6 +801,7 @@ func updateValInNQuads(nquads []*pb.NQuad, qc *queryContext, isSet bool) []*pb.N
 			continue
 		}
 
+		isSet := nq.Op == pb.Edge_SET
 		// uid(u) <amount> val(amt)
 		// For each NQuad, we need to convert the val(variable_name)
 		// to *pb.Value before applying the mutation. For that, first
@@ -883,7 +835,7 @@ func updateValInNQuads(nquads []*pb.NQuad, qc *queryContext, isSet bool) []*pb.N
 		}
 
 		// Convert the value from types.Val to *pb.Value
-		nq.ObjectValue, err = types.ObjectValue(val.Tid, val.Value)
+		nq.ObjectValue, err = types.ToBinary(val.Tid, val.Value)
 		if err != nil {
 			// Value conversion failed, ignoring the nquad. Ideally,
 			// it shouldn't happen as this is the result of a query.
@@ -900,9 +852,8 @@ func updateValInNQuads(nquads []*pb.NQuad, qc *queryContext, isSet bool) []*pb.N
 
 // updateValInMutations does following transformations:
 // 0x123 <amount> val(v) -> 0x123 <amount> 13.0
-func updateValInMutations(gmu *gql.Mutation, qc *queryContext) error {
-	gmu.Del = updateValInNQuads(gmu.Del, qc, false)
-	gmu.Set = updateValInNQuads(gmu.Set, qc, true)
+func updateValInMutations(gmu *pb.Mutation, qc *queryContext) error {
+	gmu.Edges = updateValInNQuads(gmu.Edges, qc)
 	if qc.nquadsCount > x.Config.LimitMutationsNquad {
 		return errors.Errorf("NQuad count in the request: %d, is more that threshold: %d",
 			qc.nquadsCount, int(x.Config.LimitMutationsNquad))
@@ -913,7 +864,7 @@ func updateValInMutations(gmu *gql.Mutation, qc *queryContext) error {
 // updateUIDInMutations does following transformations:
 //   * uid(v) -> 0x123     -- If v is defined in query block
 //   * uid(v) -> _:uid(v)  -- Otherwise
-func updateUIDInMutations(gmu *gql.Mutation, qc *queryContext) error {
+func updateUIDInMutations(gmu *pb.Mutation, qc *queryContext) error {
 	// usedMutationVars keeps track of variables that are used in mutations.
 	getNewVals := func(s string) []string {
 		if strings.HasPrefix(s, "uid(") {
@@ -928,7 +879,7 @@ func updateUIDInMutations(gmu *gql.Mutation, qc *queryContext) error {
 		return []string{s}
 	}
 
-	getNewNQuad := func(nq *pb.NQuad, s, o string) *pb.NQuad {
+	getNewNQuad := func(nq *pb.Edge, s, o string) *pb.Edge {
 		// The following copy is fine because we only modify Subject and ObjectId.
 		// The pointer values are not modified across different copies of NQuad.
 		n := *nq
@@ -939,8 +890,11 @@ func updateUIDInMutations(gmu *gql.Mutation, qc *queryContext) error {
 	}
 
 	// Remove the mutations from gmu.Del when no UID was found.
-	gmuDel := make([]*pb.NQuad, 0, len(gmu.Del))
-	for _, nq := range gmu.Del {
+	nquads := make([]*pb.Edge, 0, len(gmu.Edges))
+	for _, nq := range gmu.Edges {
+		if nq.Op != pb.Edge_DEL {
+			continue
+		}
 		// if Subject or/and Object are variables, each NQuad can result
 		// in multiple NQuads if any variable stores more than one UIDs.
 		newSubs := getNewVals(nq.Subject)
@@ -954,7 +908,7 @@ func updateUIDInMutations(gmu *gql.Mutation, qc *queryContext) error {
 					continue
 				}
 
-				gmuDel = append(gmuDel, getNewNQuad(nq, s, o))
+				nquads = append(nquads, getNewNQuad(nq, s, o))
 				qc.nquadsCount++
 			}
 			if qc.nquadsCount > int(x.Config.LimitMutationsNquad) {
@@ -964,11 +918,11 @@ func updateUIDInMutations(gmu *gql.Mutation, qc *queryContext) error {
 		}
 	}
 
-	gmu.Del = gmuDel
-
 	// Update the values in mutation block from the query block.
-	gmuSet := make([]*pb.NQuad, 0, len(gmu.Set))
-	for _, nq := range gmu.Set {
+	for _, nq := range gmu.Edges {
+		if nq.Op != pb.Edge_SET {
+			continue
+		}
 		newSubs := getNewVals(nq.Subject)
 		newObs := getNewVals(nq.ObjectId)
 
@@ -980,11 +934,11 @@ func updateUIDInMutations(gmu *gql.Mutation, qc *queryContext) error {
 
 		for _, s := range newSubs {
 			for _, o := range newObs {
-				gmuSet = append(gmuSet, getNewNQuad(nq, s, o))
+				nquads = append(nquads, getNewNQuad(nq, s, o))
 			}
 		}
 	}
-	gmu.Set = gmuSet
+	gmu.Edges = nquads
 	return nil
 }
 
@@ -995,7 +949,7 @@ type queryContext struct {
 	// a query or more than one mutations or both (in case of upsert)
 	req *pb.Request
 	// gmuList is the list of mutations after parsing req.Mutations
-	gmuList []*gql.Mutation
+	gmuList []*pb.Mutation
 	// gqlRes contains result of parsing the req.Query
 	gqlRes gql.Result
 	// condVars are conditional variables used in the (modified) query to figure out
@@ -1040,7 +994,7 @@ type Request struct {
 }
 
 // Health handles /health and /health?all requests.
-func (s *Server) Health(ctx context.Context, all bool) (*pb.Response, error) {
+func Health(ctx context.Context, all bool) (*pb.Response, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -1106,7 +1060,7 @@ func filterTablets(ctx context.Context, ms *pb.MembershipState) error {
 }
 
 // State handles state requests
-func (s *Server) State(ctx context.Context) (*pb.Response, error) {
+func State(ctx context.Context) (*pb.Response, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -1141,7 +1095,7 @@ func getAuthMode(ctx context.Context) AuthMode {
 }
 
 // QueryGraphQL handles only GraphQL queries, neither mutations nor DQL.
-func (s *Server) QueryGraphQL(ctx context.Context, req *pb.Request,
+func QueryGraphQL(ctx context.Context, req *pb.Request,
 	field *gqlSchema.Field) (*pb.Response, error) {
 	// Add a timeout for queries which don't have a deadline set. We don't want to
 	// apply a timeout if it's a mutation, that's currently handled by flag
@@ -1154,11 +1108,11 @@ func (s *Server) QueryGraphQL(ctx context.Context, req *pb.Request,
 		}
 	}
 	// no need to attach namespace here, it is already done by GraphQL layer
-	return s.doQuery(ctx, &Request{req: req, gqlField: field, doAuth: getAuthMode(ctx)})
+	return doQuery(ctx, &Request{req: req, gqlField: field, doAuth: getAuthMode(ctx)})
 }
 
 // Query handles queries or mutations
-func (s *Server) Query(ctx context.Context, req *pb.Request) (*pb.Response, error) {
+func Query(ctx context.Context, req *pb.Request) (*pb.Response, error) {
 	ctx = x.AttachJWTNamespace(ctx)
 	if x.WorkerConfig.AclEnabled && req.GetStartTs() != 0 {
 		// A fresh StartTs is assigned if it is 0.
@@ -1180,7 +1134,7 @@ func (s *Server) Query(ctx context.Context, req *pb.Request) (*pb.Response, erro
 			defer cancel()
 		}
 	}
-	return s.doQuery(ctx, &Request{req: req, doAuth: getAuthMode(ctx)})
+	return doQuery(ctx, &Request{req: req, doAuth: getAuthMode(ctx)})
 }
 
 var pendingQueries int64
@@ -1203,7 +1157,7 @@ func StopServingQueries() {
 	}
 }
 
-func (s *Server) doQuery(ctx context.Context, req *Request) (resp *pb.Response, rerr error) {
+func doQuery(ctx context.Context, req *Request) (resp *pb.Response, rerr error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -1290,6 +1244,7 @@ func (s *Server) doQuery(ctx context.Context, req *Request) (resp *pb.Response, 
 		graphql:  isGraphQL,
 		gqlField: req.gqlField,
 	}
+	// parseRequest converts mutation JSON to []Edge.
 	if rerr = parseRequest(qc); rerr != nil {
 		return
 	}
@@ -1332,7 +1287,7 @@ func (s *Server) doQuery(ctx context.Context, req *Request) (resp *pb.Response, 
 	// if it were a mutation, simple or upsert, in any case gqlErrs would be empty as GraphQL JSON
 	// is formed only for queries. So, gqlErrs can have something only in the case of a pure query.
 	// So, safe to ignore gqlErrs and not return that here.
-	if rerr = s.doMutate(ctx, qc, resp); rerr != nil {
+	if rerr = doMutate(ctx, qc, resp); rerr != nil {
 		return
 	}
 
@@ -1475,7 +1430,7 @@ func parseRequest(qc *queryContext) error {
 	upsertQuery := qc.req.Query
 	if len(qc.req.Mutations) > 0 {
 		// parsing mutations
-		qc.gmuList = make([]*gql.Mutation, 0, len(qc.req.Mutations))
+		qc.gmuList = make([]*pb.Mutation, 0, len(qc.req.Mutations))
 		for _, mu := range qc.req.Mutations {
 			gmu, err := parseMutationObject(mu, qc)
 			if err != nil {
@@ -1546,12 +1501,12 @@ func validateNamespace(ctx context.Context, tc *pb.TxnContext) error {
 	return nil
 }
 
-func (s *Server) CommitOrAbort(ctx context.Context, tc *pb.TxnContext) (*pb.TxnContext, error) {
+func CommitOrAbort(ctx context.Context, tc *pb.TxnContext) (*pb.TxnContext, error) {
 	return tc, nil
 }
 
 // CheckVersion returns the version of this Dgraph instance.
-func (s *Server) CheckVersion(ctx context.Context, c *pb.Check) (v *pb.Version, err error) {
+func CheckVersion(ctx context.Context, c *pb.Check) (v *pb.Version, err error) {
 	if err := x.HealthCheck(); err != nil {
 		return v, err
 	}
@@ -1612,15 +1567,15 @@ func hasPoormansAuth(ctx context.Context) error {
 // pb.Mutation#SetJson, pb.Mutation#SetNquads and pb.Mutation#Set are consolidated into the
 // gql.Mutation.Set field. Similarly the 3 fields pb.Mutation#DeleteJson, pb.Mutation#DelNquads
 // and pb.Mutation#Del are merged into the gql.Mutation#Del field.
-func parseMutationObject(mu *pb.Mutation, qc *queryContext) (*gql.Mutation, error) {
-	res := &gql.Mutation{Cond: mu.Cond}
+func parseMutationObject(mu *pb.Mutation, qc *queryContext) (*pb.Mutation, error) {
+	res := &pb.Mutation{Cond: mu.Cond}
 
 	if len(mu.SetJson) > 0 {
 		nqs, err := chunker.ParseJSON(mu.SetJson, chunker.SetNquads)
 		if err != nil {
 			return nil, err
 		}
-		res.Set = append(res.Set, nqs...)
+		res.Edges = append(res.Edges, nqs...)
 	}
 	if len(mu.DeleteJson) > 0 {
 		// The metadata is not currently needed for delete operations so it can be safely ignored.
@@ -1628,18 +1583,20 @@ func parseMutationObject(mu *pb.Mutation, qc *queryContext) (*gql.Mutation, erro
 		if err != nil {
 			return nil, err
 		}
-		res.Del = append(res.Del, nqs...)
+		for _, nq := range nqs {
+			nq.Op = pb.Edge_DEL
+		}
+		res.Edges = append(res.Edges, nqs...)
 	}
-	res.Set = append(res.Set, mu.Set...)
-	res.Del = append(res.Del, mu.Del...)
-	if err := validateNQuads(res.Set, res.Del, qc); err != nil {
+	res.Edges = append(res.Edges, mu.Edges...)
+	if err := validateNQuads(res.Edges, qc); err != nil {
 		return nil, err
 	}
 	return res, nil
 }
 
 // validateForGraphql validate nquads for graphql
-func validateForGraphql(nq *pb.NQuad, isGraphql bool) error {
+func validateForGraphql(nq *pb.Edge, isGraphql bool) error {
 	// Check whether the incoming predicate is graphql reserved predicate or not.
 	if !isGraphql && x.IsGraphqlReservedPredicate(nq.Predicate) {
 		return errors.Errorf("Cannot mutate graphql reserved predicate %s", nq.Predicate)
@@ -1647,15 +1604,15 @@ func validateForGraphql(nq *pb.NQuad, isGraphql bool) error {
 	return nil
 }
 
-func validateNQuads(set, del []*pb.NQuad, qc *queryContext) error {
-	for _, nq := range set {
+func validateNQuads(nquads []*pb.Edge, qc *queryContext) error {
+	for _, nq := range nquads {
+		if nq.Op != pb.Edge_SET {
+			continue
+		}
 		if err := validatePredName(nq.Predicate); err != nil {
 			return err
 		}
-		var ostar bool
-		if o, ok := nq.ObjectValue.GetVal().(*pb.Value_DefaultVal); ok {
-			ostar = o.DefaultVal == x.Star
-		}
+		ostar := x.IsStarAll(nq.ObjectValue)
 		if nq.Subject == x.Star || nq.Predicate == x.Star || ostar {
 			return errors.Errorf("Cannot use star in set n-quad: %+v", nq)
 		}
@@ -1666,14 +1623,14 @@ func validateNQuads(set, del []*pb.NQuad, qc *queryContext) error {
 			return err
 		}
 	}
-	for _, nq := range del {
+	for _, nq := range nquads {
+		if nq.Op != pb.Edge_DEL {
+			continue
+		}
 		if err := validatePredName(nq.Predicate); err != nil {
 			return err
 		}
-		var ostar bool
-		if o, ok := nq.ObjectValue.GetVal().(*pb.Value_DefaultVal); ok {
-			ostar = o.DefaultVal == x.Star
-		}
+		ostar := x.IsStarAll(nq.ObjectValue)
 		if nq.Subject == x.Star || (nq.Predicate == x.Star && !ostar) {
 			return errors.Errorf("Only valid wildcard delete patterns are 'S * *' and 'S P *': %v", nq)
 		}
@@ -1699,7 +1656,7 @@ func validateKey(key string) error {
 }
 
 // validateKeys checks predicate and facet keys in N-Quad for syntax errors.
-func validateKeys(nq *pb.NQuad) error {
+func validateKeys(nq *pb.Edge) error {
 	if err := validateKey(nq.Predicate); err != nil {
 		return errors.Wrapf(err, "predicate %q", nq.Predicate)
 	}

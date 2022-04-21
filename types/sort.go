@@ -73,7 +73,7 @@ func (s byValue) Less(i, j int) bool {
 // IsSortable returns true, if tid is sortable. Otherwise it returns false.
 func IsSortable(tid TypeID) bool {
 	switch tid {
-	case DateTimeID, IntID, BigIntID, FloatID, StringID, DefaultID:
+	case TypeDatetime, TypeInt64, TypeBigInt, TypeFloat, TypeString, TypeDefault:
 		return true
 	default:
 		return false
@@ -89,7 +89,7 @@ func SortWithFacet(v [][]Val, ul *[]uint64, desc []bool) error {
 
 	for _, val := range v[0] {
 		if !IsSortable(val.Tid) {
-			return errors.Errorf("Value of type: %s isn't sortable", val.Tid.Name())
+			return errors.Errorf("Value of type: %s isn't sortable", val.Tid)
 		}
 	}
 
@@ -112,7 +112,7 @@ func Less(a, b Val) (bool, error) {
 	}
 	typ := a.Tid
 	switch typ {
-	case DateTimeID, UidID, IntID, BigIntID, FloatID, StringID, DefaultID:
+	case TypeDatetime, TypeUid, TypeInt64, TypeBigInt, TypeFloat, TypeString, TypeDefault:
 		// Don't do anything, we can sort values of this type.
 	default:
 		return false, errors.Errorf("Compare not supported for type: %v", a.Tid)
@@ -125,19 +125,19 @@ func less(a, b Val, cl *collate.Collator) bool {
 		return mismatchedLess(a, b)
 	}
 	switch a.Tid {
-	case DateTimeID:
+	case TypeDatetime:
 		return a.Value.(time.Time).Before(b.Value.(time.Time))
-	case IntID:
+	case TypeInt64:
 		return (a.Value.(int64)) < (b.Value.(int64))
-	case FloatID:
+	case TypeFloat:
 		return (a.Value.(float64)) < (b.Value.(float64))
-	case BigIntID:
+	case TypeBigInt:
 		av := a.Value.(big.Int)
 		bv := b.Value.(big.Int)
 		return av.Cmp(&bv) < 0
-	case UidID:
+	case TypeUid:
 		return (a.Value.(uint64) < b.Value.(uint64))
-	case StringID, DefaultID:
+	case TypeString, TypeDefault:
 		// Use language comparator.
 		if cl != nil {
 			return cl.CompareString(a.Safe().(string), b.Safe().(string)) < 0
@@ -155,37 +155,37 @@ func mismatchedLess(a, b Val) bool {
 	// floats close to each other and greater in magnitude than 1<<53 (the
 	// point at which consecutive floats are more than 1 apart).
 	switch a.Tid {
-	case FloatID:
+	case TypeFloat:
 		av := a.Value.(float64)
 		switch b.Tid {
-		case IntID:
+		case TypeInt64:
 			return av < float64(b.Value.(int64))
-		case BigIntID:
+		case TypeBigInt:
 			af := &big.Float{}
 			bf := big.NewFloat(av)
 			bv := b.Value.(big.Int)
 			bf = bf.SetInt(&bv)
 			return af.Cmp(bf) < 0
 		}
-	case IntID:
+	case TypeInt64:
 		av := a.Value.(int64)
 		switch b.Tid {
-		case FloatID:
+		case TypeFloat:
 			return float64(av) < b.Value.(float64)
-		case BigIntID:
+		case TypeBigInt:
 			ai := big.NewInt(av)
 			bi := b.Value.(big.Int)
 			return ai.Cmp(&bi) < 0
 		}
-	case BigIntID:
+	case TypeBigInt:
 		av := a.Value.(big.Int)
 		switch b.Tid {
-		case FloatID:
+		case TypeFloat:
 			af := &big.Float{}
 			af = af.SetInt(&av)
 			aff, _ := af.Float64()
 			return aff < b.Value.(float64)
-		case BigIntID:
+		case TypeBigInt:
 			ai := a.Value.(big.Int)
 			bi := b.Value.(big.Int)
 			return ai.Cmp(&bi) < 0
@@ -203,7 +203,7 @@ func Equal(a, b Val) (bool, error) {
 	}
 	typ := a.Tid
 	switch typ {
-	case DateTimeID, IntID, FloatID, StringID, DefaultID, BoolID:
+	case TypeDatetime, TypeInt64, TypeFloat, TypeString, TypeDefault, TypeBool:
 		// Don't do anything, we can sort values of this type.
 	default:
 		return false, errors.Errorf("Equal not supported for type: %v", a.Tid)
@@ -216,27 +216,27 @@ func equal(a, b Val) bool {
 		return false
 	}
 	switch a.Tid {
-	case DateTimeID:
+	case TypeDatetime:
 		aVal, aOk := a.Value.(time.Time)
 		bVal, bOk := b.Value.(time.Time)
 		return aOk && bOk && aVal.Equal(bVal)
-	case IntID:
+	case TypeInt64:
 		aVal, aOk := a.Value.(int64)
 		bVal, bOk := b.Value.(int64)
 		return aOk && bOk && aVal == bVal
-	case BigIntID:
+	case TypeBigInt:
 		av, aOk := a.Value.(big.Int)
 		bv, bOk := b.Value.(big.Int)
 		return aOk && bOk && av.Cmp(&bv) == 0
-	case FloatID:
+	case TypeFloat:
 		aVal, aOk := a.Value.(float64)
 		bVal, bOk := b.Value.(float64)
 		return aOk && bOk && aVal == bVal
-	case StringID, DefaultID:
+	case TypeString, TypeDefault:
 		aVal, aOk := a.Value.(string)
 		bVal, bOk := b.Value.(string)
 		return aOk && bOk && aVal == bVal
-	case BoolID:
+	case TypeBool:
 		aVal, aOk := a.Value.(bool)
 		bVal, bOk := b.Value.(bool)
 		return aOk && bOk && aVal == bVal

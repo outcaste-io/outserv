@@ -88,7 +88,7 @@ func batchAndProposeKeyValues(ctx context.Context, kvs chan *pb.KVS) error {
 
 					// TODO: Check what this ReadTs would do later.
 					p := &pb.Proposal{CleanPredicate: pk.Attr, ReadTs: kv.Version - 1}
-					if err := n.proposeAndWait(ctx, p); err != nil {
+					if _, err := n.proposeAndWait(ctx, p); err != nil {
 						glog.Errorf("Error while cleaning predicate %v %v\n", pk.Attr, err)
 						return err
 					}
@@ -98,7 +98,7 @@ func batchAndProposeKeyValues(ctx context.Context, kvs chan *pb.KVS) error {
 			proposal.Kv = append(proposal.Kv, kv)
 			size += len(kv.Key) + len(kv.Value)
 			if size >= 32<<20 { // 32 MB
-				if err := n.proposeAndWait(ctx, proposal); err != nil {
+				if _, err := n.proposeAndWait(ctx, proposal); err != nil {
 					return err
 				}
 				proposal = &pb.Proposal{}
@@ -112,7 +112,7 @@ func batchAndProposeKeyValues(ctx context.Context, kvs chan *pb.KVS) error {
 	}
 	if size > 0 {
 		// Propose remaining keys.
-		if err := n.proposeAndWait(ctx, proposal); err != nil {
+		if _, err := n.proposeAndWait(ctx, proposal); err != nil {
 			return err
 		}
 	}
@@ -225,7 +225,8 @@ func (w *grpcWorker) MovePredicate(ctx context.Context,
 			ReadTs:           in.ReadTs,
 			// TODO: Should we set commitTs?
 		}
-		return &emptyPayload, groups().Node.proposeAndWait(ctx, p)
+		_, err := groups().Node.proposeAndWait(ctx, p)
+		return &emptyPayload, err
 	}
 	if err := posting.Oracle().WaitForTs(ctx, in.ReadTs); err != nil {
 		return &emptyPayload,

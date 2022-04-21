@@ -13,12 +13,10 @@ import (
 const (
 	magicVersion = 1
 
-	// AllowMutations is the mode allowing all mutations.
-	AllowMutations int = iota
+	// StrictMutations is the mode that allows mutations if and only if they contain known preds.
+	StrictMutations int = iota
 	// DisallowMutations is the mode that disallows all mutations.
 	DisallowMutations
-	// StrictMutations is the mode that allows mutations if and only if they contain known preds.
-	StrictMutations
 )
 
 // Options contains options for the Dgraph server.

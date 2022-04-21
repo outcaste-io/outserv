@@ -35,7 +35,7 @@ import (
 )
 
 var (
-	// Debug is the sub-command invoked when calling "dgraph debug"
+	// Debug is the sub-command invoked when calling "outserv debug"
 	Debug x.SubCommand
 	opt   flagOptions
 )
@@ -67,7 +67,7 @@ type flagOptions struct {
 func init() {
 	Debug.Cmd = &cobra.Command{
 		Use:   "debug",
-		Short: "Debug Dgraph instance",
+		Short: "Debug Outserv instance",
 		Run: func(cmd *cobra.Command, args []string) {
 			run()
 		},
@@ -106,11 +106,7 @@ func init() {
 }
 
 func toInt(o *pb.Posting) int {
-	from := types.Val{
-		Tid:   types.TypeID(o.ValType),
-		Value: o.Value,
-	}
-	out, err := types.Convert(from, types.StringID)
+	out, err := types.Convert(types.Sval(o.Value), types.TypeString)
 	x.Check(err)
 	val := out.Value.(string)
 	a, err := strconv.Atoi(val)
@@ -149,11 +145,7 @@ func uidToVal(itr *badger.Iterator, prefix string) map[uint64]int {
 			log.Fatalf("Unable to read posting list: %v", err)
 		}
 		err = pl.Iterate(math.MaxUint64, 0, func(o *pb.Posting) error {
-			from := types.Val{
-				Tid:   types.TypeID(o.ValType),
-				Value: o.Value,
-			}
-			out, err := types.Convert(from, types.StringID)
+			out, err := types.Convert(types.Sval(o.Value), types.TypeString)
 			x.Check(err)
 			key := out.Value.(string)
 			k, err := strconv.Atoi(key)
@@ -432,12 +424,8 @@ func appendPosting(w io.Writer, o *pb.Posting) {
 	fmt.Fprintf(w, " Uid: %#x Op: %d ", o.Uid, o.Op)
 
 	if len(o.Value) > 0 {
-		fmt.Fprintf(w, " Type: %v. ", o.ValType)
-		from := types.Val{
-			Tid:   types.TypeID(o.ValType),
-			Value: o.Value,
-		}
-		out, err := types.Convert(from, types.StringID)
+		fmt.Fprintf(w, " Type: %s. ", types.TypeID(o.Value[0]))
+		out, err := types.Convert(types.Sval(o.Value), types.TypeString)
 		if err != nil {
 			fmt.Fprintf(w, " Value: %q Error: %v", o.Value, err)
 		} else {
@@ -564,14 +552,11 @@ func printKeys(db *badger.DB) {
 		if pk.IsIndex() {
 			x.Check2(buf.WriteString("{i}"))
 		}
-		if pk.IsCountOrCountRev() {
+		if pk.IsCount() {
 			x.Check2(buf.WriteString("{c}"))
 		}
 		if pk.IsSchema() {
 			x.Check2(buf.WriteString("{s}"))
-		}
-		if pk.IsReverse() {
-			x.Check2(buf.WriteString("{r}"))
 		}
 		ns, attr := x.ParseNamespaceAttr(pk.Attr)
 		x.Check2(buf.WriteString(fmt.Sprintf(" ns: %#x ", ns)))

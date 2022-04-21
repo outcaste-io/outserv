@@ -29,7 +29,7 @@ const (
 		`client_key=; sasl-mechanism=PLAIN; tls=false;`
 	GraphQLDefaults = `introspection=true; debug=false; extensions=true; poll-interval=1s; `
 	LambdaDefaults  = `url=; num=0; port=20000; restart-after=30s; `
-	LimitDefaults   = `mutations=allow; query-edge=1000000; normalize-node=10000; ` +
+	LimitDefaults   = `disallow-mutations=false; query-edge=1000000; normalize-node=10000; ` +
 		`mutations-nquad=1000000; disallow-drop=false; query-timeout=0ms; txn-abort-after=5m;` +
 		`max-pending-queries=64;  max-retries=-1; shared-instance=false; max-splits=1000;` +
 		`max-upload-size-mb=20`

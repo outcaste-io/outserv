@@ -627,17 +627,17 @@ func stringJsonMarshal(s string) []byte {
 
 func valToBytes(v types.Val) ([]byte, error) {
 	switch v.Tid {
-	case types.StringID, types.DefaultID:
+	case types.TypeString, types.TypeDefault:
 		switch str := v.Value.(type) {
 		case string:
 			return stringJsonMarshal(str), nil
 		default:
 			return json.Marshal(str)
 		}
-	case types.BinaryID:
+	case types.TypeBinary:
 		return []byte(fmt.Sprintf("%q", v.Value)), nil
-	case types.IntID:
-		// In types.Convert(), we always convert to int64 for IntID type. fmt.Sprintf is slow
+	case types.TypeInt64:
+		// In types.Convert(), we always convert to int64 for TypeInt64 type. fmt.Sprintf is slow
 		// and hence we are using strconv.FormatInt() here. Since int64 and int are most common int
 		// types we are using FormatInt for those.
 		switch num := v.Value.(type) {
@@ -648,7 +648,7 @@ func valToBytes(v types.Val) ([]byte, error) {
 		default:
 			return []byte(fmt.Sprintf("%d", v.Value)), nil
 		}
-	case types.FloatID:
+	case types.TypeFloat:
 		f, fOk := v.Value.(float64)
 
 		// +Inf, -Inf and NaN are not representable in JSON.
@@ -658,21 +658,21 @@ func valToBytes(v types.Val) ([]byte, error) {
 		}
 
 		return []byte(fmt.Sprintf("%f", f)), nil
-	case types.BoolID:
+	case types.TypeBool:
 		if v.Value.(bool) {
 			return boolTrue, nil
 		}
 		return boolFalse, nil
-	case types.DateTimeID:
+	case types.TypeDatetime:
 		t := v.Value.(time.Time)
 		return t.MarshalJSON()
-	case types.GeoID:
+	case types.TypeGeo:
 		return geojson.Marshal(v.Value.(geom.T))
-	case types.UidID:
+	case types.TypeUid:
 		return []byte(fmt.Sprintf("\"%#x\"", v.Value)), nil
-	case types.PasswordID:
+	case types.TypePassword:
 		return []byte(fmt.Sprintf("%q", v.Value.(string))), nil
-	case types.BigIntID:
+	case types.TypeBigInt:
 		i := v.Value.(big.Int)
 		v, err := i.MarshalJSON()
 		if err != nil {
@@ -1004,7 +1004,7 @@ func (sg *SubGraph) handleCountUIDNodes(enc *encoder, n fastJsonNode, count int)
 		if uidCount && !normWithoutAlias {
 			addedNewChild = true
 
-			c := types.ValueForType(types.IntID)
+			c := types.ValueForType(types.TypeInt64)
 			c.Value = int64(count)
 
 			field := child.Params.Alias
@@ -1210,7 +1210,7 @@ func (sg *SubGraph) addCount(enc *encoder, count uint64, dst fastJsonNode) error
 	if sg.Params.Normalize && sg.Params.Alias == "" {
 		return nil
 	}
-	c := types.ValueForType(types.IntID)
+	c := types.ValueForType(types.TypeInt64)
 	c.Value = int64(count)
 	fieldName := sg.Params.Alias
 	if fieldName == "" {
@@ -1243,7 +1243,7 @@ func (sg *SubGraph) addInternalNode(enc *encoder, uid uint64, dst fastJsonNode) 
 }
 
 func (sg *SubGraph) addCheckPwd(enc *encoder, vals []*pb.TaskValue, dst fastJsonNode) error {
-	c := types.ValueForType(types.BoolID)
+	c := types.ValueForType(types.TypeBool)
 	if len(vals) == 0 {
 		c.Value = false
 	} else {
@@ -1446,7 +1446,7 @@ func (sg *SubGraph) preTraverse(enc *encoder, uid uint64, dst fastJsonNode) erro
 
 			for _, tv := range pc.valueMatrix[idx].Values {
 				// if conversion not possible, we ignore it in the result.
-				sv, convErr := convertWithBestEffort(tv, pc.Attr)
+				sv, convErr := types.FromBinary(tv.Val)
 				if convErr != nil {
 					return convErr
 				}
@@ -1496,7 +1496,7 @@ func (sg *SubGraph) preTraverse(enc *encoder, uid uint64, dst fastJsonNode) erro
 
 	if sg.pathMeta != nil {
 		totalWeight := types.Val{
-			Tid:   types.FloatID,
+			Tid:   types.TypeFloat,
 			Value: sg.pathMeta.weight,
 		}
 		if err := enc.AddValue(dst, enc.idForAttr("_weight_"), totalWeight); err != nil {

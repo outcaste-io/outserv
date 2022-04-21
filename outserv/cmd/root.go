@@ -23,6 +23,7 @@ import (
 	"github.com/outcaste-io/outserv/outserv/cmd/decrypt"
 	"github.com/outcaste-io/outserv/outserv/cmd/migrate"
 	"github.com/outcaste-io/outserv/outserv/cmd/version"
+	"github.com/outcaste-io/outserv/outserv/cmd/wallet"
 	"github.com/outcaste-io/outserv/x"
 
 	"github.com/pkg/errors"
@@ -32,10 +33,10 @@ import (
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
-	Use:   "dgraph",
-	Short: "Dgraph: Distributed Graph Database",
+	Use:   "outserv",
+	Short: "Outserv: Distributed Graph Database",
 	Long: `
-Dgraph is a horizontally scalable and distributed graph database,
+Outserv is a horizontally scalable and distributed graph database,
 providing ACID transactions, consistent replication and linearizable reads.
 It's built from the ground up to perform for a rich set of queries. Being a native
 graph database, it tightly controls how the data is arranged on disk to optimize
@@ -68,7 +69,7 @@ var subcommands = []*x.SubCommand{
 	// TODO: Consider if we need live loader.
 	&cert.Cert,
 	&alpha.Alpha, &version.Version, &debug.Debug, &migrate.Migrate,
-	&debuginfo.DebugInfo, &decrypt.Decrypt,
+	&debuginfo.DebugInfo, &decrypt.Decrypt, &wallet.Wallet,
 }
 
 func initCmds() {
@@ -93,7 +94,7 @@ func initCmds() {
 	// Always set stderrthreshold=0. Don't let users set it themselves.
 	x.Check(RootCmd.PersistentFlags().Set("stderrthreshold", "0"))
 	x.Check(RootCmd.PersistentFlags().MarkDeprecated("stderrthreshold",
-		"Dgraph always sets this flag to 0. It can't be overwritten."))
+		"Outserv always sets this flag to 0. It can't be overwritten."))
 
 	for _, sc := range subcommands {
 		RootCmd.AddCommand(sc.Cmd)
@@ -126,7 +127,7 @@ func initCmds() {
 		for _, sc := range subcommands {
 			// Set config file is provided for each subcommand, this is done
 			// for individual subcommand because each subcommand has its own config
-			// prefix, like `dgraph zero` expects the prefix to be `DGRAPH_ZERO`.
+			// prefix, like `outserv zero` expects the prefix to be `OUTSERV_ZERO`.
 			cfg := sc.Conf.GetString("config")
 			if cfg == "" {
 				continue
@@ -205,13 +206,13 @@ func shellCompletionCmd() *cobra.Command {
 		Use:   "bash",
 		Short: "bash shell completion",
 		Long: `To load bash completion run:
-dgraph completion bash > dgraph-completion.sh
+outserv completion bash > outserv-completion.sh
 
 To configure your bash shell to load completions for each session,
 add to your bashrc:
 
 # ~/.bashrc or ~/.profile
-. path/to/dgraph-completion.sh
+. path/to/outserv-completion.sh
 `,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -224,7 +225,7 @@ add to your bashrc:
 		Use:   "zsh",
 		Short: "zsh shell completion",
 		Long: `To generate zsh completion run:
-dgraph completion zsh > _dgraph
+outserv completion zsh > _outserv
 
 Then install the completion file somewhere in your $fpath or
 $_compdir paths. You must enable the compinit and compinstall plugins.
