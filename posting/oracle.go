@@ -32,8 +32,8 @@ func init() {
 
 // Txn represents a transaction.
 type Txn struct {
-	StartTs          uint64 // This does not get modified.
-	CommitTs         uint64
+	ReadTs           uint64 // ReadTs can change.
+	CommitTs         uint64 // CommitTs is fixed.
 	MaxAssignedSeen  uint64 // atomic
 	AppliedIndexSeen uint64 // atomic
 	Uids             map[string]string
@@ -46,15 +46,6 @@ type Txn struct {
 
 	slWait sync.WaitGroup
 	sl     *skl.Skiplist
-}
-
-// NewTxn returns a new Txn instance.
-func NewTxn(startTs uint64) *Txn {
-	return &Txn{
-		StartTs: startTs,
-		cache:   NewLocalCache(startTs),
-		ErrCh:   make(chan error, 1),
-	}
 }
 
 // Get retrieves the posting list for the given list from the local cache.
@@ -138,30 +129,39 @@ func (o *oracle) init() {
 	o.pendingTxns = make(map[uint64]*Txn)
 }
 
+// NewTxn returns a new Txn instance.
+func NewTxn(commitTs, readTs uint64) *Txn {
+	return &Txn{
+		ReadTs:   readTs,
+		CommitTs: commitTs,
+		cache:    NewLocalCache(readTs),
+		ErrCh:    make(chan error, 1),
+	}
+}
+
 // RegisterCommitTs would return a txn and a bool.
 // If the bool is true, the txn was already present. If false, it is new.
-func RegisterTxn(startTs, commitTs uint64) *Txn {
+func RegisterTxn(commitTs uint64) *Txn {
 	o.Lock()
 	defer o.Unlock()
 
 	_, ok := o.pendingTxns[commitTs]
 	x.AssertTrue(!ok)
 
-	txn := NewTxn(startTs)
-	txn.CommitTs = commitTs
-
+	txn := NewTxn(commitTs, ReadTimestamp())
 	RegisterTimestamp(commitTs)
 
 	o.pendingTxns[commitTs] = txn
 	return txn
 }
 
-func (o *oracle) ResetTxn(ts uint64) *Txn {
+// ResetTxn is called serially. We can use readTs = commiTs - 1 here.
+func (o *oracle) ResetTxn(commitTs uint64) *Txn {
 	o.Lock()
 	defer o.Unlock()
 
-	txn := NewTxn(ts)
-	o.pendingTxns[ts] = txn
+	txn := NewTxn(commitTs, commitTs-1)
+	o.pendingTxns[commitTs] = txn
 	return txn
 }
 
@@ -170,7 +170,7 @@ func (o *oracle) MinStartTs() uint64 {
 	defer o.RUnlock()
 	min := ReadTimestamp()
 	for _, txn := range o.pendingTxns {
-		if ts := txn.StartTs; ts < min {
+		if ts := txn.ReadTs; ts < min {
 			min = ts
 		}
 	}

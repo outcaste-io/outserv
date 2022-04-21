@@ -57,7 +57,7 @@ func (kw *keysWritten) StillValid(txn *posting.Txn) bool {
 		// commitTs is > StartTs, then it doesn't matter for reads. If the commit ts is <
 		// MaxAssignedSeen, that means our reads are valid.
 		commitTs := kw.keyCommitTs[hash]
-		if commitTs > txn.StartTs {
+		if commitTs > txn.ReadTs {
 			kw.invalidTxns++
 			return false
 		}

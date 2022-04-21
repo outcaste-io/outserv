@@ -753,7 +753,16 @@ func processTask(ctx context.Context, q *pb.Query, gid uint32) (*pb.Result, erro
 	var qs queryState
 
 	// TODO: Perhaps create a new cache to use, instead of not using any cache?
-	qs.cache = posting.NoCache(q.ReadTs)
+	var txn *posting.Txn
+	if q.CacheTs > 0 {
+		txn = posting.GetTxn(q.CacheTs)
+		glog.Infof("CacheTs: %d found txn: %+v\n", q.CacheTs, txn)
+	}
+	if txn == nil {
+		qs.cache = posting.NoCache(q.ReadTs)
+	} else {
+		qs.cache = txn.Cache()
+	}
 	// For now, remove the query level cache. It is causing contention for queries with high
 	// fan-out.
 	out, err := qs.helpProcessTask(ctx, q, gid)

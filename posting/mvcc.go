@@ -224,7 +224,7 @@ func (txn *Txn) FillContext(ctx *pb.TxnContext) {
 	}
 	txn.Lock()
 	defer txn.Unlock()
-	ctx.StartTs = txn.StartTs
+	ctx.StartTs = txn.ReadTs
 	if txn.Uids == nil {
 		return
 	}

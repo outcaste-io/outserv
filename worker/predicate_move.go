@@ -87,7 +87,7 @@ func batchAndProposeKeyValues(ctx context.Context, kvs chan *pb.KVS) error {
 					// kv.Version. kv.Version will be the TxnTs of the predicate move.
 
 					// TODO: Check what this ReadTs would do later.
-					p := &pb.Proposal{CleanPredicate: pk.Attr, ReadTs: kv.Version - 1}
+					p := &pb.Proposal{CleanPredicate: pk.Attr, CommitTs: kv.Version - 1}
 					if _, err := n.proposeAndWait(ctx, p); err != nil {
 						glog.Errorf("Error while cleaning predicate %v %v\n", pk.Attr, err)
 						return err
@@ -222,7 +222,7 @@ func (w *grpcWorker) MovePredicate(ctx context.Context,
 		p := &pb.Proposal{
 			CleanPredicate:   in.Predicate,
 			ExpectedChecksum: in.ExpectedChecksum,
-			ReadTs:           in.ReadTs,
+			CommitTs:         in.ReadTs,
 			// TODO: Should we set commitTs?
 		}
 		_, err := groups().Node.proposeAndWait(ctx, p)

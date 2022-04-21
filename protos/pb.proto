@@ -51,7 +51,7 @@ message Query {
   bool expand_all = 10;
 
   uint64 read_ts = 13;
-  int32 cache = 14;
+  uint64 cache_ts = 14;
   // Used to limit the number of result. Typically, the count is value of first
   // field. Now, It's been used only for has query.
   int32 first = 15;
@@ -206,27 +206,23 @@ message ZeroSnapshot {
 }
 
 message Proposal {
-  reserved 7;  // Was used for string key.
-  reserved 8; // Was used by OracleDelta.
+  // These following are used during processing.
+  uint64 index = 1;      // Used to store Raft index, in raft.Ready.
+  uint64 key = 2;
+  uint64 commit_ts = 3;
+  int64 entry_size = 4;
 
-  uint64 base_timestamp = 1; // Use this timestamp to derive commit timestamps.
-  Mutations mutations = 2;
-  repeated badgerpb3.KV kv = 4;
+  uint64 base_timestamp = 5; // Use this timestamp to derive commit timestamps.
+  Mutations mutations = 6;
+  repeated badgerpb3.KV kv = 7;
+
   // Delete the predicate which was moved to other group.
-  string clean_predicate = 6;
+  string clean_predicate = 8;
   Snapshot snapshot = 9;  // Used to tell the group when to take snapshot.
   // Block an operation until membership reaches this checksum.
-  uint64 expected_checksum = 11;
-  reserved 12; // Was used for restore request
-  CDCState cdc_state = 13;
-  DeleteNsRequest delete_ns = 14;  // Used to delete namespace.
-
-  // These following are used during processing.
-  uint64 index = 10;      // Used to store Raft index, in raft.Ready.
-  uint64 key = 15;
-  uint64 read_ts = 16;
-  uint64 commit_ts = 17;
-  int64 entry_size = 18;
+  uint64 expected_checksum = 10;
+  CDCState cdc_state = 11;
+  DeleteNsRequest delete_ns = 12;  // Used to delete namespace.
 }
 
 message CDCState {
