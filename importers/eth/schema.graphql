@@ -1,0 +1,15 @@
+type Txn {
+  Oid: ID!
+  Hash: String! @id
+  Value: Int64 @search
+  Block: Int64 @search
+  To: Account @hasInverse(field: Incoming)
+  From: Account @hasInverse(field: Outgoing)
+}
+
+type Account {
+  Oid: ID!
+  Hash: String! @id
+  Incoming: [Txn]
+  Outgoing: [Txn]
+}
