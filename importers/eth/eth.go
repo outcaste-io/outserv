@@ -164,7 +164,7 @@ func (c *Chain) printMetrics() {
 		maxBlockId := atomic.LoadInt64(&c.blockId)
 		num := atomic.LoadInt64(&c.numProcessed)
 		dur := time.Since(start)
-		fmt.Printf("BlockId: %d Processed: %d [ %d @ %6.1f blocks/min ]\n",
+		fmt.Printf("BlockId: %d Processed: %d [ %s @ %6.1f blocks/min ]\n",
 			maxBlockId, num,
 			dur.Round(time.Second), float64(num)/dur.Minutes())
 	}
