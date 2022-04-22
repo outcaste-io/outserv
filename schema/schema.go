@@ -210,7 +210,9 @@ func (s *state) TypeOf(pred string) (types.TypeID, error) {
 	if schema, ok := s.predicate[pred]; ok {
 		return types.TypeID(schema.ValueType), nil
 	}
-	return types.TypeUndefined, errors.Errorf("Schema not defined for predicate: %v.", pred)
+	err := errors.Errorf("Schema not defined for predicate: %q. Available: %+v",
+		pred, s.predicate)
+	return types.TypeUndefined, err
 }
 
 // IsIndexed returns whether the predicate is indexed or not

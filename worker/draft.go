@@ -634,7 +634,7 @@ func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr erro
 	txn = posting.Oracle().ResetTxn(prop.CommitTs)
 
 	// If we have an error, re-run this.
-	glog.Infof("Re-running mutation from applyCh with commit: %d", prop.CommitTs)
+	// glog.Infof("Re-running mutation from applyCh with commit: %d", prop.CommitTs)
 	span.Annotatef(nil, "Re-running mutation from applyCh with commit: %d.", prop.CommitTs)
 	return n.concMutations(ctx, m, txn)
 }

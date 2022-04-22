@@ -14,7 +14,7 @@
 
 [x] Check that an update mutation won't cause duplicate XIDs.
 [x] Deal with nested objects and their upserts.
-[ ] NumUids in deletion operation doesn't return any value.
+[x] NumUids in deletion operation doesn't return any value.
 [ ] Without upsert, we seem to be adding duplicate records.
 
 #### Inverse
@@ -33,3 +33,7 @@
 
 [ ] Separate out values from UIDs. Posting shouldn't be storing both.
 [ ] Don't use value hashes as UIDs for postings.
+
+### Deletions
+
+[ ] This doesn't work right now. Fix it: `<subject:"0x2466c53" predicate:"Account.Outgoing" object_value:"\t_STAR_ALL" op:DEL >`
