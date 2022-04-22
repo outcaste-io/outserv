@@ -714,25 +714,17 @@ func (qs *queryState) handleUidPostings(
 
 // processTask processes the query, accumulates and returns the result.
 func processTask(ctx context.Context, q *pb.Query, gid uint32) (*pb.Result, error) {
-	ctx, span := otrace.StartSpan(ctx, "processTask."+q.Attr)
-	defer span.End()
+	span := otrace.FromContext(ctx)
 
 	stop := x.SpanTimer(span, "processTask"+q.Attr)
 	defer stop()
 
-	span.Annotatef(nil, "Waiting for startTs: %d at node: %d, gid: %d",
-		q.ReadTs, groups().Node.Id, gid)
 	if err := posting.Oracle().WaitForTs(ctx, q.ReadTs); err != nil {
 		return nil, err
-	}
-	if span != nil {
-		span.Annotatef(nil, "Done waiting for ts. Attr: %q ReadTs: %d",
-			q.Attr, q.ReadTs)
 	}
 	if err := groups().ChecksumsMatch(ctx); err != nil {
 		return nil, err
 	}
-	span.Annotatef(nil, "Done waiting for checksum match")
 
 	// If a group stops serving tablet and it gets partitioned away from group
 	// zero, then it wouldn't know that this group is no longer serving this

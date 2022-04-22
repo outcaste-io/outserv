@@ -108,10 +108,15 @@ type Chain struct {
 	blockCh      chan *Block
 }
 
-func (c *Chain) Fill() {
+func (c *Chain) BlockingFill() {
+	defer close(c.blockCh)
+
 	c.blockId = *startBlock - 1
 	for {
 		blockId := atomic.AddInt64(&c.blockId, 1)
+		if blockId >= 14e6 {
+			return
+		}
 		b := &Block{Id: blockId}
 		b.Wg.Add(1)
 		go b.Fill()
@@ -119,7 +124,9 @@ func (c *Chain) Fill() {
 	}
 }
 
-func (c *Chain) processTxns() {
+func (c *Chain) processTxns(wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	var txns []Txn
 	sendTxns := func(txns []Txn) error {
 		if len(txns) == 0 {
@@ -129,7 +136,7 @@ func (c *Chain) processTxns() {
 			Query:     txnMu,
 			Variables: Batch{Txns: txns},
 		}
-		fmt.Printf("----------> Txns %d. Sending...\n", len(txns))
+		// fmt.Printf("----------> Txns %d. Sending...\n", len(txns))
 		data, err := json.Marshal(q)
 		if err != nil {
 			return err
@@ -276,23 +283,13 @@ func main() {
 	chain := Chain{
 		blockCh: make(chan *Block, 16),
 	}
-	// go chain.processAccounts()
+	var wg sync.WaitGroup
 	for i := 0; i < *numGo; i++ {
-		go chain.processTxns()
+		wg.Add(1)
+		go chain.processTxns(&wg)
 	}
 	go chain.printMetrics()
-	chain.Fill()
-
-	// TODO: Fix up the ending and the maintainance of syncing.
-	// Also add a way to check how far along is Outserv synced already.
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	// go processAccounts(&wg)
-	// for i := 0; i < *numGo; i++ {
-	// 	wg.Add(1)
-	// 	go processQueue(&wg)
-	// }
+	chain.BlockingFill()
 	wg.Wait()
-	// TODO: Deal with reqCh.
+	fmt.Println("DONE")
 }

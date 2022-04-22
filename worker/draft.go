@@ -622,9 +622,6 @@ func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr erro
 	// don't block on txn.ErrCh.
 	err, ok := <-txn.ErrCh
 	x.AssertTrue(ok)
-	if err != nil {
-		glog.Warningf("Got error from ErrCh: %v for txn: %d\n", err, txn.CommitTs)
-	}
 	if err == nil && n.keysWritten.StillValid(txn) {
 		span.Annotate(nil, "Mutation is still valid.")
 		return nil
