@@ -303,7 +303,8 @@ func (n *node) mutationWorker(workerId int) {
 
 		txn := posting.GetTxn(p.CommitTs)
 		x.AssertTruef(txn != nil, "Unable to find txn with commit ts: %d", p.CommitTs)
-		txn.ErrCh <- n.concMutations(ctx, p.Mutations, txn)
+		txn.ErrCh <- fmt.Errorf("Not running concurrently")
+		// txn.ErrCh <- n.concMutations(ctx, p.Mutations, txn)
 		close(txn.ErrCh)
 	}
 
@@ -343,13 +344,13 @@ func UidsForObject(ctx context.Context, obj *pb.Object, txn *posting.Txn) (*sroa
 			// First: 3, // We can't just ask for the first 3, because we might have
 			// to intersect this result with others.
 		}
-		glog.Infof("running query: %+v\n", q)
-		glog.Infof("Keys read before: %d\n", len(txn.Cache().ReadKeys()))
+		// glog.Infof("running query: %+v\n", q)
+		// glog.Infof("Keys read before: %d\n", len(txn.Cache().ReadKeys()))
 		result, err := ProcessTaskOverNetwork(ctx, q)
 		if err != nil {
 			return nil, errors.Wrapf(err, "while calling ProcessTaskOverNetwork")
 		}
-		glog.Infof("Keys read after: %d\n", len(txn.Cache().ReadKeys()))
+		// glog.Infof("Keys read after: %d\n", len(txn.Cache().ReadKeys()))
 		if len(result.UidMatrix) == 0 {
 			// No result found. Continue querying so we can track all the keys
 			// that need to be read for this object.
@@ -365,7 +366,10 @@ func UidsForObject(ctx context.Context, obj *pb.Object, txn *posting.Txn) (*sroa
 		// ensure that we're tracking all the keys that need to be read for this
 		// object.
 	}
-	glog.V(2).Infof("Uids (read: %d, commit: %d) for %+v are: %x\n", txn.ReadTs, txn.CommitTs, obj, res.ToArray())
+	if glog.V(2) {
+		glog.Infof("Uids (read: %d, commit: %d) for %+v are: %x\n",
+			txn.ReadTs, txn.CommitTs, obj, res.ToArray())
+	}
 	return res, nil
 }
 
@@ -380,8 +384,6 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 	// Deal with objects first.
 	resolved := make(map[string]string)
 	for _, obj := range m.NewObjects {
-		glog.Infof("Got object: %+v\n", obj)
-
 		// Does the read timestamp need to be passed to UidsForObject?
 		bm, err := UidsForObject(ctx, obj, txn)
 		if err != nil {
@@ -620,6 +622,9 @@ func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr erro
 	// don't block on txn.ErrCh.
 	err, ok := <-txn.ErrCh
 	x.AssertTrue(ok)
+	if err != nil {
+		glog.Warningf("Got error from ErrCh: %v for txn: %d\n", err, txn.CommitTs)
+	}
 	if err == nil && n.keysWritten.StillValid(txn) {
 		span.Annotate(nil, "Mutation is still valid.")
 		return nil
@@ -659,7 +664,7 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 			glog.Infof("Proposal.CommitTs: %#x\n", proposal.CommitTs)
 		}
 		if txn := posting.GetTxn(proposal.CommitTs); txn != nil {
-			n.commit(txn)
+			n.commit(ctx, txn)
 		}
 
 		span.Annotate(nil, "Done")
@@ -895,9 +900,12 @@ func (n *node) processApplyCh() {
 	}
 }
 
-func (n *node) commit(txn *posting.Txn) error {
+func (n *node) commit(ctx context.Context, txn *posting.Txn) error {
 	x.AssertTrue(txn != nil)
 	start := time.Now()
+
+	span := otrace.FromContext(ctx)
+	span.Annotate(nil, "Commit")
 
 	c := txn.Cache()
 	c.RLock()
@@ -927,6 +935,7 @@ func (n *node) commit(txn *posting.Txn) error {
 		// tracking would only consider the txns which have been successfully pushed to disk.
 		return pstore.HandoverSkiplist(txn.Skiplist(), deleteTxn)
 	})
+	span.Annotate(nil, "HandoverSkiplist done")
 	if err != nil {
 		glog.Errorf("while handing over skiplist: %v\n", err)
 	}

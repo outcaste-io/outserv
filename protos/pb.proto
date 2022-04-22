@@ -159,14 +159,13 @@ message Tablet {
   // Served by which group.
   uint32 group_id = 1 [(gogoproto.jsontag) = "groupId,omitempty"];
   string predicate = 2;
-  bool force = 3;  // Used while moving predicate.
-  int64 on_disk_bytes = 7;
-  bool remove = 8;
+  bool remove = 3;
   // If true, do not ask zero to serve any tablets.
-  bool read_only = 9 [(gogoproto.jsontag) = "readOnly,omitempty"];
-  uint64 move_ts = 10 [(gogoproto.jsontag) = "moveTs,omitempty"];
+  bool read_only = 4 [(gogoproto.jsontag) = "readOnly,omitempty"];
+  uint64 move_ts = 5 [(gogoproto.jsontag) = "moveTs,omitempty"];
   // Estimated uncompressed size of tablet in bytes
-  int64 uncompressed_bytes = 11;
+  int64 on_disk_bytes = 6;
+  int64 uncompressed_bytes = 7;
 }
 
 message Object {

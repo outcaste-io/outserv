@@ -756,7 +756,6 @@ func processTask(ctx context.Context, q *pb.Query, gid uint32) (*pb.Result, erro
 	var txn *posting.Txn
 	if q.CacheTs > 0 {
 		txn = posting.GetTxn(q.CacheTs)
-		glog.Infof("CacheTs: %d found txn: %+v\n", q.CacheTs, txn)
 	}
 	if txn == nil {
 		qs.cache = posting.NoCache(q.ReadTs)
