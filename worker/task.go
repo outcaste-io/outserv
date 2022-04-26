@@ -1280,107 +1280,6 @@ func (qs *queryState) filterGeoFunction(ctx context.Context, arg funcArgs) error
 	return nil
 }
 
-// TODO: This function is really slow when there are a lot of UIDs to filter, for e.g. when used in
-// `has(name)`. We could potentially have a query level cache, which can be used to speed things up
-// a bit. Or, try to reduce the number of UIDs which make it here.
-func (qs *queryState) filterStringFunction(arg funcArgs) error {
-	if glog.V(3) {
-		glog.Infof("filterStringFunction. arg: %+v\n", arg.q)
-		defer glog.Infof("Done filterStringFunction")
-	}
-	attr := arg.q.Attr
-
-	uids := sroar.NewBitmap()
-	var matrix []*sroar.Bitmap
-	for _, l := range arg.out.UidMatrix {
-		bm := codec.FromList(l)
-		matrix = append(matrix, bm)
-		uids.Or(bm)
-	}
-
-	filter := &stringFilter{
-		funcName: arg.srcFn.fname,
-		funcType: arg.srcFn.fnType,
-	}
-	switch arg.srcFn.fnType {
-	case hasFn:
-		filter = nil
-	case fullTextSearchFn:
-		filter.tokens = arg.srcFn.tokens
-		filter.match = defaultMatch
-		filter.tokName = "fulltext"
-	case standardFn:
-		filter.tokens = arg.srcFn.tokens
-		filter.match = defaultMatch
-		filter.tokName = "term"
-	case customIndexFn:
-		filter.tokens = arg.srcFn.tokens
-		filter.match = defaultMatch
-		filter.tokName = arg.q.SrcFunc.Args[0]
-	case compareAttrFn:
-		// filter.ineqValue = arg.srcFn.ineqValue
-		filter.eqVals = arg.srcFn.eqTokens
-		filter.match = ineqMatch
-	}
-
-	// This iteration must be done in a serial order, because we're also storing the values in a
-	// matrix, to check it later.
-	// TODO: This function can be optimized by having a query specific cache, which can be populated
-	// by the handleHasFunction for e.g. for a `has(name)` query.
-	itr := uids.NewIterator()
-
-	// We can't directly modify uids bitmap. We need to add them to another bitmap, and then take
-	// the difference.
-	remove := sroar.NewBitmap()
-	for uid := itr.Next(); uid > 0; uid = itr.Next() {
-		vals, err := qs.getValsForUID(attr, uid, arg.q.ReadTs)
-		switch {
-		case err == posting.ErrNoValue:
-			continue
-		case err != nil:
-			return err
-		}
-
-		var strVals []types.Val
-		for _, v := range vals {
-			// convert data from binary to appropriate format
-			strVal, err := types.Convert(v, types.TypeString)
-			if err != nil {
-				continue
-			}
-			strVals = append(strVals, strVal)
-		}
-		if !matchStrings(filter, strVals) {
-			remove.Set(uid)
-		}
-	}
-
-	uids.AndNot(remove)
-	for i := 0; i < len(matrix); i++ {
-		matrix[i].And(uids)
-		arg.out.UidMatrix[i].Bitmap = matrix[i].ToBuffer()
-	}
-	return nil
-}
-
-func (qs *queryState) getValsForUID(attr string, uid, ReadTs uint64) ([]types.Sval, error) {
-	key := x.DataKey(attr, uid)
-	pl, err := qs.cache.Get(key)
-	if err != nil {
-		return nil, err
-	}
-
-	var vals []types.Sval
-	var val types.Sval
-	if schema.State().IsList(attr) {
-		vals, err = pl.AllValues(ReadTs)
-	} else {
-		val, err = pl.Value(ReadTs)
-		vals = append(vals, val)
-	}
-	return vals, err
-}
-
 func matchRegex(value types.Val, regex *cregexp.Regexp) bool {
 	return len(value.Value.(string)) > 0 && regex.MatchString(value.Value.(string), true, true) > 0
 }
@@ -1428,15 +1327,6 @@ func checkRoot(q *pb.Query, fc *functionContext) {
 	} else {
 		fc.n = int(codec.ListCardinality(q.UidList))
 	}
-}
-
-// We allow atmost one lang in functions. We can inline in 1.9.
-func langForFunc(langs []string) string {
-	x.AssertTrue(len(langs) <= 1)
-	if len(langs) == 0 {
-		return ""
-	}
-	return langs[0]
 }
 
 func parseSrcFn(ctx context.Context, q *pb.Query) (*functionContext, error) {
@@ -1736,47 +1626,6 @@ func (w *grpcWorker) ServeTask(ctx context.Context, q *pb.Query) (*pb.Result, er
 	case reply := <-c:
 		return reply.result, reply.err
 	}
-}
-
-// filterOnStandardFn : tells whether facet corresponding to fcTokens can be taken or not.
-// fcTokens and argTokens should be sorted.
-func filterOnStandardFn(fname string, fcTokens []string, argTokens []string) (bool, error) {
-	switch fname {
-	case "allofterms":
-		// allofterms argTokens should be in fcTokens
-		if len(argTokens) > len(fcTokens) {
-			return false, nil
-		}
-		aidx := 0
-	loop:
-		for fidx := 0; aidx < len(argTokens) && fidx < len(fcTokens); {
-			switch {
-			case fcTokens[fidx] < argTokens[aidx]:
-				fidx++
-			case fcTokens[fidx] == argTokens[aidx]:
-				fidx++
-				aidx++
-			default:
-				// as all of argTokens should match
-				// which is not possible now.
-				break loop
-			}
-		}
-		return aidx == len(argTokens), nil
-	case "anyofterms":
-		for aidx, fidx := 0, 0; aidx < len(argTokens) && fidx < len(fcTokens); {
-			switch {
-			case fcTokens[fidx] < argTokens[aidx]:
-				fidx++
-			case fcTokens[fidx] == argTokens[aidx]:
-				return true, nil
-			default:
-				aidx++
-			}
-		}
-		return false, nil
-	}
-	return false, errors.Errorf("Fn %s not supported in facets filtering.", fname)
 }
 
 // commonTypeIDs is list of type ids which are more common. In preprocessFilter() we keep converted

@@ -6,7 +6,6 @@ package worker
 import (
 	"context"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"math"
 	"strconv"
@@ -256,29 +255,6 @@ func (n *node) applyConfChange(e raftpb.Entry) {
 	cs := n.Raft().ApplyConfChange(cc)
 	n.SetConfState(cs)
 	n.DoneConfChange(cc.ID, nil)
-}
-
-var errHasPendingTxns = errors.New("Pending transactions found. Please retry operation")
-
-// We must not wait here. Previously, we used to block until we have aborted the
-// transactions. We're now applying all updates serially, so blocking for one
-// operation is not an option.
-func detectPendingTxns(attr string) error {
-	return nil
-	// TODO: Check if we still need this?
-
-	tctxs := posting.Oracle().IterateTxns(func(key []byte) bool {
-		pk, err := x.Parse(key)
-		if err != nil {
-			glog.Errorf("error %v while parsing key %v", err, hex.EncodeToString(key))
-			return false
-		}
-		return pk.Attr == attr
-	})
-	if len(tctxs) == 0 {
-		return nil
-	}
-	return errHasPendingTxns
 }
 
 func emptyMutation(mu *pb.Mutations) bool {
@@ -544,13 +520,6 @@ func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr erro
 		n.keysWritten.rejectBeforeIndex = prop.Index
 
 		span.Annotatef(nil, "Applying schema")
-		for _, supdate := range prop.Mutations.Schema {
-			// We should not need to check for predicate move here.
-			if err := detectPendingTxns(supdate.Predicate); err != nil {
-				return err
-			}
-		}
-
 		if err := runSchemaMutation(ctx, prop.Mutations.Schema, prop.CommitTs); err != nil {
 			return err
 		}
@@ -574,12 +543,6 @@ func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr erro
 	schemaMap := make(map[string]types.TypeID)
 	for _, edge := range prop.Mutations.Edges {
 		if isDeletePredicateEdge(edge) {
-			// We should only drop the predicate if there is no pending
-			// transaction.
-			if err := detectPendingTxns(edge.Predicate); err != nil {
-				span.Annotatef(nil, "Found pending transactions. Retry later.")
-				return err
-			}
 			span.Annotatef(nil, "Deleting predicate: %s", edge.Predicate)
 			n.keysWritten.rejectBeforeIndex = prop.Index
 			return posting.DeletePredicate(ctx, edge.Predicate, prop.CommitTs)
@@ -769,7 +732,6 @@ func (n *node) processApplyCh() {
 
 	type P struct {
 		err  error
-		size int
 		seen time.Time
 	}
 	previous := make(map[uint64]*P)
@@ -1677,8 +1639,6 @@ func (n *node) calculateTabletSizes() {
 			humanize.Bytes(uint64(total)))
 	}
 }
-
-var errNoConnection = errors.New("No connection exists")
 
 // calculateSnapshot would calculate a snapshot index, considering these factors:
 // - We only start discarding once we have at least discardN entries.

@@ -2184,27 +2184,6 @@ func (t *Type) XIDFields() []*FieldDefinition {
 	return xids
 }
 
-// InterfaceImplHasAuthRules checks if an interface's implementation has auth rules.
-func (t *Type) InterfaceImplHasAuthRules() bool {
-	schema := t.inSchema.schema
-	types := schema.Types
-	if typ, ok := types[t.Name()]; !ok || typ.Kind != ast.Interface {
-		return false
-	}
-
-	for implName, implements := range schema.Implements {
-		for _, intrface := range implements {
-			if intrface.Name != t.Name() {
-				continue
-			}
-			if val, ok := t.inSchema.authRules[implName]; ok && val.Rules != nil {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func (t *Type) Interfaces() []string {
 	interfaces := t.inSchema.schema.Types[t.typ.Name()].Interfaces
 	if len(interfaces) == 0 {

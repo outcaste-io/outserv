@@ -162,8 +162,6 @@ type params struct {
 	IsInternal bool
 	// IgnoreResult is true if the node results are to be ignored.
 	IgnoreResult bool
-	// Expand holds the argument passed to the expand function.
-	Expand string
 
 	// IsGroupBy is true if @groupby is specified.
 	IsGroupBy bool // True if @groupby is specified.
@@ -472,10 +470,6 @@ func treeCopy(gq *gql.GraphQuery, sg *SubGraph) error {
 	attrsSeen := make(map[string]struct{})
 
 	for _, gchild := range gq.Children {
-		if sg.Params.Alias == "shortest" && gchild.Expand != "" {
-			return errors.Errorf("expand() not allowed inside shortest")
-		}
-
 		key := ""
 		if gchild.Alias != "" {
 			key = gchild.Alias
@@ -490,7 +484,6 @@ func treeCopy(gq *gql.GraphQuery, sg *SubGraph) error {
 
 		args := params{
 			Alias:        gchild.Alias,
-			Expand:       gchild.Expand,
 			GetUid:       sg.Params.GetUid,
 			IgnoreReflex: sg.Params.IgnoreReflex,
 			NeedsVar:     append(gchild.NeedsVar[:0:0], gchild.NeedsVar...),
@@ -1736,113 +1729,10 @@ func expandSubgraph(ctx context.Context, sg *SubGraph) ([]*SubGraph, error) {
 	stop := x.SpanTimer(span, "expandSubgraph: "+sg.Attr)
 	defer stop()
 
-	namespace, err := x.ExtractNamespace(ctx)
-	if err != nil {
-		return nil, errors.Wrapf(err, "While expanding subgraph")
-	}
 	out := make([]*SubGraph, 0, len(sg.Children))
 	for i := 0; i < len(sg.Children); i++ {
 		child := sg.Children[i]
-
-		if child.Params.Expand == "" {
-			out = append(out, child)
-			continue
-		}
-
-		var preds []string
-		typeNames, err := getNodeTypes(ctx, sg)
-		if err != nil {
-			return out, err
-		}
-
-		switch child.Params.Expand {
-		// It could be expand(_all_) or expand(val(x)).
-		case "_all_":
-			span.Annotate(nil, "expand(_all_)")
-			if len(typeNames) == 0 {
-				break
-			}
-
-			preds = getPredicatesFromTypes(namespace, typeNames)
-			// We check if enterprise is enabled and only
-			// restrict preds to allowed preds if ACL is turned on.
-			if sg.Params.AllowedPreds != nil {
-				// Take intersection of both the predicate lists
-				intersectPreds := make([]string, 0)
-				hashMap := make(map[string]bool)
-				for _, allowedPred := range sg.Params.AllowedPreds {
-					hashMap[allowedPred] = true
-				}
-				for _, pred := range preds {
-					if _, found := hashMap[pred]; found {
-						intersectPreds = append(intersectPreds, pred)
-					}
-				}
-				preds = intersectPreds
-			}
-
-		default:
-			if len(child.ExpandPreds) > 0 {
-				span.Annotate(nil, "expand default")
-				// We already have the predicates populated from the var.
-				temp := getPredsFromVals(child.ExpandPreds)
-				for _, pred := range temp {
-					preds = append(preds, x.NamespaceAttr(namespace, pred))
-				}
-			} else {
-				typeNames := strings.Split(child.Params.Expand, ",")
-				preds = getPredicatesFromTypes(namespace, typeNames)
-			}
-		}
-		preds = uniquePreds(preds)
-
-		// There's a types filter at this level so filter out any non-uid predicates
-		// since only uid nodes can have a type.
-		if len(child.Filters) > 0 {
-			preds, err = filterUidPredicates(ctx, preds)
-			if err != nil {
-				return out, err
-			}
-		}
-
-		for _, pred := range preds {
-			// Convert attribute name for the given namespace.
-			temp := &SubGraph{
-				ReadTs: sg.ReadTs,
-				Attr:   x.ParseAttr(pred),
-			}
-			temp.Params = child.Params
-			// TODO(martinmr): simplify this condition once _reverse_ and _forward_
-			// are removed
-			temp.Params.ExpandAll = child.Params.Expand != "_reverse_" &&
-				child.Params.Expand != "_forward_"
-			temp.Params.ParentVars = make(map[string]varValue)
-			for k, v := range child.Params.ParentVars {
-				temp.Params.ParentVars[k] = v
-			}
-			temp.Params.IsInternal = false
-			temp.Params.Expand = ""
-			for _, cf := range child.Filters {
-				s := &SubGraph{}
-				recursiveCopy(s, cf)
-				temp.Filters = append(temp.Filters, s)
-			}
-
-			// Go through each child, create a copy and attach to temp.Children.
-			for _, cc := range child.Children {
-				s := &SubGraph{}
-				recursiveCopy(s, cc)
-				temp.Children = append(temp.Children, s)
-			}
-
-			for _, ch := range sg.Children {
-				if ch.isSimilar(temp) {
-					return out, errors.Errorf("Repeated subgraph: [%s] while using expand()",
-						ch.Attr)
-				}
-			}
-			out = append(out, temp)
-		}
+		out = append(out, child)
 	}
 	return out, nil
 }
@@ -2192,13 +2082,6 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 	}
 
 	rch <- childErr
-}
-
-// stores index of a uid as the index in the uidMatrix (x)
-// and index in the corresponding list of the uidMatrix (y)
-type UidKey struct {
-	x int
-	y int
 }
 
 // applies "random" to lists inside uidMatrix

@@ -1284,9 +1284,6 @@ func (sg *SubGraph) preTraverse(enc *encoder, uid uint64, dst fastJsonNode) erro
 			continue
 		}
 		if pc.IsInternal() {
-			if pc.Params.Expand != "" {
-				continue
-			}
 			if pc.Params.Normalize && pc.Params.Alias == "" {
 				continue
 			}

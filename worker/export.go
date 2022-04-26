@@ -169,24 +169,6 @@ func toSchema(attr string, update *pb.SchemaUpdate) *bpb.KV {
 	}
 }
 
-func fieldToString(update *pb.SchemaUpdate) string {
-	var builder strings.Builder
-	predicate := x.ParseAttr(update.Predicate)
-	x.Check2(builder.WriteString("\t"))
-	// We don't need the namespace information with the fields. We already have that with type.
-	if strings.HasPrefix(predicate, "~") {
-		// While exporting type definitions, "<" and ">" brackets must be written around
-		// the name of reverse predicates or Dgraph won't be able to parse the exported schema.
-		x.Check2(builder.WriteString("<"))
-		x.Check2(builder.WriteString(predicate))
-		x.Check2(builder.WriteString(">"))
-	} else {
-		x.Check2(builder.WriteString(predicate))
-	}
-	x.Check2(builder.WriteString("\n"))
-	return builder.String()
-}
-
 type ExportWriter struct {
 	w             io.WriteCloser
 	bw            *bufio.Writer

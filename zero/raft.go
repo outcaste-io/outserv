@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -28,10 +27,6 @@ import (
 	otrace "go.opencensus.io/trace"
 )
 
-const (
-	raftDefaults = "idx=1; learner=false;"
-)
-
 var proposalKey uint64
 
 type node struct {
@@ -39,9 +34,6 @@ type node struct {
 	state  *State
 	ctx    context.Context
 	closer *z.Closer // to stop Run.
-
-	// The last timestamp when this Zero was able to reach quorum.
-	mu sync.RWMutex
 }
 
 func (n *node) amLeader() bool {
