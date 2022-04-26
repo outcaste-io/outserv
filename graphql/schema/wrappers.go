@@ -137,8 +137,6 @@ type Schema struct {
 	// remoteResponse stores the mapping of typeName->fieldName->responseName which will be used in result
 	// completion step.
 	remoteResponse map[string]map[string]string
-	// Map from typename to auth rules
-	authRules map[string]*TypeAuth
 	// meta is the meta information extracted from input schema
 	meta *metaInfo
 }
@@ -816,14 +814,6 @@ func AsSchema(s *ast.Schema, ns uint64) (*Schema, error) {
 		meta:               &metaInfo{}, // initialize with an empty metaInfo
 	}
 	sch.mutatedType = mutatedTypeMapping(sch, dgraphPredicate)
-	// Auth rules can't be effectively validated as part of the normal rules -
-	// because they need the fully generated schema to be checked against.
-	var err error
-	sch.authRules, err = authRules(sch)
-	if err != nil {
-		return nil, err
-	}
-
 	return sch, nil
 }
 
@@ -1770,10 +1760,6 @@ func mutationType(name string, custom *ast.Directive) MutationType {
 	default:
 		return NotSupportedMutation
 	}
-}
-
-func (t *Type) AuthRules() *TypeAuth {
-	return t.inSchema.authRules[t.DgraphName()]
 }
 
 func (t *Type) IsGeo() bool {
