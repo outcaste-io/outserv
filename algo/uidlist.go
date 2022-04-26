@@ -22,8 +22,6 @@ import (
 	"github.com/outcaste-io/sroar"
 )
 
-const jump = 32 // Jump size in InsersectWithJump.
-
 // ApplyFilter applies a filter to our UIDList.
 // TODO: ApplyFilter in this way should only happen for sorted uids. For normal
 // filter, it should use Bitmap FastAnd or And.

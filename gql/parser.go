@@ -740,18 +740,6 @@ func (f *FilterTree) collectVars(v *Vars) {
 	}
 }
 
-func (f *FilterTree) hasVars() bool {
-	if (f.Func != nil) && (len(f.Func.NeedsVar) > 0) {
-		return true
-	}
-	for _, fch := range f.Child {
-		if fch.hasVars() {
-			return true
-		}
-	}
-	return false
-}
-
 // getVariablesAndQuery checks if the query has a variable list and stores it in
 // vmap. For variable list to be present, the query should have a name which is
 // also checked for. It also calls getQuery to create the GraphQuery object tree.
@@ -2939,15 +2927,6 @@ func tryParseItemType(it *lex.ItemIterator, typ lex.ItemType) (lex.Item, bool) {
 	}
 	it.Next()
 	return item, true
-}
-
-func trySkipItemVal(it *lex.ItemIterator, val string) bool {
-	item, ok := it.PeekOne()
-	if !ok || item.Val != val {
-		return false
-	}
-	it.Next()
-	return true
 }
 
 func trySkipItemTyp(it *lex.ItemIterator, typ lex.ItemType) bool {
