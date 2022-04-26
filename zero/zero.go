@@ -7,9 +7,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"net"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -30,11 +28,7 @@ type State struct {
 
 	// nextUint is the uint64 which we can hand out next. See maxLease for the
 	// max ID leased via Zero quorum.
-	nextUint  map[pb.NumLeaseType]uint64
-	leaseLock sync.Mutex // protects nextUID, nextTxnTs, nextNsID and corresponding proposals.
-
-	// TODO: Do we need RateLimiter?
-	rateLimiter *x.RateLimiter
+	nextUint map[pb.NumLeaseType]uint64
 
 	// groupMap    map[uint32]*Group
 	closer *z.Closer // Used to tell stream to close.
@@ -103,12 +97,6 @@ func (s *State) membership() *pb.MembershipState {
 
 	return s._state
 }
-func (s *State) membershipCopy() *pb.MembershipState {
-	s.Lock()
-	defer s.Unlock()
-
-	return proto.Clone(s._state).(*pb.MembershipState)
-}
 
 func (s *State) StoreMember(m *pb.Member) {
 	s.Lock()
@@ -142,12 +130,6 @@ func (s *State) RemoveMember(raftId uint64) {
 		st.Removed = append(st.Removed, raftId)
 	}
 	s._state = st
-}
-
-func setupListener(addr string, port int, kind string) (listener net.Listener, err error) {
-	laddr := fmt.Sprintf("%s:%d", addr, port)
-	glog.Infof("Setting up %s listener at: %v\n", kind, laddr)
-	return net.Listen("tcp", laddr)
 }
 
 var inode *node

@@ -255,8 +255,6 @@ func (enc *encoder) makeCustomNode(attr uint16, val []byte) (fastJsonNode, error
 const (
 	// Value with most significant bit set to 1.
 	listBit = 1 << 63
-	// Value with second most significant bit set to 1.
-	facetsBit = 1 << 62
 	// Value with third most significant bit set to 1.
 	uidNodeBit = 1 << 61
 	// Node has been visited for fixing the children order.
@@ -346,16 +344,8 @@ func (enc *encoder) setVisited(fj fastJsonNode, visited bool) {
 	}
 }
 
-func (enc *encoder) setFacetsParent(fj fastJsonNode) {
-	fj.meta |= facetsBit
-}
-
 func (enc *encoder) setCustom(fj fastJsonNode) {
 	fj.meta |= customBit
-}
-
-func (enc *encoder) appendAttrs(fj, child fastJsonNode) {
-	enc.addChildren(fj, child)
 }
 
 // addChildren appends attrs to existing fj's attrs.
@@ -450,10 +440,6 @@ func (enc *encoder) getScalarVal(fj fastJsonNode) ([]byte, error) {
 
 func (enc *encoder) getList(fj fastJsonNode) bool {
 	return (fj.meta & listBit) > 0
-}
-
-func (enc *encoder) getFacetsParent(fj fastJsonNode) bool {
-	return (fj.meta & facetsBit) > 0
 }
 
 func (enc *encoder) getCustom(fj fastJsonNode) bool {
@@ -855,7 +841,7 @@ func (enc *encoder) normalize(fj fastJsonNode) ([]fastJsonNode, error) {
 		// children, we will flatten them, otherwise we will return all children.
 		// We should only consider those children(of fj) for flattening which have
 		// children and are not facetsParent.
-		if enc.children(chead) != nil && !enc.getFacetsParent(chead) {
+		if enc.children(chead) != nil {
 			cnt++
 		}
 		chead = chead.next
@@ -873,7 +859,7 @@ func (enc *encoder) normalize(fj fastJsonNode) ([]fastJsonNode, error) {
 	var shead, curScalar fastJsonNode
 	chead = enc.children(fj)
 	for chead != nil {
-		if enc.children(chead) != nil && enc.getFacetsParent(chead) == false {
+		if enc.children(chead) != nil {
 			chead = chead.next
 			continue
 		}
@@ -894,8 +880,8 @@ func (enc *encoder) normalize(fj fastJsonNode) ([]fastJsonNode, error) {
 	chead = enc.children(fj)
 	for chead != nil {
 		childNode := chead
-		// Here, exclude all nodes which have either no children or they are facetsParent.
-		if enc.children(childNode) == nil || enc.getFacetsParent(childNode) {
+		// Here, exclude all nodes which have no children.
+		if enc.children(childNode) == nil {
 			chead = chead.next
 			continue
 		}
@@ -1284,9 +1270,6 @@ func (sg *SubGraph) preTraverse(enc *encoder, uid uint64, dst fastJsonNode) erro
 			continue
 		}
 		if pc.IsInternal() {
-			if pc.Params.Expand != "" {
-				continue
-			}
 			if pc.Params.Normalize && pc.Params.Alias == "" {
 				continue
 			}

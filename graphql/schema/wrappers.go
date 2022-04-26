@@ -137,8 +137,6 @@ type Schema struct {
 	// remoteResponse stores the mapping of typeName->fieldName->responseName which will be used in result
 	// completion step.
 	remoteResponse map[string]map[string]string
-	// Map from typename to auth rules
-	authRules map[string]*TypeAuth
 	// meta is the meta information extracted from input schema
 	meta *metaInfo
 }
@@ -659,10 +657,6 @@ func hasExternal(f *ast.FieldDefinition) bool {
 	return f.Directives.ForName(apolloExternalDirective) != nil
 }
 
-func isEntityUnion(typ *ast.Definition) bool {
-	return typ.Kind == ast.Union && typ.Name == "_Entity"
-}
-
 func (f *Field) IsExternal() bool {
 	return hasExternal(f.field.Definition)
 }
@@ -820,14 +814,6 @@ func AsSchema(s *ast.Schema, ns uint64) (*Schema, error) {
 		meta:               &metaInfo{}, // initialize with an empty metaInfo
 	}
 	sch.mutatedType = mutatedTypeMapping(sch, dgraphPredicate)
-	// Auth rules can't be effectively validated as part of the normal rules -
-	// because they need the fully generated schema to be checked against.
-	var err error
-	sch.authRules, err = authRules(sch)
-	if err != nil {
-		return nil, err
-	}
-
 	return sch, nil
 }
 
@@ -855,14 +841,6 @@ func (f *Field) DgraphAlias() string {
 
 func (f *Field) ResponseName() string {
 	return responseName(f.field)
-}
-
-func remoteResponseDirectiveArgument(fd *ast.FieldDefinition) string {
-	remoteResponseDirectiveDefn := fd.Directives.ForName(remoteResponseDirective)
-	if remoteResponseDirectiveDefn != nil {
-		return remoteResponseDirectiveDefn.Arguments.ForName("name").Value.Raw
-	}
-	return ""
 }
 
 func (f *Field) RemoteResponseName() string {
@@ -1784,10 +1762,6 @@ func mutationType(name string, custom *ast.Directive) MutationType {
 	}
 }
 
-func (t *Type) AuthRules() *TypeAuth {
-	return t.inSchema.authRules[t.DgraphName()]
-}
-
 func (t *Type) IsGeo() bool {
 	return t.Name() == "Point" || t.Name() == "Polygon" || t.Name() == "MultiPolygon"
 }
@@ -2182,27 +2156,6 @@ func (t *Type) XIDFields() []*FieldDefinition {
 	// XIDs are sorted by name to ensure consistency.
 	sort.Slice(xids, func(i, j int) bool { return xids[i].Name() < xids[j].Name() })
 	return xids
-}
-
-// InterfaceImplHasAuthRules checks if an interface's implementation has auth rules.
-func (t *Type) InterfaceImplHasAuthRules() bool {
-	schema := t.inSchema.schema
-	types := schema.Types
-	if typ, ok := types[t.Name()]; !ok || typ.Kind != ast.Interface {
-		return false
-	}
-
-	for implName, implements := range schema.Implements {
-		for _, intrface := range implements {
-			if intrface.Name != t.Name() {
-				continue
-			}
-			if val, ok := t.inSchema.authRules[implName]; ok && val.Rules != nil {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func (t *Type) Interfaces() []string {

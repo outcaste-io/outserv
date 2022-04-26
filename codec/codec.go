@@ -35,10 +35,6 @@ const (
 	SeekCurrent
 )
 
-var (
-	bitMask uint64 = 0xffffffff00000000
-)
-
 func ToList(rm *sroar.Bitmap) *pb.List {
 	return &pb.List{
 		Bitmap: rm.ToBufferWithCopy(),

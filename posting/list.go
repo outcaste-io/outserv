@@ -828,19 +828,6 @@ func (l *List) getPostingAndLength(readTs, afterUid, uid uint64) (int, bool, *pb
 	return count, found, post
 }
 
-func (l *List) length(readTs, afterUid uint64) int {
-	l.AssertRLock()
-	count := 0
-	err := l.iterate(readTs, afterUid, func(p *pb.Posting) error {
-		count++
-		return nil
-	})
-	if err != nil {
-		return -1
-	}
-	return count
-}
-
 // Length iterates over the mutation layer and counts number of elements.
 func (l *List) Length(readTs, afterUid uint64) int {
 	opt := ListOptions{
@@ -1015,8 +1002,6 @@ func MarshalPostingList(plist *pb.PostingList, alloc *z.Allocator) *bpb.KV {
 	kv.UserMeta = alloc.Copy([]byte{BitCompletePosting})
 	return kv
 }
-
-const blockSize int = 256
 
 type rollupOutput struct {
 	plist    *pb.PostingList

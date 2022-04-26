@@ -18,11 +18,6 @@ package tok
 
 import (
 	"github.com/pkg/errors"
-	"golang.org/x/text/language"
-)
-
-var (
-	enLangTag, _ = language.Parse("en")
 )
 
 // GetTokens returns the tokens for the given tokenizer ID and value.

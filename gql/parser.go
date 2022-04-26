@@ -25,10 +25,6 @@ const (
 	uidInFunc = "uid_in"
 )
 
-var (
-	errExpandType = "expand is only compatible with type filters"
-)
-
 // GraphQuery stores the parsed Query in a tree format. This gets converted to
 // pb.y used query.SubGraph before processing the query.
 //
@@ -43,7 +39,6 @@ type GraphQuery struct {
 	Var        string
 	NeedsVar   []VarContext
 	Func       *Function
-	Expand     string // Which variable to expand with.
 
 	Args map[string]string
 	// Query can have multiple sort parameters.
@@ -743,18 +738,6 @@ func (f *FilterTree) collectVars(v *Vars) {
 	for _, fch := range f.Child {
 		fch.collectVars(v)
 	}
-}
-
-func (f *FilterTree) hasVars() bool {
-	if (f.Func != nil) && (len(f.Func.NeedsVar) > 0) {
-		return true
-	}
-	for _, fch := range f.Child {
-		if fch.hasVars() {
-			return true
-		}
-	}
-	return false
 }
 
 // getVariablesAndQuery checks if the query has a variable list and stores it in
@@ -2194,38 +2177,6 @@ loop:
 	return count, nil
 }
 
-func parseTypeList(it *lex.ItemIterator, gq *GraphQuery) error {
-	typeList := it.Item().Val
-	expectArg := false
-loop:
-	for it.Next() {
-		item := it.Item()
-		switch item.Typ {
-		case itemRightRound:
-			it.Prev()
-			break loop
-		case itemComma:
-			if expectArg {
-				return item.Errorf("Expected a variable but got comma")
-			}
-			expectArg = true
-		case itemName:
-			if !expectArg {
-				return item.Errorf("Expected a variable but got %s", item.Val)
-			}
-			typeList = fmt.Sprintf("%s,%s", typeList, item.Val)
-			expectArg = false
-		default:
-			return item.Errorf("Unexpected token %s when reading a type list", item.Val)
-		}
-	}
-	if expectArg {
-		return it.Item().Errorf("Unnecessary comma in val()")
-	}
-	gq.Expand = typeList
-	return nil
-}
-
 func parseDirective(it *lex.ItemIterator, curp *GraphQuery) error {
 	valid := true
 	it.Prev()
@@ -2236,13 +2187,10 @@ func parseDirective(it *lex.ItemIterator, curp *GraphQuery) error {
 	}
 	it.Next()
 
-	isExpand := false
-	if curp != nil && len(curp.Expand) > 0 {
-		isExpand = true
-	}
+	// isExpand := false
 	// No directive is allowed on pb.subgraph like expand all (except type filters),
 	// value variables, etc.
-	if !valid || curp == nil || (curp.IsInternal && !isExpand) {
+	if !valid || curp == nil || curp.IsInternal {
 		return item.Errorf("Invalid use of directive.")
 	}
 
@@ -2251,10 +2199,6 @@ func parseDirective(it *lex.ItemIterator, curp *GraphQuery) error {
 	peek, err := it.Peek(1)
 	if err != nil || item.Typ != itemName {
 		return item.Errorf("Expected directive or language list")
-	}
-
-	if isExpand && item.Val != "filter" {
-		return item.Errorf(errExpandType)
 	}
 
 	switch {
@@ -2277,9 +2221,6 @@ func parseDirective(it *lex.ItemIterator, curp *GraphQuery) error {
 			filter, err := parseFilter(it)
 			if err != nil {
 				return err
-			}
-			if isExpand && filter != nil && filter.Func != nil && filter.Func.Name != "type" {
-				return item.Errorf(errExpandType)
 			}
 			curp.Filter = filter
 		case "groupby":
@@ -2757,50 +2698,7 @@ func godeep(it *lex.ItemIterator, gq *GraphQuery) error {
 				curp = nil
 				continue
 			case isExpandFunc(valLower):
-				if varName != "" {
-					return it.Errorf("expand() cannot be used with a variable: %s", val)
-				}
-				if alias != "" {
-					return it.Errorf("expand() cannot have an alias")
-				}
-				it.Next() // Consume the '('
-				if it.Item().Typ != itemLeftRound {
-					return it.Errorf("Invalid use of expand()")
-				}
-				it.Next()
-				item := it.Item()
-				child := &GraphQuery{
-					Attr:       val,
-					Args:       make(map[string]string),
-					IsInternal: true,
-				}
-				switch item.Val {
-				case valueFunc:
-					count, err := parseVarList(it, child)
-					if err != nil {
-						return err
-					}
-					if count != 1 {
-						return item.Errorf("Invalid use of expand(). Exactly one variable expected.")
-					}
-					child.NeedsVar[len(child.NeedsVar)-1].Typ = ListVar
-					child.Expand = child.NeedsVar[len(child.NeedsVar)-1].Name
-				case "_all_":
-					child.Expand = "_all_"
-				case "_forward_":
-					return item.Errorf("Argument _forward_ has been deprecated")
-				case "_reverse_":
-					return item.Errorf("Argument _reverse_ has been deprecated")
-				default:
-					if err := parseTypeList(it, child); err != nil {
-						return err
-					}
-				}
-				it.Next() // Consume ')'
-				gq.Children = append(gq.Children, child)
-				// Note: curp is not set to nil. So it can have children, filters, etc.
-				curp = child
-				continue
+				return it.Errorf("expand() is no longer supported")
 			case valLower == "count":
 				if count != notSeen {
 					return it.Errorf("Invalid mention of function count")
@@ -3029,15 +2927,6 @@ func tryParseItemType(it *lex.ItemIterator, typ lex.ItemType) (lex.Item, bool) {
 	}
 	it.Next()
 	return item, true
-}
-
-func trySkipItemVal(it *lex.ItemIterator, val string) bool {
-	item, ok := it.PeekOne()
-	if !ok || item.Val != val {
-		return false
-	}
-	it.Next()
-	return true
 }
 
 func trySkipItemTyp(it *lex.ItemIterator, typ lex.ItemType) bool {

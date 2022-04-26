@@ -45,7 +45,6 @@ var pathPool = sync.Pool{
 }
 
 var errStop = errors.Errorf("STOP")
-var errFacet = errors.Errorf("Skip the edge")
 
 type priorityQueue []*queueItem
 
