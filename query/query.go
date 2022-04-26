@@ -258,11 +258,10 @@ type SubGraph struct {
 	// filters are used.
 	SrcFunc *Function
 
-	FilterOp     string
-	Filters      []*SubGraph // List of filters specified at the current node.
-	facetsFilter *pb.FilterTree
-	MathExp      *mathTree
-	Children     []*SubGraph // children of the current node, should be empty for leaf nodes.
+	FilterOp string
+	Filters  []*SubGraph // List of filters specified at the current node.
+	MathExp  *mathTree
+	Children []*SubGraph // children of the current node, should be empty for leaf nodes.
 
 	// destUIDs is a list of destination UIDs, after applying filters, pagination.
 	DestMap *sroar.Bitmap
@@ -344,33 +343,6 @@ var (
 	// ErrWrongAgg is returned when value aggregation is attempted in the root level of a query.
 	ErrWrongAgg = errors.New("Wrong level for var aggregation")
 )
-
-func (sg *SubGraph) isSimilar(ssg *SubGraph) bool {
-	if sg.Attr != ssg.Attr {
-		return false
-	}
-	if sg.Params.DoCount {
-		return ssg.Params.DoCount
-	}
-	if ssg.Params.DoCount {
-		return false
-	}
-	if sg.SrcFunc != nil {
-		if ssg.SrcFunc != nil && sg.SrcFunc.Name == ssg.SrcFunc.Name {
-			return true
-		}
-		return false
-	}
-	// Below check doesn't differentiate between different filters.
-	// It is added to differential between `hasFriend` and `hasFriend @filter()`
-	if sg.Filters != nil {
-		if ssg.Filters != nil && len(sg.Filters) == len(ssg.Filters) {
-			return true
-		}
-		return false
-	}
-	return true
-}
 
 func isEmptyIneqFnWithVar(sg *SubGraph) bool {
 	return sg.SrcFunc != nil && isInequalityFn(sg.SrcFunc.Name) && len(sg.SrcFunc.Args) == 0 &&

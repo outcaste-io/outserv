@@ -171,30 +171,6 @@ func (c *Chain) printMetrics() {
 			dur.Round(time.Second), float64(num)/dur.Minutes())
 	}
 }
-func accountsFrom(out map[string]Account, blockId int64) {
-	blockNumber := big.NewInt(blockId)
-	block, err := client.BlockByNumber(context.Background(), blockNumber)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, tx := range block.Transactions() {
-		var to, from Account
-		if msg, err := tx.AsMessage(types.NewEIP155Signer(chainID), nil); err == nil {
-			from.Hash = msg.From().Hex()
-		}
-		if _, has := out[from.Hash]; !has {
-			out[from.Hash] = from
-		}
-
-		if tx.To() != nil {
-			to.Hash = tx.To().Hex()
-			if _, has := out[to.Hash]; !has {
-				out[to.Hash] = to
-			}
-		}
-	}
-}
 
 func sendRequest(data []byte) error {
 	if *dryRun {
@@ -221,8 +197,6 @@ func sendRequest(data []byte) error {
 
 	return nil
 }
-
-const numBlocks int64 = 64
 
 func check(err error) {
 	if err != nil {

@@ -659,10 +659,6 @@ func hasExternal(f *ast.FieldDefinition) bool {
 	return f.Directives.ForName(apolloExternalDirective) != nil
 }
 
-func isEntityUnion(typ *ast.Definition) bool {
-	return typ.Kind == ast.Union && typ.Name == "_Entity"
-}
-
 func (f *Field) IsExternal() bool {
 	return hasExternal(f.field.Definition)
 }
@@ -855,14 +851,6 @@ func (f *Field) DgraphAlias() string {
 
 func (f *Field) ResponseName() string {
 	return responseName(f.field)
-}
-
-func remoteResponseDirectiveArgument(fd *ast.FieldDefinition) string {
-	remoteResponseDirectiveDefn := fd.Directives.ForName(remoteResponseDirective)
-	if remoteResponseDirectiveDefn != nil {
-		return remoteResponseDirectiveDefn.Arguments.ForName("name").Value.Raw
-	}
-	return ""
 }
 
 func (f *Field) RemoteResponseName() string {
