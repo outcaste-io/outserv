@@ -206,7 +206,7 @@ func (ir *incrRollupi) Process(closer *z.Closer) {
 			doRollup(batch, 0)
 			// We don't need a limiter here as we don't expect to call this function frequently.
 		case <-limiter.C:
-			// throttle to 1 batch = 16 rollups per 1 ms.
+			// throttle to 1 batch = 16 rollups per 10 ms.
 			select {
 			case batch := <-ir.priorityKeys[1].keysCh:
 				doRollup(batch, 1)

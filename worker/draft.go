@@ -303,8 +303,15 @@ func (n *node) mutationWorker(workerId int) {
 
 		txn := posting.GetTxn(p.CommitTs)
 		x.AssertTruef(txn != nil, "Unable to find txn with commit ts: %d", p.CommitTs)
-		txn.ErrCh <- fmt.Errorf("Not running concurrently")
+
+		// TODO(mrjn): I've noticed that by not running these txns concurrently,
+		// we get better performance. This is because the new accounts get
+		// repeated across blocks, causing mutations to conflict and having to
+		// re-do the work. Re-evaluate later.
+		//
 		// txn.ErrCh <- n.concMutations(ctx, p.Mutations, txn)
+		txn.ErrCh <- fmt.Errorf("Not running concurrently")
+
 		close(txn.ErrCh)
 	}
 
@@ -344,13 +351,10 @@ func UidsForObject(ctx context.Context, obj *pb.Object, txn *posting.Txn) (*sroa
 			// First: 3, // We can't just ask for the first 3, because we might have
 			// to intersect this result with others.
 		}
-		// glog.Infof("running query: %+v\n", q)
-		// glog.Infof("Keys read before: %d\n", len(txn.Cache().ReadKeys()))
 		result, err := ProcessTaskOverNetwork(ctx, q)
 		if err != nil {
 			return nil, errors.Wrapf(err, "while calling ProcessTaskOverNetwork")
 		}
-		// glog.Infof("Keys read after: %d\n", len(txn.Cache().ReadKeys()))
 		if len(result.UidMatrix) == 0 {
 			// No result found. Continue querying so we can track all the keys
 			// that need to be read for this object.
@@ -408,10 +412,6 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 
 	// Replace all the resolved UIDs.
 	x.ReplaceUidsIn(m.Edges, resolved)
-	// glog.Infof("Resolved is: %+v\n", resolved)
-	// for i, edge := range m.Edges {
-	// 	glog.Infof("edge [%d]: %+v\n", i, edge)
-	// }
 
 	span := otrace.FromContext(ctx)
 	// Discard the posting lists from cache to release memory at the end.
@@ -631,7 +631,6 @@ func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr erro
 	txn = posting.Oracle().ResetTxn(prop.CommitTs)
 
 	// If we have an error, re-run this.
-	// glog.Infof("Re-running mutation from applyCh with commit: %d", prop.CommitTs)
 	span.Annotatef(nil, "Re-running mutation from applyCh with commit: %d.", prop.CommitTs)
 	return n.concMutations(ctx, m, txn)
 }

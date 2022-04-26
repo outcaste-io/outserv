@@ -6,7 +6,6 @@ package worker
 import (
 	"sync/atomic"
 
-	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/posting"
 )
 
@@ -59,7 +58,6 @@ func (kw *keysWritten) StillValid(txn *posting.Txn) bool {
 		// MaxAssignedSeen, that means our reads are valid.
 		commitTs := kw.keyCommitTs[hash]
 		if commitTs > txn.ReadTs {
-			glog.Infof("commitTs: %d readTs: %d hash: %x\n", commitTs, txn.ReadTs, hash)
 			kw.invalidTxns++
 			return false
 		}

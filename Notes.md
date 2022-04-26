@@ -37,3 +37,7 @@
 ### Deletions
 
 [ ] This doesn't work right now. Fix it: `<subject:"0x2466c53" predicate:"Account.Outgoing" object_value:"\t_STAR_ALL" op:DEL >`
+
+### Badger
+
+[ ] Have a debug endpoint to inspect Badger table overlaps.

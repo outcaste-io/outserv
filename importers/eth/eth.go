@@ -1,3 +1,5 @@
+// Copyright 2022 Outcaste LLC. Licensed under the Apache License v2.0.
+
 package main
 
 import (
@@ -20,7 +22,7 @@ import (
 )
 
 var path = flag.String("geth", "", "Geth IPC path")
-var graphql = flag.String("gql", "", "GraphQL endpoint")
+var graphql = flag.String("gql", "http://localhost:8080", "GraphQL endpoint")
 var dryRun = flag.Bool("dry", false, "If true, don't send txns to GraphQL endpoint")
 var numGo = flag.Int("gor", 2, "Number of goroutines to use")
 var startBlock = flag.Int64("start", 50000, "Start at block")
@@ -200,18 +202,17 @@ func sendRequest(data []byte) error {
 	}
 	// TODO: Check that the schema is correctly set.
 	var wr WResp
-	resp, err := http.Post("http://localhost:8080/graphql", "application/json", bytes.NewBuffer(data))
+	resp, err := http.Post(fmt.Sprintf("%s/graphql", *graphql),
+		"application/json", bytes.NewBuffer(data))
 	if err != nil {
 		return errors.Wrapf(err, "while posting request")
 	}
 	out, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
-	// fmt.Printf("out: %s\n", out)
 
 	if err := json.Unmarshal(out, &wr); err != nil {
 		return errors.Wrapf(err, "response: %s\n", out)
 	}
-	// TODO: Remove this once we remove txns from Outserv.
 	for _, werr := range wr.Errors {
 		if len(werr.Message) > 0 {
 			return fmt.Errorf("Got error from GraphQL: %s\n", werr.Message)
@@ -245,33 +246,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// account := common.HexToAddress("0xad0e5c205e8c1f6dbeae4cf8b69b693390c13617")
-	// balance, err := client.BalanceAt(context.Background(), account, nil)
-	// if err != nil {
-	// 	log.Fatalf("balance without block: %v", err)
-	// }
-	// fmt.Println("bal", balance) // 25893180161173005034
-
-	// blockNumber := big.NewInt(5532993)
-	// balanceAt, err := client.BalanceAt(context.Background(), account, blockNumber)
-	// if err != nil {
-	// 	log.Fatalf("balance at error: %v", err)
-	// }
-	// fmt.Println(balanceAt) // 25729324269165216042
-
-	// fbalance := new(big.Float)
-	// fbalance.SetString(balance.String())
-	// ethValue := new(big.Float).Quo(fbalance, big.NewFloat(math.Pow10(18)))
-	// fmt.Println("eth bal", ethValue) // 25.729324269165216041
-
-	// pendingBalance, err := client.PendingBalanceAt(context.Background(), account)
-	// fmt.Println("pending", pendingBalance) // 25729324269165216042
-
-	// address := common.HexToAddress("0xad0e5c205e8c1f6dbeae4cf8b69b693390c13617")
-
-	// fmt.Println(address.Hex())        // 0x71C7656EC7ab88b098defB751B7401B5f6d8976F
-	// fmt.Println(address.Hash().Hex()) // 0x00000000000000000000000071c7656ec7ab88b098defb751b7401b5f6d8976f
 
 	header, err := client.HeaderByNumber(context.Background(), nil)
 	if err != nil {
