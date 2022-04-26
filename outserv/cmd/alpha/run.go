@@ -436,15 +436,6 @@ func stateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// storeStatsHandler outputs some basic stats for data store.
-func storeStatsHandler(w http.ResponseWriter, r *http.Request) {
-	x.AddCorsHeaders(w)
-	w.Header().Set("Content-Type", "text/html")
-	x.Check2(w.Write([]byte("<pre>")))
-	x.Check2(w.Write([]byte(worker.StoreStats())))
-	x.Check2(w.Write([]byte("</pre>")))
-}
-
 func setupListener(addr string, port int) (net.Listener, error) {
 	return net.Listen("tcp", fmt.Sprintf("%s:%d", addr, port))
 }
@@ -608,10 +599,8 @@ func setupServer(closer *z.Closer) {
 	baseMux.HandleFunc("/health", healthCheck)
 	baseMux.HandleFunc("/state", stateHandler)
 	baseMux.HandleFunc("/debug/jemalloc", x.JemallocHandler)
+	baseMux.HandleFunc("/debug/store", worker.StoreHandler)
 	zpages.Handle(baseMux, "/debug/z")
-
-	// TODO: Figure out what this is for?
-	http.HandleFunc("/debug/store", storeStatsHandler)
 
 	introspection := x.Config.GraphQL.Introspection
 

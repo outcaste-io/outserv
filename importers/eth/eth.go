@@ -18,6 +18,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/outcaste-io/badger/v3/y"
 	"github.com/pkg/errors"
 )
 
@@ -106,7 +107,7 @@ func (b *Block) Txns() []Txn {
 
 type Chain struct {
 	blockId      int64
-	numProcessed int64
+	numProcessed uint64
 	blockCh      chan *Block
 }
 
@@ -152,7 +153,7 @@ func (c *Chain) processTxns(wg *sync.WaitGroup) {
 			check(sendTxns(txns))
 			txns = txns[:0]
 		}
-		atomic.AddInt64(&c.numProcessed, 1)
+		atomic.AddUint64(&c.numProcessed, 1)
 	}
 	check(sendTxns(txns))
 }
@@ -161,14 +162,17 @@ func (c *Chain) printMetrics() {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
+	rm := y.NewRateMonitor(300)
 	start := time.Now()
 	for range ticker.C {
 		maxBlockId := atomic.LoadInt64(&c.blockId)
-		num := atomic.LoadInt64(&c.numProcessed)
+		num := atomic.LoadUint64(&c.numProcessed)
+		rm.Capture(num)
+
 		dur := time.Since(start)
-		fmt.Printf("BlockId: %d Processed: %d [ %s @ %6.1f blocks/min ]\n",
+		fmt.Printf("BlockId: %8d Processed: %5d [ %6s @ %5d blocks/min ]\n",
 			maxBlockId, num,
-			dur.Round(time.Second), float64(num)/dur.Minutes())
+			dur.Round(time.Second), rm.Rate()*60.0)
 	}
 }
 
