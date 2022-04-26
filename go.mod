@@ -3,6 +3,7 @@ module github.com/outcaste-io/outserv
 go 1.16
 
 // replace github.com/outcaste-io/ristretto => /home/mrjn/source/ristretto
+// replace github.com/outcaste-io/badger/v3 => /home/mrjn/source/badger
 
 require (
 	cloud.google.com/go/storage v1.15.0
@@ -38,7 +39,7 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/graph-gophers/graphql-go v1.3.0
 	github.com/minio/minio-go/v6 v6.0.55
-	github.com/outcaste-io/badger/v3 v3.2202.1-0.20220405110642-ade7785339cb
+	github.com/outcaste-io/badger/v3 v3.2202.1-0.20220426173331-b25bc764af0d
 	github.com/outcaste-io/dgo/v210 v210.0.0-20220225180226-43bd1b427e86
 	github.com/outcaste-io/gqlgen v0.13.3
 	github.com/outcaste-io/gqlparser/v2 v2.2.3

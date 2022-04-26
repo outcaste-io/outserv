@@ -649,8 +649,8 @@ github.com/opentracing/opentracing-go v1.1.0 h1:pWlfV3Bxv7k65HYwkikxat0+s3pV4bsq
 github.com/opentracing/opentracing-go v1.1.0/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
 github.com/openzipkin/zipkin-go v0.1.6/go.mod h1:QgAqvLzwWbR/WpD4A3cGpPtJrZXNIiJc5AZX7/PBEpw=
 github.com/ory/dockertest v3.3.4+incompatible/go.mod h1:1vX4m9wsvi00u5bseYwXaSnhNrne+V0E6LAcBILJdPs=
-github.com/outcaste-io/badger/v3 v3.2202.1-0.20220405110642-ade7785339cb h1:m3ERC2rjewWi0U3SHecqTnNaEhjaQtuNwsiWD5NHD8o=
-github.com/outcaste-io/badger/v3 v3.2202.1-0.20220405110642-ade7785339cb/go.mod h1:P5q0708InZMN6Axrw1ZcwepiiCoPeCqRqIyUGKx2aoI=
+github.com/outcaste-io/badger/v3 v3.2202.1-0.20220426173331-b25bc764af0d h1:dOoaepdC2hnmjrkSm4aWVF/pMncuAyNqYKgZbDsQE5A=
+github.com/outcaste-io/badger/v3 v3.2202.1-0.20220426173331-b25bc764af0d/go.mod h1:P5q0708InZMN6Axrw1ZcwepiiCoPeCqRqIyUGKx2aoI=
 github.com/outcaste-io/dgo/v210 v210.0.0-20220225180226-43bd1b427e86 h1:sUjjQrypjiT1ii7opdvvr4oOmWyfgFNjPaqC7WwQRD8=
 github.com/outcaste-io/dgo/v210 v210.0.0-20220225180226-43bd1b427e86/go.mod h1:Zcox8pu5QAEuA7uZAnMw4ekyM768IkQnU+msW5mJ88g=
 github.com/outcaste-io/gqlgen v0.13.3 h1:dUhBs+vlNmnbMwd9L/wYG4ZXjRXgP94zPbRNjHYQU+s=

@@ -677,6 +677,7 @@ func setupServer(closer *z.Closer) {
 	// Initialize the lambda server
 	setupLambdaServer(x.ServerCloser)
 	// Initialize the servers.
+	x.RegisterExporters(Alpha.Conf, "outserv.graphql")
 	x.ServerCloser.AddRunning(2)
 	go x.StartListenHttpAndHttps(httpListener, tlsCfg, x.ServerCloser)
 	go func() {

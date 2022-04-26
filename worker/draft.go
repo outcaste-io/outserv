@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
+	"github.com/gogo/protobuf/proto"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"go.etcd.io/etcd/raft"
@@ -302,7 +303,15 @@ func (n *node) mutationWorker(workerId int) {
 
 		txn := posting.GetTxn(p.CommitTs)
 		x.AssertTruef(txn != nil, "Unable to find txn with commit ts: %d", p.CommitTs)
-		txn.ErrCh <- n.concMutations(ctx, p.Mutations, txn)
+
+		// TODO(mrjn): I've noticed that by not running these txns concurrently,
+		// we get better performance. This is because the new accounts get
+		// repeated across blocks, causing mutations to conflict and having to
+		// re-do the work. Re-evaluate later.
+		//
+		// txn.ErrCh <- n.concMutations(ctx, p.Mutations, txn)
+		txn.ErrCh <- fmt.Errorf("Not running concurrently")
+
 		close(txn.ErrCh)
 	}
 
@@ -319,7 +328,7 @@ func (n *node) mutationWorker(workerId int) {
 	}
 }
 
-func UidsForObject(ctx context.Context, obj *pb.Object) (*sroar.Bitmap, error) {
+func UidsForObject(ctx context.Context, obj *pb.Object, txn *posting.Txn) (*sroar.Bitmap, error) {
 	var res *sroar.Bitmap
 	for _, nq := range obj.Edges {
 		if len(nq.ObjectValue) == 0 {
@@ -332,8 +341,9 @@ func UidsForObject(ctx context.Context, obj *pb.Object) (*sroar.Bitmap, error) {
 		}
 		valStr := val.Value.(string)
 		q := &pb.Query{
-			ReadTs: posting.ReadTimestamp(), // What timestamp should we use?
-			Attr:   nq.Predicate,
+			ReadTs:  txn.ReadTs,
+			CacheTs: txn.CommitTs, // This would allow us to track which keys were read.
+			Attr:    nq.Predicate,
 			SrcFunc: &pb.SrcFunction{
 				Name: "eq",
 				Args: []string{valStr},
@@ -341,14 +351,14 @@ func UidsForObject(ctx context.Context, obj *pb.Object) (*sroar.Bitmap, error) {
 			// First: 3, // We can't just ask for the first 3, because we might have
 			// to intersect this result with others.
 		}
-		glog.Infof("running query: %+v\n", q)
 		result, err := ProcessTaskOverNetwork(ctx, q)
 		if err != nil {
 			return nil, errors.Wrapf(err, "while calling ProcessTaskOverNetwork")
 		}
 		if len(result.UidMatrix) == 0 {
-			// No result found
-			return sroar.NewBitmap(), nil
+			// No result found. Continue querying so we can track all the keys
+			// that need to be read for this object.
+			continue
 		}
 		bm := codec.FromList(result.UidMatrix[0])
 		if res == nil {
@@ -356,25 +366,30 @@ func UidsForObject(ctx context.Context, obj *pb.Object) (*sroar.Bitmap, error) {
 		} else {
 			res.And(bm)
 		}
-		if res.GetCardinality() == 0 {
-			return res, nil
-		}
+		// Even if res.GetCardinality() == 0, we should continue so we can
+		// ensure that we're tracking all the keys that need to be read for this
+		// object.
 	}
-	glog.V(2).Infof("Uids for %+v are: %+v\n", obj, res.ToArray())
+	if glog.V(2) {
+		glog.Infof("Uids (read: %d, commit: %d) for %+v are: %x\n",
+			txn.ReadTs, txn.CommitTs, obj, res.ToArray())
+	}
 	return res, nil
 }
 
 func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.Txn) error {
+	// Do not modify original mutations object. We might have to re-run
+	// this mutation.
+	m = proto.Clone(m).(*pb.Mutations)
+
 	// TODO(mrjn): If this concMutation is a retry, should we upgrade the read
 	// timestamp then? It would seem logical to do so.
 	//
 	// Deal with objects first.
 	resolved := make(map[string]string)
 	for _, obj := range m.NewObjects {
-		glog.Infof("Got object: %+v\n", obj)
-
 		// Does the read timestamp need to be passed to UidsForObject?
-		bm, err := UidsForObject(ctx, obj)
+		bm, err := UidsForObject(ctx, obj, txn)
 		if err != nil {
 			return errors.Wrapf(err, "when calling UidsForObject")
 		}
@@ -521,7 +536,7 @@ func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr erro
 		return nil
 	}
 
-	if prop.ReadTs == 0 || prop.CommitTs == 0 {
+	if prop.CommitTs == 0 {
 		return errors.New("ReadTs and CommitTs must be provided")
 	}
 
@@ -612,10 +627,11 @@ func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr erro
 		return nil
 	}
 	// If mutation is invalid or we got an error, reset the txn, so we can run again.
+	// ResetTxn would reset the StartTimestamp.
 	txn = posting.Oracle().ResetTxn(prop.CommitTs)
 
 	// If we have an error, re-run this.
-	span.Annotatef(nil, "Re-running mutation from applyCh.")
+	span.Annotatef(nil, "Re-running mutation from applyCh with commit: %d.", prop.CommitTs)
 	return n.concMutations(ctx, m, txn)
 }
 
@@ -630,11 +646,6 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 	}
 
 	if proposal.Mutations != nil {
-		if proposal.ReadTs == 0 {
-			glog.Infof("Got a mutation with read ts = 0: %+v\n", proposal)
-		}
-		proposal.ReadTs = posting.ReadTimestamp()
-		x.AssertTrue(proposal.ReadTs > 0)
 		// syncmarks for this shouldn't be marked done until it's committed.
 		span.Annotate(nil, "Applying mutations")
 		if x.Debug {
@@ -649,7 +660,7 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 			glog.Infof("Proposal.CommitTs: %#x\n", proposal.CommitTs)
 		}
 		if txn := posting.GetTxn(proposal.CommitTs); txn != nil {
-			n.commit(txn)
+			n.commit(ctx, txn)
 		}
 
 		span.Annotate(nil, "Done")
@@ -885,9 +896,12 @@ func (n *node) processApplyCh() {
 	}
 }
 
-func (n *node) commit(txn *posting.Txn) error {
+func (n *node) commit(ctx context.Context, txn *posting.Txn) error {
 	x.AssertTrue(txn != nil)
 	start := time.Now()
+
+	span := otrace.FromContext(ctx)
+	span.Annotate(nil, "Commit")
 
 	c := txn.Cache()
 	c.RLock()
@@ -917,6 +931,7 @@ func (n *node) commit(txn *posting.Txn) error {
 		// tracking would only consider the txns which have been successfully pushed to disk.
 		return pstore.HandoverSkiplist(txn.Skiplist(), deleteTxn)
 	})
+	span.Annotate(nil, "HandoverSkiplist done")
 	if err != nil {
 		glog.Errorf("while handing over skiplist: %v\n", err)
 	}
@@ -1494,8 +1509,6 @@ func (n *node) Run() {
 					glog.Warningf("Inflight proposal size: %d. There would be some throttling.", sz)
 				}
 
-				readTs := posting.ReadTimestamp()
-
 				var props []*pb.Proposal
 				for _, e := range entries {
 					p := getProposal(e)
@@ -1510,7 +1523,6 @@ func (n *node) Run() {
 						continue
 					}
 
-					p.ReadTs = readTs
 					p.CommitTs = x.Timestamp(baseTimestamp, e.Index)
 					// glog.Infof("e.Index: %d commit Ts: %#x\n", e.Index, p.CommitTs)
 
@@ -1534,10 +1546,10 @@ func (n *node) Run() {
 					}
 					// We should register this txn before sending it over for concurrent
 					// application.
-					txn := posting.RegisterTxn(p.ReadTs, p.CommitTs)
+					txn := posting.RegisterTxn(p.CommitTs)
 					if x.Debug {
 						glog.Infof("RegisterTxn ts: %d commit ts: %d txn: %p. mutation: %+v\n",
-							p.ReadTs, p.CommitTs, txn, p.Mutations)
+							txn.ReadTs, p.CommitTs, txn, p.Mutations)
 					}
 
 					n.concApplyCh <- p

@@ -566,7 +566,6 @@ func (g *groupi) doSendMembership(tablets map[string]*pb.Tablet) error {
 		s := float64(srcTablet.OnDiskBytes)
 		d := float64(dstTablet.OnDiskBytes)
 		if dstTablet.Remove || (s == 0 && d > 0) || (s > 0 && math.Abs(d/s-1) > 0.1) {
-			dstTablet.Force = false
 			changes = append(changes, dstTablet)
 		}
 	}

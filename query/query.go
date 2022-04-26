@@ -823,8 +823,8 @@ func createTaskQuery(ctx context.Context, sg *SubGraph) (*pb.Query, error) {
 	first, offset := calculatePaginationParams(sg)
 
 	out := &pb.Query{
-		ReadTs:    sg.ReadTs,
-		Cache:     int32(sg.Cache),
+		ReadTs: sg.ReadTs,
+		// CacheTs:   int32(sg.Cache),
 		Attr:      x.NamespaceAttr(namespace, attr),
 		SrcFunc:   srcFunc,
 		AfterUid:  sg.Params.AfterUID,

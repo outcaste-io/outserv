@@ -131,7 +131,7 @@ func (ir *incrRollupi) Process(closer *z.Closer) {
 
 	m := make(map[uint64]int64) // map hash(key) to ts. hash(key) to limit the size of the map.
 
-	limiter := time.NewTicker(time.Millisecond)
+	limiter := time.NewTicker(10 * time.Millisecond)
 	defer limiter.Stop()
 
 	cleanupTick := time.NewTicker(5 * time.Minute)
@@ -205,10 +205,13 @@ func (ir *incrRollupi) Process(closer *z.Closer) {
 			// P0 keys are high priority keys. They have more than a threshold number of deltas.
 			doRollup(batch, 0)
 			// We don't need a limiter here as we don't expect to call this function frequently.
-		case batch := <-ir.priorityKeys[1].keysCh:
-			doRollup(batch, 1)
-			// throttle to 1 batch = 16 rollups per 1 ms.
-			<-limiter.C
+		case <-limiter.C:
+			// throttle to 1 batch = 16 rollups per 10 ms.
+			select {
+			case batch := <-ir.priorityKeys[1].keysCh:
+				doRollup(batch, 1)
+			default:
+			}
 		}
 	}
 }
@@ -224,7 +227,7 @@ func (txn *Txn) FillContext(ctx *pb.TxnContext) {
 	}
 	txn.Lock()
 	defer txn.Unlock()
-	ctx.StartTs = txn.StartTs
+	ctx.StartTs = txn.ReadTs
 	if txn.Uids == nil {
 		return
 	}

@@ -417,6 +417,14 @@ func handleDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	for _, uid := range uids {
 		uidHex := x.ToHexString(uid)
 		for _, f := range m.MutatedType().Fields() {
+			if strings.HasSuffix(f.DgraphAlias(), "Aggregate") {
+				// TODO(mrjn): This is a hack. We should figure out how to deal
+				// with this properly.
+				continue
+			}
+			if f.IsID() {
+				continue
+			}
 			accountForInverse(uidHex, f)
 			mu.Edges = append(mu.Edges, &pb.Edge{
 				Subject:     uidHex,

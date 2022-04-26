@@ -410,7 +410,7 @@ func (l *List) addMutationInternal(ctx context.Context, txn *Txn, t *pb.Edge) er
 	if err != nil {
 		return err
 	}
-	mpost.StartTs = txn.StartTs
+	mpost.StartTs = txn.ReadTs
 	if mpost.PostingType != pb.Posting_REF {
 		mpost.Uid = fingerprintEdge(t)
 	}

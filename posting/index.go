@@ -125,8 +125,8 @@ func (l *List) handleDeleteAll(ctx context.Context, edge *pb.Edge, txn *Txn) err
 	isIndexed := schema.State().IsIndexed(ctx, edge.Predicate)
 	hasCount := schema.State().HasCount(ctx, edge.Predicate)
 	// To calculate length of posting list. Used for deletion of count index.
-	plen := l.Length(txn.StartTs, 0)
-	err := l.IterateAll(txn.StartTs, 0, func(p *pb.Posting) error {
+	plen := l.Length(txn.ReadTs, 0)
+	err := l.IterateAll(txn.ReadTs, 0, func(p *pb.Posting) error {
 		switch {
 		case isIndexed:
 			// Delete index edge of each posting.
@@ -239,12 +239,12 @@ func (txn *Txn) addMutationHelper(ctx context.Context, l *List, doUpdateIndex bo
 
 	switch {
 	case hasCountIndex:
-		countBefore, found, currPost = l.getPostingAndLength(txn.StartTs, 0, getUID(t))
+		countBefore, found, currPost = l.getPostingAndLength(txn.ReadTs, 0, getUID(t))
 		if countBefore == -1 {
 			return nil, false, emptyCountParams, ErrTsTooOld
 		}
 	case doUpdateIndex || delNonListPredicate:
-		found, currPost, err = l.findPosting(txn.StartTs, fingerprintEdge(t))
+		found, currPost, err = l.findPosting(txn.ReadTs, fingerprintEdge(t))
 		if err != nil {
 			return nil, found, emptyCountParams, err
 		}
@@ -441,7 +441,7 @@ func (r *rebuilder) Run(ctx context.Context) error {
 		// We are using different transactions in each call to KeyToList function. This could
 		// be a problem for computing reverse count indexes if deltas for same key are added
 		// in different transactions. Such a case doesn't occur for now.
-		txn := NewTxn(r.startTs)
+		txn := NewTxn(r.startTs, r.startTs)
 		if err := r.fn(pk.Uid, l, txn); err != nil {
 			return nil, err
 		}
@@ -761,7 +761,7 @@ func rebuildTokIndex(ctx context.Context, rb *IndexRebuild) error {
 	builder := rebuilder{attr: rb.Attr, prefix: pk.DataPrefix(), startTs: rb.StartTs}
 	builder.fn = func(uid uint64, pl *List, txn *Txn) error {
 		edge := pb.Edge{Predicate: rb.Attr, Subject: x.ToHexString(uid)}
-		return pl.Iterate(txn.StartTs, 0, func(p *pb.Posting) error {
+		return pl.Iterate(txn.ReadTs, 0, func(p *pb.Posting) error {
 			// Add index entries based on p.
 			for {
 				err := txn.addIndexMutations(ctx, &indexMutationInfo{
@@ -894,7 +894,7 @@ func rebuildListType(ctx context.Context, rb *IndexRebuild) error {
 	builder := rebuilder{attr: rb.Attr, prefix: pk.DataPrefix(), startTs: rb.StartTs}
 	builder.fn = func(uid uint64, pl *List, txn *Txn) error {
 		var mpost *pb.Posting
-		err := pl.IterateAll(txn.StartTs, 0, func(p *pb.Posting) error {
+		err := pl.IterateAll(txn.ReadTs, 0, func(p *pb.Posting) error {
 			// We only want to modify the untagged value. There could be other values with a
 			// lang tag.
 			if p.Uid == math.MaxUint64 {

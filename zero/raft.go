@@ -283,14 +283,14 @@ func (n *node) handleMemberProposal(dst *pb.MembershipState, member *pb.Member) 
 func (n *node) handleTabletProposal(dst *pb.MembershipState, tablets []*pb.Tablet) error {
 	n.state.AssertLock()
 
-	handleOne := func(tablet *pb.Tablet) error {
-		if tablet.GroupId == 0 {
-			return errors.Errorf("Tablet group id is zero: %+v", tablet)
+	handleOne := func(cur *pb.Tablet) error {
+		if cur.GroupId == 0 {
+			return errors.Errorf("Tablet group id is zero: %+v", cur)
 		}
-		if tablet.Remove {
+		if cur.Remove {
 			glog.Infof("Removing tablet for attr: [%v], gid: [%v]\n",
-				tablet.Predicate, tablet.GroupId)
-			delete(dst.Tablets, tablet.Predicate)
+				cur.Predicate, cur.GroupId)
+			delete(dst.Tablets, cur.Predicate)
 			return nil
 		}
 
@@ -299,12 +299,13 @@ func (n *node) handleTabletProposal(dst *pb.MembershipState, tablets []*pb.Table
 		// only the first one succeeds.
 		//
 		// TODO: Do we need tablet.Force?
-		if prev := dst.Tablets[tablet.Predicate]; prev != nil && !tablet.Force {
-			return fmt.Errorf("Tablet %s is already served. Prev: %+v New: %+v\n",
-				tablet.Predicate, prev, tablet)
+		if prev := dst.Tablets[cur.Predicate]; prev != nil {
+			if prev.GroupId != cur.GroupId || prev.Predicate != cur.Predicate {
+				return fmt.Errorf("Tablet %s is already served. Prev: %+v New: %+v\n",
+					cur.Predicate, prev, cur)
+			}
 		}
-		tablet.Force = false
-		dst.Tablets[tablet.Predicate] = tablet
+		dst.Tablets[cur.Predicate] = cur
 		return nil
 	}
 

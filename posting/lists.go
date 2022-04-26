@@ -115,7 +115,7 @@ func GetNoStore(key []byte, readTs uint64) (rlist *List, err error) {
 // memory(for example before populating snapshot) or after calling syncAllMarks
 type LocalCache struct {
 	sync.RWMutex
-	startTs uint64
+	readTs uint64
 	// Keep track of the keys that we have read. So, we can later check if the keys that we read
 	// were changed by a commit. This is useful to opportunistically run mutations before the server
 	// reaches txn's start timestamp.
@@ -131,9 +131,9 @@ type LocalCache struct {
 }
 
 // NewLocalCache returns a new LocalCache instance.
-func NewLocalCache(startTs uint64) *LocalCache {
+func NewLocalCache(readTs uint64) *LocalCache {
 	return &LocalCache{
-		startTs:     startTs,
+		readTs:      readTs,
 		deltas:      make(map[string][]byte),
 		plists:      make(map[string]*List),
 		maxVersions: make(map[string]uint64),
@@ -143,8 +143,8 @@ func NewLocalCache(startTs uint64) *LocalCache {
 
 // NoCache returns a new LocalCache instance, which won't cache anything. Useful to pass startTs
 // around.
-func NoCache(startTs uint64) *LocalCache {
-	return &LocalCache{startTs: startTs}
+func NoCache(readTs uint64) *LocalCache {
+	return &LocalCache{readTs: readTs}
 }
 
 func (lc *LocalCache) getNoStore(key string) *List {
@@ -183,7 +183,7 @@ func (lc *LocalCache) getInternal(key []byte, readFromDisk bool) (*List, error) 
 		lc.RLock()
 		defer lc.RUnlock()
 		if lc.plists == nil {
-			return getNew(key, pstore, lc.startTs)
+			return getNew(key, pstore, lc.readTs)
 		}
 		return nil, nil
 	}
@@ -200,7 +200,7 @@ func (lc *LocalCache) getInternal(key []byte, readFromDisk bool) (*List, error) 
 	var pl *List
 	if readFromDisk {
 		var err error
-		pl, err = getNew(key, pstore, lc.startTs)
+		pl, err = getNew(key, pstore, lc.readTs)
 		if err != nil {
 			return nil, err
 		}
@@ -215,7 +215,7 @@ func (lc *LocalCache) getInternal(key []byte, readFromDisk bool) (*List, error) 
 	// apply it before returning the list.
 	lc.RLock()
 	if delta, ok := lc.deltas[skey]; ok && len(delta) > 0 {
-		pl.setMutation(lc.startTs, delta)
+		pl.setMutation(lc.readTs, delta)
 	}
 	lc.RUnlock()
 	return lc.SetIfAbsent(skey, pl), nil
@@ -248,7 +248,7 @@ func (lc *LocalCache) UpdateDeltasAndDiscardLists() {
 	}
 
 	for key, pl := range lc.plists {
-		if data := pl.getMutation(lc.startTs); len(data) > 0 {
+		if data := pl.getMutation(lc.readTs); len(data) > 0 {
 			lc.deltas[key] = data
 		}
 		lc.maxVersions[key] = pl.maxVersion()

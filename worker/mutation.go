@@ -91,14 +91,7 @@ func runMutation(ctx context.Context, edge *pb.Edge, txn *posting.Txn) error {
 		getFn = txn.GetFromDelta
 	}
 
-	t := time.Now()
 	plist, err := getFn(key)
-	if dur := time.Since(t); dur > time.Millisecond {
-		if span := otrace.FromContext(ctx); span != nil {
-			span.Annotatef([]otrace.Attribute{otrace.BoolAttribute("slow-get", true)},
-				"GetLru took %s", dur)
-		}
-	}
 	if err != nil {
 		return err
 	}
