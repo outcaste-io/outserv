@@ -30,6 +30,11 @@ const graphqlAdminSchema = `
 	scalar DateTime
 
 	"""
+	The BigInt scalar type represents numeric non-fractional values of varying size (arbitrary-precision arithmetic).
+	"""
+	scalar BigInt
+
+	"""
 	File Upload
 	"""
 	scalar Upload

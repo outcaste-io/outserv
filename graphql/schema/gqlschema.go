@@ -116,6 +116,12 @@ Int64 can represent values in range [-(2^63),(2^63 - 1)].
 scalar Int64
 
 """
+The BigInt scalar type represents numeric non-fractional values of varying size (arbitrary-precision arithmetic).
+"""
+scalar BigInt
+
+"""
+
 The DateTime scalar type represents date and time as a string in RFC3339 format.
 For example: "1985-04-12T23:20:50.52Z" represents 20 minutes and 50.52 seconds after the 23rd hour of April 12th, 1985 in UTC.
 """
@@ -139,6 +145,11 @@ input FloatRange{
 input Int64Range{
 	min: Int64!
 	max: Int64!
+}
+
+input BigIntRange{
+	min: BigInt!
+	max: BigInt!
 }
 
 input DateTimeRange{
@@ -349,6 +360,16 @@ input Int64Filter {
 	between: Int64Range
 }
 
+input BigIntFilter {
+	eq: BigInt
+	in: [BigInt]
+	le: BigInt
+	lt: BigInt
+	ge: BigInt
+	gt: BigInt
+	between: BigIntRange
+}
+
 input FloatFilter {
 	eq: Float
 	in: [Float]
@@ -455,6 +476,7 @@ var numUids = &ast.FieldDefinition{
 var supportedSearches = map[string]searchTypeIndex{
 	"int":          {"Int", "int"},
 	"int64":        {"Int64", "int"},
+	"bigint":       {"BigInt", "bigint"},
 	"float":        {"Float", "float"},
 	"bool":         {"Boolean", "bool"},
 	"hash":         {"String", "hash"},
@@ -478,6 +500,7 @@ var defaultSearches = map[string]string{
 	"Boolean":      "bool",
 	"Int":          "int",
 	"Int64":        "int64",
+	"BigInt":       "bigint",
 	"Float":        "float",
 	"String":       "term",
 	"DateTime":     "year",
@@ -506,6 +529,7 @@ var filtersCollisions = map[string][]string{
 var orderable = map[string]bool{
 	"Int":      true,
 	"Int64":    true,
+	"BigInt":   true,
 	"Float":    true,
 	"String":   true,
 	"DateTime": true,
@@ -513,9 +537,10 @@ var orderable = map[string]bool{
 
 // GraphQL types that can be summed. Types that have a well defined addition function.
 var summable = map[string]bool{
-	"Int":   true,
-	"Int64": true,
-	"Float": true,
+	"Int":    true,
+	"Int64":  true,
+	"BigInt": true,
+	"Float":  true,
 }
 
 var enumDirectives = map[string]bool{
@@ -530,6 +555,7 @@ var builtInFilters = map[string]string{
 	"bool":         "Boolean",
 	"int":          "IntFilter",
 	"int64":        "Int64Filter",
+	"bigint":       "BigIntFilter",
 	"float":        "FloatFilter",
 	"year":         "DateTimeFilter",
 	"month":        "DateTimeFilter",
@@ -552,6 +578,7 @@ var inbuiltTypeToDgraph = map[string]string{
 	"Boolean":      "bool",
 	"Int":          "int",
 	"Int64":        "int",
+	"BigInt":       "bigint",
 	"Float":        "float",
 	"String":       "string",
 	"DateTime":     "dateTime",
@@ -1657,7 +1684,7 @@ func isOrderable(fld *ast.FieldDefinition, defn *ast.Definition,
 	return isKeyField(fld, defn) || providesTypeMap[fld.Name]
 }
 
-// Returns true if the field is of type which can be summed. Eg: int, int64, float
+// Returns true if the field is of type which can be summed. Eg: int, int64, bigint, float
 func isSummable(fld *ast.FieldDefinition, defn *ast.Definition, providesTypeMap map[string]bool) bool {
 	if externalAndNonKeyField(fld, defn, providesTypeMap) {
 		return false

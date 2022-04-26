@@ -1358,7 +1358,7 @@ func cantCoerceScalar(val []byte, field *gqlSchema.Field) bool {
 		if _, err := strconv.ParseInt(string(val), 0, 32); err != nil {
 			return true
 		}
-	case "String", "ID", "Boolean", "Int64", "Float", "DateTime", "Upload":
+	case "String", "ID", "Boolean", "Int64", "Float", "DateTime", "BigInt", "Upload":
 		// do nothing, as for these types the GraphQL schema is same as the dgraph schema.
 		// Hence, the value coming in from fastJson node should already be in the correct form.
 		// So, no need to coerce it.

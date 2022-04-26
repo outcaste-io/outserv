@@ -4,6 +4,7 @@
 package types
 
 import (
+	"math/big"
 	"time"
 
 	geom "github.com/twpayne/go-geom"
@@ -28,6 +29,7 @@ var typeNameMap = map[string]TypeID{
 	"string":   TypeString,
 	"password": TypePassword,
 	"upload":   TypeBinary,
+	"bigint":   TypeBigInt,
 }
 
 // TypeID represents the type of the data.
@@ -46,6 +48,7 @@ const (
 	TypeString
 	TypeObject
 	TypeUndefined
+	TypeBigInt
 )
 
 // Name returns the name of the type.
@@ -71,6 +74,8 @@ func (t TypeID) String() string {
 		return "string"
 	case TypePassword:
 		return "password"
+	case TypeBigInt:
+		return "bigint"
 	}
 	return ""
 }
@@ -172,6 +177,10 @@ func ValueForType(id TypeID) Val {
 	case TypePassword:
 		var p string
 		return Val{TypePassword, p}
+
+	case TypeBigInt:
+		var i big.Int
+		return Val{TypeBigInt, &i}
 
 	default:
 		return Val{}

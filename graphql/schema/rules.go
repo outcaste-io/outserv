@@ -265,6 +265,7 @@ func typeNameValidation(schema *ast.SchemaDocument) gqlerror.List {
 	forbiddenTypeNames := map[string]bool{
 		// The static types that we define in schemaExtras
 		"Int64":                true,
+		"BigInt":               true,
 		"DateTime":             true,
 		"Upload":               true,
 		"DgraphIndex":          true,
@@ -274,6 +275,7 @@ func typeNameValidation(schema *ast.SchemaDocument) gqlerror.List {
 		"CustomHTTP":           true,
 		"IntFilter":            true,
 		"Int64Filter":          true,
+		"BigIntFilter":         true,
 		"FloatFilter":          true,
 		"DateTimeFilter":       true,
 		"StringTermFilter":     true,

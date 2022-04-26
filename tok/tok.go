@@ -18,6 +18,7 @@ package tok
 
 import (
 	"encoding/binary"
+	"math/big"
 	"plugin"
 	"strings"
 	"time"
@@ -53,6 +54,7 @@ const (
 	IdentTrigram   = 0xA
 	IdentHash      = 0xB
 	IdentSha       = 0xC
+	IdentBigInt    = 0xD
 	IdentCustom    = 0x80
 	IdentDelimiter = 0x1f // ASCII 31 - Unit seperator
 )
@@ -89,6 +91,7 @@ var tokenizers = make(map[string]Tokenizer)
 func init() {
 	registerTokenizer(GeoTokenizer{})
 	registerTokenizer(IntTokenizer{})
+	registerTokenizer(BigIntTokenizer{})
 	registerTokenizer(FloatTokenizer{})
 	registerTokenizer(YearTokenizer{})
 	registerTokenizer(HourTokenizer{})
@@ -198,6 +201,48 @@ func (t IntTokenizer) Tokens(v interface{}) ([]string, error) {
 func (t IntTokenizer) Identifier() byte { return IdentInt }
 func (t IntTokenizer) IsSortable() bool { return true }
 func (t IntTokenizer) IsLossy() bool    { return false }
+
+// BigIntTokenizer generates tokens from bigint data.
+type BigIntTokenizer struct{}
+
+func (t BigIntTokenizer) Name() string { return "bigint" }
+func (t BigIntTokenizer) Type() string { return "bigint" }
+func (t BigIntTokenizer) Tokens(v interface{}) ([]string, error) {
+	tval := v.(big.Int)
+	buf := make([]byte, 17)
+
+	// Doesn't fit, set it to min/max
+	if len(tval.Bytes()) > len(buf)-1 {
+		for i := range buf {
+			buf[i] = byte(255)
+		}
+		if tval.Sign() < 0 {
+			for i := range buf {
+				buf[i] = byte(255) - buf[i]
+			}
+			buf[0] = 0
+		} else {
+			buf[0] = 1
+		}
+		return []string{string(buf)}, nil
+	}
+
+	tval.FillBytes(buf[1:])
+	if tval.Sign() < 0 {
+		for i := range buf {
+			buf[i] = byte(255) - buf[i]
+		}
+		buf[0] = 0
+	} else {
+		buf[0] = 1
+	}
+
+	return []string{string(buf)}, nil
+}
+
+func (t BigIntTokenizer) Identifier() byte { return IdentBigInt }
+func (t BigIntTokenizer) IsSortable() bool { return true }
+func (t BigIntTokenizer) IsLossy() bool    { return false }
 
 // FloatTokenizer generates tokens from floating-point data.
 type FloatTokenizer struct{}

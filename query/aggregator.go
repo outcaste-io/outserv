@@ -5,6 +5,7 @@ package query
 
 import (
 	"math"
+	"math/big"
 	"time"
 
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -52,6 +53,10 @@ func compareValues(ag string, va, vb types.Val) (bool, error) {
 		case vb.Tid == types.TypeInt64:
 			vb.Tid = types.TypeFloat
 			vb.Value = float64(vb.Value.(int64))
+		case vb.Tid == types.TypeBigInt:
+			vb.Tid = types.TypeFloat
+			vi := vb.Value.(big.Int)
+			vb.Value = float64(vi.Int64())
 		default:
 			return false, err
 		}
@@ -101,6 +106,11 @@ func applyAdd(a, b, c *types.Val) error {
 	case FLOAT:
 		c.Value = a.Value.(float64) + b.Value.(float64)
 
+	case BIGINT:
+		va := a.Value.(big.Int)
+		vb := a.Value.(big.Int)
+		c.Value = va.Add(&va, &vb)
+
 	case DEFAULT:
 		return errors.Errorf("Wrong type %v encountered for func +", a.Tid)
 	}
@@ -122,6 +132,11 @@ func applySub(a, b, c *types.Val) error {
 
 	case FLOAT:
 		c.Value = a.Value.(float64) - b.Value.(float64)
+
+	case BIGINT:
+		va := a.Value.(big.Int)
+		vb := a.Value.(big.Int)
+		c.Value = va.Sub(&va, &vb)
 
 	case DEFAULT:
 		return errors.Errorf("Wrong type %v encountered for func -", a.Tid)
@@ -145,6 +160,11 @@ func applyMul(a, b, c *types.Val) error {
 	case FLOAT:
 		c.Value = a.Value.(float64) * b.Value.(float64)
 
+	case BIGINT:
+		va := a.Value.(big.Int)
+		vb := a.Value.(big.Int)
+		c.Value = va.Mul(&va, &vb)
+
 	case DEFAULT:
 		return errors.Errorf("Wrong type %v encountered for func *", a.Tid)
 	}
@@ -165,6 +185,14 @@ func applyDiv(a, b, c *types.Val) error {
 			return ErrorDivisionByZero
 		}
 		c.Value = a.Value.(float64) / b.Value.(float64)
+
+	case BIGINT:
+		va := a.Value.(big.Int)
+		vb := a.Value.(big.Int)
+		if vb.Cmp(big.NewInt(0)) == 0 {
+			return ErrorDivisionByZero
+		}
+		c.Value = va.Div(&va, &vb)
 
 	case DEFAULT:
 		return errors.Errorf("Wrong type %v encountered for func /", a.Tid)
@@ -187,6 +215,14 @@ func applyMod(a, b, c *types.Val) error {
 		}
 		c.Value = math.Mod(a.Value.(float64), b.Value.(float64))
 
+	case BIGINT:
+		va := a.Value.(big.Int)
+		vb := a.Value.(big.Int)
+		if vb.Cmp(big.NewInt(0)) == 0 {
+			return ErrorDivisionByZero
+		}
+		c.Value = va.Mod(&va, &vb)
+
 	case DEFAULT:
 		return errors.Errorf("Wrong type %v encountered for func %%", a.Tid)
 	}
@@ -207,6 +243,11 @@ func applyPow(a, b, c *types.Val) error {
 			return ErrorFractionalPower
 		}
 		c.Value = math.Pow(a.Value.(float64), b.Value.(float64))
+
+	case BIGINT:
+		va := a.Value.(big.Int)
+		vb := a.Value.(big.Int)
+		c.Value = va.Exp(&va, &vb, nil)
 
 	case DEFAULT:
 		return errors.Errorf("Wrong type %v encountered for func ^", a.Tid)
@@ -233,6 +274,15 @@ func applyLog(a, b, c *types.Val) error {
 			return ErrorDivisionByZero
 		}
 		c.Value = math.Log(a.Value.(float64)) / math.Log(b.Value.(float64))
+
+	case BIGINT:
+		va := a.Value.(big.Int)
+		vb := a.Value.(big.Int)
+		a.Tid = types.TypeInt64
+		a.Value = va.Int64()
+		b.Tid = types.TypeInt64
+		b.Value = vb.Int64()
+		return applyLog(a, b, c)
 
 	case DEFAULT:
 		return errors.Errorf("Wrong type %v encountered for func log", a.Tid)
@@ -282,6 +332,12 @@ func applyLn(a, res *types.Val) error {
 		}
 		res.Value = math.Log(a.Value.(float64))
 
+	case BIGINT:
+		va := a.Value.(big.Int)
+		a.Tid = types.TypeInt64
+		a.Value = va.Int64()
+		return applyLn(a, res)
+
 	case DEFAULT:
 		return errors.Errorf("Wrong type %v encountered for func ln", a.Tid)
 	}
@@ -297,6 +353,12 @@ func applyExp(a, res *types.Val) error {
 
 	case FLOAT:
 		res.Value = math.Exp(a.Value.(float64))
+
+	case BIGINT:
+		va := a.Value.(big.Int)
+		a.Tid = types.TypeInt64
+		a.Value = va.Int64()
+		return applyExp(a, res)
 
 	case DEFAULT:
 		return errors.Errorf("Wrong type %v encountered for func exp", a.Tid)
@@ -316,6 +378,10 @@ func applyNeg(a, res *types.Val) error {
 
 	case FLOAT:
 		res.Value = -a.Value.(float64)
+
+	case BIGINT:
+		va := a.Value.(big.Int)
+		res.Value = va.Neg(&va)
 
 	case DEFAULT:
 		return errors.Errorf("Wrong type %v encountered for func u-", a.Tid)
@@ -339,6 +405,10 @@ func applySqrt(a, res *types.Val) error {
 		}
 		res.Value = math.Sqrt(a.Value.(float64))
 
+	case BIGINT:
+		va := a.Value.(big.Int)
+		res.Value = va.Sqrt(&va)
+
 	case DEFAULT:
 		return errors.Errorf("Wrong type %v encountered for func sqrt", a.Tid)
 	}
@@ -354,6 +424,9 @@ func applyFloor(a, res *types.Val) error {
 	case FLOAT:
 		res.Value = math.Floor(a.Value.(float64))
 
+	case BIGINT:
+		res.Value = a.Value.(big.Int)
+
 	case DEFAULT:
 		return errors.Errorf("Wrong type %v encountered for func floor", a.Tid)
 	}
@@ -368,6 +441,9 @@ func applyCeil(a, res *types.Val) error {
 
 	case FLOAT:
 		res.Value = math.Ceil(a.Value.(float64))
+
+	case BIGINT:
+		res.Value = a.Value.(big.Int)
 
 	case DEFAULT:
 		return errors.Errorf("Wrong type %v encountered for fun ceil", a.Tid)
@@ -415,6 +491,7 @@ type valType int
 const (
 	INT valType = iota
 	FLOAT
+	BIGINT
 	DEFAULT
 )
 
@@ -425,6 +502,8 @@ func getValType(v *types.Val) valType {
 		vBase = INT
 	case types.TypeFloat:
 		vBase = FLOAT
+	case types.TypeBigInt:
+		vBase = BIGINT
 	default:
 		vBase = DEFAULT
 	}
@@ -443,15 +522,34 @@ func (ag *aggregator) matchType(v, va *types.Val) error {
 			va.Tid, ag.name)
 	}
 
-	// One of them is int and one is float
-	if vBase == INT {
+	if vBase == INT && vaBase == BIGINT {
+		v.Tid = types.TypeBigInt
+		v.Value = big.NewInt(v.Value.(int64))
+	}
+
+	if vBase == INT && vaBase == FLOAT {
 		v.Tid = types.TypeFloat
 		v.Value = float64(v.Value.(int64))
 	}
 
-	if vaBase == INT {
+	if vBase == FLOAT && vaBase == BIGINT {
+		v.Tid = types.TypeBigInt
+		v.Value = big.NewInt(int64(v.Value.(float64)))
+	}
+
+	if vBase == FLOAT && vaBase == INT {
 		va.Tid = types.TypeFloat
-		va.Value = float64(va.Value.(int64))
+		va.Value = float64(v.Value.(int64))
+	}
+
+	if vBase == BIGINT && vaBase == INT {
+		va.Tid = types.TypeBigInt
+		va.Value = big.NewInt(v.Value.(int64))
+	}
+
+	if vBase == BIGINT && vaBase == FLOAT {
+		va.Tid = types.TypeBigInt
+		va.Value = big.NewInt(int64(v.Value.(float64)))
 	}
 
 	return nil
@@ -530,6 +628,10 @@ func (ag *aggregator) Apply(val types.Val) {
 			va.Value = va.Value.(int64) + vb.Value.(int64)
 		case va.Tid == types.TypeFloat && vb.Tid == types.TypeFloat:
 			va.Value = va.Value.(float64) + vb.Value.(float64)
+		case va.Tid == types.TypeBigInt && vb.Tid == types.TypeBigInt:
+			a := va.Value.(big.Int)
+			b := vb.Value.(big.Int)
+			va.Value = *a.Add(&a, &b)
 		}
 		// Skipping the else case since that means the pair cannot be summed.
 		res = va
@@ -563,6 +665,15 @@ func (ag *aggregator) divideByCount() {
 		v = float64(ag.result.Value.(int64))
 	case types.TypeFloat:
 		v = ag.result.Value.(float64)
+	case types.TypeBigInt:
+		vi := ag.result.Value.(big.Int)
+		vf := &big.Float{}
+		vf = vf.SetInt(&vi)
+		vq := big.NewFloat(float64(ag.count))
+
+		ag.result.Tid = types.TypeFloat
+		ag.result.Value, _ = vf.Quo(vf, vq).Float64()
+		return
 	}
 
 	ag.result.Tid = types.TypeFloat

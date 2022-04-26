@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"math"
+	"math/big"
 	"strconv"
 	"time"
 
@@ -177,7 +178,7 @@ func CompleteValue(
 	switch val := val.(type) {
 	case map[string]interface{}:
 		switch field.Type().Name() {
-		case "String", "ID", "Boolean", "Float", "Int", "Int64", "DateTime", "Upload":
+		case "String", "ID", "Boolean", "Float", "Int", "Int64", "BigInt", "DateTime", "Upload":
 			return nil, x.GqlErrorList{field.GqlErrorf(path, ErrExpectedScalar)}
 		}
 		enumValues := field.EnumValues()
@@ -421,6 +422,17 @@ func coerceScalar(val interface{}, field *Field, path []interface{}) (interface{
 		switch v := val.(type) {
 		case json.Number:
 			if _, err := strconv.ParseUint(v.String(), 10, 64); err != nil {
+				return nil, valueCoercionError(v)
+			}
+			// do nothing, as val is already a valid number in UInt64 range
+		default:
+			return nil, valueCoercionError(v)
+		}
+	case "BigInt":
+		switch v := val.(type) {
+		case json.Number:
+			var i *big.Int
+			if _, ok := i.SetString(v.String(), 10); !ok {
 				return nil, valueCoercionError(v)
 			}
 			// do nothing, as val is already a valid number in UInt64 range

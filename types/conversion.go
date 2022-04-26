@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/big"
 	"strconv"
 	"time"
 	"unsafe"
@@ -76,6 +77,13 @@ func Convert(from Sval, toID TypeID) (Val, error) {
 				*res = w
 			case TypePassword:
 				*res = string(data)
+			case TypeBigInt:
+				b := &big.Int{}
+				err := b.UnmarshalText(data)
+				if err != nil {
+					return to, errors.Errorf("Marshalling failed for bigint %v", data)
+				}
+				*res = *b
 			default:
 				return to, cantConvert(fromID, toID)
 			}
@@ -92,6 +100,13 @@ func Convert(from Sval, toID TypeID) (Val, error) {
 					return to, err
 				}
 				*res = val
+			case TypeBigInt:
+				val := &big.Int{}
+				val, ok := val.SetString(vc, 10)
+				if !ok {
+					return to, errors.New("Non-numeric string")
+				}
+				*res = *val
 			case TypeFloat:
 				val, err := strconv.ParseFloat(vc, 64)
 				if err != nil {
@@ -146,6 +161,10 @@ func Convert(from Sval, toID TypeID) (Val, error) {
 				var bs [8]byte
 				binary.LittleEndian.PutUint64(bs[:], uint64(vc))
 				*res = bs[:]
+			case TypeBigInt:
+				i := &big.Int{}
+				i.SetInt64(vc)
+				*res = *i
 			case TypeFloat:
 				*res = float64(vc)
 			case TypeBool:
@@ -154,6 +173,31 @@ func Convert(from Sval, toID TypeID) (Val, error) {
 				*res = strconv.FormatInt(vc, 10)
 			case TypeDatetime:
 				*res = time.Unix(vc, 0).UTC()
+			default:
+				return to, cantConvert(fromID, toID)
+			}
+		}
+	case TypeBigInt:
+		{
+			vc := &big.Int{}
+			vc.UnmarshalText(data)
+			switch toID {
+			case TypeBigInt, TypeBinary:
+				*res = *vc
+			case TypeInt64:
+				// We are ignoring here, whether the value will fit into a int64
+				*res = vc.Int64()
+			case TypeFloat:
+				f := &big.Float{}
+				f.SetInt(vc)
+				// We are ignoring here, whether the value will fit into a float64
+				*res, _ = f.Float64()
+			case TypeBool:
+				*res = vc.Int64() != 0
+			case TypeString, TypeDefault:
+				*res = vc.String()
+			case TypeDatetime:
+				*res = time.Unix(vc.Int64(), 0).UTC()
 			default:
 				return to, cantConvert(fromID, toID)
 			}
@@ -178,6 +222,11 @@ func Convert(from Sval, toID TypeID) (Val, error) {
 					return to, errors.Errorf("Float out of int64 range")
 				}
 				*res = int64(vc)
+			case TypeBigInt:
+				f := &big.Float{}
+				f = f.SetFloat64(vc)
+				i, _ := f.Int(nil)
+				*res = i
 			case TypeBool:
 				*res = vc != 0
 			case TypeString, TypeDefault:
@@ -217,6 +266,11 @@ func Convert(from Sval, toID TypeID) (Val, error) {
 				if vc {
 					*res = float64(1)
 				}
+			case TypeBigInt:
+				*res = big.NewInt(0)
+				if vc {
+					*res = big.NewInt(1)
+				}
 			case TypeString, TypeDefault:
 				*res = strconv.FormatBool(vc)
 			default:
@@ -248,6 +302,8 @@ func Convert(from Sval, toID TypeID) (Val, error) {
 				*res = t.Unix()
 			case TypeFloat:
 				*res = float64(t.UnixNano()) / float64(nanoSecondsInSec)
+			case TypeBigInt:
+				*res = big.NewInt(t.Unix())
 			default:
 				return to, cantConvert(fromID, toID)
 			}
@@ -321,7 +377,7 @@ func Marshal(from Val, toID TypeID) (Val, error) {
 		switch toID {
 		case TypeString:
 			*res = string(vc)
-		case TypeBinary:
+		case TypeBinary, TypeBigInt:
 			*res = vc
 		default:
 			return to, cantConvert(fromID, toID)
@@ -347,6 +403,18 @@ func Marshal(from Val, toID TypeID) (Val, error) {
 			*res = bs[:]
 		default:
 			return to, cantConvert(fromID, toID)
+		}
+	case TypeBigInt:
+		vc := val.(big.Int)
+		switch toID {
+		case TypeBinary:
+			i, err := vc.MarshalText()
+			if err != nil {
+				return to, cantConvert(fromID, toID)
+			}
+			*res = i
+		case TypeString:
+			*res = vc.String()
 		}
 	case TypeFloat:
 		vc := val.(float64)
@@ -474,6 +542,9 @@ func (v Val) MarshalJSON() ([]byte, error) {
 		return json.Marshal(v.Safe().(string))
 	case TypePassword:
 		return json.Marshal(v.Value.(string))
+	case TypeBigInt:
+		i := v.Value.(big.Int)
+		return i.MarshalJSON()
 	}
 	return nil, errors.Errorf("Invalid type for MarshalJSON: %v", v.Tid)
 }
