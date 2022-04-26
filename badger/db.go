@@ -1036,22 +1036,8 @@ func (db *DB) handoverSkiplist(r *handoverRequest) error {
 
 	mt := &memTable{sl: skl}
 
-	// Iterate over the skiplist and send the entries to the publisher.
-	it := skl.NewIterator()
-
-	var entries []*Entry
-	for it.SeekToFirst(); it.Valid(); it.Next() {
-		v := it.Value()
-		e := &Entry{
-			Key:       it.Key(),
-			Value:     v.Value,
-			ExpiresAt: v.ExpiresAt,
-			UserMeta:  v.UserMeta,
-		}
-		entries = append(entries, e)
-	}
 	req := &request{
-		Entries: entries,
+		Skl: skl,
 	}
 	reqs := []*request{req}
 	db.pub.sendUpdates(reqs)

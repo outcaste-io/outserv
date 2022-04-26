@@ -667,6 +667,7 @@ func (vlog *valueLog) sortedFids() []uint32 {
 
 type request struct {
 	// Input values
+	Skl     *skl.Skiplist
 	Entries []*Entry
 	// Output values and wait group stuff below
 	Ptrs []valuePointer

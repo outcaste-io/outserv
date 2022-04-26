@@ -88,6 +88,32 @@ func (p *publisher) publishUpdates(reqs requests) {
 	}()
 	batchedUpdates := make(map[uint64]*pb.KVList)
 	for _, req := range reqs {
+		if req.Skl != nil && !req.Skl.Empty() {
+			itr := req.Skl.NewIterator()
+			defer itr.Close()
+
+			for itr.SeekToFirst(); itr.Valid(); itr.Next() {
+				ids := p.indexer.Get(itr.Key())
+				if len(ids) == 0 {
+					continue
+				}
+				v := itr.Value()
+				kv := &pb.KV{
+					Key:       y.ParseKey(itr.Key()),
+					Version:   y.ParseTs(itr.Key()),
+					Value:     y.SafeCopy(nil, v.Value),
+					UserMeta:  []byte{v.UserMeta},
+					ExpiresAt: v.ExpiresAt,
+				}
+				for id := range ids {
+					if _, ok := batchedUpdates[id]; !ok {
+						batchedUpdates[id] = &pb.KVList{}
+					}
+					batchedUpdates[id].Kv = append(batchedUpdates[id].Kv, kv)
+				}
+			}
+		}
+
 		for _, e := range req.Entries {
 			ids := p.indexer.Get(e.Key)
 			if len(ids) == 0 {
@@ -97,7 +123,7 @@ func (p *publisher) publishUpdates(reqs requests) {
 			kv := &pb.KV{
 				Key:       y.ParseKey(k),
 				Value:     y.SafeCopy(nil, e.Value),
-				Meta:      []byte{e.UserMeta},
+				UserMeta:  []byte{e.UserMeta},
 				ExpiresAt: e.ExpiresAt,
 				Version:   y.ParseTs(k),
 			}
