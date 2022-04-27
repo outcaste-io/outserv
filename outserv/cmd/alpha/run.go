@@ -572,7 +572,7 @@ func setupLambdaServer(closer *z.Closer) {
 	}()
 }
 
-func setupServer(closer *z.Closer) {
+func setupServer() {
 	laddr := "localhost"
 	if bindall {
 		laddr = "0.0.0.0"
@@ -626,8 +626,8 @@ func setupServer(closer *z.Closer) {
 	var mainServer *admin.GqlHandler
 	var gqlHealthStore *admin.GraphQLHealthStore
 	// Do not use := notation here because adminServer is a global variable.
-	mainServer, adminServer, gqlHealthStore = admin.NewServers(introspection,
-		globalEpoch, closer)
+	mainServer, adminServer, gqlHealthStore = admin.NewServers(introspection, globalEpoch)
+
 	baseMux.HandleFunc("/graphql", func(w http.ResponseWriter, r *http.Request) {
 		namespace := x.ExtractNamespaceHTTP(r)
 		r.Header.Set("resolver", strconv.FormatUint(namespace, 10))
@@ -946,11 +946,7 @@ func run() {
 		edgraph.RefreshAcls(updaters)
 	}()
 
-	// Graphql subscribes to alpha to get schema updates. We need to close that before we
-	// close alpha. This closer is for closing and waiting that subscription.
-	adminCloser := z.NewCloser(1)
-
-	setupServer(adminCloser)
+	setupServer()
 	glog.Infoln("HTTP stopped.")
 
 	// This might not close until group is given the signal to close. So, only signal here,
@@ -960,9 +956,6 @@ func run() {
 	edgraph.StopServingQueries()
 	worker.BlockingStop()
 	glog.Infoln("Worker stopped.")
-
-	adminCloser.SignalAndWait()
-	glog.Infoln("adminCloser closed.")
 
 	audit.Close()
 

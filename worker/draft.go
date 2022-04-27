@@ -1101,6 +1101,7 @@ func (n *node) proposeBaseTimestamp() {
 		}
 	}
 
+	time.Sleep(10 * time.Second)
 	propose() // Immediately after start.
 	for {
 		select {

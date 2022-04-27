@@ -99,7 +99,6 @@ func (ir *incrRollupi) rollupKey(sl *skl.Skiplist, key []byte) error {
 			vs.Meta = badger.BitDiscardEarlierVersions
 		default:
 		}
-		glog.Infof("kv.Key: %x Version: %x\n", kv.Key, kv.Version)
 		sl.Put(y.KeyWithTs(kv.Key, kv.Version), vs)
 	}
 
@@ -343,8 +342,6 @@ func ReadPostingList(key []byte, it *badger.Iterator) (*List, error) {
 	deltaCount := 0
 	defer func() {
 		if deltaCount > 0 {
-			glog.Infof("key: %x l.maxTs: %x\n", key, l.maxTs)
-			glog.Infof("l.maxTs: %x\n", l.maxTs)
 			// If deltaCount is high, send it to high priority channel instead.
 			if deltaCount > 500 {
 				IncrRollup.addKeyToBatch(key, 0)

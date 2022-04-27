@@ -17,7 +17,6 @@ import (
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
-	"github.com/outcaste-io/ristretto/z"
 )
 
 const (
@@ -180,8 +179,9 @@ type adminServer struct {
 
 // NewServers initializes the GraphQL servers.  It sets up an empty server for the
 // main /graphql endpoint and an admin server.  The result is mainServer, adminServer.
-func NewServers(withIntrospection bool, globalEpoch map[uint64]*uint64,
-	closer *z.Closer) (*GqlHandler, *GqlHandler, *GraphQLHealthStore) {
+func NewServers(withIntrospection bool, globalEpoch map[uint64]*uint64) (
+	*GqlHandler, *GqlHandler, *GraphQLHealthStore) {
+
 	gqlSchema, err := schema.FromString("", x.GalaxyNamespace)
 	if err != nil {
 		x.Panic(err)
@@ -196,7 +196,7 @@ func NewServers(withIntrospection bool, globalEpoch map[uint64]*uint64,
 		Qrw: resolve.NewQueryRewriter(),
 		Ex:  resolve.NewDgraphExecutor(),
 	}
-	adminResolvers := newAdminResolver(mainServer, fns, withIntrospection, globalEpoch, closer)
+	adminResolvers := newAdminResolver(mainServer, fns, withIntrospection, globalEpoch)
 	e = globalEpoch[x.GalaxyNamespace]
 	adminServer := NewServer()
 	adminServer.Set(x.GalaxyNamespace, e, adminResolvers)
@@ -209,8 +209,7 @@ func newAdminResolver(
 	defaultGqlServer *GqlHandler,
 	fns *resolve.ResolverFns,
 	withIntrospection bool,
-	epoch map[uint64]*uint64,
-	closer *z.Closer) *resolve.RequestResolver {
+	epoch map[uint64]*uint64) *resolve.RequestResolver {
 
 	adminSchema, err := schema.FromString(graphqlAdminSchema, x.GalaxyNamespace)
 	if err != nil {
@@ -231,7 +230,7 @@ func newAdminResolver(
 	adminServerVar = server // store the admin server in package variable
 
 	// The subscribe for updates code is really ugly. Removing it for now.
-	go server.initServer()
+	server.initServer()
 
 	return server.resolver
 }
