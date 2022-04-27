@@ -114,7 +114,9 @@ func processWithBackupRequest(
 // ProcessTaskOverNetwork is used to process the query and get the result from
 // the instance which stores posting list corresponding to the predicate in the
 // query.
-func ProcessTaskOverNetwork(ctx context.Context, q *pb.Query) (*pb.Result, error) {
+func ProcessTaskOverNetwork(ctx0 context.Context, q *pb.Query) (*pb.Result, error) {
+	ctx := otrace.NewContext(ctx0, nil)
+
 	attr := q.Attr
 	gid, err := groups().BelongsToReadOnly(attr, q.ReadTs)
 	switch {
@@ -770,7 +772,8 @@ type queryState struct {
 func (qs *queryState) helpProcessTask(ctx context.Context, q *pb.Query, gid uint32) (
 	*pb.Result, error) {
 
-	span := otrace.FromContext(ctx)
+	var span *otrace.Span
+	// span := otrace.FromContext(ctx)
 	out := new(pb.Result)
 	attr := q.Attr
 

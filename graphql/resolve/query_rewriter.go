@@ -11,14 +11,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/gql"
+	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
-
-type queryRewriter struct{}
 
 // The struct is used as a return type for buildCommonAuthQueries function.
 type commonAuthQueryVars struct {
@@ -30,11 +30,6 @@ type commonAuthQueryVars struct {
 	// Stores queries which aggregate filters and auth rules. Eg.
 	// // User6 as var(func: uid(User2), orderasc: ...) @filter((eq(User.username, "User1") AND (...Auth Filter))))
 	selectionQry *gql.GraphQuery
-}
-
-// NewQueryRewriter returns a new QueryRewriter.
-func NewQueryRewriter() QueryRewriter {
-	return &queryRewriter{}
 }
 
 func hasCascadeDirective(field *schema.Field) bool {
@@ -62,10 +57,19 @@ func dqlHasCascadeDirective(q *gql.GraphQuery) bool {
 	return false
 }
 
+type QueryRewriter struct{}
+
+// NewQueryRewriter returns a new QueryRewriter.
+func NewQueryRewriter() *QueryRewriter {
+	return &QueryRewriter{}
+}
+
 // Rewrite rewrites a GraphQL query into a Dgraph GraphQuery.
-func (qr *queryRewriter) Rewrite(
+func (qr *QueryRewriter) Rewrite(
 	ctx context.Context,
 	gqlQuery *schema.Field) ([]*gql.GraphQuery, error) {
+
+	glog.Infof("QueryRewriter. Rewrite: %+v\n", gqlQuery.QueryType())
 
 	switch gqlQuery.QueryType() {
 	case schema.GetQuery:
@@ -659,10 +663,12 @@ func addCommonRules(
 	// We first check ids in the query filter and rewrite accordingly.
 	ids := idFilter(extractQueryFilter(field), fieldType.IDField())
 
+	glog.Infof("ids: %+v\n", ids)
 	// Todo: Add more comments to this block.
-	if ids != nil {
+	if len(ids) > 0 {
 		addUIDFunc(dgQuery, ids)
 	} else {
+		glog.Infof("add type func: %q", fieldType.DgraphName())
 		addTypeFunc(dgQuery, fieldType.DgraphName())
 	}
 	return []*gql.GraphQuery{dgQuery}
@@ -670,26 +676,46 @@ func addCommonRules(
 
 func rewriteAsQuery(field *schema.Field) []*gql.GraphQuery {
 	dgQuery := addCommonRules(field, field.Type())
+	glog.Infof("1: %s\n", dgraph.AsString(dgQuery))
 
 	addArgumentsToField(dgQuery[0], field)
+	glog.Infof("2: %s\n", dgraph.AsString(dgQuery))
+
 	selectionAuth := addSelectionSetFrom(dgQuery[0], field)
+	glog.Infof("2.5: %s\n", dgraph.AsString(selectionAuth))
+
+	glog.Infof("3: %s\n", dgraph.AsString(dgQuery))
+
 	addUID(dgQuery[0])
+	glog.Infof("4: %s\n", dgraph.AsString(dgQuery))
+
 	addCascadeDirective(dgQuery[0], field)
+	glog.Infof("5: %s\n", dgraph.AsString(dgQuery))
 
 	if len(selectionAuth) > 0 {
+		glog.Infof("6.1: %s\n", dgraph.AsString(dgQuery))
 		return append(dgQuery, selectionAuth...)
 	}
 
 	dgQuery = rootQueryOptimization(dgQuery)
+	glog.Infof("6.2: %s\n", dgraph.AsString(dgQuery))
 	return dgQuery
 }
 
 func rootQueryOptimization(dgQuery []*gql.GraphQuery) []*gql.GraphQuery {
-	if dgQuery[0].Filter != nil && dgQuery[0].Filter.Func != nil &&
-		dgQuery[0].Filter.Func.Name == "eq" && dgQuery[0].Func.Name == "type" {
-		rootFunc := dgQuery[0].Func
-		dgQuery[0].Func = dgQuery[0].Filter.Func
-		dgQuery[0].Filter.Func = rootFunc
+	q := dgQuery[0]
+	if q.Filter != nil && q.Filter.Func != nil &&
+		q.Filter.Func.Name == "eq" && q.Func.Name == "type" {
+		rootFunc := q.Func
+		q.Func = q.Filter.Func
+		q.Filter.Func = rootFunc
+	}
+	// We can skip the type(..) filter.
+	if q.Func != nil && q.Filter != nil && q.Filter.Func != nil {
+		fn := q.Filter.Func
+		if fn.Name == "type" {
+			q.Filter = nil
+		}
 	}
 	return dgQuery
 }
@@ -1258,6 +1284,7 @@ func buildFilter(typ *schema.Type, filter map[string]interface{}) *gql.FilterTre
 					// it will be interpreted as {filter: {not: {has: title}}}, rest of
 					// the filters with null values will be ignored in query rewriting.
 					if fn == "eq" {
+						glog.Infof("Got fn eq: %+v\n", fn)
 						hasFilterMap := map[string]interface{}{"not": map[string]interface{}{"has": []interface{}{field}}}
 						ands = append(ands, buildFilter(typ, hasFilterMap))
 					}

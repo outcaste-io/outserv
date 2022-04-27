@@ -203,7 +203,16 @@ func (f *Function) IsPasswordVerifier() bool {
 
 // DebugPrint is useful for debugging.
 func (gq *GraphQuery) DebugPrint(prefix string) {
-	glog.Infof("%s[%x %q %q]\n", prefix, gq.UID, gq.Attr, gq.Alias)
+	glog.Infof("%s[%x %q %q] func: %+v\n", prefix, gq.UID, gq.Attr, gq.Alias, gq.Func)
+	f := gq.Filter
+	if f != nil {
+		if f.Func != nil {
+			glog.Infof("%s Filter Func: %+v\n", prefix, f.Func)
+		}
+		if len(f.Child) > 0 {
+			glog.Infof("%s Filter Children: %d\n", len(f.Child))
+		}
+	}
 	for _, c := range gq.Children {
 		c.DebugPrint(prefix + "|->")
 	}

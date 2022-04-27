@@ -284,9 +284,11 @@ func (n *node) mutationWorker(workerId int) {
 		// we get better performance. This is because the new accounts get
 		// repeated across blocks, causing mutations to conflict and having to
 		// re-do the work. Re-evaluate later.
-		//
-		// txn.ErrCh <- n.concMutations(ctx, p.Mutations, txn)
-		txn.ErrCh <- fmt.Errorf("Not running concurrently")
+		if len(p.Mutations.NewObjects) == 0 {
+			txn.ErrCh <- n.concMutations(ctx, p.Mutations, txn)
+		} else {
+			txn.ErrCh <- fmt.Errorf("Not running concurrently")
+		}
 
 		close(txn.ErrCh)
 	}
@@ -358,10 +360,12 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 	// this mutation.
 	m = proto.Clone(m).(*pb.Mutations)
 
+	span := otrace.FromContext(ctx)
 	// TODO(mrjn): If this concMutation is a retry, should we upgrade the read
 	// timestamp then? It would seem logical to do so.
 	//
 	// Deal with objects first.
+	span.Annotatef(nil, "Found %d NewObjects", len(m.NewObjects))
 	resolved := make(map[string]string)
 	for _, obj := range m.NewObjects {
 		// Does the read timestamp need to be passed to UidsForObject?
@@ -389,7 +393,6 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 	// Replace all the resolved UIDs.
 	x.ReplaceUidsIn(m.Edges, resolved)
 
-	span := otrace.FromContext(ctx)
 	// Discard the posting lists from cache to release memory at the end.
 	defer func() {
 		txn.Update(ctx, resolved)
@@ -542,7 +545,7 @@ func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr erro
 	// Stores a map of predicate and type of first mutation for each predicate.
 	schemaMap := make(map[string]types.TypeID)
 	for _, edge := range prop.Mutations.Edges {
-		if isDeletePredicateEdge(edge) {
+		if isDeletePredicate(edge) {
 			span.Annotatef(nil, "Deleting predicate: %s", edge.Predicate)
 			n.keysWritten.rejectBeforeIndex = prop.Index
 			return posting.DeletePredicate(ctx, edge.Predicate, prop.CommitTs)
@@ -1498,7 +1501,7 @@ func (n *node) Run() {
 					for _, e := range p.Mutations.GetEdges() {
 						// This is a drop predicate mutation. We should not try to execute it
 						// concurrently.
-						if isDeletePredicateEdge(e) {
+						if isDeletePredicate(e) {
 							skip = true
 							break
 						}

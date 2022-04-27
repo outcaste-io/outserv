@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/codec"
@@ -234,6 +235,7 @@ func handleAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		}
 	}
 
+	start := time.Now()
 	typ := m.MutatedType()
 	var res []Object
 	for _, i := range val {
@@ -244,6 +246,8 @@ func handleAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		}
 		res = append(res, objs...)
 	}
+	span := otrace.FromContext(ctx)
+	span.Annotatef(nil, "GatherObjects took %s", time.Since(start).Round(time.Millisecond))
 
 	filter := res[:0]
 	var resultUids []uint64
@@ -268,10 +272,12 @@ func handleAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		return resultUids, nil
 	}
 
+	start = time.Now()
 	nquads, err := handleInverses(ctx, typ, res)
 	if err != nil {
 		return nil, errors.Wrapf(err, "handleAdd.handleInverses")
 	}
+	span.Annotatef(nil, "handleInverses took %s", time.Since(start).Round(time.Millisecond))
 
 	data, err := json.Marshal(res)
 	x.Check(err)
@@ -285,7 +291,9 @@ func handleAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		glog.Infof("Mutation Req JSON data: %s\n", data2)
 		glog.Infof("NQuads: %+v\n", mu.Edges)
 	}
+	start = time.Now()
 	resp, err := edgraph.QueryGraphQL(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}}, m)
+	span.Annotatef(nil, "QueryGraphQL took %s", time.Since(start).Round(time.Millisecond))
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +321,8 @@ func extractMutationFilter(m *schema.Field) map[string]interface{} {
 	return filter
 }
 
-func getUidsFromFilter(ctx context.Context, m *schema.Field) ([]uint64, error) {
+func getUidsFromFilter(ctx0 context.Context, m *schema.Field) ([]uint64, error) {
+	ctx := otrace.NewContext(ctx0, nil)
 	dgQuery := []*gql.GraphQuery{{
 		Attr: m.Name(),
 	}}
@@ -323,15 +332,18 @@ func getUidsFromFilter(ctx context.Context, m *schema.Field) ([]uint64, error) {
 
 	filter := extractMutationFilter(m)
 	ids := idFilter(filter, m.MutatedType().IDField())
-	if ids != nil {
+	if len(ids) > 0 {
 		addUIDFunc(dgQuery[0], ids)
 	} else {
 		addTypeFunc(dgQuery[0], m.MutatedType().DgraphName())
 	}
 
 	_ = addFilter(dgQuery[0], m.MutatedType(), filter)
+	dgQuery = rootQueryOptimization(dgQuery)
 
 	q := dgraph.AsString(dgQuery)
+	glog.Infof("getUidsFromFilter query: %s\n", q)
+
 	resp, err := edgraph.Query(ctx, &pb.Request{Query: q})
 	if err != nil {
 		return nil, errors.Wrapf(err, "while querying")
@@ -352,6 +364,7 @@ func getUidsFromFilter(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		uid := u.Uid
 		uids = append(uids, x.FromHex(uid))
 	}
+	glog.Infof("Got uids: %x\n", uids)
 	return uids, nil
 }
 
@@ -441,6 +454,7 @@ func handleDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		})
 	}
 
+	glog.Infof("mutation: %+v\n", mu)
 	req := &pb.Request{}
 	req.Mutations = append(req.Mutations, mu)
 
@@ -452,7 +466,9 @@ func handleDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 	return uids, nil
 }
 
-func getObject(ctx context.Context, uid string, fields ...string) (map[string]interface{}, error) {
+func getObject(ctx0 context.Context, uid string, fields ...string) (map[string]interface{}, error) {
+	ctx := otrace.NewContext(ctx0, nil)
+
 	q := fmt.Sprintf(`{q(func: uid(%s)) { %s }}`, uid, strings.Join(fields[:], ", "))
 	resp, err := edgraph.Query(ctx, &pb.Request{Query: q})
 	if err != nil {
