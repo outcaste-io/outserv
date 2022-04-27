@@ -696,6 +696,7 @@ func setupServer() {
 		time.Sleep(500 * time.Millisecond)
 	}
 	x.ServerCloser.Wait()
+	glog.Infoln("x.ServerCloser.Wait is DONE")
 }
 
 func run() {
@@ -873,6 +874,7 @@ func run() {
 	go func() {
 		var numShutDownSig int
 		for range sdCh {
+			glog.Infof("got something from sdCh")
 			closer := x.ServerCloser
 			select {
 			case <-closer.HasBeenClosed():
