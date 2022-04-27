@@ -801,12 +801,6 @@ func buildAggregateFields(
 	fieldFilter, _ := f.ArgValue("filter").(map[string]interface{})
 	_ = addFilter(mainField, constructedForType, fieldFilter)
 
-	// Add type filter in case the Dgraph predicate for which the aggregate
-	// field belongs to is a reverse edge
-	if strings.HasPrefix(constructedForDgraphPredicate, "~") {
-		addTypeFilter(mainField, f.ConstructedFor())
-	}
-
 	// isAggregateVarAdded is a map from field name to boolean. It is used to
 	// ensure that a field is added to Var query at maximum once.
 	// Eg. Even if scoreMax and scoreMin are queried, the corresponding field will
@@ -964,11 +958,6 @@ func addSelectionSetFrom(
 		// if this field has been filtered out by the filter, then don't add it in DQL query
 		if includeField := addFilter(child, f.Type(), filter); !includeField {
 			continue
-		}
-
-		// Add type filter in case the Dgraph predicate is a reverse edge
-		if strings.HasPrefix(f.DgraphPredicate(), "~") {
-			addTypeFilter(child, f.Type())
 		}
 
 		addOrder(child, f)
@@ -1200,6 +1189,7 @@ func buildFilter(typ *schema.Type, filter map[string]interface{}) *gql.FilterTre
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
+	glog.Infof("Gotta build filter for: %+v . Keys: %+v\n", filter, keys)
 
 	// Each key in filter is either "and", "or", "not" or the field name it
 	// applies to such as "title" in: `title: { anyofterms: "GraphQL" }``
@@ -1207,6 +1197,7 @@ func buildFilter(typ *schema.Type, filter map[string]interface{}) *gql.FilterTre
 		if filter[field] == nil {
 			continue
 		}
+		glog.Infof("Field: %s\n", field)
 		switch field {
 
 		// In 'and', 'or' and 'not' cases, filter[field] must be a map[string]interface{}
@@ -1269,6 +1260,7 @@ func buildFilter(typ *schema.Type, filter map[string]interface{}) *gql.FilterTre
 					Child: []*gql.FilterTree{not},
 				})
 		default:
+			glog.Infof("Field: %s. val: %+v\n", field, filter[field])
 			//// It's a base case like:
 			//// title: { anyofterms: "GraphQL" } ->  anyofterms(Post.title: "GraphQL")
 			//// numLikes: { between : { min : 10,  max:100 }}
@@ -1290,7 +1282,12 @@ func buildFilter(typ *schema.Type, filter map[string]interface{}) *gql.FilterTre
 					}
 					continue
 				}
+				glog.Infof("typ: %q predicates: %+v\n", typ.Name(), typ.DgraphPredicates())
 				args := []gql.Arg{{Value: typ.DgraphPredicate(field)}}
+				glog.Infof("field: %s args: %+v\n", field, args)
+				if len(args[0].Value) == 0 {
+					panic("i am here")
+				}
 				switch fn {
 				// in takes List of Scalars as argument, for eg:
 				// code : { in: ["abc", "def", "ghi"] } -> eq(State.code,"abc","def","ghi")
@@ -1360,12 +1357,14 @@ func buildFilter(typ *schema.Type, filter map[string]interface{}) *gql.FilterTre
 				default:
 					args = append(args, gql.Arg{Value: schema.MaybeQuoteArg(fn, val)})
 				}
+				glog.Infof("args: %+v\n", args)
 				ands = append(ands, &gql.FilterTree{
 					Func: &gql.Function{
 						Name: fn,
 						Args: args,
 					},
 				})
+				glog.Infof("ands: %+v\n", ands)
 			case []interface{}:
 				// has: [comments, text] -> has(comments) AND has(text)
 				// ids: [ 0x123, 0x124]

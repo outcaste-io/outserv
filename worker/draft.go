@@ -1478,11 +1478,20 @@ func (n *node) Run() {
 				for _, e := range entries {
 					p := getProposal(e)
 					if p.BaseTimestamp > 0 {
-						if x.Debug {
-							glog.V(2).Infof("Setting base timestamp to: %#x for index: %d\n",
-								p.BaseTimestamp, e.Index)
-						}
+						glog.V(1).Infof("Setting base timestamp to: %#x for index: %d\n",
+							p.BaseTimestamp, e.Index)
 						baseTimestamp = p.BaseTimestamp
+
+						// We can safely register p.BaseTimestamp with the
+						// Oracle. Because all future timestamps would be higher
+						// than this. We do this registeration and done to
+						// ensure that the Oracle clock advances even if there
+						// are no mutations. This is important to allow this
+						// alpha to be able to get fresh data from alphas in
+						// other groups.
+						posting.RegisterTimestamp(p.BaseTimestamp)
+						posting.DoneTimestamp(p.BaseTimestamp)
+
 						n.Proposals.Done(p.Key, propResult(nil))
 						n.Applied.Done(p.Index)
 						continue

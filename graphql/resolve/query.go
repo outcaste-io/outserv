@@ -70,6 +70,7 @@ func (qr *queryResolver) Resolve(ctx context.Context, query *schema.Field) *Reso
 	timer.Start()
 	defer timer.Stop()
 
+	glog.Infof("queryResolver.Resolve")
 	resolved := qr.rewriteAndExecute(ctx, query)
 	qr.resultCompleter.Complete(ctx, resolved)
 	return resolved

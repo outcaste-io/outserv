@@ -44,7 +44,6 @@ type GqlSchema struct {
 	Schema          string `json:"schema,omitempty"`
 	Version         uint64
 	GeneratedSchema string
-	Loaded          bool // This indicate whether the schema has been loaded into graphql server
 	// or not
 }
 
@@ -62,6 +61,7 @@ func NewGQLSchemaStore() *GQLSchemaStore {
 }
 
 func (gs *GQLSchemaStore) Set(ns uint64, sch *GqlSchema) {
+	glog.Infof("GQLSchemaStore.Set called for %d with %+v\n", ns, sch)
 	gs.mux.Lock()
 	defer gs.mux.Unlock()
 	gs.schema[ns] = sch

@@ -217,10 +217,6 @@ func (s *Schema) Mutations(t MutationType) []string {
 	return result
 }
 
-func (s *Schema) IsFederated() bool {
-	return s.schema.Types["_Entity"] != nil
-}
-
 func (s *Schema) SetMeta(meta *metaInfo) {
 	s.meta = meta
 }
@@ -1597,13 +1593,15 @@ func (f *Field) ConstructedFor() *Type {
 	// if !f.IsAggregateField() {
 	// 	return f.Type()
 	// }
-	if f.QueryType() != AggregateQuery {
+	glog.Infof("f.ConstructedFor: %q %q %q\n", f.Name(), f.Type().Name(), f.QueryType())
+	if !f.IsAggregateField() && f.QueryType() != AggregateQuery {
 		return f.Type()
 	}
 
 	// f has type of the form <SomeTypeName>AggregateResult
 	fieldName := f.Type().Name()
 	typeName := fieldName[:len(fieldName)-15]
+	glog.Infof("returning fieldname: %q typeName: %q\n", fieldName, typeName)
 	return &Type{
 		typ: &ast.Type{
 			NamedType: typeName,
@@ -2064,6 +2062,10 @@ func (t *Type) ListType() *Type {
 // type's field fld.  Mostly this will be type_name.field_name,.
 func (t *Type) DgraphPredicate(fld string) string {
 	return t.dgraphPredicate[t.Name()][fld]
+}
+
+func (t *Type) DgraphPredicates() map[string]string {
+	return t.dgraphPredicate[t.Name()]
 }
 
 func (t *Type) String() string {

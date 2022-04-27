@@ -2343,6 +2343,8 @@ type Request struct {
 // Fills Subgraphs and Vars.
 // It can process multiple query blocks that are part of the query..
 func (req *Request) ProcessQuery(ctx context.Context) (err error) {
+	glog.Infof("Request.ProcessQuery: %x\n", req.ReadTs)
+
 	span := otrace.FromContext(ctx)
 	stop := x.SpanTimer(span, "query.ProcessQuery")
 	defer stop()
