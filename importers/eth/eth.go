@@ -149,7 +149,7 @@ func (c *Chain) processTxns(wg *sync.WaitGroup) {
 
 	for block := range c.blockCh {
 		txns = append(txns, block.Txns()...)
-		if len(txns) >= 1000 {
+		if len(txns) >= 100 {
 			check(sendTxns(txns))
 			txns = txns[:0]
 		}

@@ -284,12 +284,14 @@ func (n *node) mutationWorker(workerId int) {
 		// we get better performance. This is because the new accounts get
 		// repeated across blocks, causing mutations to conflict and having to
 		// re-do the work. Re-evaluate later.
-		if len(p.Mutations.NewObjects) == 0 {
-			txn.ErrCh <- n.concMutations(ctx, p.Mutations, txn)
-		} else {
-			txn.ErrCh <- fmt.Errorf("Not running concurrently")
-		}
+		//
+		// if len(p.Mutations.NewObjects) == 0 {
+		// 	txn.ErrCh <- n.concMutations(ctx, p.Mutations, txn)
+		// } else {
+		// 	txn.ErrCh <- fmt.Errorf("Not running concurrently")
+		// }
 
+		txn.ErrCh <- fmt.Errorf("Not running concurrently")
 		close(txn.ErrCh)
 	}
 

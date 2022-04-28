@@ -371,7 +371,8 @@ func getUidsFromFilter(ctx0 context.Context, m *schema.Field) ([]uint64, error) 
 func getChildrenUids(ctx context.Context, uid, pred string) ([]string, error) {
 	// We need to get the UID for the object. So, the field in
 	// getObject is really a query.
-	obj, err := getObject(ctx, uid, fmt.Sprintf("%s {uid}", pred))
+	field := fmt.Sprintf("%s {uid}", pred)
+	obj, err := getObject(ctx, uid, field)
 	if err != nil {
 		return nil, fmt.Errorf("While getting %s: %+v", pred, err)
 	}
@@ -383,7 +384,11 @@ func getChildrenUids(ctx context.Context, uid, pred string) ([]string, error) {
 	// Delete in the reverse direction.
 	var children []string
 	if co, has := childObj.(map[string]interface{}); has {
-		childUid := co["uid"].(string)
+		childUid, ok := co["uid"].(string)
+		if !ok {
+			glog.Infof("uid is not string. getObject with uid: %s field: %s childObj: %+v co[uid]: %+v", uid, field, childObj, co["uid"])
+			panic("stop here")
+		}
 		children = append(children, childUid)
 	} else if clist, has := childObj.([]interface{}); has {
 		for _, co := range clist {
