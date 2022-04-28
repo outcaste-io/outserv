@@ -1073,7 +1073,7 @@ func (n *node) updateRaftProgress() error {
 	atomic.StoreUint64(&n.checkpointTs, snap.BaseTs)
 
 	n.Store.SetUint(raftwal.CheckpointIndex, snap.GetIndex())
-	glog.V(2).Infof("[%#x] Set Raft checkpoint to index: %d, ts: %#x.",
+	glog.V(1).Infof("[%#x] Set Raft checkpoint to index: %d, ts: %#x.",
 		n.Id, snap.Index, snap.BaseTs)
 	return nil
 }

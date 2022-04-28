@@ -583,10 +583,12 @@ func setupServer() {
 		log.Fatalf("Failed to setup TLS: %v\n", err)
 	}
 
+	glog.Infof("Setting up HTTP listener")
 	httpListener, err := setupListener(laddr, httpPort())
 	if err != nil {
 		log.Fatal(err)
 	}
+	glog.Infof("Setting up HTTP listener: DONE")
 
 	baseMux := http.NewServeMux()
 	http.Handle("/", audit.AuditRequestHttp(baseMux))
@@ -601,8 +603,6 @@ func setupServer() {
 	baseMux.HandleFunc("/debug/jemalloc", x.JemallocHandler)
 	baseMux.HandleFunc("/debug/store", worker.StoreHandler)
 	zpages.Handle(baseMux, "/debug/z")
-
-	introspection := x.Config.GraphQL.Introspection
 
 	// Global Epoch is a lockless synchronization mechanism for graphql service.
 	// It's is just an atomic counter used by the graphql subscription to update its state.
@@ -623,9 +623,12 @@ func setupServer() {
 	atomic.StoreUint64(e, 0)
 	globalEpoch[x.GalaxyNamespace] = e
 
+	glog.Infof("Setting up newServers")
+	// Do not use := notation here because adminServer is a global variable.
+	// admin.NewServers loads up GraphQL schema.
+	introspection := x.Config.GraphQL.Introspection
 	var mainServer *admin.GqlHandler
 	var gqlHealthStore *admin.GraphQLHealthStore
-	// Do not use := notation here because adminServer is a global variable.
 	mainServer, adminServer, gqlHealthStore = admin.NewServers(introspection, globalEpoch)
 
 	baseMux.HandleFunc("/graphql", func(w http.ResponseWriter, r *http.Request) {
@@ -638,6 +641,7 @@ func setupServer() {
 		mainServer.HTTPHandler().ServeHTTP(w, r)
 	})
 
+	glog.Infof("At probe graphql")
 	baseMux.Handle("/probe/graphql", graphqlProbeHandler(gqlHealthStore, globalEpoch))
 
 	baseMux.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
@@ -681,22 +685,12 @@ func setupServer() {
 		err := httpListener.Close()
 		glog.Infof("HTTP listener closed with error: %v", err)
 	}()
-
 	glog.Infoln("HTTP server started.  Listening on port", httpPort())
 
-	atomic.AddUint32(&initDone, 1)
 	// Audit needs groupId and nodeId to initialize audit files
 	// Therefore we wait for the cluster initialization to be done.
-	for {
-		if x.HealthCheck() == nil {
-			// Audit is enterprise feature.
-			x.Check(audit.InitAuditorIfNecessary(worker.Config.Audit, nil))
-			break
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
-	x.ServerCloser.Wait()
-	glog.Infoln("x.ServerCloser.Wait is DONE")
+	// Audit is enterprise feature.
+	x.Check(audit.InitAuditorIfNecessary(worker.Config.Audit, nil))
 }
 
 func run() {
@@ -934,21 +928,30 @@ func run() {
 		glog.Errorf("Grpc serve returned with error: %+v", err)
 	}()
 
-	updaters := z.NewCloser(4)
-	go func() {
-		billing.Run(updaters)
-		zero.Run(updaters, bindall)
+	updaters := z.NewCloser(2)
+	billing.Run(updaters)
+	zero.Run(updaters, bindall)
 
-		worker.StartRaftNodes(worker.State.WALstore, bindall)
-		atomic.AddUint32(&initDone, 1)
+	// StartRaftNodes loads up DQL schema from disk. This is important step
+	// that's needed before GraphQL schema can be loaded in setupServer.
+	worker.StartRaftNodes(worker.State.WALstore, bindall)
+	atomic.AddUint32(&initDone, 1)
 
-		// initialization of the admin account can only be done after raft nodes are running
-		// and health check passes
-		edgraph.ResetAcl(updaters)
-		edgraph.RefreshAcls(updaters)
-	}()
+	// initialization of the admin account can only be done after raft nodes are running
+	// and health check passes
+	// edgraph.ResetAcl(updaters)
+	// edgraph.RefreshAcls(updaters)
 
+	// This must be called here, because setupServer does DQL queries, which
+	// would return error if health check fails.
+	x.UpdateHealthStatus(true)
 	setupServer()
+	atomic.AddUint32(&initDone, 1)
+	glog.Infof("Server is ready: OK")
+
+	// The following would block until Ctrl+C.
+	x.ServerCloser.Wait()
+	glog.Infoln("x.ServerCloser.Wait is DONE")
 	glog.Infoln("HTTP stopped.")
 
 	// This might not close until group is given the signal to close. So, only signal here,

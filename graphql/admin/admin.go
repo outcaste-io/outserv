@@ -196,6 +196,8 @@ func NewServers(withIntrospection bool, globalEpoch map[uint64]*uint64) (
 		Qrw: resolve.NewQueryRewriter(),
 		Ex:  resolve.NewDgraphExecutor(),
 	}
+
+	// newAdminResolver loads up GraphQL schema.
 	adminResolvers := newAdminResolver(mainServer, fns, withIntrospection, globalEpoch)
 	e = globalEpoch[x.GalaxyNamespace]
 	adminServer := NewServer()
@@ -439,6 +441,7 @@ func (as *adminServer) lazyLoadSchema(namespace uint64) error {
 	if _, ok := as.gqlSchemas.GetCurrent(namespace); ok {
 		return nil
 	}
+	glog.Infof("Unable to find schema in cache for %d. Fetching...\n", namespace)
 
 	// otherwise, fetch the schema from disk
 	cur, err := getCurrentGraphQLSchema(namespace)

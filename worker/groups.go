@@ -145,9 +145,6 @@ func StartRaftNodes(walStore *raftwal.DiskStorage, bindall bool) {
 	glog.Infof("Informed Zero about tablets I have: OK")
 	gr.applyInitialSchema()
 	glog.Infof("Upserted Schema: OK")
-
-	x.UpdateHealthStatus(true)
-	glog.Infof("Server is ready: OK")
 }
 
 func (g *groupi) Ctx() context.Context {

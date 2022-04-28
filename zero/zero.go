@@ -251,8 +251,6 @@ func Run(closer *z.Closer, bindall bool) {
 	store.SetUint(raftwal.RaftId, nodeId)
 	store.SetUint(raftwal.GroupId, 0) // All zeros have group zero.
 
-	go x.MonitorDiskMetrics("wal_fs", wdir, closer)
-
 	rc := pb.RaftContext{
 		WhoIs:     "zero",
 		Id:        nodeId,
@@ -263,7 +261,8 @@ func Run(closer *z.Closer, bindall bool) {
 	cn := conn.NewNode(&rc, store, x.WorkerConfig.TLSClientConfig)
 	conn.UpdateNode(rc.WhoIs, cn)
 
-	nodeCloser := z.NewCloser(2)
+	nodeCloser := z.NewCloser(3)
+	go x.MonitorDiskMetrics("wal_fs", wdir, nodeCloser)
 	go func() {
 		defer closer.Done()
 		<-closer.HasBeenClosed()
