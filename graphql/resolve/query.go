@@ -70,7 +70,6 @@ func (qr *queryResolver) Resolve(ctx context.Context, query *schema.Field) *Reso
 	timer.Start()
 	defer timer.Stop()
 
-	glog.Infof("queryResolver.Resolve")
 	resolved := qr.rewriteAndExecute(ctx, query)
 	qr.resultCompleter.Complete(ctx, resolved)
 	return resolved
@@ -99,7 +98,7 @@ func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query *schema.Fi
 			query.ResponseName()))
 	}
 	qry := dgraph.AsString(dgQuery)
-	glog.V(1).Infof("DQL Query: %s\n", qry)
+	glog.V(2).Infof("DQL Query: %s\n", qry)
 
 	queryTimer := newtimer(ctx, &dgraphQueryDuration.OffsetDuration)
 	queryTimer.Start()

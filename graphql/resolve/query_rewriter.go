@@ -11,9 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/gql"
-	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
@@ -68,8 +66,6 @@ func NewQueryRewriter() *QueryRewriter {
 func (qr *QueryRewriter) Rewrite(
 	ctx context.Context,
 	gqlQuery *schema.Field) ([]*gql.GraphQuery, error) {
-
-	glog.Infof("QueryRewriter. Rewrite: %+v\n", gqlQuery.QueryType())
 
 	switch gqlQuery.QueryType() {
 	case schema.GetQuery:
@@ -663,12 +659,10 @@ func addCommonRules(
 	// We first check ids in the query filter and rewrite accordingly.
 	ids := idFilter(extractQueryFilter(field), fieldType.IDField())
 
-	glog.Infof("ids: %+v\n", ids)
 	// Todo: Add more comments to this block.
 	if len(ids) > 0 {
 		addUIDFunc(dgQuery, ids)
 	} else {
-		glog.Infof("add type func: %q", fieldType.DgraphName())
 		addTypeFunc(dgQuery, fieldType.DgraphName())
 	}
 	return []*gql.GraphQuery{dgQuery}
@@ -676,29 +670,15 @@ func addCommonRules(
 
 func rewriteAsQuery(field *schema.Field) []*gql.GraphQuery {
 	dgQuery := addCommonRules(field, field.Type())
-	glog.Infof("1: %s\n", dgraph.AsString(dgQuery))
-
 	addArgumentsToField(dgQuery[0], field)
-	glog.Infof("2: %s\n", dgraph.AsString(dgQuery))
 
 	selectionAuth := addSelectionSetFrom(dgQuery[0], field)
-	glog.Infof("2.5: %s\n", dgraph.AsString(selectionAuth))
-
-	glog.Infof("3: %s\n", dgraph.AsString(dgQuery))
-
 	addUID(dgQuery[0])
-	glog.Infof("4: %s\n", dgraph.AsString(dgQuery))
-
 	addCascadeDirective(dgQuery[0], field)
-	glog.Infof("5: %s\n", dgraph.AsString(dgQuery))
-
 	if len(selectionAuth) > 0 {
-		glog.Infof("6.1: %s\n", dgraph.AsString(dgQuery))
 		return append(dgQuery, selectionAuth...)
 	}
-
 	dgQuery = rootQueryOptimization(dgQuery)
-	glog.Infof("6.2: %s\n", dgraph.AsString(dgQuery))
 	return dgQuery
 }
 
@@ -1189,7 +1169,6 @@ func buildFilter(typ *schema.Type, filter map[string]interface{}) *gql.FilterTre
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	glog.Infof("Gotta build filter for: %+v . Keys: %+v\n", filter, keys)
 
 	// Each key in filter is either "and", "or", "not" or the field name it
 	// applies to such as "title" in: `title: { anyofterms: "GraphQL" }``
@@ -1197,7 +1176,6 @@ func buildFilter(typ *schema.Type, filter map[string]interface{}) *gql.FilterTre
 		if filter[field] == nil {
 			continue
 		}
-		glog.Infof("Field: %s\n", field)
 		switch field {
 
 		// In 'and', 'or' and 'not' cases, filter[field] must be a map[string]interface{}
@@ -1260,10 +1238,9 @@ func buildFilter(typ *schema.Type, filter map[string]interface{}) *gql.FilterTre
 					Child: []*gql.FilterTree{not},
 				})
 		default:
-			glog.Infof("Field: %s. val: %+v\n", field, filter[field])
-			//// It's a base case like:
-			//// title: { anyofterms: "GraphQL" } ->  anyofterms(Post.title: "GraphQL")
-			//// numLikes: { between : { min : 10,  max:100 }}
+			// It's a base case like:
+			// title: { anyofterms: "GraphQL" } ->  anyofterms(Post.title: "GraphQL")
+			// numLikes: { between : { min : 10,  max:100 }}
 			switch dgFunc := filter[field].(type) {
 			case map[string]interface{}:
 				// title: { anyofterms: "GraphQL" } ->  anyofterms(Post.title, "GraphQL")
@@ -1276,18 +1253,12 @@ func buildFilter(typ *schema.Type, filter map[string]interface{}) *gql.FilterTre
 					// it will be interpreted as {filter: {not: {has: title}}}, rest of
 					// the filters with null values will be ignored in query rewriting.
 					if fn == "eq" {
-						glog.Infof("Got fn eq: %+v\n", fn)
 						hasFilterMap := map[string]interface{}{"not": map[string]interface{}{"has": []interface{}{field}}}
 						ands = append(ands, buildFilter(typ, hasFilterMap))
 					}
 					continue
 				}
-				glog.Infof("typ: %q predicates: %+v\n", typ.Name(), typ.DgraphPredicates())
 				args := []gql.Arg{{Value: typ.DgraphPredicate(field)}}
-				glog.Infof("field: %s args: %+v\n", field, args)
-				if len(args[0].Value) == 0 {
-					panic("i am here")
-				}
 				switch fn {
 				// in takes List of Scalars as argument, for eg:
 				// code : { in: ["abc", "def", "ghi"] } -> eq(State.code,"abc","def","ghi")
@@ -1357,14 +1328,12 @@ func buildFilter(typ *schema.Type, filter map[string]interface{}) *gql.FilterTre
 				default:
 					args = append(args, gql.Arg{Value: schema.MaybeQuoteArg(fn, val)})
 				}
-				glog.Infof("args: %+v\n", args)
 				ands = append(ands, &gql.FilterTree{
 					Func: &gql.Function{
 						Name: fn,
 						Args: args,
 					},
 				})
-				glog.Infof("ands: %+v\n", ands)
 			case []interface{}:
 				// has: [comments, text] -> has(comments) AND has(text)
 				// ids: [ 0x123, 0x124]

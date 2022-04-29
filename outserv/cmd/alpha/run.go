@@ -623,7 +623,7 @@ func setupServer() {
 	atomic.StoreUint64(e, 0)
 	globalEpoch[x.GalaxyNamespace] = e
 
-	glog.Infof("Setting up newServers")
+	glog.Infof("Setting up GraphQL servers")
 	// Do not use := notation here because adminServer is a global variable.
 	// admin.NewServers loads up GraphQL schema.
 	introspection := x.Config.GraphQL.Introspection
@@ -640,8 +640,6 @@ func setupServer() {
 		}
 		mainServer.HTTPHandler().ServeHTTP(w, r)
 	})
-
-	glog.Infof("At probe graphql")
 	baseMux.Handle("/probe/graphql", graphqlProbeHandler(gqlHealthStore, globalEpoch))
 
 	baseMux.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
@@ -868,7 +866,6 @@ func run() {
 	go func() {
 		var numShutDownSig int
 		for range sdCh {
-			glog.Infof("got something from sdCh")
 			closer := x.ServerCloser
 			select {
 			case <-closer.HasBeenClosed():
@@ -951,7 +948,6 @@ func run() {
 
 	// The following would block until Ctrl+C.
 	x.ServerCloser.Wait()
-	glog.Infoln("x.ServerCloser.Wait is DONE")
 	glog.Infoln("HTTP stopped.")
 
 	// This might not close until group is given the signal to close. So, only signal here,

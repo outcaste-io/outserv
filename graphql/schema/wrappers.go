@@ -1593,7 +1593,6 @@ func (f *Field) ConstructedFor() *Type {
 	// if !f.IsAggregateField() {
 	// 	return f.Type()
 	// }
-	glog.Infof("f.ConstructedFor: %q %q %q\n", f.Name(), f.Type().Name(), f.QueryType())
 	if !f.IsAggregateField() && f.QueryType() != AggregateQuery {
 		return f.Type()
 	}
@@ -1601,7 +1600,6 @@ func (f *Field) ConstructedFor() *Type {
 	// f has type of the form <SomeTypeName>AggregateResult
 	fieldName := f.Type().Name()
 	typeName := fieldName[:len(fieldName)-15]
-	glog.Infof("returning fieldname: %q typeName: %q\n", fieldName, typeName)
 	return &Type{
 		typ: &ast.Type{
 			NamedType: typeName,

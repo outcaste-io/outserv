@@ -772,8 +772,7 @@ type queryState struct {
 func (qs *queryState) helpProcessTask(ctx context.Context, q *pb.Query, gid uint32) (
 	*pb.Result, error) {
 
-	var span *otrace.Span
-	// span := otrace.FromContext(ctx)
+	span := otrace.FromContext(ctx)
 	out := new(pb.Result)
 	attr := q.Attr
 

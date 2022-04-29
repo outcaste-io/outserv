@@ -342,8 +342,6 @@ func getUidsFromFilter(ctx0 context.Context, m *schema.Field) ([]uint64, error) 
 	dgQuery = rootQueryOptimization(dgQuery)
 
 	q := dgraph.AsString(dgQuery)
-	glog.Infof("getUidsFromFilter query: %s\n", q)
-
 	resp, err := edgraph.Query(ctx, &pb.Request{Query: q})
 	if err != nil {
 		return nil, errors.Wrapf(err, "while querying")
@@ -364,7 +362,6 @@ func getUidsFromFilter(ctx0 context.Context, m *schema.Field) ([]uint64, error) 
 		uid := u.Uid
 		uids = append(uids, x.FromHex(uid))
 	}
-	glog.Infof("Got uids: %x\n", uids)
 	return uids, nil
 }
 
@@ -386,8 +383,9 @@ func getChildrenUids(ctx context.Context, uid, pred string) ([]string, error) {
 	if co, has := childObj.(map[string]interface{}); has {
 		childUid, ok := co["uid"].(string)
 		if !ok {
-			glog.Infof("uid is not string. getObject with uid: %s field: %s childObj: %+v co[uid]: %+v", uid, field, childObj, co["uid"])
-			panic("stop here")
+			glog.Errorf("uid is not string. getObject with uid: %s field: %s childObj: %+v"+
+				" co[uid]: %+v", uid, field, childObj, co["uid"])
+			panic("getChildrenUids: Invalid childUid")
 		}
 		children = append(children, childUid)
 	} else if clist, has := childObj.([]interface{}); has {
@@ -459,7 +457,6 @@ func handleDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		})
 	}
 
-	glog.Infof("mutation: %+v\n", mu)
 	req := &pb.Request{}
 	req.Mutations = append(req.Mutations, mu)
 

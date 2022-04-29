@@ -1481,7 +1481,7 @@ func (n *node) Run() {
 				for _, e := range entries {
 					p := getProposal(e)
 					if p.BaseTimestamp > 0 {
-						glog.V(1).Infof("Setting base timestamp to: %#x for index: %d\n",
+						glog.V(1).Infof("Setting base timestamp to: %#x at index: %d\n",
 							p.BaseTimestamp, e.Index)
 						baseTimestamp = p.BaseTimestamp
 

@@ -175,7 +175,6 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	glog.Infof("Got mediaType: %q content-type: %q", mediaType, contentType)
 	switch mediaType {
 	case "application/json":
 		if err := json.Unmarshal(body, &params); err != nil {
