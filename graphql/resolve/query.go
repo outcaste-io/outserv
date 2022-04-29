@@ -12,7 +12,6 @@ import (
 	"github.com/golang/glog"
 	otrace "go.opencensus.io/trace"
 
-	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -24,11 +23,6 @@ var errNotScalar = errors.New("provided value is not a scalar, can't convert it 
 // A QueryResolver can resolve a single query.
 type QueryResolver interface {
 	Resolve(ctx context.Context, query *schema.Field) *Resolved
-}
-
-// A QueryRewriter can build a Dgraph gql.GraphQuery from a GraphQL query,
-type QueryRewriter interface {
-	Rewrite(ctx context.Context, q *schema.Field) ([]*gql.GraphQuery, error)
 }
 
 // QueryResolverFunc is an adapter that allows to build a QueryResolver from
@@ -44,19 +38,19 @@ func (qr QueryResolverFunc) Resolve(ctx context.Context, query *schema.Field) *R
 // 1) rewrite the query using qr (return error if failed)
 // 2) execute the rewritten query with ex (return error if failed)
 // 3) process the result with rc
-func NewQueryResolver(qr QueryRewriter, ex DgraphExecutor) QueryResolver {
+func NewQueryResolver(qr *QueryRewriter, ex DgraphExecutor) QueryResolver {
 	return &queryResolver{queryRewriter: qr, executor: ex, resultCompleter: CompletionFunc(noopCompletion)}
 }
 
 // NewEntitiesQueryResolver creates a new query resolver for `_entities` query.
 // It is introduced because result completion works little different for `_entities` query.
-func NewEntitiesQueryResolver(qr QueryRewriter, ex DgraphExecutor) QueryResolver {
+func NewEntitiesQueryResolver(qr *QueryRewriter, ex DgraphExecutor) QueryResolver {
 	return &queryResolver{queryRewriter: qr, executor: ex, resultCompleter: CompletionFunc(entitiesQueryCompletion)}
 }
 
 // a queryResolver can resolve a single GraphQL query field.
 type queryResolver struct {
-	queryRewriter   QueryRewriter
+	queryRewriter   *QueryRewriter
 	executor        DgraphExecutor
 	resultCompleter CompletionFunc
 }
@@ -127,12 +121,12 @@ func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query *schema.Fi
 	return resolved
 }
 
-func NewCustomDQLQueryResolver(qr QueryRewriter, ex DgraphExecutor) QueryResolver {
+func NewCustomDQLQueryResolver(qr *QueryRewriter, ex DgraphExecutor) QueryResolver {
 	return &customDQLQueryResolver{queryRewriter: qr, executor: ex}
 }
 
 type customDQLQueryResolver struct {
-	queryRewriter QueryRewriter
+	queryRewriter *QueryRewriter
 	executor      DgraphExecutor
 }
 

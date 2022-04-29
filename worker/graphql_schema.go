@@ -44,7 +44,6 @@ type GqlSchema struct {
 	Schema          string `json:"schema,omitempty"`
 	Version         uint64
 	GeneratedSchema string
-	Loaded          bool // This indicate whether the schema has been loaded into graphql server
 	// or not
 }
 

@@ -36,7 +36,7 @@ var (
 // Default limit on number of simultaneous open files on unix systems
 const DefaultMaxOpenFileLimit = 1024
 
-func isDeletePredicateEdge(edge *pb.Edge) bool {
+func isDeletePredicate(edge *pb.Edge) bool {
 	return len(edge.Subject) == 0 && x.IsStarAll(edge.ObjectValue)
 }
 
@@ -53,7 +53,7 @@ func runMutation(ctx context.Context, edge *pb.Edge, txn *posting.Txn) error {
 		}
 	}
 
-	if isDeletePredicateEdge(edge) {
+	if isDeletePredicate(edge) {
 		return errors.New("We should never reach here")
 	}
 
@@ -395,7 +395,10 @@ func checkSchema(s *pb.SchemaUpdate) error {
 // ValidateAndConvert checks compatibility or converts to the schema type if the storage type is
 // specified. If no storage type is specified then it converts to the schema type.
 func ValidateAndConvert(edge *pb.Edge, su *pb.SchemaUpdate) error {
-	if isDeletePredicateEdge(edge) {
+	if isDeletePredicate(edge) {
+		return nil
+	}
+	if edge.Op == pb.Edge_DEL && x.IsStarAll(edge.ObjectValue) {
 		return nil
 	}
 

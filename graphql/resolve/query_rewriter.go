@@ -18,8 +18,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-type queryRewriter struct{}
-
 // The struct is used as a return type for buildCommonAuthQueries function.
 type commonAuthQueryVars struct {
 	// Stores queries of the form
@@ -30,11 +28,6 @@ type commonAuthQueryVars struct {
 	// Stores queries which aggregate filters and auth rules. Eg.
 	// // User6 as var(func: uid(User2), orderasc: ...) @filter((eq(User.username, "User1") AND (...Auth Filter))))
 	selectionQry *gql.GraphQuery
-}
-
-// NewQueryRewriter returns a new QueryRewriter.
-func NewQueryRewriter() QueryRewriter {
-	return &queryRewriter{}
 }
 
 func hasCascadeDirective(field *schema.Field) bool {
@@ -62,8 +55,15 @@ func dqlHasCascadeDirective(q *gql.GraphQuery) bool {
 	return false
 }
 
+type QueryRewriter struct{}
+
+// NewQueryRewriter returns a new QueryRewriter.
+func NewQueryRewriter() *QueryRewriter {
+	return &QueryRewriter{}
+}
+
 // Rewrite rewrites a GraphQL query into a Dgraph GraphQuery.
-func (qr *queryRewriter) Rewrite(
+func (qr *QueryRewriter) Rewrite(
 	ctx context.Context,
 	gqlQuery *schema.Field) ([]*gql.GraphQuery, error) {
 
@@ -660,7 +660,7 @@ func addCommonRules(
 	ids := idFilter(extractQueryFilter(field), fieldType.IDField())
 
 	// Todo: Add more comments to this block.
-	if ids != nil {
+	if len(ids) > 0 {
 		addUIDFunc(dgQuery, ids)
 	} else {
 		addTypeFunc(dgQuery, fieldType.DgraphName())
@@ -670,26 +670,32 @@ func addCommonRules(
 
 func rewriteAsQuery(field *schema.Field) []*gql.GraphQuery {
 	dgQuery := addCommonRules(field, field.Type())
-
 	addArgumentsToField(dgQuery[0], field)
+
 	selectionAuth := addSelectionSetFrom(dgQuery[0], field)
 	addUID(dgQuery[0])
 	addCascadeDirective(dgQuery[0], field)
-
 	if len(selectionAuth) > 0 {
 		return append(dgQuery, selectionAuth...)
 	}
-
 	dgQuery = rootQueryOptimization(dgQuery)
 	return dgQuery
 }
 
 func rootQueryOptimization(dgQuery []*gql.GraphQuery) []*gql.GraphQuery {
-	if dgQuery[0].Filter != nil && dgQuery[0].Filter.Func != nil &&
-		dgQuery[0].Filter.Func.Name == "eq" && dgQuery[0].Func.Name == "type" {
-		rootFunc := dgQuery[0].Func
-		dgQuery[0].Func = dgQuery[0].Filter.Func
-		dgQuery[0].Filter.Func = rootFunc
+	q := dgQuery[0]
+	if q.Filter != nil && q.Filter.Func != nil &&
+		q.Filter.Func.Name == "eq" && q.Func.Name == "type" {
+		rootFunc := q.Func
+		q.Func = q.Filter.Func
+		q.Filter.Func = rootFunc
+	}
+	// We can skip the type(..) filter.
+	if q.Func != nil && q.Filter != nil && q.Filter.Func != nil {
+		fn := q.Filter.Func
+		if fn.Name == "type" {
+			q.Filter = nil
+		}
 	}
 	return dgQuery
 }
@@ -774,12 +780,6 @@ func buildAggregateFields(
 	// and mainField
 	fieldFilter, _ := f.ArgValue("filter").(map[string]interface{})
 	_ = addFilter(mainField, constructedForType, fieldFilter)
-
-	// Add type filter in case the Dgraph predicate for which the aggregate
-	// field belongs to is a reverse edge
-	if strings.HasPrefix(constructedForDgraphPredicate, "~") {
-		addTypeFilter(mainField, f.ConstructedFor())
-	}
 
 	// isAggregateVarAdded is a map from field name to boolean. It is used to
 	// ensure that a field is added to Var query at maximum once.
@@ -938,11 +938,6 @@ func addSelectionSetFrom(
 		// if this field has been filtered out by the filter, then don't add it in DQL query
 		if includeField := addFilter(child, f.Type(), filter); !includeField {
 			continue
-		}
-
-		// Add type filter in case the Dgraph predicate is a reverse edge
-		if strings.HasPrefix(f.DgraphPredicate(), "~") {
-			addTypeFilter(child, f.Type())
 		}
 
 		addOrder(child, f)
@@ -1243,9 +1238,9 @@ func buildFilter(typ *schema.Type, filter map[string]interface{}) *gql.FilterTre
 					Child: []*gql.FilterTree{not},
 				})
 		default:
-			//// It's a base case like:
-			//// title: { anyofterms: "GraphQL" } ->  anyofterms(Post.title: "GraphQL")
-			//// numLikes: { between : { min : 10,  max:100 }}
+			// It's a base case like:
+			// title: { anyofterms: "GraphQL" } ->  anyofterms(Post.title: "GraphQL")
+			// numLikes: { between : { min : 10,  max:100 }}
 			switch dgFunc := filter[field].(type) {
 			case map[string]interface{}:
 				// title: { anyofterms: "GraphQL" } ->  anyofterms(Post.title, "GraphQL")

@@ -45,8 +45,14 @@ func (usr *updateSchemaResolver) Resolve(ctx context.Context,
 		return resolve.EmptyResult(m, err), false
 	}
 
-	// we don't need the correct namespace for validation, so passing the Galaxy namespace
-	if _, err = schema.FromString(schHandler.GQLSchema(), x.GalaxyNamespace); err != nil {
+	namespace, err := x.ExtractNamespace(ctx)
+	if err != nil {
+		return resolve.EmptyResult(m, err), false
+	}
+	// We don't need the correct namespace for validation, so Galaxy
+	// namespace can be passed as well.
+	sch, err := schema.FromString(schHandler.GQLSchema(), namespace)
+	if err != nil {
 		return resolve.EmptyResult(m, err), false
 	}
 
@@ -55,6 +61,7 @@ func (usr *updateSchemaResolver) Resolve(ctx context.Context,
 		return resolve.EmptyResult(m, err), false
 	}
 
+	adminServerVar.resetSchema(namespace, sch)
 	return resolve.DataResult(
 		m,
 		map[string]interface{}{

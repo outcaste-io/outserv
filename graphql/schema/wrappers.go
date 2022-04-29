@@ -217,10 +217,6 @@ func (s *Schema) Mutations(t MutationType) []string {
 	return result
 }
 
-func (s *Schema) IsFederated() bool {
-	return s.schema.Types["_Entity"] != nil
-}
-
 func (s *Schema) SetMeta(meta *metaInfo) {
 	s.meta = meta
 }
@@ -1597,7 +1593,7 @@ func (f *Field) ConstructedFor() *Type {
 	// if !f.IsAggregateField() {
 	// 	return f.Type()
 	// }
-	if f.QueryType() != AggregateQuery {
+	if !f.IsAggregateField() && f.QueryType() != AggregateQuery {
 		return f.Type()
 	}
 
@@ -2064,6 +2060,10 @@ func (t *Type) ListType() *Type {
 // type's field fld.  Mostly this will be type_name.field_name,.
 func (t *Type) DgraphPredicate(fld string) string {
 	return t.dgraphPredicate[t.Name()][fld]
+}
+
+func (t *Type) DgraphPredicates() map[string]string {
+	return t.dgraphPredicate[t.Name()]
 }
 
 func (t *Type) String() string {

@@ -285,9 +285,13 @@ func (n *node) mutationWorker(workerId int) {
 		// repeated across blocks, causing mutations to conflict and having to
 		// re-do the work. Re-evaluate later.
 		//
-		// txn.ErrCh <- n.concMutations(ctx, p.Mutations, txn)
-		txn.ErrCh <- fmt.Errorf("Not running concurrently")
+		// if len(p.Mutations.NewObjects) == 0 {
+		// 	txn.ErrCh <- n.concMutations(ctx, p.Mutations, txn)
+		// } else {
+		// 	txn.ErrCh <- fmt.Errorf("Not running concurrently")
+		// }
 
+		txn.ErrCh <- fmt.Errorf("Not running concurrently")
 		close(txn.ErrCh)
 	}
 
@@ -358,10 +362,12 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 	// this mutation.
 	m = proto.Clone(m).(*pb.Mutations)
 
+	span := otrace.FromContext(ctx)
 	// TODO(mrjn): If this concMutation is a retry, should we upgrade the read
 	// timestamp then? It would seem logical to do so.
 	//
 	// Deal with objects first.
+	span.Annotatef(nil, "Found %d NewObjects", len(m.NewObjects))
 	resolved := make(map[string]string)
 	for _, obj := range m.NewObjects {
 		// Does the read timestamp need to be passed to UidsForObject?
@@ -389,7 +395,6 @@ func (n *node) concMutations(ctx context.Context, m *pb.Mutations, txn *posting.
 	// Replace all the resolved UIDs.
 	x.ReplaceUidsIn(m.Edges, resolved)
 
-	span := otrace.FromContext(ctx)
 	// Discard the posting lists from cache to release memory at the end.
 	defer func() {
 		txn.Update(ctx, resolved)
@@ -542,7 +547,7 @@ func (n *node) applyMutations(ctx context.Context, prop *pb.Proposal) (rerr erro
 	// Stores a map of predicate and type of first mutation for each predicate.
 	schemaMap := make(map[string]types.TypeID)
 	for _, edge := range prop.Mutations.Edges {
-		if isDeletePredicateEdge(edge) {
+		if isDeletePredicate(edge) {
 			span.Annotatef(nil, "Deleting predicate: %s", edge.Predicate)
 			n.keysWritten.rejectBeforeIndex = prop.Index
 			return posting.DeletePredicate(ctx, edge.Predicate, prop.CommitTs)
@@ -1070,7 +1075,7 @@ func (n *node) updateRaftProgress() error {
 	atomic.StoreUint64(&n.checkpointTs, snap.BaseTs)
 
 	n.Store.SetUint(raftwal.CheckpointIndex, snap.GetIndex())
-	glog.V(2).Infof("[%#x] Set Raft checkpoint to index: %d, ts: %#x.",
+	glog.V(1).Infof("[%#x] Set Raft checkpoint to index: %d, ts: %#x.",
 		n.Id, snap.Index, snap.BaseTs)
 	return nil
 }
@@ -1098,6 +1103,7 @@ func (n *node) proposeBaseTimestamp() {
 		}
 	}
 
+	time.Sleep(10 * time.Second)
 	propose() // Immediately after start.
 	for {
 		select {
@@ -1475,11 +1481,20 @@ func (n *node) Run() {
 				for _, e := range entries {
 					p := getProposal(e)
 					if p.BaseTimestamp > 0 {
-						if x.Debug {
-							glog.V(2).Infof("Setting base timestamp to: %#x for index: %d\n",
-								p.BaseTimestamp, e.Index)
-						}
+						glog.V(1).Infof("Setting base timestamp to: %#x at index: %d\n",
+							p.BaseTimestamp, e.Index)
 						baseTimestamp = p.BaseTimestamp
+
+						// We can safely register p.BaseTimestamp with the
+						// Oracle. Because all future timestamps would be higher
+						// than this. We do this registeration and done to
+						// ensure that the Oracle clock advances even if there
+						// are no mutations. This is important to allow this
+						// alpha to be able to get fresh data from alphas in
+						// other groups.
+						posting.RegisterTimestamp(p.BaseTimestamp)
+						posting.DoneTimestamp(p.BaseTimestamp)
+
 						n.Proposals.Done(p.Key, propResult(nil))
 						n.Applied.Done(p.Index)
 						continue
@@ -1498,7 +1513,7 @@ func (n *node) Run() {
 					for _, e := range p.Mutations.GetEdges() {
 						// This is a drop predicate mutation. We should not try to execute it
 						// concurrently.
-						if isDeletePredicateEdge(e) {
+						if isDeletePredicate(e) {
 							skip = true
 							break
 						}

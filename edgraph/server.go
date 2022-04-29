@@ -145,12 +145,14 @@ func getGQLSchema(namespace uint64) (*x.GQL, error) {
 	ctx = x.AttachNamespace(ctx, namespace)
 	resp, err := Query(ctx,
 		&pb.Request{
+			StartTs: math.MaxUint64,
 			Query: fmt.Sprintf(`
 			query {
 			  ExistingGQLSchema(func: uid(%#x)) {
 				dgraph.graphql.schema
 			  }
 			}`, worker.SchemaNodeUid)})
+	glog.Infof("getGQLSchema response: %s error: %v\n", resp.Json, err)
 	if err != nil {
 		return nil, err
 	}

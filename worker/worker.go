@@ -6,11 +6,14 @@
 package worker
 
 import (
+	"fmt"
+	"net/http"
 	"sync"
 	"sync/atomic"
 
 	"github.com/outcaste-io/badger/v3"
 	badgerpb "github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
@@ -127,4 +130,30 @@ func UpdateLogRequest(val bool) {
 // LogRequestEnabled returns true if logging of requests is enabled otherwise false.
 func LogRequestEnabled() bool {
 	return atomic.LoadInt32(&x.WorkerConfig.LogRequest) > 0
+}
+
+func StoreHandler(w http.ResponseWriter, r *http.Request) {
+	x.AddCorsHeaders(w)
+
+	fmt.Fprintln(w, pstore.LevelsToString())
+	fmt.Fprintln(w, "---")
+	tables := pstore.Tables()
+	for i, src := range tables {
+		left, right := src.Left, src.Right
+		src.Left, src.Right = []byte{}, []byte{}
+		numTables := 0
+		for _, dst := range tables[i+1:] {
+			if y.CompareKeys(left, dst.Right) > 0 {
+				// no overlap
+			} else if y.CompareKeys(right, dst.Left) < 0 {
+				// no overlap
+			} else {
+				numTables++
+				fmt.Fprintf(w, "%d.%d overlaps with: %d.%d\n",
+					src.Level, src.ID, dst.Level, dst.ID)
+			}
+		}
+		fmt.Fprintf(w, "Table: %+v overlaps with %d tables\n", src, numTables)
+	}
+	fmt.Fprintln(w, "DONE")
 }

@@ -182,7 +182,9 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 			x.SetStatus(w, x.ErrorInvalidRequest, jsonErr.Error())
 			return
 		}
-	case "application/graphql+-", "application/dql":
+	case "application/graphql+-", "application/dql", "application/x-www-form-urlencoded":
+		// If nothing is specified, it would be marked as x-www-form-urlencoded.
+		// In that case, assume DQL.
 		params.Query = string(body)
 	default:
 		x.SetStatus(w, x.ErrorInvalidRequest, "Unsupported Content-Type. "+
