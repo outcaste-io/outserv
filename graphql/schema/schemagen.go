@@ -59,6 +59,8 @@ func (s *Handler) DGSchema() string {
 	return s.dgraphSchema
 }
 
+// TODO(mrjn): Understand this better and remove Apollo Federation stuff.
+//
 // GQLSchemaWithoutApolloExtras return GraphQL schema string
 // excluding Apollo extras definitions and Apollo Queries and
 // some directives which are not exposed to the Apollo Gateway
