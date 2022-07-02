@@ -1,6 +1,6 @@
-+++ 
-title = "Projects Using Badger" 
-aliases = ["/project-using-badger"] 
++++
+title = "Projects Using Badger"
+aliases = ["/project-using-badger"]
 +++
 
 Below is a list of known projects that use Badger:
@@ -8,7 +8,7 @@ Below is a list of known projects that use Badger:
 * [Dgraph](https://github.com/dgraph-io/dgraph) - Distributed graph database.
 * [Jaeger](https://github.com/jaegertracing/jaeger) - Distributed tracing platform.
 * [flow-go](https://github.com/onflow/flow-go) - A fast, secure, and developer-friendly blockchain built to support the next generation of games, apps and the digital assets that power them.
-* [gowarcserver](https://github.com/nlnwa/gowarcserver) - Open-source server for warc files. Can be used in conjunction with pywb 
+* [gowarcserver](https://github.com/nlnwa/gowarcserver) - Open-source server for warc files. Can be used in conjunction with pywb
 * [go-ipfs](https://github.com/ipfs/go-ipfs) - Go client for the InterPlanetary File System (IPFS), a new hypermedia distribution protocol.
 * [Riot](https://github.com/go-ego/riot) - An open-source, distributed search engine.
 * [emitter](https://github.com/emitter-io/emitter) - Scalable, low latency, distributed pub/sub broker with message storage, uses MQTT, gossip and badger.
@@ -38,7 +38,7 @@ Below is a list of known projects that use Badger:
 * [BadgerHold](https://github.com/timshannon/badgerhold) - An embeddable NoSQL store for querying Go types built on Badger
 * [Goblero](https://github.com/didil/goblero) - Pure Go embedded persistent job queue backed by BadgerDB
 * [Surfline](https://www.surfline.com) - Serving global wave and weather forecast data with Badger.
-* [Cete](https://github.com/mosuka/cete) - Simple and highly available distributed key-value store built on Badger. Makes it easy bringing up a cluster of Badger with Raft consensus algorithm by hashicorp/raft. 
+* [Cete](https://github.com/mosuka/cete) - Simple and highly available distributed key-value store built on Badger. Makes it easy bringing up a cluster of Badger with Raft consensus algorithm by hashicorp/raft.
 * [Volument](https://volument.com/) - A new take on website analytics backed by Badger.
 * [KVdb](https://kvdb.io/) - Hosted key-value store and serverless platform built on top of Badger.
 * [Terminotes](https://gitlab.com/asad-awadia/terminotes) - Self hosted notes storage and search server - storage powered by BadgerDB
