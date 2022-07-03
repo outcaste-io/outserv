@@ -12,8 +12,8 @@ for the process.
 
 The pricing is set based on cpu-hours used across the entire Outserv cluster.
 Similar to kilowatt-hour, one cpu-hour is equal to one CPU usage sustained for
-one hour. **The current pricing is set to 3¢ US (3 pennies) per cpu-hour.**
-Every server would use a minimum of 1 cpu-hour every hour.
+one hour. **The current pricing is set to 7¢ US (7 pennies) per cpu-hour.**
+Every server would use a minimum of 2 cpu-hours every hour.
 
 ## Usage Tracking
 
@@ -23,11 +23,11 @@ CPUs, but held an sustained usage of 4 CPUs in the hour (4 CPUs were busy the
 entire hour), then the server used 4 cpu-hours.
 
 If the server was idle the entire hour, then the usage might be 0.05 cpu-hours.
-But, given the minimum of 1 cpu-hour, usage would be accounted as 1 cpu-hour.
+But, given the minimum of 2 cpu-hours, usage would be accounted as 2 cpu-hours.
 
 A user can restrict usage by limiting how many CPUs does the process have
-access to. If the server only has access to 3 CPUs, then the usage would always
-be between 1 to 3 cpu-hours per hour.
+access to. If the server only has access to 4 CPUs, then the usage would always
+be between 2 to 4 cpu-hours per hour.
 
 ## Mechanism
 

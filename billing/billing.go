@@ -20,9 +20,9 @@ func Run(closer *z.Closer) {
 }
 
 // One CPU is always considered to be used.
-func minOne(a float64) float64 {
-	if a < 1.0 {
-		return 1.0
+func minCores(a float64) float64 {
+	if a < 2.0 {
+		return 2.0
 	}
 	return a
 }
@@ -30,7 +30,7 @@ func minOne(a float64) float64 {
 var microCpuHour int64
 
 const (
-	USDPerCpuHour = 0.03        // 3 cents per cpu-hour.
+	USDPerCpuHour = 0.07        // 7 cents per cpu-hour.
 	Minute        = time.Minute // Using this indirection for debugging.
 )
 
@@ -66,9 +66,9 @@ func trackCPU(closer *z.Closer) {
 			usage, err := proc.Percent(0)
 			x.Checkf(err, "unable to track CPU usage")
 
-			usage = usage / 100.0 // Convert percentage to the number of cpus.
-			usage = minOne(usage) // Minimum usage of one cpu.
-			usage = usage / 60    // 60 mins in the hour.
+			usage = usage / 100.0   // Convert percentage to the number of cpus.
+			usage = minCores(usage) // Minimum usage.
+			usage = usage / 60      // 60 mins in the hour.
 			atomic.AddInt64(&microCpuHour, int64(usage*1e6))
 
 		case <-closer.HasBeenClosed():
