@@ -1,6 +1,6 @@
 # Monetization
 
-This is the monetization module mentioned in the Smart License.
+This is the monetization module mentioned in the Sustainable License.
 
 ## Pricing
 

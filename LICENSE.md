@@ -1,4 +1,4 @@
-# Smart License Version 1.0 (SLv1)
+# Sustainable License Version 1.0 (SLv1)
 
 ## Acceptance
 

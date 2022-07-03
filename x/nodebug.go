@@ -1,7 +1,7 @@
 //go:build !debug
 
 // Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache License v2.0.
-// Portions Copyright 2022 Outcaste LLC are available under the Smart License v1.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Sustainable License v1.0.
 
 package x
 

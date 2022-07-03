@@ -1,4 +1,4 @@
-// Copyright 2022 Outcaste LLC. Licensed under the Smart License v1.0.
+// Copyright 2022 Outcaste LLC. Licensed under the Sustainable License v1.0.
 
 package schema
 

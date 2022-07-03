@@ -5,7 +5,7 @@
 <charlie> <follows> <dani> .
 <dani> <follows> <bob> .
 <dani> <follows> <greg> .
-<dani> <status> "Smart Dani" .
+<dani> <status> "Sustainable Dani" .
 <emily> <follows> <fred> .
 <fred> <follows> <greg> .
 <greg> <status> "Mr. Cool greg" .

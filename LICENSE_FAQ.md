@@ -1,8 +1,8 @@
-# Smart License: Frequently Asked Questions
+# Sustainable License: Frequently Asked Questions
 
-### 1. Can you summarize what is allowed with the Smart License 1.0?
+### 1. Can you summarize what is allowed with the Sustainable License 1.0?
 
-Smart License allows the right to use, modify, create derivative works, and
+Sustainable License allows the right to use, modify, create derivative works, and
 commercialize, with these limitations:
 
 - You may not circumvent the monetization module.
@@ -10,58 +10,58 @@ commercialize, with these limitations:
 
 ### 2. What is a monetization module? What does it do?
 
-Smart License follows an open pricing model. The pricing and the charging
+Sustainable License follows an open pricing model. The pricing and the charging
 mechanism for the software are baked into the software itself, in a module we
 call the monetization module.
 
 You can read the source code of the module [here](/billing).
 
-### 3. Is Smart License Open Source?
+### 3. Is Sustainable License Open Source?
 
-No. Smart License imposes limitations around modification of the monetization
+No. Sustainable License imposes limitations around modification of the monetization
 module, which is against OSI guidelines.
 
-### 4. Is Smart License Free Software?
+### 4. Is Sustainable License Free Software?
 
-No. Smart License imposes limitations around modification of the monetization
+No. Sustainable License imposes limitations around modification of the monetization
 module, which is against FSF guidelines.
 
-### 5. Is Smart License Proprietary?
+### 5. Is Sustainable License Proprietary?
 
 Not quite. Most proprietary softwares do not come with the source code, or
-encourage sharing and commercialization. Smart License allows the software to be
+encourage sharing and commercialization. Sustainable License allows the software to be
 modified, redistributed and commercialized.
 
-### 6. Is Smart License EULA?
+### 6. Is Sustainable License EULA?
 
 No. EULAs do not allow users to change or distribute code.
 
-### 7. Is Smart License Freeware?
+### 7. Is Sustainable License Freeware?
 
 No. Freeware is software that is distributed at no monetary cost to the
-end user. The source code is typically not made available. Smart License is the
+end user. The source code is typically not made available. Sustainable License is the
 opposite of freeware, where the source code is freely available to modify, but
 comes at a monetary cost.
 
-### 8. Is Smart License Shareware?
+### 8. Is Sustainable License Shareware?
 
 No. Shareware is a type of proprietary software which is initially shared by the
 owner for trial use at little or no cost with usually limited functionality or
 incomplete documentation but which can be upgraded upon payment. Code under
-Smart License is expected to be provided with full functionality with no
+Sustainable License is expected to be provided with full functionality with no
 upgrades beyond the enforced monetization.
 
-### 9. What is Smart License?
+### 9. What is Sustainable License?
 
-**Smart License is a very liberal commercial license.** The only main limitation
-Smart License adds is to ensure a source of income for the developing entity.
+**Sustainable License is a very liberal commercial license.** The only main limitation
+Sustainable License adds is to ensure a source of income for the developing entity.
 Beyond that, it provides all the liberties expected from a free and open source
 software, which includes modifications, redistributions and commercialization,
 without discrimination.
 
 We think Open Source has taken hits recently with many open source companies
 moving away from it to use non-open-source licenses (SSPL, Elastic License,
-various community licenses) to eliminate competing SaaS offerings. Smart License
+various community licenses) to eliminate competing SaaS offerings. Sustainable License
 provides an alternative solution which doesn't forbid commercialization of the
 software by anyone. We think software commercialization is NOT a zero-sum game,
 the more participants in the economy, the better for end-users and everyone can win.
@@ -71,17 +71,17 @@ developers behind the software are left high and dry, unable to balance their
 financial needs against the time and effort it takes to maintain the software,
 ultimately giving up on the software and moving on.
 
-Smart License is a practical solution to that, while staying true to the many
+Sustainable License is a practical solution to that, while staying true to the many
 liberties promised by FOSS. We believe users are willing to pay for the software
-that benefits them. And by charging for the software, Smart License creates the
+that benefits them. And by charging for the software, Sustainable License creates the
 right alignment between the developers and the users, hence ensuring the
 longevity of the software which is the best outcome for everyone.
 
-### 10. How does Smart License compare against Elastic License?
+### 10. How does Sustainable License compare against Elastic License?
 
-Smart License 1.0 is modeled after [Elastic License
+Sustainable License 1.0 is modeled after [Elastic License
 2.0](https://www.elastic.co/licensing/elastic-license) but differs in the
-limitations it imposes. Elastic License 2.0 has this limitation, that Smart
+limitations it imposes. Elastic License 2.0 has this limitation, that Sustainable
 License 1.0 does NOT have:
 
 > ~ELv2: You may not provide the software to third parties as a hosted or managed
@@ -90,7 +90,7 @@ License 1.0 does NOT have:
 
 As mentioned above, we encourage managed service providers to make this software
 as widely available as possible. Elastic License 2.0 has this limitation, which
-Smart License 1.0 has modified:
+Sustainable License 1.0 has modified:
 
 > ~ELv2: You may not move, change, disable, or circumvent the license key
   functionality in the software, and you may not remove or obscure any
@@ -100,10 +100,10 @@ Smart License 1.0 has modified:
   the software. You may not move, change, disable, or circumvent this functionality
   in the software.
 
-### 11. Can I provide a managed service using a project under Smart License?
+### 11. Can I provide a managed service using a project under Sustainable License?
 
 Absolutely. As opposed to other such licenses (like Elastic License or
-SSPL), Smart License allows building commercial products, including building
+SSPL), Sustainable License allows building commercial products, including building
 managed services. In fact, we encourage others to do so, to make
 this software as broadly available as possible for end-users.
 
@@ -115,13 +115,13 @@ this fork by charging for the software (at a higher price than what you're
 paying), linking it to your proprietary code, or creating proprietary services
 around the fork.
 
-However, the fork must continue to abide by the limitations of the Smart
+However, the fork must continue to abide by the limitations of the Sustainable
 License, which includes keeping the monetization module, licensing, copyright,
 and other notices.
 
 ### 13. If I copy only certain parts of the code into another program, do I still need to pay?
 
-Yes. If you copy any part of the codebase under the Smart License,
+Yes. If you copy any part of the codebase under the Sustainable License,
 your program should pay and do the equivalent of what the monetization module
 would have done.
 
@@ -162,22 +162,22 @@ We think none of these options are particularly attractive in a world where
 users are increasingly willing to pay for the software, as long as the pricing
 model is open and fair to all.
 
-*With Smart License, we aim to hit the nail on its head.* Make the software charge
+*With Sustainable License, we aim to hit the nail on its head.* Make the software charge
 for its usage with an open pricing model baked into the code itself, available
 and visible to everyone. And provide as much freedom as possible for others to
 use, modify or build commercial services around the software.
 
-**TL;DR: A software under Smart License provides a direct income stream to the
+**TL;DR: A software under Sustainable License provides a direct income stream to the
 developer so they can focus on the software while eliminating the rift between
 free v/s paid feature set, opaque pricing models, or disallowing others from
 building commercial services.**
 
 
-### 15. Can I apply Smart License to my project?
+### 15. Can I apply Sustainable License to my project?
 
-Yes. We think more developers should be using Smart License to make a living out
+Yes. We think more developers should be using Sustainable License to make a living out
 of their hard work.
 
-The best application for Smart License is standalone servers. It can also be
+The best application for Sustainable License is standalone servers. It can also be
 applied to heavy-weight libraries, where the developer believes a payment for
 usage is justified.
