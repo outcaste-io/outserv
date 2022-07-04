@@ -512,13 +512,11 @@ func TestBackupBitClear(t *testing.T) {
 	defer removeDir(dir)
 
 	opt := getTestOptions(dir)
-	opt.ValueThreshold = 10 // This is important
 	db, err := Open(opt)
 	require.NoError(t, err)
 
 	key := []byte("foo")
 	val := []byte(fmt.Sprintf("%0100d", 1))
-	require.Greater(t, int64(len(val)), db.valueThreshold())
 
 	err = db.Update(func(txn *Txn) error {
 		e := NewEntry(key, val)
@@ -542,7 +540,6 @@ func TestBackupBitClear(t *testing.T) {
 	require.NoError(t, db.Close())
 
 	opt = getTestOptions(dir)
-	opt.ValueThreshold = 200 // This is important.
 	db, err = Open(opt)
 	require.NoError(t, err)
 	defer db.Close()

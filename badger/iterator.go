@@ -19,7 +19,6 @@ package badger
 import (
 	"bytes"
 	"fmt"
-	"hash/crc32"
 	"math"
 	"sort"
 	"sync"
@@ -150,7 +149,6 @@ func (item *Item) DiscardEarlierVersions() bool {
 }
 
 func (item *Item) yieldItemValue() ([]byte, func(), error) {
-	key := item.Key() // No need to copy.
 	if !item.hasValue() {
 		return nil, nil, nil
 	}
@@ -159,46 +157,9 @@ func (item *Item) yieldItemValue() ([]byte, func(), error) {
 		item.slice = new(y.Slice)
 	}
 
-	if (item.meta & bitValuePointer) == 0 {
-		val := item.slice.Resize(len(item.vptr))
-		copy(val, item.vptr)
-		return val, nil, nil
-	}
-
-	var vp valuePointer
-	vp.Decode(item.vptr)
-	db := item.txn.db
-	result, cb, err := db.vlog.Read(vp, item.slice)
-	if err != nil {
-		db.opt.Logger.Errorf("Unable to read: Key: %v, Version : %v, meta: %v, userMeta: %v"+
-			" Error: %v", key, item.version, item.meta, item.userMeta, err)
-		var txn *Txn
-		if db.opt.managedTxns {
-			txn = db.NewTransactionAt(math.MaxUint64, false)
-		} else {
-			txn = db.NewTransaction(false)
-		}
-		defer txn.Discard()
-
-		iopt := DefaultIteratorOptions
-		iopt.AllVersions = true
-		iopt.InternalAccess = true
-		iopt.PrefetchValues = false
-
-		it := txn.NewKeyIterator(item.Key(), iopt)
-		defer it.Close()
-		for it.Rewind(); it.Valid(); it.Next() {
-			item := it.Item()
-			var vp valuePointer
-			if item.meta&bitValuePointer > 0 {
-				vp.Decode(item.vptr)
-			}
-			db.opt.Logger.Errorf("Key: %v, Version : %v, meta: %v, userMeta: %v valuePointer: %+v",
-				item.Key(), item.version, item.meta, item.userMeta, vp)
-		}
-	}
-	// Don't return error if we cannot read the value. Just log the error.
-	return result, cb, nil
+	val := item.slice.Resize(len(item.vptr))
+	copy(val, item.vptr)
+	return val, nil, nil
 }
 
 func runCallback(cb func()) {
@@ -230,12 +191,7 @@ func (item *Item) EstimatedSize() int64 {
 	if !item.hasValue() {
 		return 0
 	}
-	if (item.meta & bitValuePointer) == 0 {
-		return int64(len(item.key) + len(item.vptr))
-	}
-	var vp valuePointer
-	vp.Decode(item.vptr)
-	return int64(vp.Len) // includes key length.
+	return int64(len(item.key) + len(item.vptr))
 }
 
 // KeySize returns the size of the key.
@@ -252,16 +208,7 @@ func (item *Item) ValueSize() int64 {
 	if !item.hasValue() {
 		return 0
 	}
-	if (item.meta & bitValuePointer) == 0 {
-		return int64(len(item.vptr))
-	}
-	var vp valuePointer
-	vp.Decode(item.vptr)
-
-	klen := int64(len(item.key) + 8) // 8 bytes for timestamp.
-	// 6 bytes are for the approximate length of the header. Since header is encoded in varint, we
-	// cannot find the exact length of header without fetching it.
-	return int64(vp.Len) - klen - 6 - crc32.Size
+	return int64(len(item.vptr))
 }
 
 // UserMeta returns the userMeta set by the user. Typically, this byte, optionally set by the user
@@ -485,7 +432,6 @@ func (txn *Txn) NewIterator(opt IteratorOptions) *Iterator {
 	// the prefix.
 	tables, decr := txn.db.getMemTables()
 	defer decr()
-	txn.db.vlog.incrIteratorCount()
 	var iters []y.Iterator
 	if itr := txn.newPendingWritesIterator(opt.Reverse); itr != nil {
 		iters = append(iters, itr)
@@ -573,8 +519,6 @@ func (it *Iterator) Close() {
 	waitFor(it.waste)
 	waitFor(it.data)
 
-	// TODO: We could handle this error.
-	_ = it.txn.db.vlog.decrIteratorCount()
 	atomic.AddInt32(&it.txn.numIterators, -1)
 }
 

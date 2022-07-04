@@ -42,6 +42,23 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Values have their first byte being byteData or byteDelete. This helps us distinguish between
+// a key that has never been seen and a key that has been explicitly deleted.
+const (
+	bitDelete                 byte = 1 << 0 // Set if the key has been deleted.
+	BitDiscardEarlierVersions byte = 1 << 2 // Set if earlier versions can be discarded.
+
+	// The MSB 2 bits are for transactions.
+	bitTxn    byte = 1 << 6 // Set if the entry is part of a txn.
+	bitFinTxn byte = 1 << 7 // Set if the entry is to indicate end of txn in value log.
+
+	// size of vlog header.
+	// +----------------+------------------+
+	// | keyID(8 bytes) |  baseIV(12 bytes)|
+	// +----------------+------------------+
+	vlogHeaderSize = 20
+)
+
 var (
 	badgerPrefix = []byte("!badger!")       // Prefix for internal keys used by badger.
 	txnKey       = []byte("!badger!txn")    // For indicating end of entries in txn.
@@ -53,7 +70,6 @@ type closers struct {
 	compactors  *z.Closer
 	memtable    *z.Closer
 	writes      *z.Closer
-	valueGC     *z.Closer
 	pub         *z.Closer
 	cacheHealth *z.Closer
 }
@@ -106,7 +122,6 @@ type DB struct {
 	opt       Options
 	manifest  *manifestFile
 	lc        *levelsController
-	vlog      valueLog
 	writeCh   chan *request
 	sklCh     chan *handoverRequest
 	flushChan chan flushTask // For flushing memtables.
@@ -117,7 +132,6 @@ type DB struct {
 
 	orc              *oracle
 	bannedNamespaces *lockedKeys
-	threshold        *vlogThreshold
 
 	pub        *publisher
 	registry   *KeyRegistry
@@ -148,25 +162,6 @@ func checkAndSetOptions(opt *Options) error {
 	opt.maxValueThreshold = math.Min(maxValueThreshold, float64(opt.maxBatchSize))
 	if opt.VLogPercentile < 0.0 || opt.VLogPercentile > 1.0 {
 		return errors.New("vlogPercentile must be within range of 0.0-1.0")
-	}
-
-	// We are limiting opt.ValueThreshold to maxValueThreshold for now.
-	if opt.ValueThreshold > maxValueThreshold {
-		return errors.Errorf("Invalid ValueThreshold, must be less or equal to %d",
-			maxValueThreshold)
-	}
-
-	// If ValueThreshold is greater than opt.maxBatchSize, we won't be able to push any data using
-	// the transaction APIs. Transaction batches entries into batches of size opt.maxBatchSize.
-	if opt.ValueThreshold > opt.maxBatchSize {
-		return errors.Errorf("Valuethreshold %d greater than max batch size of %d. Either "+
-			"reduce opt.ValueThreshold or increase opt.MaxTableSize.",
-			opt.ValueThreshold, opt.maxBatchSize)
-	}
-	// ValueLogFileSize should be stricly LESS than 2<<30 otherwise we will
-	// overflow the uint32 when we mmap it in OpenMemtable.
-	if !(opt.ValueLogFileSize < 2<<30 && opt.ValueLogFileSize >= 1<<20) {
-		return ErrValueLogSize
 	}
 
 	if opt.ReadOnly {
@@ -251,7 +246,6 @@ func Open(opt Options) (*DB, error) {
 		pub:              newPublisher(),
 		allocPool:        z.NewAllocatorPool(8),
 		bannedNamespaces: &lockedKeys{keys: make(map[uint64]struct{})},
-		threshold:        initVlogThreshold(&opt),
 	}
 	// Cleanup all the goroutines started by badger in case of an error.
 	defer func() {
@@ -310,8 +304,6 @@ func Open(opt Options) (*DB, error) {
 
 	if db.opt.InMemory {
 		db.opt.SyncWrites = false
-		// If badger is running in memory mode, push everything into the LSM Tree.
-		db.opt.ValueThreshold = math.MaxInt32
 	}
 	krOpt := KeyRegistryOptions{
 		ReadOnly:                      opt.ReadOnly,
@@ -343,9 +335,6 @@ func Open(opt Options) (*DB, error) {
 		return db, err
 	}
 
-	// Initialize vlog struct.
-	db.vlog.init(db)
-
 	if !opt.ReadOnly {
 		db.closers.compactors = z.NewCloser(1)
 		db.lc.startCompact(db.closers.compactors)
@@ -363,10 +352,6 @@ func Open(opt Options) (*DB, error) {
 	db.orc.nextTxnTs = db.MaxVersion()
 	db.opt.Infof("Set nextTxnTs to %d", db.orc.nextTxnTs)
 
-	if err = db.vlog.open(db); err != nil {
-		return db, y.Wrapf(err, "During db.vlog.open")
-	}
-
 	// Let's advance nextTxnTs to one more than whatever we observed via
 	// replaying the logs.
 	db.orc.txnMark.Done(db.orc.nextTxnTs)
@@ -375,8 +360,6 @@ func Open(opt Options) (*DB, error) {
 	db.orc.readMark.Done(db.orc.nextTxnTs)
 	db.orc.incrementNextTs()
 
-	go db.threshold.listenForValueThresholdUpdate()
-
 	if err := db.initBannedNamespaces(); err != nil {
 		return db, errors.Wrapf(err, "While setting banned keys")
 	}
@@ -384,11 +367,6 @@ func Open(opt Options) (*DB, error) {
 	db.closers.writes = z.NewCloser(2)
 	go db.doWrites(db.closers.writes)
 	go db.handleHandovers(db.closers.writes)
-
-	if !db.opt.InMemory {
-		db.closers.valueGC = z.NewCloser(1)
-		go db.vlog.waitOnGC(db.closers.valueGC)
-	}
 
 	db.closers.pub = z.NewCloser(1)
 	go db.pub.listenForUpdates(db.closers.pub)
@@ -488,9 +466,6 @@ func (db *DB) cleanup() {
 	if db.closers.updateSize != nil {
 		db.closers.updateSize.Signal()
 	}
-	if db.closers.valueGC != nil {
-		db.closers.valueGC.Signal()
-	}
 	if db.closers.writes != nil {
 		db.closers.writes.Signal()
 	}
@@ -543,11 +518,6 @@ func (db *DB) close() (err error) {
 	db.opt.Infof("Lifetime L0 stalled for: %s\n", time.Duration(atomic.LoadInt64(&db.lc.l0stallsMs)))
 
 	atomic.StoreInt32(&db.blockWrites, 1)
-
-	if !db.opt.InMemory {
-		// Stop value GC first.
-		db.closers.valueGC.SignalAndWait()
-	}
 
 	// Stop writes next.
 	db.closers.writes.SignalAndWait()
@@ -614,11 +584,6 @@ func (db *DB) close() (err error) {
 		}
 	}
 
-	// Now close the value log.
-	if vlogErr := db.vlog.Close(); vlogErr != nil {
-		err = y.Wrap(vlogErr, "DB.Close")
-	}
-
 	db.opt.Infof(db.LevelsToString())
 	if lcErr := db.lc.close(); err == nil {
 		err = y.Wrap(lcErr, "DB.Close")
@@ -630,7 +595,6 @@ func (db *DB) close() (err error) {
 	db.indexCache.Close()
 
 	atomic.StoreUint32(&db.isClosed, 1)
-	db.threshold.close()
 
 	if db.opt.InMemory {
 		return
@@ -679,7 +643,7 @@ const (
 // Sync syncs database content to disk. This function provides
 // more control to user to sync data whenever required.
 func (db *DB) Sync() error {
-	return db.vlog.sync()
+	return nil
 }
 
 // getMemtables returns the current memtables and get references.
@@ -760,31 +724,19 @@ var requestPool = sync.Pool{
 func (db *DB) writeToLSM(b *request) error {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
-	for i, entry := range b.Entries {
-		var err error
-		if db.opt.managedTxns || entry.skipVlogAndSetThreshold(db.valueThreshold()) {
-			// Will include deletion / tombstone case.
-			err = db.mt.Put(entry.Key,
-				y.ValueStruct{
-					Value: entry.Value,
-					// Ensure value pointer flag is removed. Otherwise, the value will fail
-					// to be retrieved during iterator prefetch. `bitValuePointer` is only
-					// known to be set in write to LSM when the entry is loaded from a backup
-					// with lower ValueThreshold and its value was stored in the value log.
-					Meta:      entry.meta &^ bitValuePointer,
-					UserMeta:  entry.UserMeta,
-					ExpiresAt: entry.ExpiresAt,
-				})
-		} else {
-			// Write pointer to Memtable.
-			err = db.mt.Put(entry.Key,
-				y.ValueStruct{
-					Value:     b.Ptrs[i].Encode(),
-					Meta:      entry.meta | bitValuePointer,
-					UserMeta:  entry.UserMeta,
-					ExpiresAt: entry.ExpiresAt,
-				})
-		}
+	for _, entry := range b.Entries {
+		// Will include deletion / tombstone case.
+		err := db.mt.Put(entry.Key,
+			y.ValueStruct{
+				Value: entry.Value,
+				// Ensure value pointer flag is removed. Otherwise, the value will fail
+				// to be retrieved during iterator prefetch. `bitValuePointer` is only
+				// known to be set in write to LSM when the entry is loaded from a backup
+				// with lower ValueThreshold and its value was stored in the value log.
+				Meta:      entry.meta,
+				UserMeta:  entry.UserMeta,
+				ExpiresAt: entry.ExpiresAt,
+			})
 		if err != nil {
 			return y.Wrapf(err, "while writing to memTable")
 		}
@@ -806,12 +758,6 @@ func (db *DB) writeRequests(reqs []*request) error {
 			r.Err = err
 			r.Wg.Done()
 		}
-	}
-	db.opt.Debugf("writeRequests called. Writing to value log")
-	err := db.vlog.write(reqs)
-	if err != nil {
-		done(err)
-		return err
 	}
 
 	db.opt.Debugf("Sending updates to subscribers")
@@ -855,7 +801,7 @@ func (db *DB) sendToWriteCh(entries []*Entry) (*request, error) {
 	}
 	var count, size int64
 	for _, e := range entries {
-		size += e.estimateSizeAndSetThreshold(db.valueThreshold())
+		size += e.estimateSize()
 		count++
 	}
 	if count >= db.opt.maxBatchCount || size >= db.opt.maxBatchSize {
@@ -1093,12 +1039,7 @@ func buildL0Table(ft flushTask, bopts table.Options) *table.Builder {
 		if len(ft.dropPrefixes) > 0 && hasAnyPrefixes(iter.Key(), ft.dropPrefixes) {
 			continue
 		}
-		vs := iter.Value()
-		var vp valuePointer
-		if vs.Meta&bitValuePointer > 0 {
-			vp.Decode(vs.Value)
-		}
-		b.Add(iter.Key(), iter.Value(), vp.Len)
+		b.Add(iter.Key(), iter.Value())
 	}
 	return b
 }
@@ -1298,45 +1239,6 @@ func (db *DB) updateSize(lc *z.Closer) {
 			return
 		}
 	}
-}
-
-// RunValueLogGC triggers a value log garbage collection.
-//
-// It picks value log files to perform GC based on statistics that are collected
-// during compactions.  If no such statistics are available, then log files are
-// picked in random order. The process stops as soon as the first log file is
-// encountered which does not result in garbage collection.
-//
-// When a log file is picked, it is first sampled. If the sample shows that we
-// can discard at least discardRatio space of that file, it would be rewritten.
-//
-// If a call to RunValueLogGC results in no rewrites, then an ErrNoRewrite is
-// thrown indicating that the call resulted in no file rewrites.
-//
-// We recommend setting discardRatio to 0.5, thus indicating that a file be
-// rewritten if half the space can be discarded.  This results in a lifetime
-// value log write amplification of 2 (1 from original write + 0.5 rewrite +
-// 0.25 + 0.125 + ... = 2). Setting it to higher value would result in fewer
-// space reclaims, while setting it to a lower value would result in more space
-// reclaims at the cost of increased activity on the LSM tree. discardRatio
-// must be in the range (0.0, 1.0), both endpoints excluded, otherwise an
-// ErrInvalidRequest is returned.
-//
-// Only one GC is allowed at a time. If another value log GC is running, or DB
-// has been closed, this would return an ErrRejected.
-//
-// Note: Every time GC is run, it would produce a spike of activity on the LSM
-// tree.
-func (db *DB) RunValueLogGC(discardRatio float64) error {
-	if db.opt.InMemory {
-		return ErrGCInMemoryMode
-	}
-	if discardRatio >= 1.0 || discardRatio <= 0.0 {
-		return ErrInvalidRequest
-	}
-
-	// Pick a log file and run GC
-	return db.vlog.runGC(discardRatio)
 }
 
 // Size returns the size of lsm and value log files in bytes. It can be used to decide how often to
@@ -1840,15 +1742,9 @@ func (db *DB) dropAll() (func(), error) {
 	}
 	db.opt.Infof("Deleted %d SSTables. Now deleting value logs...\n", num)
 
-	num, err = db.vlog.dropAll()
-	if err != nil {
-		return resume, err
-	}
 	db.lc.nextFileID = 1
-	db.opt.Infof("Deleted %d value log files. DropAll done.\n", num)
 	db.blockCache.Clear()
 	db.indexCache.Clear()
-	db.threshold.Clear(db.opt)
 	return resume, nil
 }
 

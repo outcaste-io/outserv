@@ -217,7 +217,7 @@ func (b *Builder) keyDiff(newKey []byte) []byte {
 	return newKey[i:]
 }
 
-func (b *Builder) addHelper(key []byte, v y.ValueStruct, vpLen uint32) {
+func (b *Builder) addHelper(key []byte, v y.ValueStruct) {
 	b.keyHashes = append(b.keyHashes, y.Hash(y.ParseKey(key)))
 
 	if version := y.ParseTs(key); version > b.maxVersion {
@@ -252,10 +252,6 @@ func (b *Builder) addHelper(key []byte, v y.ValueStruct, vpLen uint32) {
 
 	dst := b.allocate(int(v.EncodedSize()))
 	v.Encode(dst)
-
-	// Add the vpLen to the onDisk size. We'll add the size of the block to
-	// onDisk size in Finish() function.
-	b.onDiskSize += vpLen
 }
 
 /*
@@ -333,18 +329,19 @@ func (b *Builder) shouldFinishBlock(key []byte, value y.ValueStruct) bool {
 // AddStaleKey is same is Add function but it also increments the internal
 // staleDataSize counter. This value will be used to prioritize this table for
 // compaction.
-func (b *Builder) AddStaleKey(key []byte, v y.ValueStruct, valueLen uint32) {
+func (b *Builder) AddStaleKey(key []byte, v y.ValueStruct) {
 	// Rough estimate based on how much space it will occupy in the SST.
 	b.staleDataSize += len(key) + len(v.Value) + 4 /* entry offset */ + 4 /* header size */
-	b.addInternal(key, v, valueLen, true)
+	b.addInternal(key, v, true)
 }
 
 // Add adds a key-value pair to the block.
-func (b *Builder) Add(key []byte, value y.ValueStruct, valueLen uint32) {
-	b.addInternal(key, value, valueLen, false)
+func (b *Builder) Add(key []byte, value y.ValueStruct) {
+	// TODO: Fix up addInternal
+	b.addInternal(key, value, false)
 }
 
-func (b *Builder) addInternal(key []byte, value y.ValueStruct, valueLen uint32, isStale bool) {
+func (b *Builder) addInternal(key []byte, value y.ValueStruct, isStale bool) {
 	if b.shouldFinishBlock(key, value) {
 		if isStale {
 			// This key will be added to tableIndex and it is stale.
@@ -356,7 +353,7 @@ func (b *Builder) addInternal(key []byte, value y.ValueStruct, valueLen uint32, 
 			data: b.alloc.Allocate(b.opts.BlockSize + padding),
 		}
 	}
-	b.addHelper(key, value, valueLen)
+	b.addHelper(key, value)
 }
 
 // TODO: vvv this was the comment on ReachedCapacity.

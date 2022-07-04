@@ -147,31 +147,17 @@ type Entry struct {
 	meta      byte
 
 	// Fields maintained internally.
-	hlen         int // Length of the header.
-	valThreshold int64
+	hlen int // Length of the header.
 }
 
 func (e *Entry) isZero() bool {
 	return len(e.Key) == 0
 }
 
-func (e *Entry) estimateSizeAndSetThreshold(threshold int64) int64 {
-	if e.valThreshold == 0 {
-		e.valThreshold = threshold
-	}
+func (e *Entry) estimateSize() int64 {
 	k := int64(len(e.Key))
 	v := int64(len(e.Value))
-	if v < e.valThreshold {
-		return k + v + 2 // Meta, UserMeta
-	}
-	return k + 12 + 2 // 12 for ValuePointer, 2 for metas.
-}
-
-func (e *Entry) skipVlogAndSetThreshold(threshold int64) bool {
-	if e.valThreshold == 0 {
-		e.valThreshold = threshold
-	}
-	return int64(len(e.Value)) < e.valThreshold
+	return k + v + 2 // Meta, UserMeta
 }
 
 func (e Entry) String() {
@@ -214,12 +200,5 @@ func (e *Entry) WithDiscard() *Entry {
 // after the time has elapsed, and will be eligible for garbage collection.
 func (e *Entry) WithTTL(dur time.Duration) *Entry {
 	e.ExpiresAt = uint64(time.Now().Add(dur).Unix())
-	return e
-}
-
-// withMergeBit sets merge bit in entry's metadata. This
-// function is called by MergeOperator's Add method.
-func (e *Entry) withMergeBit() *Entry {
-	e.meta = bitMergeEntry
 	return e
 }

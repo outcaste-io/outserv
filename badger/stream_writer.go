@@ -248,13 +248,6 @@ func (sw *StreamWriter) Write(buf *z.Buffer) error {
 	sw.writeLock.Lock()
 	defer sw.writeLock.Unlock()
 
-	// We are writing all requests to vlog even if some request belongs to already closed stream.
-	// It is safe to do because we are panicking while writing to sorted writer, which will be nil
-	// for closed stream. At restart, stream writer will drop all the data in Prepare function.
-	if err := sw.db.vlog.write(all); err != nil {
-		return err
-	}
-
 	// Moved this piece of code to within the lock.
 	if sw.prevLevel == 0 {
 		// If prevLevel is 0, that means that we have not written anything yet.
@@ -423,28 +416,17 @@ func (w *sortedWriter) handleRequests() {
 	defer w.closer.Done()
 
 	process := func(req *request) {
-		for i, e := range req.Entries {
+		for _, e := range req.Entries {
 			// If badger is running in InMemory mode, len(req.Ptrs) == 0.
-			var vs y.ValueStruct
 			// Sorted stream writer receives Key-Value (not a pointer to value). So, its upto the
 			// writer (and not the sender) to determine if the Value goes to vlog or stays in SST
 			// only. In managed mode, we do not write values to vlog and hence we would not have
 			// req.Ptrs initialized.
-			if w.db.opt.managedTxns || e.skipVlogAndSetThreshold(w.db.valueThreshold()) {
-				vs = y.ValueStruct{
-					Value:     e.Value,
-					Meta:      e.meta,
-					UserMeta:  e.UserMeta,
-					ExpiresAt: e.ExpiresAt,
-				}
-			} else {
-				vptr := req.Ptrs[i]
-				vs = y.ValueStruct{
-					Value:     vptr.Encode(),
-					Meta:      e.meta | bitValuePointer,
-					UserMeta:  e.UserMeta,
-					ExpiresAt: e.ExpiresAt,
-				}
+			vs := y.ValueStruct{
+				Value:     e.Value,
+				Meta:      e.meta,
+				UserMeta:  e.UserMeta,
+				ExpiresAt: e.ExpiresAt,
 			}
 			if err := w.Add(e.Key, vs); err != nil {
 				panic(err)
@@ -483,12 +465,7 @@ func (w *sortedWriter) Add(key []byte, vs y.ValueStruct) error {
 	}
 
 	w.lastKey = y.SafeCopy(w.lastKey, key)
-	var vp valuePointer
-	if vs.Meta&bitValuePointer > 0 {
-		vp.Decode(vs.Value)
-	}
-
-	w.builder.Add(key, vs, vp.Len)
+	w.builder.Add(key, vs)
 	return nil
 }
 

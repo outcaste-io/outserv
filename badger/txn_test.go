@@ -853,7 +853,6 @@ func TestArmV7Issue311Fix(t *testing.T) {
 	defer removeDir(dir)
 
 	db, err := Open(DefaultOptions(dir).
-		WithValueLogFileSize(16 << 20).
 		WithBaseLevelSize(8 << 20).
 		WithBaseTableSize(2 << 20).
 		WithSyncWrites(false))

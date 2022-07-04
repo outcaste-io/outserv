@@ -113,7 +113,7 @@ func TestTableIndex(t *testing.T) {
 					blockCount++
 					blockFirstKeys = append(blockFirstKeys, k)
 				}
-				builder.Add(k, vs, 0)
+				builder.Add(k, vs)
 			}
 			tbl, err := CreateTable(filename, builder)
 			require.NoError(t, err, "unable to open table")
@@ -181,7 +181,7 @@ func BenchmarkBuilder(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			builder := NewTableBuilder(*opt)
 			for j := 0; j < keysCount; j++ {
-				builder.Add(keyList[j], vs, 0)
+				builder.Add(keyList[j], vs)
 			}
 			_ = builder.Finish()
 			builder.Close()

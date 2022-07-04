@@ -345,7 +345,7 @@ func (txn *Txn) newPendingWritesIterator(reversed bool) *pendingWritesIterator {
 func (txn *Txn) checkSize(e *Entry) error {
 	count := txn.count + 1
 	// Extra bytes for the version in key.
-	size := txn.size + e.estimateSizeAndSetThreshold(txn.db.valueThreshold()) + 10
+	size := txn.size + e.estimateSize() + 10
 	if count >= txn.db.opt.maxBatchCount || size >= txn.db.opt.maxBatchSize {
 		return ErrTxnTooBig
 	}
@@ -396,10 +396,8 @@ func (txn *Txn) modify(e *Entry) error {
 		// keep things safe and allow badger move prefix and a timestamp suffix, let's
 		// cut it down to 65000, instead of using 65536.
 		return exceedsSize("Key", maxKeySize, e.Key)
-	case int64(len(e.Value)) > txn.db.opt.ValueLogFileSize:
-		return exceedsSize("Value", txn.db.opt.ValueLogFileSize, e.Value)
-	case txn.db.opt.InMemory && int64(len(e.Value)) > txn.db.valueThreshold():
-		return exceedsSize("Value", txn.db.valueThreshold(), e.Value)
+	case txn.db.opt.InMemory && int64(len(e.Value)) > maxValueThreshold:
+		return exceedsSize("Value", maxValueThreshold, e.Value)
 	}
 
 	if err := txn.db.isBanned(e.Key); err != nil {

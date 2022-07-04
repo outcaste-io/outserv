@@ -269,11 +269,9 @@ func writeBench(cmd *cobra.Command, args []string) error {
 		WithValueDir(vlogDir).
 		WithSyncWrites(wo.syncWrites).
 		WithCompactL0OnClose(wo.force).
-		WithValueThreshold(wo.valueThreshold).
 		WithNumVersionsToKeep(wo.numVersions).
 		WithBlockCacheSize(wo.blockCacheSize << 20).
 		WithIndexCacheSize(wo.indexCacheSize << 20).
-		WithValueLogMaxEntries(wo.vlogMaxEntries).
 		WithEncryptionKey([]byte(wo.encryptionKey)).
 		WithDetectConflicts(wo.detectConflicts).
 		WithLoggingLevel(badger.INFO)
@@ -302,11 +300,10 @@ func writeBench(cmd *cobra.Command, args []string) error {
 
 	startTime = time.Now()
 	num := uint64(wo.numKeys * mil)
-	c := z.NewCloser(4)
+	c := z.NewCloser(3)
 	go reportStats(c, db)
 	go dropAll(c, db)
 	go dropPrefix(c, db)
-	go runGC(c, db)
 
 	if wo.sorted {
 		err = writeSorted(db, num)
@@ -403,30 +400,6 @@ func reportStats(c *z.Closer, db *badger.DB) {
 
 			if count%10 == 0 {
 				fmt.Println(db.LevelsToString())
-			}
-		}
-	}
-}
-
-func runGC(c *z.Closer, db *badger.DB) {
-	defer c.Done()
-	period, err := time.ParseDuration(wo.gcPeriod)
-	y.Check(err)
-	if period == 0 {
-		return
-	}
-
-	t := time.NewTicker(period)
-	defer t.Stop()
-	for {
-		select {
-		case <-c.HasBeenClosed():
-			return
-		case <-t.C:
-			if err := db.RunValueLogGC(wo.gcDiscardRatio); err == nil {
-				atomic.AddUint64(&gcSuccess, 1)
-			} else {
-				log.Printf("[GC] Failed due to following err %v", err)
 			}
 		}
 	}

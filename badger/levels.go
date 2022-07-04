@@ -641,21 +641,6 @@ func (s *levelsController) subcompact(it y.Iterator, kr keyRange, cd compactDef,
 	// that would affect the snapshot view guarantee provided by transactions.
 	discardTs := s.kv.orc.discardAtOrBelow()
 
-	// Try to collect stats so that we can inform value log about GC. That would help us find which
-	// value log file should be GCed.
-	discardStats := make(map[uint32]int64)
-	updateStats := func(vs y.ValueStruct) {
-		// We don't need to store/update discard stats when badger is running in Disk-less mode.
-		if s.kv.opt.InMemory {
-			return
-		}
-		if vs.Meta&bitValuePointer > 0 {
-			var vp valuePointer
-			vp.Decode(vs.Value)
-			discardStats[vp.Fid] += int64(vp.Len)
-		}
-	}
-
 	// exceedsAllowedOverlap returns true if the given key range would overlap with more than 10
 	// tables from level below nextLevel (nextLevel+1). This helps avoid generating tables at Li
 	// with huge overlaps with Li+1.
@@ -689,7 +674,6 @@ func (s *levelsController) subcompact(it y.Iterator, kr keyRange, cd compactDef,
 			// See if we need to skip the prefix.
 			if len(cd.dropPrefixes) > 0 && hasAnyPrefixes(it.Key(), cd.dropPrefixes) {
 				numSkips++
-				updateStats(it.Value())
 				continue
 			}
 
@@ -697,7 +681,6 @@ func (s *levelsController) subcompact(it y.Iterator, kr keyRange, cd compactDef,
 			if len(skipKey) > 0 {
 				if y.SameKey(it.Key(), skipKey) {
 					numSkips++
-					updateStats(it.Value())
 					continue
 				} else {
 					skipKey = skipKey[:0]
@@ -745,7 +728,7 @@ func (s *levelsController) subcompact(it y.Iterator, kr keyRange, cd compactDef,
 
 			// Do not discard entries inserted by merge operator. These entries will be
 			// discarded once they're merged
-			if version <= discardTs && vs.Meta&bitMergeEntry == 0 {
+			if version <= discardTs {
 				// Keep track of the number of versions encountered for this key. Only consider the
 				// versions which are below the minReadTs, otherwise, we might end up discarding the
 				// only valid version for a running transaction.
@@ -775,28 +758,23 @@ func (s *levelsController) subcompact(it y.Iterator, kr keyRange, cd compactDef,
 					default:
 						// If no overlap, we can skip all the versions, by continuing here.
 						numSkips++
-						updateStats(vs)
 						continue // Skip adding this key.
 					}
 				}
 			}
 			numKeys++
-			var vp valuePointer
-			if vs.Meta&bitValuePointer > 0 {
-				vp.Decode(vs.Value)
-			}
 			switch {
 			case firstKeyHasDiscardSet:
 				// This key is same as the last key which had "DiscardEarlierVersions" set. The
 				// the next compactions will drop this key if its ts >
 				// discardTs (of the next compaction).
-				builder.AddStaleKey(it.Key(), vs, vp.Len)
+				builder.AddStaleKey(it.Key(), vs)
 			case isExpired:
 				// If the key is expired, the next compaction will drop it if
 				// its ts > discardTs (of the next compaction).
-				builder.AddStaleKey(it.Key(), vs, vp.Len)
+				builder.AddStaleKey(it.Key(), vs)
 			default:
-				builder.Add(it.Key(), vs, vp.Len)
+				builder.Add(it.Key(), vs)
 			}
 		}
 		s.kv.opt.Debugf("[%d] LOG Compact. Added %d keys. Skipped %d keys. Iteration took: %v",
@@ -854,8 +832,6 @@ func (s *levelsController) subcompact(it y.Iterator, kr keyRange, cd compactDef,
 			res <- tbl
 		}(builder, s.reserveFileID())
 	}
-	s.kv.vlog.updateDiscardStats(discardStats)
-	s.kv.opt.Debugf("Discard stats: %v", discardStats)
 }
 
 // compactBuildTables merges topTables and botTables to form a list of new tables.

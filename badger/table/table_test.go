@@ -77,7 +77,7 @@ func buildTable(t *testing.T, keyValues [][]string, opts Options) *Table {
 	for _, kv := range keyValues {
 		y.AssertTrue(len(kv) == 2)
 		b.Add(y.KeyWithTs([]byte(kv[0]), 0),
-			y.ValueStruct{Value: []byte(kv[1]), Meta: 'A', UserMeta: 0}, 0)
+			y.ValueStruct{Value: []byte(kv[1]), Meta: 'A', UserMeta: 0})
 	}
 	tbl, err := CreateTable(filename, b)
 	require.NoError(t, err, "writing to file failed")
@@ -649,7 +649,7 @@ func TestTableBigValues(t *testing.T) {
 	for i := 0; i < n; i++ {
 		key := y.KeyWithTs([]byte(key("", i)), uint64(i+1))
 		vs := y.ValueStruct{Value: value(i)}
-		builder.Add(key, vs, 0)
+		builder.Add(key, vs)
 	}
 
 	filename := fmt.Sprintf("%s%s%d.sst", os.TempDir(), string(os.PathSeparator), rand.Uint32())
@@ -736,7 +736,7 @@ func BenchmarkReadAndBuild(b *testing.B) {
 			defer it.Close()
 			for it.seekToFirst(); it.Valid(); it.next() {
 				vs := it.Value()
-				newBuilder.Add(it.Key(), vs, 0)
+				newBuilder.Add(it.Key(), vs)
 			}
 			newBuilder.Finish()
 		}()
@@ -763,7 +763,7 @@ func BenchmarkReadMerged(b *testing.B) {
 			// id := i*tableSize+j (not interleaved)
 			k := fmt.Sprintf("%016x", id)
 			v := fmt.Sprintf("%d", id)
-			builder.Add([]byte(k), y.ValueStruct{Value: []byte(v), Meta: 123, UserMeta: 0}, 0)
+			builder.Add([]byte(k), y.ValueStruct{Value: []byte(v), Meta: 123, UserMeta: 0})
 		}
 		tbl, err := CreateTable(filename, builder)
 		y.Check(err)
@@ -852,7 +852,7 @@ func getTableForBenchmarks(b *testing.B, count int, cache *ristretto.Cache) *Tab
 	for i := 0; i < count; i++ {
 		k := fmt.Sprintf("%016x", i)
 		v := fmt.Sprintf("%d", i)
-		builder.Add([]byte(k), y.ValueStruct{Value: []byte(v)}, 0)
+		builder.Add([]byte(k), y.ValueStruct{Value: []byte(v)})
 	}
 
 	tbl, err := CreateTable(filename, builder)
@@ -890,7 +890,7 @@ func TestMaxVersion(t *testing.T) {
 	filename := fmt.Sprintf("%s%s%d.sst", os.TempDir(), string(os.PathSeparator), rand.Uint32())
 	N := 1000
 	for i := 0; i < N; i++ {
-		b.Add(y.KeyWithTs([]byte(fmt.Sprintf("foo:%d", i)), uint64(i+1)), y.ValueStruct{}, 0)
+		b.Add(y.KeyWithTs([]byte(fmt.Sprintf("foo:%d", i)), uint64(i+1)), y.ValueStruct{})
 	}
 	table, err := CreateTable(filename, b)
 	require.NoError(t, err)

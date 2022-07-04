@@ -24,12 +24,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math"
 	"math/rand"
-	"os"
-	"path/filepath"
-	"regexp"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -44,77 +39,6 @@ import (
 	"github.com/outcaste-io/ristretto/z"
 	"github.com/stretchr/testify/require"
 )
-
-func TestTruncateVlogWithClose(t *testing.T) {
-	key := func(i int) []byte {
-		return []byte(fmt.Sprintf("%d%10d", i, i))
-	}
-	data := func(l int) []byte {
-		m := make([]byte, l)
-		_, err := rand.Read(m)
-		require.NoError(t, err)
-		return m
-	}
-
-	dir, err := ioutil.TempDir("", "badger-test")
-	require.NoError(t, err)
-	defer removeDir(dir)
-
-	opt := getTestOptions(dir)
-	opt.SyncWrites = true
-	opt.ValueThreshold = 1 // Force all reads from value log.
-
-	db, err := Open(opt)
-	require.NoError(t, err)
-
-	err = db.Update(func(txn *Txn) error {
-		return txn.SetEntry(NewEntry(key(0), data(4055)))
-	})
-	require.NoError(t, err)
-
-	// Close the DB.
-	require.NoError(t, db.Close())
-	// We start value logs at 1.
-	require.NoError(t, os.Truncate(filepath.Join(dir, "000001.vlog"), 4090))
-
-	// Reopen and write some new data.
-	db, err = Open(opt)
-	require.NoError(t, err)
-	for i := 0; i < 32; i++ {
-		err := db.Update(func(txn *Txn) error {
-			return txn.SetEntry(NewEntry(key(i), data(10)))
-		})
-		require.NoError(t, err)
-	}
-
-	// Read it back to ensure that we can read it now.
-	for i := 0; i < 32; i++ {
-		err := db.View(func(txn *Txn) error {
-			item, err := txn.Get(key(i))
-			require.NoError(t, err)
-			val := getItemValue(t, item)
-			require.Equal(t, 10, len(val))
-			return nil
-		})
-		require.NoError(t, err)
-	}
-	require.NoError(t, db.Close())
-
-	// Reopen and read the data again.
-	db, err = Open(opt)
-	require.NoError(t, err)
-	for i := 0; i < 32; i++ {
-		err := db.View(func(txn *Txn) error {
-			item, err := txn.Get(key(i))
-			require.NoError(t, err, "key: %s", key(i))
-			val := getItemValue(t, item)
-			require.Equal(t, 10, len(val))
-			return nil
-		})
-		require.NoError(t, err)
-	}
-	require.NoError(t, db.Close())
-}
 
 var manual = flag.Bool("manual", false, "Set when manually running some tests.")
 
@@ -205,145 +129,6 @@ func TestTruncateVlogNoClose3(t *testing.T) {
 	}
 }
 
-func TestBigKeyValuePairs(t *testing.T) {
-	// This test takes too much memory. So, run separately.
-	if !*manual {
-		t.Skip("Skipping test meant to be run manually.")
-		return
-	}
-
-	// Passing an empty directory since it will be filled by runBadgerTest.
-	opts := DefaultOptions("").
-		WithBaseTableSize(1 << 20).
-		WithValueLogMaxEntries(64)
-	runBadgerTest(t, &opts, func(t *testing.T, db *DB) {
-		bigK := make([]byte, 65001)
-		bigV := make([]byte, db.opt.ValueLogFileSize+1)
-		small := make([]byte, 65000)
-
-		txn := db.NewTransaction(true)
-		require.Regexp(t, regexp.MustCompile("Key.*exceeded"), txn.SetEntry(NewEntry(bigK, small)))
-		require.Regexp(t, regexp.MustCompile("Value.*exceeded"),
-			txn.SetEntry(NewEntry(small, bigV)))
-
-		require.NoError(t, txn.SetEntry(NewEntry(small, small)))
-		require.Regexp(t, regexp.MustCompile("Key.*exceeded"), txn.SetEntry(NewEntry(bigK, bigV)))
-
-		require.NoError(t, db.View(func(txn *Txn) error {
-			_, err := txn.Get(small)
-			require.Equal(t, ErrKeyNotFound, err)
-			return nil
-		}))
-
-		// Now run a longer test, which involves value log GC.
-		data := fmt.Sprintf("%100d", 1)
-		key := func(i int) string {
-			return fmt.Sprintf("%65000d", i)
-		}
-
-		saveByKey := func(key string, value []byte) error {
-			return db.Update(func(txn *Txn) error {
-				return txn.SetEntry(NewEntry([]byte(key), value))
-			})
-		}
-
-		getByKey := func(key string) error {
-			return db.View(func(txn *Txn) error {
-				item, err := txn.Get([]byte(key))
-				if err != nil {
-					return err
-				}
-				return item.Value(func(val []byte) error {
-					if len(val) == 0 {
-						log.Fatalf("key not found %q", len(key))
-					}
-					return nil
-				})
-			})
-		}
-
-		for i := 0; i < 32; i++ {
-			if i < 30 {
-				require.NoError(t, saveByKey(key(i), []byte(data)))
-			} else {
-				require.NoError(t, saveByKey(key(i), []byte(fmt.Sprintf("%100d", i))))
-			}
-		}
-
-		for j := 0; j < 5; j++ {
-			for i := 0; i < 32; i++ {
-				if i < 30 {
-					require.NoError(t, saveByKey(key(i), []byte(data)))
-				} else {
-					require.NoError(t, saveByKey(key(i), []byte(fmt.Sprintf("%100d", i))))
-				}
-			}
-		}
-
-		for i := 0; i < 32; i++ {
-			require.NoError(t, getByKey(key(i)))
-		}
-
-		var loops int
-		var err error
-		for err == nil {
-			err = db.RunValueLogGC(0.5)
-			require.NotRegexp(t, regexp.MustCompile("truncate"), err)
-			loops++
-		}
-		t.Logf("Ran value log GC %d times. Last error: %v\n", loops, err)
-	})
-}
-
-// The following test checks for issue #585.
-func TestPushValueLogLimit(t *testing.T) {
-	// This test takes too much memory. So, run separately.
-	if !*manual {
-		t.Skip("Skipping test meant to be run manually.")
-		return
-	}
-
-	// Passing an empty directory since it will be filled by runBadgerTest.
-	opt := DefaultOptions("").
-		WithValueLogMaxEntries(64).
-		WithValueLogFileSize(2<<30 - 1)
-	runBadgerTest(t, &opt, func(t *testing.T, db *DB) {
-		data := []byte(fmt.Sprintf("%30d", 1))
-		key := func(i int) string {
-			return fmt.Sprintf("%100d", i)
-		}
-
-		for i := 0; i < 32; i++ {
-			if i == 4 {
-				v := make([]byte, math.MaxInt32)
-				err := db.Update(func(txn *Txn) error {
-					return txn.SetEntry(NewEntry([]byte(key(i)), v))
-				})
-				require.NoError(t, err)
-			} else {
-				err := db.Update(func(txn *Txn) error {
-					return txn.SetEntry(NewEntry([]byte(key(i)), data))
-				})
-				require.NoError(t, err)
-			}
-		}
-
-		for i := 0; i < 32; i++ {
-			err := db.View(func(txn *Txn) error {
-				item, err := txn.Get([]byte(key(i)))
-				require.NoError(t, err, "Getting key: %s", key(i))
-				err = item.Value(func(v []byte) error {
-					_ = v
-					return nil
-				})
-				require.NoError(t, err, "Getting value: %s", key(i))
-				return nil
-			})
-			require.NoError(t, err)
-		}
-	})
-}
-
 // The following benchmark test is supposed to be run against a badger directory with some data.
 // Use badger fill to create data if it doesn't exist.
 func BenchmarkDBOpen(b *testing.B) {
@@ -367,9 +152,7 @@ func TestBigValues(t *testing.T) {
 		t.Skip("Skipping test meant to be run manually.")
 		return
 	}
-	opts := DefaultOptions("").
-		WithValueThreshold(1 << 20).
-		WithValueLogMaxEntries(100)
+	opts := DefaultOptions("")
 	test := func(t *testing.T, db *DB) {
 		keyCount := 1000
 
@@ -516,7 +299,7 @@ func createTableWithRange(t *testing.T, db *DB, start, end int) *table.Table {
 		binary.BigEndian.PutUint64(key[:], uint64(i))
 		key = y.KeyWithTs(key, uint64(0))
 		val := y.ValueStruct{Value: []byte(fmt.Sprintf("%d", i))}
-		b.Add(key, val, 0)
+		b.Add(key, val)
 	}
 
 	fileID := db.lc.reserveFileID()
@@ -552,18 +335,13 @@ func TestReadSameVlog(t *testing.T) {
 	}
 
 	t.Run("Test Read Again Plain Text", func(t *testing.T) {
-		opt := getTestOptions("")
-		// Forcing to read from vlog
-		opt.ValueThreshold = 1
 		runBadgerTest(t, nil, func(t *testing.T, db *DB) {
 			testReadingSameKey(t, db)
 		})
-
 	})
 
 	t.Run("Test Read Again Encryption", func(t *testing.T) {
 		opt := getTestOptions("")
-		opt.ValueThreshold = 1
 		// Generate encryption key.
 		eKey := make([]byte, 32)
 		_, err := rand.Read(eKey)
@@ -573,172 +351,6 @@ func TestReadSameVlog(t *testing.T) {
 			testReadingSameKey(t, db)
 		})
 	})
-}
-
-// The test ensures we don't lose data when badger is opened with KeepL0InMemory and GC is being
-// done.
-func TestL0GCBug(t *testing.T) {
-	t.Skipf("TestL0GCBug is DISABLED. TODO(ibrahim): Do we need this?")
-
-	dir, err := ioutil.TempDir("", "badger-test")
-	require.NoError(t, err)
-	defer removeDir(dir)
-
-	// Do not change any of the options below unless it's necessary.
-	opts := getTestOptions(dir)
-	opts.NumLevelZeroTables = 50
-	opts.NumLevelZeroTablesStall = 51
-	opts.ValueLogMaxEntries = 2
-	opts.ValueThreshold = 2
-	// Setting LoadingMode to mmap seems to cause segmentation fault while closing DB.
-
-	db1, err := Open(opts)
-	require.NoError(t, err)
-	key := func(i int) []byte {
-		return []byte(fmt.Sprintf("%10d", i))
-	}
-	val := []byte{1, 1, 1, 1, 1, 1, 1, 1}
-	// Insert 100 entries. This will create about 50*3 vlog files and 6 SST files.
-	for i := 0; i < 3; i++ {
-		for j := 0; j < 100; j++ {
-			err = db1.Update(func(txn *Txn) error {
-				return txn.SetEntry(NewEntry(key(j), val))
-			})
-			require.NoError(t, err)
-		}
-	}
-	// Run value log GC multiple times. This would ensure at least
-	// one value log file is garbage collected.
-	success := 0
-	for i := 0; i < 10; i++ {
-		err := db1.RunValueLogGC(0.01)
-		if err == nil {
-			success++
-		}
-		if err != nil && !errors.Is(err, ErrNoRewrite) {
-			t.Fatalf(err.Error())
-		}
-	}
-	// Ensure alteast one GC call was successful.
-	require.NotZero(t, success)
-	// CheckKeys reads all the keys previously stored.
-	checkKeys := func(db *DB) {
-		for i := 0; i < 100; i++ {
-			err := db.View(func(txn *Txn) error {
-				item, err := txn.Get(key(i))
-				require.NoError(t, err)
-				val1 := getItemValue(t, item)
-				require.Equal(t, val, val1)
-				return nil
-			})
-			require.NoError(t, err)
-		}
-	}
-
-	checkKeys(db1)
-	// Simulate a crash by not closing db1 but releasing the locks.
-	if db1.dirLockGuard != nil {
-		require.NoError(t, db1.dirLockGuard.release())
-		db1.dirLockGuard = nil
-	}
-	if db1.valueDirGuard != nil {
-		require.NoError(t, db1.valueDirGuard.release())
-		db1.valueDirGuard = nil
-	}
-	require.NoError(t, db1.Close())
-
-	db2, err := Open(opts)
-	require.NoError(t, err)
-
-	// Ensure we still have all the keys.
-	checkKeys(db2)
-	require.NoError(t, db2.Close())
-}
-
-// Regression test for https://github.com/dgraph-io/badger/issues/1126
-//
-// The test has 3 steps
-// Step 1 - Create badger data. It is necessary that the value size is
-//          greater than valuethreshold. The value log file size after
-//          this step is around 170 bytes.
-// Step 2 - Re-open the same badger and simulate a crash. The value log file
-//          size after this crash is around 2 GB (we increase the file size to mmap it).
-// Step 3 - Re-open the same badger. We should be able to read all the data
-//          inserted in the first step.
-func TestWindowsDataLoss(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("The test is only for Windows.")
-	}
-
-	dir, err := ioutil.TempDir("", "badger-test")
-	require.NoError(t, err)
-	defer removeDir(dir)
-
-	opt := DefaultOptions(dir).WithSyncWrites(true)
-	opt.ValueThreshold = 32
-
-	db, err := Open(opt)
-	require.NoError(t, err)
-	keyCount := 20
-	var keyList [][]byte // Stores all the keys generated.
-	for i := 0; i < keyCount; i++ {
-		// It is important that we create different transactions for each request.
-		err := db.Update(func(txn *Txn) error {
-			key := []byte(fmt.Sprintf("%d", i))
-			v := []byte("barValuebarValuebarValuebarValuebarValue")
-			require.Greater(t, len(v), db.valueThreshold())
-
-			//32 bytes length and now it's not working
-			err := txn.Set(key, v)
-			require.NoError(t, err)
-			keyList = append(keyList, key)
-			return nil
-		})
-		require.NoError(t, err)
-	}
-	require.NoError(t, db.Close())
-
-	db, err = Open(opt)
-	require.NoError(t, err)
-	// Return after reading one entry. We're simulating a crash.
-	// Simulate a crash by not closing db but releasing the locks.
-	if db.dirLockGuard != nil {
-		require.NoError(t, db.dirLockGuard.release())
-	}
-	if db.valueDirGuard != nil {
-		require.NoError(t, db.valueDirGuard.release())
-	}
-	// Don't use vlog.Close here. We don't want to fix the file size. Only un-mmap
-	// the data so that we can truncate the file durning the next vlog.Open.
-	require.NoError(t, z.Munmap(db.vlog.filesMap[db.vlog.maxFid].Data))
-	for _, f := range db.vlog.filesMap {
-		require.NoError(t, f.Fd.Close())
-	}
-	require.NoError(t, db.registry.Close())
-	require.NoError(t, db.manifest.close())
-	require.NoError(t, db.lc.close())
-
-	db, err = Open(opt)
-	require.NoError(t, err)
-	defer db.Close()
-
-	txn := db.NewTransaction(false)
-	defer txn.Discard()
-	it := txn.NewIterator(DefaultIteratorOptions)
-	defer it.Close()
-
-	var result [][]byte // stores all the keys read from the db.
-	for it.Rewind(); it.Valid(); it.Next() {
-		item := it.Item()
-		k := item.Key()
-		err := item.Value(func(v []byte) error {
-			_ = v
-			return nil
-		})
-		require.NoError(t, err)
-		result = append(result, k)
-	}
-	require.ElementsMatch(t, keyList, result)
 }
 
 func TestDropPrefixWithNoData(t *testing.T) {

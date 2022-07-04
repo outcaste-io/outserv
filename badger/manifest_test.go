@@ -150,7 +150,7 @@ func buildTable(t *testing.T, keyValues [][]string, bopts table.Options) *table.
 			Value:    []byte(kv[1]),
 			Meta:     'A',
 			UserMeta: 0,
-		}, 0)
+		})
 	}
 
 	tbl, err := table.CreateTable(filename, b)

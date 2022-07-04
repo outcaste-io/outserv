@@ -50,7 +50,6 @@ type flagOptions struct {
 	truncate                 bool
 	encryptionKey            string
 	checksumVerificationMode string
-	discard                  bool
 	externalMagicVersion     uint16
 }
 
@@ -81,8 +80,6 @@ func init() {
 	infoCmd.Flags().StringVar(&opt.encryptionKey, "enc-key", "", "Use the provided encryption key")
 	infoCmd.Flags().StringVar(&opt.checksumVerificationMode, "cv-mode", "none",
 		"[none, table, block, tableAndBlock] Specifies when the db should verify checksum for SST.")
-	infoCmd.Flags().BoolVar(&opt.discard, "discard", false,
-		"Parse and print DISCARD file from value logs.")
 	infoCmd.Flags().Uint16Var(&opt.externalMagicVersion, "external-magic", 0,
 		"External magic number")
 }
@@ -109,17 +106,6 @@ func handleInfo(cmd *cobra.Command, args []string) error {
 		WithEncryptionKey([]byte(opt.encryptionKey)).
 		WithChecksumVerificationMode(cvMode).
 		WithExternalMagic(opt.externalMagicVersion)
-
-	if opt.discard {
-		ds, err := badger.InitDiscardStats(bopt)
-		y.Check(err)
-		ds.Iterate(func(fid, stats uint64) {
-			fmt.Printf("Value Log Fid: %5d. Stats: %10d [ %s ]\n",
-				fid, stats, humanize.IBytes(stats))
-		})
-		fmt.Println("DONE")
-		return nil
-	}
 
 	if err := printInfo(sstDir, vlogDir); err != nil {
 		return y.Wrap(err, "failed to print information in MANIFEST file")

@@ -62,7 +62,6 @@ func TestDropAllManaged(t *testing.T) {
 	defer removeDir(dir)
 	opts := getTestOptions(dir)
 	opts.managedTxns = true
-	opts.ValueLogFileSize = 5 << 20
 	db, err := Open(opts)
 	require.NoError(t, err)
 
@@ -106,7 +105,6 @@ func TestDropAll(t *testing.T) {
 	require.NoError(t, err)
 	defer removeDir(dir)
 	opts := getTestOptions(dir)
-	opts.ValueLogFileSize = 5 << 20
 	db, err := Open(opts)
 	require.NoError(t, err)
 
@@ -170,7 +168,6 @@ func TestDropAllTwice(t *testing.T) {
 		require.NoError(t, err)
 		defer removeDir(dir)
 		opts := getTestOptions(dir)
-		opts.ValueLogFileSize = 5 << 20
 		test(t, opts)
 	})
 	t.Run("InMemory mode", func(t *testing.T) {
@@ -185,7 +182,6 @@ func TestDropAllWithPendingTxn(t *testing.T) {
 	require.NoError(t, err)
 	defer removeDir(dir)
 	opts := getTestOptions(dir)
-	opts.ValueLogFileSize = 5 << 20
 	db, err := Open(opts)
 	require.NoError(t, err)
 	defer func() {
@@ -256,7 +252,6 @@ func TestDropReadOnly(t *testing.T) {
 	require.NoError(t, err)
 	defer removeDir(dir)
 	opts := getTestOptions(dir)
-	opts.ValueLogFileSize = 5 << 20
 	db, err := Open(opts)
 	require.NoError(t, err)
 	N := uint64(1000)
@@ -289,7 +284,6 @@ func TestWriteAfterClose(t *testing.T) {
 	require.NoError(t, err)
 	defer removeDir(dir)
 	opts := getTestOptions(dir)
-	opts.ValueLogFileSize = 5 << 20
 	db, err := Open(opts)
 	require.NoError(t, err)
 	N := uint64(1000)
@@ -379,7 +373,6 @@ func TestDropPrefix(t *testing.T) {
 	require.NoError(t, err)
 	defer removeDir(dir)
 	opts := getTestOptions(dir)
-	opts.ValueLogFileSize = 5 << 20
 	db, err := Open(opts)
 	require.NoError(t, err)
 
@@ -431,7 +424,6 @@ func TestDropPrefixWithPendingTxn(t *testing.T) {
 	require.NoError(t, err)
 	defer removeDir(dir)
 	opts := getTestOptions(dir)
-	opts.ValueLogFileSize = 5 << 20
 	db, err := Open(opts)
 	require.NoError(t, err)
 	defer func() {
@@ -503,7 +495,6 @@ func TestDropPrefixReadOnly(t *testing.T) {
 	require.NoError(t, err)
 	defer removeDir(dir)
 	opts := getTestOptions(dir)
-	opts.ValueLogFileSize = 5 << 20
 	db, err := Open(opts)
 	require.NoError(t, err)
 	N := uint64(1000)
@@ -816,66 +807,5 @@ func TestWriteViaSkip(t *testing.T) {
 			i++
 		}
 		require.Equal(t, 100, i)
-	})
-}
-
-func TestZeroDiscardStats(t *testing.T) {
-	N := uint64(10000)
-	populate := func(t *testing.T, db *DB) {
-		writer := db.NewWriteBatch()
-		for i := uint64(0); i < N; i++ {
-			require.NoError(t, writer.Set([]byte(key("key", int(i))), val(true)))
-		}
-		require.NoError(t, writer.Flush())
-	}
-
-	t.Run("after rewrite", func(t *testing.T) {
-		opts := getTestOptions("")
-		opts.ValueLogFileSize = 5 << 20
-		opts.ValueThreshold = 1 << 10
-		opts.MemTableSize = 1 << 15
-		runBadgerTest(t, &opts, func(t *testing.T, db *DB) {
-			populate(t, db)
-			require.Equal(t, int(N), numKeys(db))
-
-			fids := db.vlog.sortedFids()
-			for _, fid := range fids {
-				db.vlog.discardStats.Update(uint32(fid), 1)
-			}
-
-			// Ensure we have some valid fids.
-			require.True(t, len(fids) > 2)
-			fid := fids[0]
-			require.NoError(t, db.vlog.rewrite(db.vlog.filesMap[fid]))
-			// All data should still be present.
-			require.Equal(t, int(N), numKeys(db))
-
-			db.vlog.discardStats.Iterate(func(id, val uint64) {
-				// Vlog with id=fid has been re-written, it's discard stats should be zero.
-				if uint32(id) == fid {
-					require.Zero(t, val)
-				}
-			})
-		})
-	})
-	t.Run("after dropall", func(t *testing.T) {
-		opts := getTestOptions("")
-		opts.ValueLogFileSize = 5 << 20
-		runBadgerTest(t, &opts, func(t *testing.T, db *DB) {
-			populate(t, db)
-			require.Equal(t, int(N), numKeys(db))
-
-			// Fill discard stats. Normally these are filled by compaction.
-			fids := db.vlog.sortedFids()
-			for _, fid := range fids {
-				db.vlog.discardStats.Update(uint32(fid), 1)
-			}
-
-			db.vlog.discardStats.Iterate(func(id, val uint64) { require.NotZero(t, val) })
-			require.NoError(t, db.DropAll())
-			require.Equal(t, 0, numKeys(db))
-			// We've deleted everything. DS should be zero.
-			db.vlog.discardStats.Iterate(func(id, val uint64) { require.Zero(t, val) })
-		})
 	})
 }
