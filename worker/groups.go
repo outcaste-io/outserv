@@ -13,7 +13,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
-	badgerpb "github.com/outcaste-io/badger/v3/pb"
+	badgerpb "github.com/outcaste-io/outserv/badger/pb"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/raftwal"

@@ -35,10 +35,10 @@ import (
 	"github.com/golang/snappy"
 	"github.com/pkg/errors"
 
-	"github.com/outcaste-io/badger/v3/fb"
-	"github.com/outcaste-io/badger/v3/options"
-	"github.com/outcaste-io/badger/v3/pb"
-	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/outserv/badger/fb"
+	"github.com/outcaste-io/outserv/badger/options"
+	"github.com/outcaste-io/outserv/badger/pb"
+	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/outcaste-io/ristretto"
 	"github.com/outcaste-io/ristretto/z"
 )

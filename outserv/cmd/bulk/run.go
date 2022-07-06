@@ -17,7 +17,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/outserv/badger"
 	"github.com/outcaste-io/outserv/ee"
 	"github.com/outcaste-io/outserv/filestore"
 	"github.com/outcaste-io/outserv/posting"

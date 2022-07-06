@@ -19,7 +19,7 @@ package y
 import (
 	"hash/crc32"
 
-	"github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/outserv/badger/pb"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/pkg/errors"

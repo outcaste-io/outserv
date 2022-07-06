@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/outserv/badger/pb"
 	"github.com/outcaste-io/ristretto/z"
 	"github.com/stretchr/testify/require"
 )

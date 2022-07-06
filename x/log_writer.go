@@ -34,7 +34,7 @@ import (
 
 	"github.com/outcaste-io/ristretto/z"
 
-	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/outserv/badger/y"
 )
 
 const (

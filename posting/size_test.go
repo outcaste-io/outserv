@@ -33,7 +33,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/dustin/go-humanize"
-	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/outserv/badger"
 	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/pkg/errors"

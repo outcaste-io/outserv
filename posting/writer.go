@@ -21,8 +21,8 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
-	"github.com/outcaste-io/badger/v3"
-	"github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/outserv/badger"
+	"github.com/outcaste-io/outserv/badger/pb"
 )
 
 // TxnWriter is in charge or writing transactions to badger.

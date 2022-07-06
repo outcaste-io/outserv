@@ -29,9 +29,9 @@ import (
 	"sync"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/outcaste-io/badger/v3/options"
-	"github.com/outcaste-io/badger/v3/pb"
-	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/outserv/badger/options"
+	"github.com/outcaste-io/outserv/badger/pb"
+	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/pkg/errors"
 )
 

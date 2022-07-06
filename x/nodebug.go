@@ -6,9 +6,9 @@
 package x
 
 import (
-	bpb "github.com/outcaste-io/badger/v3/pb"
+	bpb "github.com/outcaste-io/outserv/badger/pb"
 
-	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/outserv/badger"
 	"github.com/outcaste-io/outserv/protos/pb"
 )
 

@@ -11,9 +11,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/outcaste-io/badger/v3"
-	badgerpb "github.com/outcaste-io/badger/v3/pb"
-	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/outserv/badger"
+	badgerpb "github.com/outcaste-io/outserv/badger/pb"
+	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"

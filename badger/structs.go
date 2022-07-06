@@ -21,7 +21,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/outcaste-io/badger/v3/skl"
+	"github.com/outcaste-io/outserv/badger/skl"
 )
 
 // Entry provides Key, Value, UserMeta and ExpiresAt. This struct can be used by

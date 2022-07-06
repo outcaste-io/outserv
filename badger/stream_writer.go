@@ -23,9 +23,9 @@ import (
 
 	humanize "github.com/dustin/go-humanize"
 	"github.com/golang/protobuf/proto"
-	"github.com/outcaste-io/badger/v3/pb"
-	"github.com/outcaste-io/badger/v3/table"
-	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/outserv/badger/pb"
+	"github.com/outcaste-io/outserv/badger/table"
+	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/outcaste-io/ristretto/z"
 	"github.com/pkg/errors"
 )

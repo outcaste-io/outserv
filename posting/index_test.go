@@ -24,8 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/outcaste-io/badger/v3"
-	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/outserv/badger"
+	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/stretchr/testify/require"
 
 	"github.com/outcaste-io/outserv/protos/pb"

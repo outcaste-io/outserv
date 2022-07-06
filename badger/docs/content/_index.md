@@ -89,7 +89,7 @@ be compatible with all of the v1.x. Badger v2.0 supports compression, encryption
 
 For more details on our version naming schema please read [Choosing a version]({{< relref "get-started/index.md#choosing-a-version" >}}).
 
-[Changelog]:https://github.com/outcaste-io/badger/blob/main/CHANGELOG.md
+[Changelog]:https://github.com/outcaste-io/outserv/badger/blob/main/CHANGELOG.md
 
 ## Contribute
 

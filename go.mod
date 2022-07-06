@@ -3,7 +3,7 @@ module github.com/outcaste-io/outserv
 go 1.16
 
 // replace github.com/outcaste-io/ristretto => /home/mrjn/source/ristretto
-// replace github.com/outcaste-io/badger/v3 => /home/mrjn/source/badger
+// replace github.com/outcaste-io/outserv/badger => /home/mrjn/source/badger
 
 require (
 	cloud.google.com/go/storage v1.15.0
@@ -16,6 +16,7 @@ require (
 	github.com/Microsoft/go-winio v0.4.15 // indirect
 	github.com/Shopify/sarama v1.27.2
 	github.com/blevesearch/bleve v1.0.13
+	github.com/cespare/xxhash/v2 v2.1.1
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd
 	github.com/dgraph-io/graphql-transport-ws v0.0.0-20210511143556-2cef522f1f15
 	github.com/dgraph-io/simdjson-go v0.3.0
@@ -34,12 +35,13 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/golang/snappy v0.0.4
 	github.com/google/codesearch v1.0.0
+	github.com/google/flatbuffers v1.11.0
 	github.com/google/go-cmp v0.5.7
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/graph-gophers/graphql-go v1.3.0
+	github.com/klauspost/compress v1.11.7
 	github.com/minio/minio-go/v6 v6.0.55
-	github.com/outcaste-io/badger/v3 v3.2202.1-0.20220426173331-b25bc764af0d
 	github.com/outcaste-io/dgo/v210 v210.0.0-20220225180226-43bd1b427e86
 	github.com/outcaste-io/gqlgen v0.13.3
 	github.com/outcaste-io/gqlparser/v2 v2.2.3

@@ -23,8 +23,8 @@ import (
 	"math"
 	"sync"
 
-	"github.com/outcaste-io/badger/v3/table"
-	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/outserv/badger/table"
+	"github.com/outcaste-io/outserv/badger/y"
 )
 
 type keyRange struct {

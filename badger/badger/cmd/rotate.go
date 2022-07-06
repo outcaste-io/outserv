@@ -21,7 +21,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/outserv/badger"
 
 	"github.com/spf13/cobra"
 )

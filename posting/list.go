@@ -15,8 +15,8 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/golang/protobuf/proto"
-	bpb "github.com/outcaste-io/badger/v3/pb"
-	"github.com/outcaste-io/badger/v3/y"
+	bpb "github.com/outcaste-io/outserv/badger/pb"
+	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/outcaste-io/outserv/codec"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/schema"

@@ -24,9 +24,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/outcaste-io/badger/v3"
-	"github.com/outcaste-io/badger/v3/options"
-	bpb "github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/outserv/badger"
+	"github.com/outcaste-io/outserv/badger/options"
+	bpb "github.com/outcaste-io/outserv/badger/pb"
 	"github.com/stretchr/testify/require"
 )
 

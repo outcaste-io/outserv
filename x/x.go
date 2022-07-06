@@ -28,10 +28,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/peer"
 
-	"github.com/dustin/go-humanize"
-	"github.com/outcaste-io/badger/v3"
-	bo "github.com/outcaste-io/badger/v3/options"
-	badgerpb "github.com/outcaste-io/badger/v3/pb"
+	bo "github.com/outcaste-io/outserv/badger/options"
+	badgerpb "github.com/outcaste-io/outserv/badger/pb"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/ristretto/z"
 
@@ -967,46 +965,6 @@ func IsGuardian(groups []string) bool {
 	}
 
 	return false
-}
-
-// RunVlogGC runs value log gc on store. It runs GC unconditionally after every 10 minutes.
-// Additionally it also runs GC if vLogSize has grown more than 1 GB in last minute.
-func RunVlogGC(store *badger.DB, closer *z.Closer) {
-	defer closer.Done()
-
-	// Runs every 1m, checks size of vlog and runs GC conditionally.
-	ticker := time.NewTicker(1 * time.Minute)
-	defer ticker.Stop()
-
-	abs := func(a, b int64) int64 {
-		if a > b {
-			return a - b
-		}
-		return b - a
-	}
-
-	var lastSz int64
-	runGC := func() {
-		for err := error(nil); err == nil; {
-			// If a GC is successful, immediately run it again.
-			err = store.RunValueLogGC(0.7)
-		}
-		_, sz := store.Size()
-		if abs(lastSz, sz) > 512<<20 {
-			glog.V(2).Infof("Value log size: %s\n", humanize.IBytes(uint64(sz)))
-			lastSz = sz
-		}
-	}
-
-	runGC()
-	for {
-		select {
-		case <-closer.HasBeenClosed():
-			return
-		case <-ticker.C:
-			runGC()
-		}
-	}
 }
 
 type DB interface {

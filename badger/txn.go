@@ -22,7 +22,7 @@ import (
 	"math"
 	"sync/atomic"
 
-	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/pkg/errors"
 )
 

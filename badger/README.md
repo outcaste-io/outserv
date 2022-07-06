@@ -1,4 +1,4 @@
-# BadgerDB [![Go Reference](https://pkg.go.dev/badge/github.com/outcaste-io/badger/v3.svg)](https://pkg.go.dev/github.com/outcaste-io/badger/v3)
+# BadgerDB [![Go Reference](https://pkg.go.dev/badge/github.com/outcaste-io/outserv/badger.svg)](https://pkg.go.dev/github.com/outcaste-io/outserv/badger)
 
 **This is a fork of dgraph-io/badger, maintained by the original authors of Badger.**
 
@@ -38,7 +38,7 @@ The [Changelog] is kept fairly up-to-date.
 
 For more details on our version naming schema please read [Choosing a version](#choosing-a-version).
 
-[Changelog]:https://github.com/outcaste-io/badger/blob/main/CHANGELOG.md
+[Changelog]:https://github.com/outcaste-io/outserv/badger/blob/main/CHANGELOG.md
 
 ## Table of Contents
  * [Getting Started](#getting-started)
@@ -62,13 +62,13 @@ For more details on our version naming schema please read [Choosing a version](#
 Badger v2 and later require Go Modules. To start using Badger, install Go 1.12 or above and run the following command to retrieve the library.
 
 ```sh
-$ go get github.com/outcaste-io/badger/v3
+$ go get github.com/outcaste-io/outserv/badger
 ```
 This will retrieve the library.
 
 #### Installing Badger Command Line Tool
 
-Download and extract the latest Badger DB release from https://github.com/outcaste-io/badger/releases and then run the following commands.
+Download and extract the latest Badger DB release from https://github.com/outcaste-io/outserv/badger/releases and then run the following commands.
 
 ```sh
 $ cd badger-<version>/badger
@@ -98,14 +98,14 @@ Following these rules:
 For a longer explanation on the reasons behind using a new versioning naming schema, you can read
 [VERSIONING.md](VERSIONING.md).
 
-### Migrating from dgraph-io/badger to outcaste-io/badger
+### Migrating from dgraph-io/badger to outcaste-io/outserv/badger
 
-If you're currently using dgraph-io/badger, you can migrate to outcaste-io/badger by using pattern
+If you're currently using dgraph-io/badger, you can migrate to outcaste-io/outserv/badger by using pattern
 replacement with `gofmt` to update all the import paths in your project's Go files:
 
 ```bash
-go get github.com/outcaste-io/badger/v3
-find . -name '*.go' | xargs gofmt -w -r '"github.com/dgraph-io/badger/v3" -> "github.com/outcaste-io/badger/v3"'
+go get github.com/outcaste-io/outserv/badger
+find . -name '*.go' | xargs gofmt -w -r '"github.com/dgraph-io/badger/v3" -> "github.com/outcaste-io/outserv/badger"'
 ```
 
 ## Badger Documentation

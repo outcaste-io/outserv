@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/outserv/badger"
 	"github.com/outcaste-io/ristretto"
 	"github.com/outcaste-io/ristretto/z"
 	ostats "go.opencensus.io/stats"

@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/outcaste-io/badger/v3/options"
+	"github.com/outcaste-io/outserv/badger/options"
 )
 
 func TestOptions(t *testing.T) {

@@ -22,8 +22,8 @@ import (
 	"io"
 	"sort"
 
-	"github.com/outcaste-io/badger/v3/fb"
-	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/outserv/badger/fb"
+	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/pkg/errors"
 )
 

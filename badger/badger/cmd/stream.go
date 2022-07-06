@@ -22,9 +22,9 @@ import (
 	"math"
 	"os"
 
-	"github.com/outcaste-io/badger/v3"
-	"github.com/outcaste-io/badger/v3/options"
-	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/outserv/badger"
+	"github.com/outcaste-io/outserv/badger/options"
+	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )

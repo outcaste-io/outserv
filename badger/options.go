@@ -27,9 +27,9 @@ import (
 	"github.com/outcaste-io/ristretto/z"
 	"github.com/pkg/errors"
 
-	"github.com/outcaste-io/badger/v3/options"
-	"github.com/outcaste-io/badger/v3/table"
-	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/outserv/badger/options"
+	"github.com/outcaste-io/outserv/badger/table"
+	"github.com/outcaste-io/outserv/badger/y"
 )
 
 // Note: If you add a new option X make sure you also add a WithX method on Options.

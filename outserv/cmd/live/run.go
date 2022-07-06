@@ -39,8 +39,8 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/dgryski/go-farm"
-	"github.com/outcaste-io/badger/v3"
-	bopt "github.com/outcaste-io/badger/v3/options"
+	"github.com/outcaste-io/outserv/badger"
+	bopt "github.com/outcaste-io/outserv/badger/options"
 	"github.com/outcaste-io/dgo/v210"
 	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/ristretto/z"

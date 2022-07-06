@@ -24,10 +24,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/outcaste-io/badger/v3/table"
+	"github.com/outcaste-io/outserv/badger/table"
 	"github.com/outcaste-io/ristretto/z"
 
-	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/outserv/badger/y"
 )
 
 type prefetchStatus uint8

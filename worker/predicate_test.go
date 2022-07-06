@@ -27,7 +27,7 @@ package worker
 // "sync/atomic"
 // "testing"
 
-// "github.com/outcaste-io/badger/v3"
+// "github.com/outcaste-io/outserv/badger"
 // "github.com/golang/glog"
 // "github.com/stretchr/testify/require"
 // "google.golang.org/grpc"

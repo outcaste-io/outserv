@@ -19,7 +19,7 @@ import (
 
 	"github.com/dgryski/go-farm"
 	"github.com/golang/glog"
-	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/outserv/badger"
 	"github.com/outcaste-io/dgo/v210"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"

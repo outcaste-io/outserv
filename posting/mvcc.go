@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/outcaste-io/badger/v3"
-	"github.com/outcaste-io/badger/v3/skl"
-	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/outserv/badger"
+	"github.com/outcaste-io/outserv/badger/skl"
+	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"

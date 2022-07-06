@@ -10,7 +10,7 @@ syntax = "proto3";
 
 package pb;
 
-import "github.com/outcaste-io/badger/v3/pb/pb.proto";
+import "github.com/outcaste-io/outserv/badger/pb/pb.proto";
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
 /* import "gogoproto/gogo.proto"; */
