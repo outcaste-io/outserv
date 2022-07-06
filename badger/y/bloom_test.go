@@ -1,3 +1,5 @@
+// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Apache License v2.0.
 // Copyright 2013 The LevelDB-Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
