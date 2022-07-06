@@ -9,7 +9,7 @@ import (
 	fmt "fmt"
 	_ "github.com/gogo/protobuf/gogoproto"
 	proto "github.com/gogo/protobuf/proto"
-	pb "github.com/outcaste-io/badger/v3/pb"
+	pb "github.com/outcaste-io/outserv/badger/pb"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"

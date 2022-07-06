@@ -30,9 +30,9 @@ import (
 	"github.com/outcaste-io/outserv/x"
 	"github.com/stretchr/testify/require"
 
-	"github.com/outcaste-io/badger/v3/y"
 	"github.com/outcaste-io/dgo/v210"
 	"github.com/outcaste-io/dgo/v210/protos/api"
+	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/outcaste-io/outserv/testutil"
 )
 

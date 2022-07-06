@@ -1,3 +1,6 @@
+// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Apache License v2.0.
+
 package badger
 
 import (
@@ -8,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/stretchr/testify/require"
 )
 

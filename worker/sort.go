@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
 
-	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/outserv/badger"
 	"github.com/outcaste-io/outserv/codec"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -222,7 +222,7 @@ func sortWithIndex(ctx context.Context, ts *pb.SortMessage) *sortresult {
 	iterOpt.PrefetchValues = false
 	iterOpt.Reverse = order.Desc
 	iterOpt.Prefix = x.IndexKey(order.Attr, string(prefix))
-	txn := pstore.NewTransactionAt(ts.ReadTs, false)
+	txn := pstore.NewReadTxn(ts.ReadTs)
 	defer txn.Discard()
 	var seekKey []byte
 	if !order.Desc {

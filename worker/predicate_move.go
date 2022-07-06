@@ -14,8 +14,8 @@ import (
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
 
-	"github.com/outcaste-io/badger/v3"
-	bpb "github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/outserv/badger"
+	bpb "github.com/outcaste-io/outserv/badger/pb"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/schema"
@@ -276,7 +276,7 @@ func movePredicateHelper(ctx context.Context, in *pb.MovePredicatePayload) error
 		return errors.Wrapf(err, "while calling ReceivePredicate")
 	}
 
-	txn := pstore.NewTransactionAt(in.ReadTs, false)
+	txn := pstore.NewReadTxn(in.ReadTs)
 	defer txn.Discard()
 
 	// Send schema first.

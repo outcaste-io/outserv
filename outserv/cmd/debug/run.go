@@ -20,8 +20,8 @@ import (
 	"sync/atomic"
 
 	"github.com/dustin/go-humanize"
-	"github.com/outcaste-io/badger/v3"
-	bpb "github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/outserv/badger"
+	bpb "github.com/outcaste-io/outserv/badger/pb"
 	"github.com/outcaste-io/ristretto/z"
 
 	"github.com/outcaste-io/outserv/codec"
@@ -50,7 +50,6 @@ type flagOptions struct {
 	readOnly      bool
 	pdir          string
 	itemMeta      bool
-	jepsen        string
 	readTs        uint64
 	sizeHistogram bool
 	noKeys        bool
@@ -80,7 +79,6 @@ func init() {
 	flag.BoolVar(&opt.vals, "vals", false, "Output values along with keys.")
 	flag.BoolVar(&opt.noKeys, "nokeys", false,
 		"Ignore key_. Only consider amount when calculating total.")
-	flag.StringVar(&opt.jepsen, "jepsen", "", "Disect Jepsen output. Can be linear/binary.")
 	flag.Uint64Var(&opt.readTs, "at", math.MaxUint64, "Set read timestamp for all txns.")
 	flag.BoolVarP(&opt.readOnly, "readonly", "o", false, "Open in read only mode.")
 	flag.StringVarP(&opt.predicate, "pred", "r", "", "Only output specified predicate.")
@@ -158,197 +156,6 @@ func uidToVal(itr *badger.Iterator, prefix string) map[uint64]int {
 		x.Checkf(err, "during iterate")
 	}
 	return keys
-}
-
-func seekTotal(db *badger.DB, readTs uint64) int {
-	txn := db.NewTransactionAt(readTs, false)
-	defer txn.Discard()
-
-	iopt := badger.DefaultIteratorOptions
-	iopt.AllVersions = true
-	iopt.PrefetchValues = false
-	itr := txn.NewIterator(iopt)
-	defer itr.Close()
-
-	keys := uidToVal(itr, "key_")
-	fmt.Printf("Got keys: %+v\n", keys)
-	vals := uidToVal(itr, "amount_")
-	var total int
-	for _, val := range vals {
-		total += val
-	}
-	fmt.Printf("Got vals: %+v. Total: %d\n", vals, total)
-	if opt.noKeys {
-		// Ignore the key_ predicate. Only consider the amount_ predicate. Useful when tablets are
-		// being moved around.
-		keys = vals
-	}
-
-	total = 0
-	for uid, key := range keys {
-		a := vals[uid]
-		fmt.Printf("uid: %-5d %x key: %d amount: %d\n", uid, uid, key, a)
-		total += a
-	}
-	fmt.Printf("Total @ %d = %d\n", readTs, total)
-	return total
-}
-
-func findFirstValidTxn(db *badger.DB) uint64 {
-	readTs := opt.readTs
-	var wrong uint64
-	for {
-		min, max := getMinMax(db, readTs-1)
-		if max <= min {
-			fmt.Printf("Can't find it. Max: %d\n", max)
-			return 0
-		}
-		readTs = max
-		if total := seekTotal(db, readTs); total != 100 {
-			fmt.Printf("===> VIOLATION at ts: %d\n", readTs)
-			showAllPostingsAt(db, readTs)
-			wrong = readTs
-		} else {
-			fmt.Printf("===> Found first correct version at %d\n", readTs)
-			showAllPostingsAt(db, readTs)
-			return wrong
-		}
-	}
-}
-
-func findFirstInvalidTxn(db *badger.DB, lowTs, highTs uint64) uint64 {
-	fmt.Println()
-	if highTs-lowTs < 1 {
-		fmt.Printf("Checking at lowTs: %d\n", lowTs)
-		if total := seekTotal(db, lowTs); total != 100 {
-			fmt.Printf("==> VIOLATION at ts: %d\n", lowTs)
-			return lowTs
-		}
-		fmt.Printf("No violation found at ts: %d\n", lowTs)
-		return 0
-	}
-
-	midTs := (lowTs + highTs) / 2
-	fmt.Printf("Checking. low=%d. high=%d. mid=%d\n", lowTs, highTs, midTs)
-	if total := seekTotal(db, midTs); total == 100 {
-		// If no failure, move to higher ts.
-		return findFirstInvalidTxn(db, midTs+1, highTs)
-	}
-	// Found an error.
-	return findFirstInvalidTxn(db, lowTs, midTs)
-}
-
-func showAllPostingsAt(db *badger.DB, readTs uint64) {
-	txn := db.NewTransactionAt(readTs, false)
-	defer txn.Discard()
-
-	itr := txn.NewIterator(badger.DefaultIteratorOptions)
-	defer itr.Close()
-
-	type account struct {
-		Key int
-		Amt int
-	}
-	keys := make(map[uint64]*account)
-
-	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "SHOWING all postings at %d\n", readTs)
-	for itr.Rewind(); itr.Valid(); itr.Next() {
-		item := itr.Item()
-		if item.Version() != readTs {
-			continue
-		}
-
-		pk, err := x.Parse(item.Key())
-		x.Check(err)
-		if !pk.IsData() {
-			continue
-		}
-
-		var acc *account
-		attr := x.ParseAttr(pk.Attr)
-		if strings.HasPrefix(attr, "key_") || strings.HasPrefix(attr, "amount_") {
-			var has bool
-			acc, has = keys[pk.Uid]
-			if !has {
-				acc = &account{}
-				keys[pk.Uid] = acc
-			}
-		}
-		fmt.Fprintf(&buf, "  key: %+v hex: %x\n", pk, item.Key())
-		val, err := item.ValueCopy(nil)
-		x.Check(err)
-		var plist pb.PostingList
-		x.Check(plist.Unmarshal(val))
-
-		x.AssertTrue(len(plist.Postings) <= 1)
-		var num int
-		for _, p := range plist.Postings {
-			num = toInt(p)
-			appendPosting(&buf, p)
-		}
-		if num > 0 && acc != nil {
-			switch {
-			case strings.HasPrefix(attr, "key_"):
-				acc.Key = num
-			case strings.HasPrefix(attr, "amount_"):
-				acc.Amt = num
-			}
-		}
-	}
-	for uid, acc := range keys {
-		fmt.Fprintf(&buf, "Uid: %#x Key: %d Amount: %d\n", uid, acc.Key, acc.Amt)
-	}
-	fmt.Println(buf.String())
-}
-
-func getMinMax(db *badger.DB, readTs uint64) (uint64, uint64) {
-	var min, max uint64 = math.MaxUint64, 0
-	txn := db.NewTransactionAt(readTs, false)
-	defer txn.Discard()
-
-	iopt := badger.DefaultIteratorOptions
-	iopt.AllVersions = true
-	itr := txn.NewIterator(iopt)
-	defer itr.Close()
-
-	for itr.Rewind(); itr.Valid(); itr.Next() {
-		item := itr.Item()
-		if min > item.Version() {
-			min = item.Version()
-		}
-		if max < item.Version() {
-			max = item.Version()
-		}
-	}
-	return min, max
-}
-
-func jepsen(db *badger.DB) {
-	min, max := getMinMax(db, opt.readTs)
-	fmt.Printf("min=%d. max=%d\n", min, max)
-
-	var ts uint64
-	switch opt.jepsen {
-	case "binary":
-		ts = findFirstInvalidTxn(db, min, max)
-	case "linear":
-		ts = findFirstValidTxn(db)
-	}
-	fmt.Println()
-	if ts == 0 {
-		fmt.Println("Nothing found. Exiting.")
-		return
-	}
-	showAllPostingsAt(db, ts)
-	seekTotal(db, ts-1)
-
-	for i := 0; i < 5; i++ {
-		// Get a few previous commits.
-		_, ts = getMinMax(db, ts-1)
-		showAllPostingsAt(db, ts)
-		seekTotal(db, ts-1)
-	}
 }
 
 func history(lookup []byte, itr *badger.Iterator) {
@@ -435,7 +242,7 @@ func appendPosting(w io.Writer, o *pb.Posting) {
 	fmt.Fprintln(w, "")
 }
 func rollupKey(db *badger.DB) {
-	txn := db.NewTransactionAt(opt.readTs, false)
+	txn := db.NewReadTxn(opt.readTs)
 	defer txn.Discard()
 
 	key, err := hex.DecodeString(opt.rollupKey)
@@ -467,13 +274,13 @@ func rollupKey(db *badger.DB) {
 	kvs, err := pl.Rollup(alloc)
 	x.Check(err)
 
-	wb := db.NewManagedWriteBatch()
+	wb := db.NewWriteBatch()
 	x.Check(wb.WriteList(&bpb.KVList{Kv: kvs}))
 	x.Check(wb.Flush())
 }
 
 func lookup(db *badger.DB) {
-	txn := db.NewTransactionAt(opt.readTs, false)
+	txn := db.NewReadTxn(opt.readTs)
 	defer txn.Discard()
 
 	iopts := badger.DefaultIteratorOptions
@@ -658,7 +465,7 @@ func printKeys(db *badger.DB) {
 }
 
 func sizeHistogram(db *badger.DB) {
-	txn := db.NewTransactionAt(opt.readTs, false)
+	txn := db.NewReadTxn(opt.readTs)
 	defer txn.Discard()
 
 	iopts := badger.DefaultIteratorOptions
@@ -822,7 +629,7 @@ func run() {
 	x.AssertTruef(len(bopts.Dir) > 0, "No posting or wal dir specified.")
 	fmt.Printf("Opening DB: %s\n", bopts.Dir)
 
-	db, err := badger.OpenManaged(bopts)
+	db, err := badger.Open(bopts)
 	x.Check(err)
 	// Not using posting list cache
 	posting.Init(db, 0)
@@ -842,11 +649,6 @@ func run() {
 		rollupKey(db)
 	case len(opt.keyLookup) > 0:
 		lookup(db)
-	case len(opt.jepsen) > 0:
-		jepsen(db)
-	case opt.vals:
-		total := seekTotal(db, opt.readTs)
-		fmt.Printf("Total: %d\n", total)
 	case opt.sizeHistogram:
 		sizeHistogram(db)
 	default:

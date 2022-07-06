@@ -19,7 +19,7 @@ syntax = "proto3";
 
 package badgerpb3;
 
-option go_package = "github.com/outcaste-io/badger/v3/pb";
+option go_package = "github.com/outcaste-io/outserv/badger/pb";
 
 message KV {
   bytes key = 1;

@@ -21,7 +21,7 @@ import (
 	"sort"
 
 	"github.com/golang/glog"
-	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
 	"github.com/pkg/errors"

@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/outcaste-io/badger/v3"
-	"github.com/outcaste-io/badger/v3/skl"
-	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/outserv/badger"
+	"github.com/outcaste-io/outserv/badger/skl"
+	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
@@ -462,7 +462,7 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 		lCache.Set(key, uint64(1), 0)
 	}
 
-	txn := pstore.NewTransactionAt(readTs, false)
+	txn := pstore.NewReadTxn(readTs)
 	defer txn.Discard()
 
 	// When we do rollups, an older version would go to the top of the LSM tree, which can cause

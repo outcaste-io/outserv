@@ -15,8 +15,8 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/golang/protobuf/proto"
-	bpb "github.com/outcaste-io/badger/v3/pb"
-	"github.com/outcaste-io/badger/v3/y"
+	bpb "github.com/outcaste-io/outserv/badger/pb"
+	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/outcaste-io/outserv/codec"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/schema"
@@ -1378,7 +1378,7 @@ func (l *List) readListPart(startUid uint64) (*pb.PostingList, error) {
 			"cannot generate key for list with base key %s and start UID %d",
 			hex.EncodeToString(l.key), startUid)
 	}
-	txn := pstore.NewTransactionAt(l.minTs, false)
+	txn := pstore.NewReadTxn(l.minTs)
 	item, err := txn.Get(key)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not read list part with key %s",

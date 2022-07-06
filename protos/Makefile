@@ -4,7 +4,7 @@
 # Update BADGER_PB_VERSION when upgrading Badger major versions
 BADGER_PB_VERSION = 3
 
-BADGER_PATH := github.com/outcaste-io/badger/v${BADGER_PB_VERSION}
+BADGER_PATH := github.com/outcaste-io/outserv/badger/v${BADGER_PB_VERSION}
 GOGO_PATH   := github.com/gogo/protobuf
 
 TMPDIR     := $(shell mktemp -d)

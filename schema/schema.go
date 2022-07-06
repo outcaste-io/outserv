@@ -16,8 +16,8 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/trace"
 
-	"github.com/outcaste-io/badger/v3"
-	badgerpb "github.com/outcaste-io/badger/v3/pb"
+	"github.com/outcaste-io/outserv/badger"
+	badgerpb "github.com/outcaste-io/outserv/badger/pb"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/tok"
 	"github.com/outcaste-io/outserv/types"
@@ -84,12 +84,9 @@ func (s *state) Delete(attr string, ts uint64) error {
 	defer s.Unlock()
 
 	glog.Infof("Deleting schema for predicate: [%s]", attr)
-	txn := pstore.NewTransactionAt(ts, true)
-	if err := txn.Delete(x.SchemaKey(attr)); err != nil {
-		return err
-	}
-	// Delete is called rarely so sync write should be fine.
-	if err := txn.CommitAt(ts, nil); err != nil {
+	wb := pstore.NewWriteBatch()
+	x.Check(wb.DeleteAt(x.SchemaKey(attr), ts))
+	if err := wb.Flush(); err != nil {
 		return err
 	}
 
@@ -385,7 +382,7 @@ func Load(predicate string) error {
 	}
 	delete(State().mutSchema, predicate)
 	key := x.SchemaKey(predicate)
-	txn := pstore.NewTransactionAt(math.MaxUint64, false)
+	txn := pstore.NewReadTxn(math.MaxUint64)
 	defer txn.Discard()
 	item, err := txn.Get(key)
 	if err == badger.ErrKeyNotFound || err == badger.ErrBannedKey {

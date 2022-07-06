@@ -4,7 +4,6 @@ go 1.17
 
 require (
 	github.com/ethereum/go-ethereum v1.10.17
-	github.com/outcaste-io/badger/v3 v3.2202.1-0.20220426173331-b25bc764af0d
 	github.com/pkg/errors v0.9.1
 )
 

@@ -27,9 +27,9 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/outcaste-io/badger/v3"
-	bpb "github.com/outcaste-io/badger/v3/pb"
 	"github.com/outcaste-io/dgo/v210/protos/api"
+	"github.com/outcaste-io/outserv/badger"
+	bpb "github.com/outcaste-io/outserv/badger/pb"
 	"github.com/stretchr/testify/require"
 
 	"github.com/outcaste-io/outserv/codec"

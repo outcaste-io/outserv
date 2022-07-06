@@ -1,3 +1,5 @@
+// Copyright 2022 Outcaste LLC under the Apache License v2.0.
+
 package y
 
 import (

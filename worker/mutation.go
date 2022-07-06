@@ -10,13 +10,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/outcaste-io/badger/v3/y"
+	"github.com/outcaste-io/outserv/badger/y"
 
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
 
-	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/outserv/badger"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -264,8 +264,7 @@ func runSchemaMutation(ctx context.Context, updates []*pb.SchemaUpdate, startTs 
 func updateSchema(s *pb.SchemaUpdate, ts uint64) error {
 	schema.State().Set(s.Predicate, s)
 	schema.State().DeleteMutSchema(s.Predicate)
-	txn := pstore.NewTransactionAt(ts, true)
-	defer txn.Discard()
+	wb := pstore.NewWriteBatch()
 	data, err := s.Marshal()
 	x.Check(err)
 	e := &badger.Entry{
@@ -273,10 +272,8 @@ func updateSchema(s *pb.SchemaUpdate, ts uint64) error {
 		Value:    data,
 		UserMeta: posting.BitSchemaPosting,
 	}
-	if err = txn.SetEntry(e.WithDiscard()); err != nil {
-		return err
-	}
-	return txn.CommitAt(ts, nil)
+	x.Check(wb.SetEntryAt(e.WithDiscard(), ts))
+	return wb.Flush()
 }
 
 func createSchema(attr string, typ types.TypeID, ts uint64) error {
@@ -307,7 +304,7 @@ func hasEdges(attr string, startTs uint64) bool {
 	iterOpt.PrefetchValues = false
 	iterOpt.Prefix = pk.DataPrefix()
 
-	txn := pstore.NewTransactionAt(startTs, false)
+	txn := pstore.NewReadTxn(startTs)
 	defer txn.Discard()
 
 	it := txn.NewIterator(iterOpt)

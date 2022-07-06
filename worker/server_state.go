@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/golang/glog"
-	"github.com/outcaste-io/badger/v3"
+	"github.com/outcaste-io/outserv/badger"
 	"github.com/outcaste-io/outserv/raftwal"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
@@ -56,8 +56,7 @@ func InitServerState() {
 }
 
 func setBadgerOptions(opt badger.Options) badger.Options {
-	opt = opt.WithSyncWrites(false).
-		WithLogger(&x.ToGlog{}).
+	opt = opt.WithLogger(&x.ToGlog{}).
 		WithEncryptionKey(x.WorkerConfig.EncryptionKey)
 
 	// Disable conflict detection in badger. Alpha runs in managed mode and
@@ -87,7 +86,7 @@ func (s *ServerState) initStorage() {
 		pdir := x.WorkerConfig.Dir.Posting
 		x.Check(os.MkdirAll(pdir, 0700))
 		opt := x.WorkerConfig.Badger.
-			WithDir(pdir).WithValueDir(pdir).
+			WithDir(pdir).
 			WithNumVersionsToKeep(math.MaxInt32).
 			WithNamespaceOffset(x.NamespaceOffset).
 			WithExternalMagic(x.MagicVersion)
@@ -100,7 +99,7 @@ func (s *ServerState) initStorage() {
 		glog.Infof("Opening postings BadgerDB with options: %+v\n", opt)
 		opt.EncryptionKey = key
 
-		s.Pstore, err = badger.OpenManaged(opt)
+		s.Pstore, err = badger.Open(opt)
 		x.Checkf(err, "Error while creating badger KV posting store")
 
 		// zero out from memory
@@ -109,8 +108,7 @@ func (s *ServerState) initStorage() {
 	// Temp directory
 	x.Check(os.MkdirAll(x.WorkerConfig.Dir.Tmp, 0700))
 
-	s.gcCloser = z.NewCloser(3)
-	go x.RunVlogGC(s.Pstore, s.gcCloser)
+	s.gcCloser = z.NewCloser(2)
 	// Commenting this out because Badger is doing its own cache checks.
 	go x.MonitorCacheHealth(s.Pstore, s.gcCloser)
 	go x.MonitorDiskMetrics("postings_fs", x.WorkerConfig.Dir.Posting, s.gcCloser)

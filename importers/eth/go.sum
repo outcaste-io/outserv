@@ -298,8 +298,8 @@ github.com/onsi/gomega v1.10.1/go.mod h1:iN09h71vgCQne3DLsj+A5owkum+a2tYe+TOCB1y
 github.com/opentracing/opentracing-go v1.0.2/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
 github.com/opentracing/opentracing-go v1.0.3-0.20180606204148-bd9c31933947/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
 github.com/opentracing/opentracing-go v1.1.0/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
-github.com/outcaste-io/badger/v3 v3.2202.1-0.20220426173331-b25bc764af0d h1:dOoaepdC2hnmjrkSm4aWVF/pMncuAyNqYKgZbDsQE5A=
-github.com/outcaste-io/badger/v3 v3.2202.1-0.20220426173331-b25bc764af0d/go.mod h1:P5q0708InZMN6Axrw1ZcwepiiCoPeCqRqIyUGKx2aoI=
+github.com/outcaste-io/outserv/badger v3.2202.1-0.20220426173331-b25bc764af0d h1:dOoaepdC2hnmjrkSm4aWVF/pMncuAyNqYKgZbDsQE5A=
+github.com/outcaste-io/outserv/badger v3.2202.1-0.20220426173331-b25bc764af0d/go.mod h1:P5q0708InZMN6Axrw1ZcwepiiCoPeCqRqIyUGKx2aoI=
 github.com/outcaste-io/ristretto v0.1.1-0.20220404170646-118eb5c81eac h1:h2Sky+PxkcaxCoIWYINMrPVYJLnLrELaPvCgmiTpLcQ=
 github.com/outcaste-io/ristretto v0.1.1-0.20220404170646-118eb5c81eac/go.mod h1:LWEAKsXjquNJfHEtD/qDRdAQa5JV+F2gNMfIOZSEkuk=
 github.com/paulbellamy/ratecounter v0.2.0/go.mod h1:Hfx1hDpSGoqxkVVpBi/IlYD7kChlfo5C6hzIHwPqfFE=
