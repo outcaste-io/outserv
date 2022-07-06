@@ -1,8 +1,8 @@
-files=$(find . ! -path "./vendor/*" ! -path "./bp128/*" ! -path "./protos/*" -type f -name "*.go")
+files=$(find badger ! -path "./vendor/*" ! -path "./bp128/*" ! -path "./protos/*" -type f -name "*.go")
 
 for f in $files; do
   echo "Processing $f"
-  python2 contrib/scripts/license.py $f
+  python3 contrib/scripts/license.py $f
 
   # # Start from year.
   # year=$(git log --format=%aD $f | tail -1 | awk '{print $4}')

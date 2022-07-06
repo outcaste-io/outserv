@@ -3,7 +3,7 @@
 import sys
 
 notice = """
-// Portions Copyright 2018 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2020 Dgraph Labs, Inc. are available under the Apache License v2.0.
 // Portions Copyright 2022 Outcaste LLC are available under the Apache License v2.0.
 """
 
@@ -23,6 +23,7 @@ def update(file):
     f.close()
 
     found = False
+    end = 0
     for idx, l in enumerate(lines):
         if "Copyright" in l and "Dgraph" in l:
             start = idx - 1
