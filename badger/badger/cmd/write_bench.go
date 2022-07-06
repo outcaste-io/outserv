@@ -52,22 +52,18 @@ var writeBenchCmd = &cobra.Command{
 
 var (
 	wo = struct {
-		keySz      int
-		valSz      int
-		numKeys    float64
-		syncWrites bool
-		force      bool
-		sorted     bool
-		showLogs   bool
+		keySz    int
+		valSz    int
+		numKeys  float64
+		force    bool
+		sorted   bool
+		showLogs bool
 
-		valueThreshold   int64
 		numVersions      int
-		vlogMaxEntries   uint32
 		loadBloomsOnOpen bool
 		detectConflicts  bool
 		zstdComp         bool
 		showDir          bool
-		ttlDuration      string
 		encryptionKey    string
 		showKeysCount    bool
 		blockCacheSize   int64
@@ -97,19 +93,15 @@ func init() {
 	writeBenchCmd.Flags().IntVar(&wo.valSz, "val-size", 128, "Size of value")
 	writeBenchCmd.Flags().Float64VarP(&wo.numKeys, "keys-mil", "m", 10.0,
 		"Number of keys to add in millions")
-	writeBenchCmd.Flags().BoolVar(&wo.syncWrites, "sync", false,
-		"If true, sync writes to disk.")
 	writeBenchCmd.Flags().BoolVarP(&wo.force, "force-compact", "f", true,
 		"Force compact level 0 on close.")
 	writeBenchCmd.Flags().BoolVarP(&wo.sorted, "sorted", "s", false, "Write keys in sorted order.")
 	writeBenchCmd.Flags().BoolVarP(&wo.showLogs, "verbose", "v", false, "Show Badger logs.")
-	writeBenchCmd.Flags().Int64VarP(&wo.valueThreshold, "value-th", "t", 1<<10, "Value threshold")
 	writeBenchCmd.Flags().IntVarP(&wo.numVersions, "num-version", "n", 1, "Number of versions to keep")
 	writeBenchCmd.Flags().Int64Var(&wo.blockCacheSize, "block-cache-mb", 256,
 		"Size of block cache in MB")
 	writeBenchCmd.Flags().Int64Var(&wo.indexCacheSize, "index-cache-mb", 0,
 		"Size of index cache in MB.")
-	writeBenchCmd.Flags().Uint32Var(&wo.vlogMaxEntries, "vlog-maxe", 1000000, "Value log Max Entries")
 	writeBenchCmd.Flags().StringVarP(&wo.encryptionKey, "encryption-key", "e", "",
 		"If it is true, badger will encrypt all the data stored on the disk.")
 	writeBenchCmd.Flags().BoolVar(&wo.loadBloomsOnOpen, "load-blooms", true,
@@ -124,8 +116,6 @@ func init() {
 		"If set, run dropAll periodically over given duration.")
 	writeBenchCmd.Flags().StringVar(&wo.dropPrefixPeriod, "drop-prefix", "0s",
 		"If set, drop random prefixes periodically over given duration.")
-	writeBenchCmd.Flags().StringVar(&wo.ttlDuration, "entry-ttl", "0s",
-		"TTL duration in seconds for the entries, 0 means without TTL")
 	writeBenchCmd.Flags().StringVarP(&wo.gcPeriod, "gc-every", "g", "0s", "GC Period.")
 	writeBenchCmd.Flags().Float64VarP(&wo.gcDiscardRatio, "gc-ratio", "r", 0.5, "GC discard ratio.")
 	writeBenchCmd.Flags().BoolVar(&wo.showKeysCount, "show-keys", false,
@@ -137,10 +127,7 @@ func writeRandom(db *badger.DB, num uint64) error {
 	y.Check2(rand.Read(value))
 
 	es := uint64(wo.keySz + wo.valSz) // entry size is keySz + valSz
-	batch := db.NewManagedWriteBatch()
-
-	ttlPeriod, errParse := time.ParseDuration(wo.ttlDuration)
-	y.Check(errParse)
+	batch := db.NewWriteBatch()
 
 	for i := uint64(1); i <= num; i++ {
 		key := make([]byte, wo.keySz)
@@ -149,13 +136,10 @@ func writeRandom(db *badger.DB, num uint64) error {
 		vsz := rand.Intn(wo.valSz) + 1
 		e := badger.NewEntry(key, value[:vsz])
 
-		if ttlPeriod != 0 {
-			e.WithTTL(ttlPeriod)
-		}
 		err := batch.SetEntryAt(e, 1)
 		for errors.Is(err, badger.ErrBlockedWrites) {
 			time.Sleep(time.Second)
-			batch = db.NewManagedWriteBatch()
+			batch = db.NewWriteBatch()
 			err = batch.SetEntryAt(e, 1)
 		}
 		if err != nil {
@@ -266,8 +250,6 @@ func writeSorted(db *badger.DB, num uint64) error {
 
 func writeBench(cmd *cobra.Command, args []string) error {
 	opt := badger.DefaultOptions(sstDir).
-		WithValueDir(vlogDir).
-		WithSyncWrites(wo.syncWrites).
 		WithCompactL0OnClose(wo.force).
 		WithNumVersionsToKeep(wo.numVersions).
 		WithBlockCacheSize(wo.blockCacheSize << 20).
@@ -284,7 +266,7 @@ func writeBench(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Opening badger with options = %+v\n", opt)
-	db, err := badger.OpenManaged(opt)
+	db, err := badger.Open(opt)
 	if err != nil {
 		return err
 	}
@@ -323,7 +305,7 @@ func showKeysStats(db *badger.DB) {
 		validKeyCount    uint32
 	)
 
-	txn := db.NewTransactionAt(math.MaxUint64, false)
+	txn := db.NewReadTxn(math.MaxUint64)
 	defer txn.Discard()
 
 	iopt := badger.DefaultIteratorOptions

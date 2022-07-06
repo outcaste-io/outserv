@@ -18,16 +18,14 @@ package y
 
 import (
 	"bytes"
-	"encoding/binary"
 )
 
 // ValueStruct represents the value info that can be associated with a key, but also the internal
 // Meta field.
 type ValueStruct struct {
-	Meta      byte
-	UserMeta  byte
-	ExpiresAt uint64
-	Value     []byte
+	Meta     byte
+	UserMeta byte
+	Value    []byte
 
 	Version uint64 // This field is not serialized. Only for internal usage.
 }
@@ -45,27 +43,22 @@ func sizeVarint(x uint64) (n int) {
 
 // EncodedSize is the size of the ValueStruct when encoded
 func (v *ValueStruct) EncodedSize() uint32 {
-	sz := len(v.Value) + 2 // meta, usermeta.
-	enc := sizeVarint(v.ExpiresAt)
-	return uint32(sz + enc)
+	return uint32(len(v.Value) + 2) // meta, usermeta.
 }
 
 // Decode uses the length of the slice to infer the length of the Value field.
 func (v *ValueStruct) Decode(b []byte) {
 	v.Meta = b[0]
 	v.UserMeta = b[1]
-	var sz int
-	v.ExpiresAt, sz = binary.Uvarint(b[2:])
-	v.Value = b[2+sz:]
+	v.Value = b[2:]
 }
 
 // Encode expects a slice of length at least v.EncodedSize().
 func (v *ValueStruct) Encode(b []byte) uint32 {
 	b[0] = v.Meta
 	b[1] = v.UserMeta
-	sz := binary.PutUvarint(b[2:], v.ExpiresAt)
-	n := copy(b[2+sz:], v.Value)
-	return uint32(2 + sz + n)
+	n := copy(b[2:], v.Value)
+	return uint32(2 + n)
 }
 
 // EncodeTo should be kept in sync with the Encode function above. The reason
@@ -74,10 +67,6 @@ func (v *ValueStruct) Encode(b []byte) uint32 {
 func (v *ValueStruct) EncodeTo(buf *bytes.Buffer) {
 	buf.WriteByte(v.Meta)
 	buf.WriteByte(v.UserMeta)
-	var enc [binary.MaxVarintLen64]byte
-	sz := binary.PutUvarint(enc[:], v.ExpiresAt)
-
-	buf.Write(enc[:sz])
 	buf.Write(v.Value)
 }
 

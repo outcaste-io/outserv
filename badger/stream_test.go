@@ -73,17 +73,17 @@ func TestStream(t *testing.T) {
 	require.NoError(t, err)
 	defer removeDir(dir)
 
-	db, err := OpenManaged(DefaultOptions(dir))
+	db, err := Open(DefaultOptions(dir))
 	require.NoError(t, err)
 
 	var count int
 	for _, prefix := range []string{"p0", "p1", "p2"} {
-		txn := db.NewTransactionAt(math.MaxUint64, true)
+		wb := db.NewWriteBatch()
 		for i := 1; i <= 100; i++ {
-			require.NoError(t, txn.SetEntry(NewEntry(keyWithPrefix(prefix, i), value(i))))
+			require.NoError(t, wb.SetAt(keyWithPrefix(prefix, i), value(i), 5))
 			count++
 		}
-		require.NoError(t, txn.CommitAt(5, nil))
+		require.NoError(t, wb.Flush())
 	}
 
 	stream := db.NewStreamAt(math.MaxUint64)
@@ -175,17 +175,17 @@ func TestStreamWithThreadId(t *testing.T) {
 	require.NoError(t, err)
 	defer removeDir(dir)
 
-	db, err := OpenManaged(DefaultOptions(dir))
+	db, err := Open(DefaultOptions(dir))
 	require.NoError(t, err)
 
 	var count int
 	for _, prefix := range []string{"p0", "p1", "p2"} {
-		txn := db.NewTransactionAt(math.MaxUint64, true)
+		wb := db.NewWriteBatch()
 		for i := 1; i <= 100; i++ {
-			require.NoError(t, txn.SetEntry(NewEntry(keyWithPrefix(prefix, i), value(i))))
+			require.NoError(t, wb.SetEntryAt(NewEntry(keyWithPrefix(prefix, i), value(i)), 5))
 			count++
 		}
-		require.NoError(t, txn.CommitAt(5, nil))
+		require.NoError(t, wb.Flush())
 	}
 
 	stream := db.NewStreamAt(math.MaxUint64)
@@ -234,14 +234,14 @@ func TestBigStream(t *testing.T) {
 	require.NoError(t, err)
 	defer removeDir(dir)
 
-	db, err := OpenManaged(DefaultOptions(dir))
+	db, err := Open(DefaultOptions(dir))
 	require.NoError(t, err)
 
 	var count int
-	wb := db.NewWriteBatchAt(5)
+	wb := db.NewWriteBatch()
 	for _, prefix := range []string{"p0", "p1", "p2"} {
 		for i := 1; i <= testSize; i++ {
-			require.NoError(t, wb.SetEntry(NewEntry(keyWithPrefix(prefix, i), value(i))))
+			require.NoError(t, wb.SetEntryAt(NewEntry(keyWithPrefix(prefix, i), value(i)), 5))
 			count++
 		}
 	}
@@ -278,18 +278,18 @@ func TestStreamCustomKeyToList(t *testing.T) {
 	require.NoError(t, err)
 	defer removeDir(dir)
 
-	db, err := OpenManaged(DefaultOptions(dir))
+	db, err := Open(DefaultOptions(dir))
 	require.NoError(t, err)
 
 	var count int
+	wb := db.NewWriteBatch()
 	for _, key := range []string{"p0", "p1", "p2"} {
 		for i := 1; i <= 100; i++ {
-			txn := db.NewTransactionAt(math.MaxUint64, true)
-			require.NoError(t, txn.SetEntry(NewEntry([]byte(key), value(i))))
+			require.NoError(t, wb.SetEntryAt(NewEntry([]byte(key), value(i)), uint64(i)))
 			count++
-			require.NoError(t, txn.CommitAt(uint64(i), nil))
 		}
 	}
+	require.NoError(t, wb.Flush())
 
 	stream := db.NewStreamAt(math.MaxUint64)
 	stream.LogPrefix = "Testing"

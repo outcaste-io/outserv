@@ -40,7 +40,6 @@ This command streams the contents of this DB into another DB with the given opti
 
 var so = struct {
 	outDir          string
-	outFile         string
 	compressionType uint32
 	numVersions     int
 	readOnly        bool
@@ -52,8 +51,6 @@ func init() {
 	RootCmd.AddCommand(streamCmd)
 	streamCmd.Flags().StringVarP(&so.outDir, "out", "o", "",
 		"Path to output DB. The directory should be empty.")
-	streamCmd.Flags().StringVarP(&so.outFile, "", "f", "",
-		"Run a backup to this file.")
 	streamCmd.Flags().BoolVarP(&so.readOnly, "read_only", "", true,
 		"Option to open input DB in read-only mode")
 	streamCmd.Flags().IntVarP(&so.numVersions, "num_versions", "", 0,
@@ -87,7 +84,7 @@ func stream(cmd *cobra.Command, args []string) error {
 		return errors.Errorf(
 			"compression value must be one of 0 (disabled), 1 (Snappy), or 2 (ZSTD)")
 	}
-	inDB, err := badger.OpenManaged(inOpt)
+	inDB, err := badger.Open(inOpt)
 	if err != nil {
 		return y.Wrapf(err, "cannot open DB at %s", sstDir)
 	}
@@ -113,22 +110,11 @@ func stream(cmd *cobra.Command, args []string) error {
 		stream.LogPrefix = "DB.Stream"
 		outOpt := inOpt.
 			WithDir(so.outDir).
-			WithValueDir(so.outDir).
 			WithNumVersionsToKeep(so.numVersions).
 			WithCompression(options.CompressionType(so.compressionType)).
 			WithEncryptionKey(encKey).
 			WithReadOnly(false)
 		err = inDB.StreamDB(outOpt)
-
-	} else if len(so.outFile) > 0 {
-		stream.LogPrefix = "DB.Backup"
-		var f *os.File
-		f, err = os.OpenFile(so.outFile, os.O_RDWR|os.O_CREATE, 0666)
-		y.Check(err)
-		_, err = stream.Backup(f, 0)
-		if err != nil {
-			return y.Wrapf(err, "cannot backup DB at %s", so.outFile)
-		}
 	}
 	fmt.Println("Done.")
 	return err

@@ -117,7 +117,7 @@ func (histogram *histogramData) Update(value int64) {
 // When keyPrefix is set, only the keys that have prefix "keyPrefix" are
 // considered for creating the histogram
 func (db *DB) buildHistogram(keyPrefix []byte) *sizeHistogram {
-	txn := db.NewTransaction(false)
+	txn := db.NewReadTxn(math.MaxUint64)
 	defer txn.Discard()
 
 	itr := txn.NewIterator(DefaultIteratorOptions)

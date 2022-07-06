@@ -71,7 +71,6 @@ func flatten(cmd *cobra.Command, args []string) error {
 			"compression value must be one of 0 (disabled), 1 (Snappy), or 2 (ZSTD)")
 	}
 	opt := badger.DefaultOptions(sstDir).
-		WithValueDir(vlogDir).
 		WithNumVersionsToKeep(fo.numVersions).
 		WithNumCompactors(0).
 		WithBlockCacheSize(100 << 20).

@@ -18,43 +18,11 @@ package badger
 
 import (
 	"fmt"
-	"io/ioutil"
-	"math/rand"
-	"strconv"
 	"sync"
-	"sync/atomic"
 	"testing"
-	"time"
-
-	"github.com/outcaste-io/badger/v3/y"
-	"github.com/outcaste-io/ristretto/z"
-	"github.com/pkg/errors"
 
 	"github.com/stretchr/testify/require"
 )
-
-func TestTxnSimple(t *testing.T) {
-	runBadgerTest(t, nil, func(t *testing.T, db *DB) {
-		txn := db.NewTransaction(true)
-
-		for i := 0; i < 10; i++ {
-			k := []byte(fmt.Sprintf("key=%d", i))
-			v := []byte(fmt.Sprintf("val=%d", i))
-			require.NoError(t, txn.SetEntry(NewEntry(k, v)))
-		}
-
-		item, err := txn.Get([]byte("key=8"))
-		require.NoError(t, err)
-
-		require.NoError(t, item.Value(func(val []byte) error {
-			require.Equal(t, []byte("val=8"), val)
-			return nil
-		}))
-
-		require.Panics(t, func() { txn.CommitAt(100, nil) })
-		require.NoError(t, txn.Commit())
-	})
-}
 
 func TestTxnReadAfterWrite(t *testing.T) {
 	test := func(t *testing.T, db *DB) {
@@ -64,12 +32,13 @@ func TestTxnReadAfterWrite(t *testing.T) {
 		for i := 0; i < N; i++ {
 			go func(i int) {
 				defer wg.Done()
+
 				key := []byte(fmt.Sprintf("key%d", i))
-				err := db.Update(func(tx *Txn) error {
-					return tx.SetEntry(NewEntry(key, key))
-				})
-				require.NoError(t, err)
-				err = db.View(func(tx *Txn) error {
+				e := NewEntry(key, key)
+				e.version = 1
+				require.NoError(t, db.BatchSet([]*Entry{e}))
+
+				err := db.View(func(tx *Txn) error {
 					item, err := tx.Get(key)
 					require.NoError(t, err)
 					val, err := item.ValueCopy(nil)
@@ -97,82 +66,15 @@ func TestTxnReadAfterWrite(t *testing.T) {
 	})
 }
 
-func TestTxnCommitAsync(t *testing.T) {
-	key := func(i int) []byte {
-		return []byte(fmt.Sprintf("key=%d", i))
-	}
-
-	runBadgerTest(t, nil, func(t *testing.T, db *DB) {
-		txn := db.NewTransaction(true)
-		for i := 0; i < 40; i++ {
-			err := txn.SetEntry(NewEntry(key(i), []byte(strconv.Itoa(100))))
-			require.NoError(t, err)
-		}
-		require.NoError(t, txn.Commit())
-		txn.Discard()
-
-		closer := z.NewCloser(1)
-		go func() {
-			defer closer.Done()
-			for {
-				select {
-				case <-closer.HasBeenClosed():
-					return
-				default:
-				}
-				// Keep checking balance variant
-				txn := db.NewTransaction(false)
-				totalBalance := 0
-				for i := 0; i < 40; i++ {
-					item, err := txn.Get(key(i))
-					require.NoError(t, err)
-					val, err := item.ValueCopy(nil)
-					require.NoError(t, err)
-					bal, err := strconv.Atoi(string(val))
-					require.NoError(t, err)
-					totalBalance += bal
-				}
-				require.Equal(t, totalBalance, 4000)
-				txn.Discard()
-			}
-		}()
-
-		var wg sync.WaitGroup
-		wg.Add(100)
-		for i := 0; i < 100; i++ {
-			go func() {
-				txn := db.NewTransaction(true)
-				delta := rand.Intn(100)
-				for i := 0; i < 20; i++ {
-					err := txn.SetEntry(NewEntry(key(i), []byte(strconv.Itoa(100-delta))))
-					require.NoError(t, err)
-				}
-				for i := 20; i < 40; i++ {
-					err := txn.SetEntry(NewEntry(key(i), []byte(strconv.Itoa(100+delta))))
-					require.NoError(t, err)
-				}
-				// We are only doing writes, so there won't be any conflicts.
-				txn.CommitWith(func(err error) {})
-				txn.Discard()
-				wg.Done()
-			}()
-		}
-		wg.Wait()
-		closer.SignalAndWait()
-		time.Sleep(time.Millisecond * 10) // allow goroutine to complete.
-	})
-}
-
+/*
 func TestTxnVersions(t *testing.T) {
 	runBadgerTest(t, nil, func(t *testing.T, db *DB) {
 		k := []byte("key")
+		wb := db.NewWriteBatch()
 		for i := 1; i < 10; i++ {
-			txn := db.NewTransaction(true)
-
-			require.NoError(t, txn.SetEntry(NewEntry(k, []byte(fmt.Sprintf("valversion=%d", i)))))
-			require.NoError(t, txn.Commit())
-			require.Equal(t, uint64(i), db.orc.readTs())
+			require.NoError(t, wb.SetEntryAt(NewEntry(k, []byte(fmt.Sprintf("valversion=%d", i))), uint64(i)))
 		}
+		require.NoError(t, wb.Flush())
 
 		checkIterator := func(itr *Iterator, i int) {
 			defer itr.Close()
@@ -220,8 +122,7 @@ func TestTxnVersions(t *testing.T) {
 		}
 
 		for i := 1; i < 10; i++ {
-			txn := db.NewTransaction(true)
-			txn.readTs = uint64(i) // Read version at i.
+			txn := db.NewReadTxn(uint64(i))
 
 			item, err := txn.Get(k)
 			require.NoError(t, err)
@@ -964,3 +865,4 @@ func TestTxnGetters(t *testing.T) {
 		})
 	})
 }
+*/

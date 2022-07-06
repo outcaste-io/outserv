@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var sstDir, vlogDir string
+var sstDir string
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -46,9 +46,6 @@ func Execute() {
 func init() {
 	RootCmd.PersistentFlags().StringVar(&sstDir, "dir", "",
 		"Directory where the LSM tree files are located. (required)")
-
-	RootCmd.PersistentFlags().StringVar(&vlogDir, "vlog-dir", "",
-		"Directory where the value log files are located, if different from --dir")
 }
 
 func validateRootCmdArgs(cmd *cobra.Command, args []string) error {
@@ -57,9 +54,6 @@ func validateRootCmdArgs(cmd *cobra.Command, args []string) error {
 	}
 	if sstDir == "" {
 		return errors.New("--dir not specified")
-	}
-	if vlogDir == "" {
-		vlogDir = sstDir
 	}
 	return nil
 }

@@ -47,14 +47,19 @@ func TestManifestBasic(t *testing.T) {
 		kv, err := Open(opt)
 		require.NoError(t, err)
 		n := 5000
+
+		wb := kv.NewWriteBatch()
 		for i := 0; i < n; i++ {
 			if (i % 10000) == 0 {
 				fmt.Printf("Putting i=%d\n", i)
 			}
 			k := []byte(fmt.Sprintf("%16x", rand.Int63()))
-			txnSet(t, kv, k, k, 0x00)
+			require.NoError(t, wb.SetAt(k, k, 1))
 		}
-		txnSet(t, kv, []byte("testkey"), []byte("testval"), 0x05)
+		entry := NewEntry([]byte("testkey"), []byte("testval")).WithMeta(0x05)
+		require.NoError(t, wb.SetEntryAt(entry, 1))
+		require.NoError(t, wb.Flush())
+
 		kv.validate()
 		require.NoError(t, kv.Close())
 	}

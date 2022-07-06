@@ -18,7 +18,6 @@ package badger
 
 import (
 	"fmt"
-	"io/ioutil"
 	"testing"
 	"time"
 
@@ -44,12 +43,15 @@ func TestWriteBatch(t *testing.T) {
 
 		N, M := 50000, 1000
 		start := time.Now()
+		var version uint64
 
 		for i := 0; i < N; i++ {
-			require.NoError(t, wb.Set(key(i), val(i)))
+			version++
+			require.NoError(t, wb.SetAt(key(i), val(i), version))
 		}
 		for i := 0; i < M; i++ {
-			require.NoError(t, wb.Delete(key(i)))
+			version++
+			require.NoError(t, wb.DeleteAt(key(i), version))
 		}
 		require.NoError(t, wb.Flush())
 		t.Logf("Time taken for %d writes (w/ test options): %s\n", N+M, time.Since(start))
@@ -80,7 +82,6 @@ func TestWriteBatch(t *testing.T) {
 		t.Logf("Disk mode done\n")
 	})
 	t.Run("InMemory mode", func(t *testing.T) {
-		t.Skipf("TODO(ibrahim): Please fix this")
 		opt := getTestOptions("")
 		opt.InMemory = true
 		db, err := Open(opt)
@@ -93,37 +94,13 @@ func TestWriteBatch(t *testing.T) {
 
 // This test ensures we don't end up in deadlock in case of empty writebatch.
 func TestEmptyWriteBatch(t *testing.T) {
-	t.Run("normal mode", func(t *testing.T) {
-		runBadgerTest(t, nil, func(t *testing.T, db *DB) {
-			wb := db.NewWriteBatch()
-			require.NoError(t, wb.Flush())
-			wb = db.NewWriteBatch()
-			require.NoError(t, wb.Flush())
-			wb = db.NewWriteBatch()
-			require.NoError(t, wb.Flush())
-		})
-	})
-	t.Run("managed mode", func(t *testing.T) {
-		opt := getTestOptions("")
-		opt.managedTxns = true
-		runBadgerTest(t, &opt, func(t *testing.T, db *DB) {
-			t.Run("WriteBatchAt", func(t *testing.T) {
-				wb := db.NewWriteBatchAt(2)
-				require.NoError(t, wb.Flush())
-				wb = db.NewWriteBatchAt(208)
-				require.NoError(t, wb.Flush())
-				wb = db.NewWriteBatchAt(31)
-				require.NoError(t, wb.Flush())
-			})
-			t.Run("ManagedWriteBatch", func(t *testing.T) {
-				wb := db.NewManagedWriteBatch()
-				require.NoError(t, wb.Flush())
-				wb = db.NewManagedWriteBatch()
-				require.NoError(t, wb.Flush())
-				wb = db.NewManagedWriteBatch()
-				require.NoError(t, wb.Flush())
-			})
-		})
+	runBadgerTest(t, nil, func(t *testing.T, db *DB) {
+		wb := db.NewWriteBatch()
+		require.NoError(t, wb.Flush())
+		wb = db.NewWriteBatch()
+		require.NoError(t, wb.Flush())
+		wb = db.NewWriteBatch()
+		require.NoError(t, wb.Flush())
 	})
 }
 
@@ -144,19 +121,4 @@ func TestFlushPanic(t *testing.T) {
 			require.Error(t, y.ErrCommitAfterFinish, wb.Flush())
 		})
 	})
-}
-
-func TestBatchErrDeadlock(t *testing.T) {
-	dir, err := ioutil.TempDir("", "badger-test")
-	require.NoError(t, err)
-	defer removeDir(dir)
-
-	opt := DefaultOptions(dir)
-	db, err := OpenManaged(opt)
-	require.NoError(t, err)
-
-	wb := db.NewManagedWriteBatch()
-	require.NoError(t, wb.SetEntryAt(&Entry{Key: []byte("foo")}, 0))
-	require.Error(t, wb.Flush())
-	require.NoError(t, db.Close())
 }

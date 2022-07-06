@@ -2,7 +2,6 @@ package y
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"math/rand"
@@ -265,18 +264,14 @@ func TestSizeVarintForZero(t *testing.T) {
 
 func TestEncodedSize(t *testing.T) {
 	valBufSize := uint32(rand.Int31n(1e5))
-	expiry := rand.Uint64()
-	expiryVarintBuf := make([]byte, 64)
-	expVarintSize := uint32(binary.PutUvarint(expiryVarintBuf, expiry))
 	valBuf := make([]byte, valBufSize)
 	_, _ = rand.Read(valBuf)
 
 	valStruct := &ValueStruct{
-		Value:     valBuf,
-		ExpiresAt: expiry,
+		Value: valBuf,
 	}
 
-	require.Equal(t, valBufSize+uint32(2)+expVarintSize, valStruct.EncodedSize())
+	require.Equal(t, valBufSize+uint32(2), valStruct.EncodedSize())
 }
 
 func TestAllocatorReuse(t *testing.T) {

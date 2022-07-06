@@ -45,90 +45,6 @@ var manual = flag.Bool("manual", false, "Set when manually running some tests.")
 // Badger dir to be used for performing db.Open benchmark.
 var benchDir = flag.String("benchdir", "", "Set when running db.Open benchmark")
 
-// The following 3 TruncateVlogNoClose tests should be run one after another.
-// None of these close the DB, simulating a crash. They should be run with a
-// script, which truncates the value log to 4090, lining up with the end of the
-// first entry in the txn. At <4090, it would cause the entry to be truncated
-// immediately, at >4090, same thing.
-func TestTruncateVlogNoClose(t *testing.T) {
-	if !*manual {
-		t.Skip("Skipping test meant to be run manually.")
-		return
-	}
-	dir := "p"
-	opts := getTestOptions(dir)
-	opts.SyncWrites = true
-
-	kv, err := Open(opts)
-	require.NoError(t, err)
-	key := func(i int) string {
-		return fmt.Sprintf("%d%10d", i, i)
-	}
-	data := fmt.Sprintf("%4055d", 1)
-	err = kv.Update(func(txn *Txn) error {
-		return txn.SetEntry(NewEntry([]byte(key(0)), []byte(data)))
-	})
-	require.NoError(t, err)
-}
-func TestTruncateVlogNoClose2(t *testing.T) {
-	if !*manual {
-		t.Skip("Skipping test meant to be run manually.")
-		return
-	}
-	dir := "p"
-	opts := getTestOptions(dir)
-	opts.SyncWrites = true
-
-	kv, err := Open(opts)
-	require.NoError(t, err)
-	key := func(i int) string {
-		return fmt.Sprintf("%d%10d", i, i)
-	}
-	data := fmt.Sprintf("%10d", 1)
-	for i := 32; i < 64; i++ {
-		err := kv.Update(func(txn *Txn) error {
-			return txn.SetEntry(NewEntry([]byte(key(i)), []byte(data)))
-		})
-		require.NoError(t, err)
-	}
-	for i := 32; i < 64; i++ {
-		require.NoError(t, kv.View(func(txn *Txn) error {
-			item, err := txn.Get([]byte(key(i)))
-			require.NoError(t, err)
-			val := getItemValue(t, item)
-			require.NotNil(t, val)
-			require.True(t, len(val) > 0)
-			return nil
-		}))
-	}
-}
-func TestTruncateVlogNoClose3(t *testing.T) {
-	if !*manual {
-		t.Skip("Skipping test meant to be run manually.")
-		return
-	}
-	fmt.Print("Running")
-	dir := "p"
-	opts := getTestOptions(dir)
-	opts.SyncWrites = true
-
-	kv, err := Open(opts)
-	require.NoError(t, err)
-	key := func(i int) string {
-		return fmt.Sprintf("%d%10d", i, i)
-	}
-	for i := 32; i < 64; i++ {
-		require.NoError(t, kv.View(func(txn *Txn) error {
-			item, err := txn.Get([]byte(key(i)))
-			require.NoError(t, err)
-			val := getItemValue(t, item)
-			require.NotNil(t, val)
-			require.True(t, len(val) > 0)
-			return nil
-		}))
-	}
-}
-
 // The following benchmark test is supposed to be run against a badger directory with some data.
 // Use badger fill to create data if it doesn't exist.
 func BenchmarkDBOpen(b *testing.B) {
@@ -161,12 +77,6 @@ func TestBigValues(t *testing.T) {
 			return fmt.Sprintf("%65000d", i)
 		}
 
-		saveByKey := func(key string, value []byte) error {
-			return db.Update(func(txn *Txn) error {
-				return txn.SetEntry(NewEntry([]byte(key), value))
-			})
-		}
-
 		getByKey := func(key string) error {
 			return db.View(func(txn *Txn) error {
 				item, err := txn.Get([]byte(key))
@@ -182,9 +92,12 @@ func TestBigValues(t *testing.T) {
 			})
 		}
 
+		wb := db.NewWriteBatch()
 		for i := 0; i < keyCount; i++ {
-			require.NoError(t, saveByKey(key(i), []byte(data)))
+			require.NoError(t, wb.SetEntryAt(
+				NewEntry([]byte(key(i)), []byte(data)), 1))
 		}
+		require.NoError(t, wb.Flush())
 
 		for i := 0; i < keyCount; i++ {
 			require.NoError(t, getByKey(key(i)))
@@ -198,7 +111,6 @@ func TestBigValues(t *testing.T) {
 	t.Run("InMemory mode", func(t *testing.T) {
 		opts.InMemory = true
 		opts.Dir = ""
-		opts.ValueDir = ""
 		db, err := Open(opts)
 		require.NoError(t, err)
 		test(t, db)
@@ -314,12 +226,12 @@ func TestReadSameVlog(t *testing.T) {
 	}
 	testReadingSameKey := func(t *testing.T, db *DB) {
 		// Forcing to read all values from vlog.
+		wb := db.NewWriteBatch()
 		for i := 0; i < 50; i++ {
-			err := db.Update(func(txn *Txn) error {
-				return txn.Set(key(i), key(i))
-			})
-			require.NoError(t, err)
+			require.NoError(t, wb.SetAt(key(i), key(i), 1))
 		}
+		require.NoError(t, wb.Flush())
+
 		// reading it again several times
 		for i := 0; i < 50; i++ {
 			for j := 0; j < 10; j++ {
@@ -353,30 +265,6 @@ func TestReadSameVlog(t *testing.T) {
 	})
 }
 
-func TestDropPrefixWithNoData(t *testing.T) {
-	runBadgerTest(t, nil, func(t *testing.T, db *DB) {
-		val := []byte("value")
-		require.NoError(t, db.Update(func(txn *Txn) error {
-			require.NoError(t, txn.Set([]byte("aaa"), val))
-			require.NoError(t, txn.Set([]byte("aab"), val))
-			require.NoError(t, txn.Set([]byte("aba"), val))
-			require.NoError(t, txn.Set([]byte("aca"), val))
-			return nil
-		}))
-
-		// If we drop prefix, we flush the memtables and create a new mutable memtable. Hence, the
-		// nextMemFid increases by 1. But if there does not exist any data for the prefixes, we
-		// don't do that.
-		memFid := db.nextMemFid
-		prefixes := [][]byte{[]byte("bbb")}
-		require.NoError(t, db.DropPrefix(prefixes...))
-		require.Equal(t, memFid, db.nextMemFid)
-		prefixes = [][]byte{[]byte("aba"), []byte("bbb")}
-		require.NoError(t, db.DropPrefix(prefixes...))
-		require.Equal(t, memFid+1, db.nextMemFid)
-	})
-}
-
 func TestDropAllDropPrefix(t *testing.T) {
 	key := func(i int) []byte {
 		return []byte(fmt.Sprintf("%10d", i))
@@ -391,7 +279,7 @@ func TestDropAllDropPrefix(t *testing.T) {
 		N := 50000
 
 		for i := 0; i < N; i++ {
-			require.NoError(t, wb.Set(key(i), val(i)))
+			require.NoError(t, wb.SetAt(key(i), val(i), 1))
 		}
 		require.NoError(t, wb.Flush())
 
@@ -440,7 +328,6 @@ func TestIsClosed(t *testing.T) {
 			defer removeDir(dir)
 
 			opt.Dir = dir
-			opt.ValueDir = dir
 		}
 
 		db, err := Open(opt)
@@ -462,19 +349,6 @@ func TestIsClosed(t *testing.T) {
 // This test is failing currently because we're returning version+1 from MaxVersion()
 func TestMaxVersion(t *testing.T) {
 	N := 10000
-	key := func(i int) []byte {
-		return []byte(fmt.Sprintf("%d%10d", i, i))
-	}
-	t.Run("normal", func(t *testing.T) {
-		runBadgerTest(t, nil, func(t *testing.T, db *DB) {
-			// This will create commits from 1 to N.
-			for i := 0; i < int(N); i++ {
-				txnSet(t, db, key(i), nil, 0)
-			}
-			ver := db.MaxVersion()
-			require.Equal(t, N, int(ver))
-		})
-	})
 	t.Run("multiple versions", func(t *testing.T) {
 		dir, err := ioutil.TempDir("", "badger-test")
 		require.NoError(t, err)
@@ -482,10 +356,10 @@ func TestMaxVersion(t *testing.T) {
 
 		opt := getTestOptions(dir)
 		opt.NumVersionsToKeep = 100
-		db, err := OpenManaged(opt)
+		db, err := Open(opt)
 		require.NoError(t, err)
 
-		wb := db.NewManagedWriteBatch()
+		wb := db.NewWriteBatch()
 		defer wb.Cancel()
 
 		k := make([]byte, 100)
@@ -507,10 +381,10 @@ func TestMaxVersion(t *testing.T) {
 		defer removeDir(dir)
 
 		opt := getTestOptions(dir)
-		db, err := OpenManaged(opt)
+		db, err := Open(opt)
 		require.NoError(t, err)
 
-		wb := db.NewManagedWriteBatch()
+		wb := db.NewWriteBatch()
 		defer wb.Cancel()
 
 		// This will create commits from 1 to N.
@@ -525,26 +399,6 @@ func TestMaxVersion(t *testing.T) {
 
 		require.NoError(t, db.Close())
 	})
-}
-
-func TestTxnReadTs(t *testing.T) {
-	dir, err := ioutil.TempDir("", "badger-test")
-	require.NoError(t, err)
-	defer removeDir(dir)
-
-	opt := DefaultOptions(dir)
-	db, err := Open(opt)
-	require.NoError(t, err)
-	require.Equal(t, 0, int(db.orc.readTs()))
-
-	txnSet(t, db, []byte("foo"), nil, 0)
-	require.Equal(t, 1, int(db.orc.readTs()))
-	require.NoError(t, db.Close())
-	require.Equal(t, 1, int(db.orc.readTs()))
-
-	db, err = Open(opt)
-	require.NoError(t, err)
-	require.Equal(t, 1, int(db.orc.readTs()))
 }
 
 // This tests failed for stream writer with jemalloc and compression enabled.
@@ -648,7 +502,7 @@ func TestKeyCount(t *testing.T) {
 	count := 0
 
 	streams := make(map[uint32]int)
-	stream := db2.NewStream()
+	stream := db2.NewStreamAt(1)
 	stream.Send = func(buf *z.Buffer) error {
 		list, err := BufferToKVList(buf)
 		if err != nil {
@@ -675,7 +529,7 @@ func TestDropPrefixNonBlocking(t *testing.T) {
 	require.NoError(t, err)
 	defer removeDir(dir)
 
-	db, err := OpenManaged(DefaultOptions(dir).WithAllowStopTheWorld(false))
+	db, err := Open(DefaultOptions(dir).WithAllowStopTheWorld(false))
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -683,17 +537,16 @@ func TestDropPrefixNonBlocking(t *testing.T) {
 
 	// Insert key-values
 	write := func() {
-		txn := db.NewTransactionAt(1, true)
-		defer txn.Discard()
-		require.NoError(t, txn.Set([]byte("aaa"), val))
-		require.NoError(t, txn.Set([]byte("aab"), val))
-		require.NoError(t, txn.Set([]byte("aba"), val))
-		require.NoError(t, txn.Set([]byte("aca"), val))
-		require.NoError(t, txn.CommitAt(2, nil))
+		wb := db.NewWriteBatch()
+		require.NoError(t, wb.SetAt([]byte("aaa"), val, 2))
+		require.NoError(t, wb.SetAt([]byte("aab"), val, 2))
+		require.NoError(t, wb.SetAt([]byte("aba"), val, 2))
+		require.NoError(t, wb.SetAt([]byte("aca"), val, 2))
+		require.NoError(t, wb.Flush())
 	}
 
 	read := func() {
-		txn := db.NewTransactionAt(6, false)
+		txn := db.NewReadTxn(6)
 		defer txn.Discard()
 		iterOpts := DefaultIteratorOptions
 		iterOpts.Prefix = []byte("aa")
@@ -721,7 +574,7 @@ func TestDropPrefixNonBlockingNoError(t *testing.T) {
 	defer removeDir(dir)
 
 	opt := DefaultOptions(dir)
-	db, err := OpenManaged(opt)
+	db, err := Open(opt)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -736,16 +589,16 @@ func TestDropPrefixNonBlockingNoError(t *testing.T) {
 			case <-closer.HasBeenClosed():
 				return
 			default:
-				txn := db.NewTransactionAt(atomic.AddUint64(&clock, 1), true)
-				require.NoError(t, txn.SetEntry(NewEntry([]byte("aaa"), val)))
+				wb := db.NewWriteBatch()
+				vs := atomic.AddUint64(&clock, 2)
+				require.NoError(t, wb.SetEntryAt(NewEntry([]byte("aaa"), val), vs))
+				err := wb.Flush()
 
-				err := txn.CommitAt(atomic.AddUint64(&clock, 1), nil)
 				if shouldFail && err != nil {
 					require.Error(t, err, ErrBlockedWrites)
 				} else if !shouldFail {
 					require.NoError(t, err)
 				}
-				txn.Discard()
 			}
 		}
 	}

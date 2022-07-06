@@ -127,7 +127,6 @@ func (st *Stream) ToList(key []byte, itr *Iterator) (*pb.KVList, error) {
 			return nil, err
 		}
 		kv.Version = item.Version()
-		kv.ExpiresAt = item.ExpiresAt()
 		// As we do full copy, we need to transmit only if it is a delete key or not.
 		kv.Meta = []byte{item.meta & bitDelete}
 		kv.UserMeta = a.Copy([]byte{item.UserMeta()})
@@ -449,7 +448,7 @@ func (st *Stream) copyTablesOver(ctx context.Context, tableMatrix [][]*table.Tab
 // return that error. Orchestrate can be called multiple times, but in serial order.
 func (st *Stream) Orchestrate(ctx context.Context) error {
 	if st.FullCopy {
-		if !st.db.opt.managedTxns || st.SinceTs != 0 || st.ChooseKey != nil && st.KeyToList != nil {
+		if st.SinceTs != 0 || st.ChooseKey != nil && st.KeyToList != nil {
 			panic("Got invalid stream options when doing full copy")
 		}
 	}
@@ -546,18 +545,13 @@ func (st *Stream) Orchestrate(ctx context.Context) error {
 		}
 	}
 
-	var txn *Txn
-	if st.readTs > 0 {
-		txn = st.db.NewTransactionAt(st.readTs, false)
-	} else {
-		txn = st.db.NewTransaction(false)
-	}
+	txn := st.db.NewReadTxn(st.readTs)
 	defer txn.Discard()
 
 	newIterator := func(threadId int) *Iterator {
 		var itrs []y.Iterator
 		for _, mt := range memTables {
-			itrs = append(itrs, mt.sl.NewUniIterator(false))
+			itrs = append(itrs, mt.NewUniIterator(false))
 		}
 		if tables := tableMatrix[0]; len(tables) > 0 {
 			itrs = append(itrs, iteratorsReversed(tables, 0)...)
@@ -636,19 +630,8 @@ func (db *DB) newStream() *Stream {
 	}
 }
 
-// NewStream creates a new Stream.
-func (db *DB) NewStream() *Stream {
-	if db.opt.managedTxns {
-		panic("This API can not be called in managed mode.")
-	}
-	return db.newStream()
-}
-
 // NewStreamAt creates a new Stream at a particular timestamp. Should only be used with managed DB.
 func (db *DB) NewStreamAt(readTs uint64) *Stream {
-	if !db.opt.managedTxns {
-		panic("This API can only be called in managed mode.")
-	}
 	stream := db.newStream()
 	stream.readTs = readTs
 	return stream

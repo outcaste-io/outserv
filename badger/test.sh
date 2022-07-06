@@ -61,11 +61,6 @@ manual() {
   # Run the special Truncate test.
   rm -rf p
   set -e
-  go test $tags $timeout -run='TestTruncateVlogNoClose$' --manual=true
-  truncate --size=4096 p/000000.vlog
-  go test $tags $timeout -run='TestTruncateVlogNoClose2$' --manual=true
-  go test $tags $timeout -run='TestTruncateVlogNoClose3$' --manual=true
-  rm -rf p
 
   # TODO(ibrahim): Let's make these tests have Manual prefix.
   # go test $tags -run='TestManual' --manual=true --parallel=2
@@ -91,7 +86,7 @@ root() {
 
   echo "==> Running root level tests."
   set -e
-  go test $tags -timeout=25m . -v -race -parallel 16
+  go test --failfast $tags -timeout=25m . -v -race -parallel 16
   echo "==> DONE root level tests"
 }
 

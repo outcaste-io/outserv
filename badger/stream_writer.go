@@ -220,11 +220,10 @@ func (sw *StreamWriter) Write(buf *z.Buffer) error {
 			sw.maxVersion = kv.Version
 		}
 		e := &Entry{
-			Key:       y.KeyWithTs(kv.Key, kv.Version),
-			Value:     y.Copy(kv.Value),
-			UserMeta:  userMeta,
-			ExpiresAt: kv.ExpiresAt,
-			meta:      meta,
+			Key:      y.KeyWithTs(kv.Key, kv.Version),
+			Value:    y.Copy(kv.Value),
+			UserMeta: userMeta,
+			meta:     meta,
 		}
 		// If the value can be collocated with the key in LSM tree, we can skip
 		// writing the value to value log.
@@ -317,17 +316,6 @@ func (sw *StreamWriter) Flush() error {
 		}
 	}
 
-	if !sw.db.opt.managedTxns {
-		if sw.db.orc != nil {
-			sw.db.orc.Stop()
-		}
-		sw.db.orc = newOracle(sw.db.opt)
-		sw.db.orc.nextTxnTs = sw.maxVersion
-		sw.db.orc.txnMark.Done(sw.maxVersion)
-		sw.db.orc.readMark.Done(sw.maxVersion)
-		sw.db.orc.incrementNextTs()
-	}
-
 	// Wait for all files to be written.
 	if err := sw.throttle.Finish(); err != nil {
 		return err
@@ -338,12 +326,6 @@ func (sw *StreamWriter) Flush() error {
 		l.sortTables()
 	}
 
-	// Now sync the directories, so all the files are registered.
-	if sw.db.opt.ValueDir != sw.db.opt.Dir {
-		if err := sw.db.syncDir(sw.db.opt.ValueDir); err != nil {
-			return err
-		}
-	}
 	if err := sw.db.syncDir(sw.db.opt.Dir); err != nil {
 		return err
 	}
@@ -423,10 +405,9 @@ func (w *sortedWriter) handleRequests() {
 			// only. In managed mode, we do not write values to vlog and hence we would not have
 			// req.Ptrs initialized.
 			vs := y.ValueStruct{
-				Value:     e.Value,
-				Meta:      e.meta,
-				UserMeta:  e.UserMeta,
-				ExpiresAt: e.ExpiresAt,
+				Value:    e.Value,
+				Meta:     e.meta,
+				UserMeta: e.UserMeta,
 			}
 			if err := w.Add(e.Key, vs); err != nil {
 				panic(err)

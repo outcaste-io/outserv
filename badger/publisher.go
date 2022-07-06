@@ -99,11 +99,10 @@ func (p *publisher) publishUpdates(reqs requests) {
 				}
 				v := itr.Value()
 				kv := &pb.KV{
-					Key:       y.ParseKey(itr.Key()),
-					Version:   y.ParseTs(itr.Key()),
-					Value:     y.SafeCopy(nil, v.Value),
-					UserMeta:  []byte{v.UserMeta},
-					ExpiresAt: v.ExpiresAt,
+					Key:      y.ParseKey(itr.Key()),
+					Version:  y.ParseTs(itr.Key()),
+					Value:    y.SafeCopy(nil, v.Value),
+					UserMeta: []byte{v.UserMeta},
 				}
 				for id := range ids {
 					if _, ok := batchedUpdates[id]; !ok {
@@ -121,11 +120,10 @@ func (p *publisher) publishUpdates(reqs requests) {
 			}
 			k := y.SafeCopy(nil, e.Key)
 			kv := &pb.KV{
-				Key:       y.ParseKey(k),
-				Value:     y.SafeCopy(nil, e.Value),
-				UserMeta:  []byte{e.UserMeta},
-				ExpiresAt: e.ExpiresAt,
-				Version:   y.ParseTs(k),
+				Key:      y.ParseKey(k),
+				Value:    y.SafeCopy(nil, e.Value),
+				UserMeta: []byte{e.UserMeta},
+				Version:  y.ParseTs(k),
 			}
 			for id := range ids {
 				if _, ok := batchedUpdates[id]; !ok {

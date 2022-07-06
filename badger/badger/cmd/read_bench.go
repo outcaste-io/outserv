@@ -43,9 +43,11 @@ This command reads data from existing Badger database randomly using multiple go
 }
 
 var (
-	sizeRead    uint64    // will store size read till now
-	entriesRead uint64    // will store entries read till now
-	startTime   time.Time // start time of read benchmarking
+	sizeRead      uint64    // will store size read till now
+	entriesRead   uint64    // will store entries read till now
+	startTime     time.Time // start time of read benchmarking
+	numGoroutines int
+	duration      string
 
 	ro = struct {
 		blockCacheSize int64
@@ -78,7 +80,7 @@ func init() {
 
 // Scan the whole database using the iterators
 func fullScanDB(db *badger.DB) {
-	txn := db.NewTransactionAt(math.MaxUint64, false)
+	txn := db.NewReadTxn(math.MaxUint64)
 	defer txn.Discard()
 
 	startTime = time.Now()
@@ -105,12 +107,11 @@ func readBench(cmd *cobra.Command, args []string) error {
 	}
 	y.AssertTrue(numGoroutines > 0)
 	opt := badger.DefaultOptions(sstDir).
-		WithValueDir(vlogDir).
 		WithReadOnly(ro.readOnly).
 		WithBlockCacheSize(ro.blockCacheSize << 20).
 		WithIndexCacheSize(ro.indexCacheSize << 20)
 	fmt.Printf("Opening badger with options = %+v\n", opt)
-	db, err := badger.OpenManaged(opt)
+	db, err := badger.Open(opt)
 	if err != nil {
 		return y.Wrapf(err, "unable to open DB")
 	}

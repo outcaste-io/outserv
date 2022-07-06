@@ -21,6 +21,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -99,7 +100,6 @@ to the Dgraph team.
 func handleInfo(cmd *cobra.Command, args []string) error {
 	cvMode := checksumVerificationMode(opt.checksumVerificationMode)
 	bopt := badger.DefaultOptions(sstDir).
-		WithValueDir(vlogDir).
 		WithReadOnly(opt.readOnly).
 		WithBlockCacheSize(100 << 20).
 		WithIndexCacheSize(200 << 20).
@@ -107,7 +107,7 @@ func handleInfo(cmd *cobra.Command, args []string) error {
 		WithChecksumVerificationMode(cvMode).
 		WithExternalMagic(opt.externalMagicVersion)
 
-	if err := printInfo(sstDir, vlogDir); err != nil {
+	if err := printInfo(sstDir); err != nil {
 		return y.Wrap(err, "failed to print information in MANIFEST file")
 	}
 
@@ -119,7 +119,7 @@ func handleInfo(cmd *cobra.Command, args []string) error {
 	defer db.Close()
 
 	if opt.showTables {
-		tableInfo(sstDir, vlogDir, db)
+		tableInfo(sstDir, db)
 	}
 
 	prefix, err := hex.DecodeString(opt.withPrefix)
@@ -148,7 +148,7 @@ func showKeys(db *badger.DB, prefix []byte) error {
 	if len(prefix) > 0 {
 		fmt.Printf("Only choosing keys with prefix: \n%s", hex.Dump(prefix))
 	}
-	txn := db.NewTransaction(false)
+	txn := db.NewReadTxn(math.MaxUint64)
 	defer txn.Discard()
 
 	iopt := badger.DefaultIteratorOptions
@@ -175,7 +175,7 @@ func showKeys(db *badger.DB, prefix []byte) error {
 }
 
 func lookup(db *badger.DB) error {
-	txn := db.NewTransaction(false)
+	txn := db.NewReadTxn(math.MaxUint64)
 	defer txn.Discard()
 
 	key, err := hex.DecodeString(opt.keyLookup)
@@ -260,7 +260,7 @@ func getInfo(fileInfos []os.FileInfo, tid uint64) int64 {
 	return 0
 }
 
-func tableInfo(dir, valueDir string, db *badger.DB) {
+func tableInfo(dir string, db *badger.DB) {
 	// we want all tables with keys count here.
 	tables := db.Tables()
 	fileInfos, err := ioutil.ReadDir(dir)
@@ -296,13 +296,11 @@ func tableInfo(dir, valueDir string, db *badger.DB) {
 	fmt.Println()
 }
 
-func printInfo(dir, valueDir string) error {
+func printInfo(dir string) error {
 	if dir == "" {
 		return fmt.Errorf("--dir not supplied")
 	}
-	if valueDir == "" {
-		valueDir = dir
-	}
+	valueDir := dir
 	fp, err := os.Open(filepath.Join(dir, badger.ManifestFilename))
 	if err != nil {
 		return err

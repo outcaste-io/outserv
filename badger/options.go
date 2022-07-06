@@ -44,12 +44,10 @@ import (
 type Options struct {
 	// Required options.
 
-	Dir      string
-	ValueDir string
+	Dir string
 
 	// Usually modified options.
 
-	SyncWrites        bool
 	NumVersionsToKeep int
 	ReadOnly          bool
 	Logger            Logger
@@ -68,8 +66,7 @@ type Options struct {
 	TableSizeMultiplier int
 	MaxLevels           int
 
-	VLogPercentile float64
-	NumMemtables   int
+	NumMemtables int
 	// Changing BlockSize across DB runs will not break badger. The block size is
 	// read from the block index stored at the end of the table.
 	BlockSize          int
@@ -115,11 +112,6 @@ type Options struct {
 	// with incompatible data format.
 	ExternalMagicVersion uint16
 
-	// Transaction start and commit timestamps are managed by end-user.
-	// This is only useful for databases built on top of Badger (like Dgraph).
-	// Not recommended for most users.
-	managedTxns bool
-
 	// 4. Flags for testing purposes
 	// ------------------------------
 	maxBatchCount int64 // max entries in batch
@@ -132,8 +124,7 @@ type Options struct {
 // Feel free to modify these to suit your needs with the WithX methods.
 func DefaultOptions(path string) Options {
 	return Options{
-		Dir:      path,
-		ValueDir: path,
+		Dir: path,
 
 		MemTableSize:        64 << 20,
 		BaseTableSize:       2 << 20,
@@ -151,7 +142,6 @@ func DefaultOptions(path string) Options {
 		NumMemtables:            15,
 		BloomFalsePositive:      0.01,
 		BlockSize:               4 * 1024,
-		SyncWrites:              false,
 		NumVersionsToKeep:       1,
 		CompactL0OnClose:        false,
 		VerifyValueChecksum:     false,
@@ -339,30 +329,6 @@ func (opt Options) FromSuperFlag(superflag string) Options {
 // This is set automatically to be the path given to `DefaultOptions`.
 func (opt Options) WithDir(val string) Options {
 	opt.Dir = val
-	return opt
-}
-
-// WithValueDir returns a new Options value with ValueDir set to the given value.
-//
-// ValueDir is the path of the directory where value data will be stored in.
-// If it doesn't exist, Badger will try to create it for you.
-// This is set automatically to be the path given to `DefaultOptions`.
-func (opt Options) WithValueDir(val string) Options {
-	opt.ValueDir = val
-	return opt
-}
-
-// WithSyncWrites returns a new Options value with SyncWrites set to the given value.
-//
-// Badger does all writes via mmap. So, all writes can survive process crashes or k8s environments
-// with SyncWrites set to false.
-//
-// When set to true, Badger would call an additional msync after writes to flush mmap buffer over to
-// disk to survive hard reboots. Most users of Badger should not need to do this.
-//
-// The default value of SyncWrites is false.
-func (opt Options) WithSyncWrites(val bool) Options {
-	opt.SyncWrites = val
 	return opt
 }
 

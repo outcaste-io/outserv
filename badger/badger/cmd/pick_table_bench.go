@@ -60,10 +60,9 @@ func init() {
 
 func pickTableBench(cmd *cobra.Command, args []string) error {
 	opt := badger.DefaultOptions(sstDir).
-		WithValueDir(vlogDir).
 		WithReadOnly(pickOpts.readOnly)
 	fmt.Printf("Opening badger with options = %+v\n", opt)
-	db, err := badger.OpenManaged(opt)
+	db, err := badger.Open(opt)
 	if err != nil {
 		return y.Wrapf(err, "unable to open DB")
 	}

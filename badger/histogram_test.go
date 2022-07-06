@@ -26,16 +26,12 @@ func TestBuildKeyValueSizeHistogram(t *testing.T) {
 	t.Run("All same size key-values", func(t *testing.T) {
 		runBadgerTest(t, nil, func(t *testing.T, db *DB) {
 			entries := int64(40)
-			err := db.Update(func(txn *Txn) error {
-				for i := rune(0); i < rune(entries); i++ {
-					err := txn.SetEntry(NewEntry([]byte(string(i)), []byte("B")))
-					if err != nil {
-						return err
-					}
-				}
-				return nil
-			})
-			require.NoError(t, err)
+			wb := db.NewWriteBatch()
+			for i := rune(0); i < rune(entries); i++ {
+				err := wb.SetEntryAt(NewEntry([]byte(string(i)), []byte("B")), 1)
+				require.NoError(t, err)
+			}
+			require.NoError(t, wb.Flush())
 
 			histogram := db.buildHistogram(nil)
 			keyHistogram := histogram.keySizeHistogram
@@ -63,18 +59,15 @@ func TestBuildKeyValueSizeHistogram(t *testing.T) {
 	t.Run("different size key-values", func(t *testing.T) {
 		runBadgerTest(t, nil, func(t *testing.T, db *DB) {
 			entries := int64(3)
-			err := db.Update(func(txn *Txn) error {
-				if err := txn.SetEntry(NewEntry([]byte("A"), []byte("B"))); err != nil {
-					return err
-				}
-
-				if err := txn.SetEntry(NewEntry([]byte("AA"), []byte("BB"))); err != nil {
-					return err
-				}
-
-				return txn.SetEntry(NewEntry([]byte("AAA"), []byte("BBB")))
-			})
+			wb := db.NewWriteBatch()
+			err := wb.SetEntryAt(NewEntry([]byte("A"), []byte("B")), 1)
 			require.NoError(t, err)
+			err = wb.SetEntryAt(NewEntry([]byte("AA"), []byte("BB")), 1)
+			require.NoError(t, err)
+
+			err = wb.SetEntryAt(NewEntry([]byte("AAA"), []byte("BBB")), 1)
+			require.NoError(t, err)
+			require.NoError(t, wb.Flush())
 
 			histogram := db.buildHistogram(nil)
 			keyHistogram := histogram.keySizeHistogram

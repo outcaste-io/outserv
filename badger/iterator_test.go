@@ -137,7 +137,7 @@ func TestIterateSinceTs(t *testing.T) {
 			if (i % 10000) == 0 {
 				t.Logf("Put i=%d\n", i)
 			}
-			require.NoError(t, batch.Set(bkey(i), val))
+			require.NoError(t, batch.SetAt(bkey(i), val, 1))
 		}
 		require.NoError(t, batch.Flush())
 
@@ -160,24 +160,6 @@ func TestIterateSinceTs(t *testing.T) {
 	})
 }
 
-func TestIterateSinceTsWithPendingWrites(t *testing.T) {
-	// The pending entries still have version=0. Even IteratorOptions.SinceTs is 0, the entries
-	// should be visible.
-	runBadgerTest(t, nil, func(t *testing.T, db *DB) {
-		txn := db.NewTransaction(true)
-		defer txn.Discard()
-		require.NoError(t, txn.Set([]byte("key1"), []byte("value1")))
-		require.NoError(t, txn.Set([]byte("key2"), []byte("value2")))
-		itr := txn.NewIterator(DefaultIteratorOptions)
-		defer itr.Close()
-		count := 0
-		for itr.Rewind(); itr.Valid(); itr.Next() {
-			count++
-		}
-		require.Equal(t, 2, count)
-	})
-}
-
 func TestIteratePrefix(t *testing.T) {
 	if !*manual {
 		t.Skip("Skipping test meant to be run manually.")
@@ -195,7 +177,7 @@ func TestIteratePrefix(t *testing.T) {
 			if (i % 1000) == 0 {
 				t.Logf("Put i=%d\n", i)
 			}
-			require.NoError(t, batch.Set(bkey(i), val))
+			require.NoError(t, batch.SetAt(bkey(i), val, 1))
 		}
 		require.NoError(t, batch.Flush())
 
@@ -366,7 +348,7 @@ func BenchmarkIteratePrefixSingleKey(b *testing.B) {
 
 	batch := db.NewWriteBatch()
 	for i := 0; i < N; i++ {
-		y.Check(batch.Set(bkey(i), val))
+		y.Check(batch.SetAt(bkey(i), val, 1))
 	}
 	y.Check(batch.Flush())
 	var lsmFiles int

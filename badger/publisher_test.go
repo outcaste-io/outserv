@@ -18,11 +18,12 @@ package badger
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/stretchr/testify/require"
 
@@ -55,28 +56,26 @@ func TestPublisherDeadlock(t *testing.T) {
 		}()
 		subWg.Wait()
 		go func() {
-			err := db.Update(func(txn *Txn) error {
-				e := NewEntry([]byte(fmt.Sprintf("key%d", 0)), []byte(fmt.Sprintf("value%d", 0)))
-				return txn.SetEntry(e)
-			})
-			require.NoError(t, err)
+			wb := db.NewWriteBatch()
+			e := NewEntry([]byte(fmt.Sprintf("key%d", 0)), []byte(fmt.Sprintf("value%d", 0)))
+			require.NoError(t, wb.SetEntryAt(e, 1))
+			require.NoError(t, wb.Flush())
 		}()
 
 		firstUpdate.Wait()
 		req := int64(0)
-		for i := 1; i < 1110; i++ {
+		for i := 1; i < 111; i++ {
 			time.Sleep(time.Millisecond * 10)
 			go func(i int) {
-				err := db.Update(func(txn *Txn) error {
-					e := NewEntry([]byte(fmt.Sprintf("key%d", i)), []byte(fmt.Sprintf("value%d", i)))
-					return txn.SetEntry(e)
-				})
-				require.NoError(t, err)
+				wb := db.NewWriteBatch()
+				e := NewEntry([]byte(fmt.Sprintf("key%d", i)), []byte(fmt.Sprintf("value%d", i)))
+				require.NoError(t, wb.SetEntryAt(e, 1))
+				require.NoError(t, wb.Flush())
 				atomic.AddInt64(&req, 1)
 			}(i)
 		}
 		for {
-			if atomic.LoadInt64(&req) == 1109 {
+			if atomic.LoadInt64(&req) == 110 {
 				break
 			}
 			time.Sleep(time.Second)
@@ -112,10 +111,10 @@ func TestPublisherOrdering(t *testing.T) {
 		}()
 		subWg.Wait()
 		for i := 0; i < 5; i++ {
-			db.Update(func(txn *Txn) error {
-				e := NewEntry([]byte(fmt.Sprintf("key%d", i)), []byte(fmt.Sprintf("value%d", i)))
-				return txn.SetEntry(e)
-			})
+			wb := db.NewWriteBatch()
+			e := NewEntry([]byte(fmt.Sprintf("key%d", i)), []byte(fmt.Sprintf("value%d", i)))
+			require.NoError(t, wb.SetEntryAt(e, 1))
+			require.NoError(t, wb.Flush())
 		}
 		wg.Wait()
 		for i := 0; i < 5; i++ {
@@ -154,12 +153,15 @@ func TestMultiplePrefix(t *testing.T) {
 			}
 		}()
 		subWg.Wait()
-		db.Update(func(txn *Txn) error {
-			return txn.SetEntry(NewEntry([]byte("key"), []byte("value")))
-		})
-		db.Update(func(txn *Txn) error {
-			return txn.SetEntry(NewEntry([]byte("hello"), []byte("badger")))
-		})
+
+		e := NewEntry([]byte("key"), []byte("value"))
+		e.version = 1
+		require.NoError(t, db.BatchSet([]*Entry{e}))
+
+		e = NewEntry([]byte("hello"), []byte("badger"))
+		e.version = 1
+		require.NoError(t, db.BatchSet([]*Entry{e}))
+
 		wg.Wait()
 	})
 }

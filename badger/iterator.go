@@ -23,7 +23,6 @@ import (
 	"sort"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/outcaste-io/badger/v3/table"
 	"github.com/outcaste-io/ristretto/z"
@@ -40,11 +39,10 @@ const (
 // Item is returned during iteration. Both the Key() and Value() output is only valid until
 // iterator.Next() is called.
 type Item struct {
-	key       []byte
-	vptr      []byte
-	val       []byte
-	version   uint64
-	expiresAt uint64
+	key     []byte
+	vptr    []byte
+	val     []byte
+	version uint64
 
 	slice *y.Slice // Used only during prefetching.
 	next  *Item
@@ -139,7 +137,7 @@ func (item *Item) hasValue() bool {
 
 // IsDeletedOrExpired returns true if item contains deleted or expired value.
 func (item *Item) IsDeletedOrExpired() bool {
-	return isDeletedOrExpired(item.meta, item.expiresAt)
+	return isDeletedOrExpired(item.meta)
 }
 
 // DiscardEarlierVersions returns whether the item was created with the
@@ -215,12 +213,6 @@ func (item *Item) ValueSize() int64 {
 // is used to interpret the value.
 func (item *Item) UserMeta() byte {
 	return item.userMeta
-}
-
-// ExpiresAt returns a Unix time value indicating when the item will be
-// considered expired. 0 indicates that the item will never expire.
-func (item *Item) ExpiresAt() uint64 {
-	return item.expiresAt
 }
 
 // TODO: Switch this to use linked list container in Go.
@@ -430,14 +422,11 @@ func (txn *Txn) NewIterator(opt IteratorOptions) *Iterator {
 
 	// TODO: If Prefix is set, only pick those memtables which have keys with
 	// the prefix.
-	tables, decr := txn.db.getMemTables()
+	mts, decr := txn.db.getMemTables()
 	defer decr()
 	var iters []y.Iterator
-	if itr := txn.newPendingWritesIterator(opt.Reverse); itr != nil {
-		iters = append(iters, itr)
-	}
-	for i := 0; i < len(tables); i++ {
-		iters = append(iters, tables[i].sl.NewUniIterator(opt.Reverse))
+	for i := 0; i < len(mts); i++ {
+		iters = append(iters, mts[i].NewUniIterator(opt.Reverse))
 	}
 	iters = append(iters, txn.db.lc.iterators(&opt)...) // This will increment references.
 	res := &Iterator{
@@ -473,8 +462,6 @@ func (it *Iterator) newItem() *Item {
 // Item returns pointer to the current key-value pair.
 // This item is only valid until it.Next() gets called.
 func (it *Iterator) Item() *Item {
-	tx := it.txn
-	tx.addReadKey(it.item.Key())
 	return it.item
 }
 
@@ -544,14 +531,8 @@ func (it *Iterator) Next() {
 	}
 }
 
-func isDeletedOrExpired(meta byte, expiresAt uint64) bool {
-	if meta&bitDelete > 0 {
-		return true
-	}
-	if expiresAt == 0 {
-		return false
-	}
-	return expiresAt <= uint64(time.Now().Unix())
+func isDeletedOrExpired(meta byte) bool {
+	return meta&bitDelete > 0
 }
 
 // parseItem is a complex function because it needs to handle both forward and reverse iteration
@@ -625,7 +606,7 @@ func (it *Iterator) parseItem() bool {
 FILL:
 	// If deleted, advance and return.
 	vs := mi.Value()
-	if isDeletedOrExpired(vs.Meta, vs.ExpiresAt) {
+	if isDeletedOrExpired(vs.Meta) {
 		mi.Next()
 		return false
 	}
@@ -657,7 +638,6 @@ func (it *Iterator) fill(item *Item) {
 	vs := it.iitr.Value()
 	item.meta = vs.Meta
 	item.userMeta = vs.UserMeta
-	item.expiresAt = vs.ExpiresAt
 
 	item.version = y.ParseTs(it.iitr.Key())
 	item.key = y.SafeCopy(item.key, y.ParseKey(it.iitr.Key()))
@@ -700,9 +680,6 @@ func (it *Iterator) prefetch() {
 func (it *Iterator) Seek(key []byte) uint64 {
 	if it.iitr == nil {
 		return it.latestTs
-	}
-	if len(key) > 0 {
-		it.txn.addReadKey(key)
 	}
 	for i := it.data.pop(); i != nil; i = it.data.pop() {
 		i.wg.Wait()

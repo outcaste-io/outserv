@@ -46,12 +46,6 @@ func (s *levelHandler) isLastLevel() bool {
 	return s.level == s.db.opt.MaxLevels-1
 }
 
-func (s *levelHandler) getTotalStaleSize() int64 {
-	s.RLock()
-	defer s.RUnlock()
-	return s.totalStaleSize
-}
-
 func (s *levelHandler) getTotalSize() int64 {
 	s.RLock()
 	defer s.RUnlock()

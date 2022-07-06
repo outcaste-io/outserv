@@ -180,7 +180,6 @@ func getAllAndCheck(t *testing.T, db *DB, expected []keyValVersion) {
 func TestCompaction(t *testing.T) {
 	// Disable compactions and keep single version of each key.
 	opt := DefaultOptions("").WithNumCompactors(0).WithNumVersionsToKeep(1)
-	opt.managedTxns = true
 	t.Run("level 0 to level 1", func(t *testing.T) {
 		runBadgerTest(t, &opt, func(t *testing.T, db *DB) {
 			l0 := []keyValVersion{{"foo", "bar", 3, 0}, {"fooz", "baz", 1, 0}}
@@ -472,7 +471,6 @@ func TestCompaction(t *testing.T) {
 func TestCompactionTwoVersions(t *testing.T) {
 	// Disable compactions and keep two versions of each key.
 	opt := DefaultOptions("").WithNumCompactors(0).WithNumVersionsToKeep(2)
-	opt.managedTxns = true
 	t.Run("with overlap", func(t *testing.T) {
 		runBadgerTest(t, &opt, func(t *testing.T, db *DB) {
 			l1 := []keyValVersion{{"foo", "bar", 3, 0}, {"fooz", "baz", 1, bitDelete}}
@@ -529,7 +527,6 @@ func TestCompactionTwoVersions(t *testing.T) {
 func TestCompactionAllVersions(t *testing.T) {
 	// Disable compactions and keep all versions of the each key.
 	opt := DefaultOptions("").WithNumCompactors(0).WithNumVersionsToKeep(math.MaxInt32)
-	opt.managedTxns = true
 	t.Run("without overlap", func(t *testing.T) {
 		runBadgerTest(t, &opt, func(t *testing.T, db *DB) {
 			l1 := []keyValVersion{{"foo", "bar", 3, 0}, {"fooz", "baz", 1, bitDelete}}
@@ -613,7 +610,6 @@ func TestCompactionAllVersions(t *testing.T) {
 func TestDiscardTs(t *testing.T) {
 	// Disable compactions and keep single version of each key.
 	opt := DefaultOptions("").WithNumCompactors(0).WithNumVersionsToKeep(1)
-	opt.managedTxns = true
 
 	t.Run("all keys above discardTs", func(t *testing.T) {
 		runBadgerTest(t, &opt, func(t *testing.T, db *DB) {
@@ -720,7 +716,6 @@ func TestDiscardFirstVersion(t *testing.T) {
 	opt := DefaultOptions("")
 	opt.NumCompactors = 0
 	opt.NumVersionsToKeep = math.MaxInt32
-	opt.managedTxns = true
 
 	runBadgerTest(t, &opt, func(t *testing.T, db *DB) {
 		l0 := []keyValVersion{{"foo", "bar", 1, 0}}
@@ -989,7 +984,6 @@ func TestLevelGet(t *testing.T) {
 
 func TestKeyVersions(t *testing.T) {
 	inMemoryOpt := DefaultOptions("").
-		WithSyncWrites(false).
 		WithInMemory(true)
 
 	t.Run("disk", func(t *testing.T) {
@@ -1010,7 +1004,7 @@ func TestKeyVersions(t *testing.T) {
 					l0 = append(l0, keyValVersion{fmt.Sprintf("%05d", i), "foo", 1, 0})
 				}
 				createAndOpen(db, l0, 0)
-				require.Equal(t, 8, len(db.Ranges(nil, 10000)))
+				require.Equal(t, 7, len(db.Ranges(nil, 10000)))
 			})
 		})
 		t.Run("large table", func(t *testing.T) {
@@ -1020,7 +1014,7 @@ func TestKeyVersions(t *testing.T) {
 					l0 = append(l0, keyValVersion{fmt.Sprintf("%05d", i), "foo", 1, 0})
 				}
 				createAndOpen(db, l0, 0)
-				require.Equal(t, 62, len(db.Ranges(nil, 10000)))
+				require.Greater(t, len(db.Ranges(nil, 10000)), 35)
 			})
 		})
 		t.Run("prefix", func(t *testing.T) {
@@ -1038,9 +1032,9 @@ func TestKeyVersions(t *testing.T) {
 	t.Run("in-memory", func(t *testing.T) {
 		t.Run("small table", func(t *testing.T) {
 			runBadgerTest(t, &inMemoryOpt, func(t *testing.T, db *DB) {
-				writer := db.newWriteBatch(false)
+				writer := db.NewWriteBatch()
 				for i := 0; i < 10; i++ {
-					writer.Set([]byte(fmt.Sprintf("%05d", i)), []byte("foo"))
+					writer.SetAt([]byte(fmt.Sprintf("%05d", i)), []byte("foo"), 1)
 				}
 				require.NoError(t, writer.Flush())
 				require.Equal(t, 2, len(db.Ranges(nil, 10000)))
@@ -1048,19 +1042,19 @@ func TestKeyVersions(t *testing.T) {
 		})
 		t.Run("large table", func(t *testing.T) {
 			runBadgerTest(t, &inMemoryOpt, func(t *testing.T, db *DB) {
-				writer := db.newWriteBatch(false)
+				writer := db.NewWriteBatch()
 				for i := 0; i < 100000; i++ {
-					writer.Set([]byte(fmt.Sprintf("%05d", i)), []byte("foo"))
+					writer.SetAt([]byte(fmt.Sprintf("%05d", i)), []byte("foo"), 1)
 				}
 				require.NoError(t, writer.Flush())
-				require.Equal(t, 11, len(db.Ranges(nil, 10000)))
+				require.Greater(t, len(db.Ranges(nil, 10000)), 15)
 			})
 		})
 		t.Run("prefix", func(t *testing.T) {
 			runBadgerTest(t, &inMemoryOpt, func(t *testing.T, db *DB) {
-				writer := db.newWriteBatch(false)
+				writer := db.NewWriteBatch()
 				for i := 0; i < 10000; i++ {
-					writer.Set([]byte(fmt.Sprintf("%05d", i)), []byte("foo"))
+					writer.SetAt([]byte(fmt.Sprintf("%05d", i)), []byte("foo"), 1)
 				}
 				require.NoError(t, writer.Flush())
 				require.Equal(t, 1, len(db.Ranges([]byte("a"), 10000)))
@@ -1073,7 +1067,6 @@ func TestSameLevel(t *testing.T) {
 	opt := DefaultOptions("")
 	opt.NumCompactors = 0
 	opt.NumVersionsToKeep = math.MaxInt32
-	opt.managedTxns = true
 	opt.LmaxCompaction = true
 	runBadgerTest(t, &opt, func(t *testing.T, db *DB) {
 		l6 := []keyValVersion{
@@ -1183,7 +1176,6 @@ func TestTableContainsPrefix(t *testing.T) {
 
 func TestStaleDataCleanup(t *testing.T) {
 	opt := DefaultOptions("")
-	opt.managedTxns = true
 	opt.LmaxCompaction = true
 	runBadgerTest(t, &opt, func(t *testing.T, db *DB) {
 		opts := table.Options{
@@ -1225,23 +1217,17 @@ func TestStaleDataCleanup(t *testing.T) {
 		}
 		require.NoError(t, db.lc.validate())
 
-		require.NotZero(t, lh.getTotalStaleSize())
-
 		db.SetDiscardTs(1 << 30)
 		// Modify the target file size so that we can compact all tables at once.
 		tt := db.lc.levelTargets()
 		tt.fileSz[6] = 1 << 30
 		prio := compactionPriority{level: 6, t: tt}
 		require.NoError(t, db.lc.doCompact(-1, prio))
-
-		require.Zero(t, lh.getTotalStaleSize())
-
 	})
 }
 
 func TestStreamWithFullCopy(t *testing.T) {
 	dbopts := DefaultOptions("")
-	dbopts.managedTxns = true
 	dbopts.MaxLevels = 7
 	dbopts.NumVersionsToKeep = math.MaxInt32
 
@@ -1262,7 +1248,6 @@ func TestStreamWithFullCopy(t *testing.T) {
 			require.NoError(t, err)
 			defer removeDir(dir)
 			outOpts.Dir = dir
-			outOpts.ValueDir = dir
 		}
 
 		require.NoError(t, db.StreamDB(outOpts))

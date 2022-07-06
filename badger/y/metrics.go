@@ -23,8 +23,6 @@ import (
 var (
 	// lsmSize has size of the LSM in bytes
 	lsmSize *expvar.Map
-	// vlogSize has size of the value log in bytes
-	vlogSize *expvar.Map
 	// pendingWrites tracks the number of pending writes.
 	pendingWrites *expvar.Map
 
@@ -67,7 +65,6 @@ func init() {
 	numBlockedPuts = expvar.NewInt("badger_v3_blocked_puts_total")
 	numMemtableGets = expvar.NewInt("badger_v3_memtable_gets_total")
 	lsmSize = expvar.NewMap("badger_v3_lsm_size_bytes")
-	vlogSize = expvar.NewMap("badger_v3_vlog_size_bytes")
 	pendingWrites = expvar.NewMap("badger_v3_pending_writes_total")
 	numCompactionTables = expvar.NewInt("badger_v3_compactions_current")
 }
@@ -112,10 +109,6 @@ func LSMSizeSet(enabled bool, key string, val expvar.Var) {
 	storeToMap(enabled, lsmSize, key, val)
 }
 
-func VlogSizeSet(enabled bool, key string, val expvar.Var) {
-	storeToMap(enabled, vlogSize, key, val)
-}
-
 func PendingWritesSet(enabled bool, key string, val expvar.Var) {
 	storeToMap(enabled, pendingWrites, key, val)
 }
@@ -130,10 +123,6 @@ func NumLSMGetsAdd(enabled bool, key string, val int64) {
 
 func LSMSizeGet(enabled bool, key string) expvar.Var {
 	return getFromMap(enabled, lsmSize, key)
-}
-
-func VlogSizeGet(enabled bool, key string) expvar.Var {
-	return getFromMap(enabled, vlogSize, key)
 }
 
 func addInt(enabled bool, metric *expvar.Int, val int64) {
