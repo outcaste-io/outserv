@@ -3,7 +3,6 @@ module github.com/outcaste-io/outserv
 go 1.16
 
 // replace github.com/outcaste-io/ristretto => /home/mrjn/source/ristretto
-// replace github.com/outcaste-io/outserv/badger => /home/mrjn/source/badger
 
 require (
 	cloud.google.com/go/storage v1.15.0
