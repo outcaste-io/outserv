@@ -19,8 +19,8 @@ import (
 
 	"github.com/dgryski/go-farm"
 	"github.com/golang/glog"
-	"github.com/outcaste-io/outserv/badger"
 	"github.com/outcaste-io/dgo/v210"
+	"github.com/outcaste-io/outserv/badger"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
@@ -223,7 +223,7 @@ func (m *XidMap) dbWriter() {
 	defer m.wg.Done()
 	for buf := range m.kvChan {
 		for _, kv := range buf {
-			x.Panic(m.writer.Set(kv.key, kv.value))
+			x.Panic(m.writer.SetAt(kv.key, kv.value, 1))
 		}
 	}
 }

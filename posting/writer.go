@@ -17,39 +17,19 @@
 package posting
 
 import (
-	"math"
-	"sync"
-
-	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/badger"
 	"github.com/outcaste-io/outserv/badger/pb"
 )
 
 // TxnWriter is in charge or writing transactions to badger.
 type TxnWriter struct {
-	db  *badger.DB
-	wg  sync.WaitGroup
-	che chan error
+	wb *badger.WriteBatch
 }
 
 // NewTxnWriter returns a new TxnWriter instance.
 func NewTxnWriter(db *badger.DB) *TxnWriter {
 	return &TxnWriter{
-		db:  db,
-		che: make(chan error, 1),
-	}
-}
-
-func (w *TxnWriter) cb(err error) {
-	defer w.wg.Done()
-	if err == nil {
-		return
-	}
-
-	glog.Errorf("TxnWriter got error during callback: %v", err)
-	select {
-	case w.che <- err:
-	default:
+		wb: db.NewWriteBatch(),
 	}
 }
 
@@ -67,62 +47,23 @@ func (w *TxnWriter) Write(kvs *pb.KVList) error {
 	return nil
 }
 
-func (w *TxnWriter) update(commitTs uint64, f func(txn *badger.Txn) error) error {
-	if commitTs == 0 {
-		return nil
-	}
-	txn := w.db.NewTransactionAt(math.MaxUint64, true)
-	defer txn.Discard()
-
-	err := f(txn)
-	if err == badger.ErrTxnTooBig {
-		// continue to commit.
-	} else if err != nil {
-		return err
-	}
-	w.wg.Add(1)
-	return txn.CommitAt(commitTs, w.cb)
-}
-
 // SetAt writes a key-value pair at the given timestamp.
 func (w *TxnWriter) SetAt(key, val []byte, meta byte, ts uint64) error {
-	return w.update(ts, func(txn *badger.Txn) error {
-		switch meta {
-		case BitCompletePosting, BitEmptyPosting, BitForbidPosting:
-			err := txn.SetEntry((&badger.Entry{
-				Key:      key,
-				Value:    val,
-				UserMeta: meta,
-			}).WithDiscard())
-			if err != nil {
-				return err
-			}
-		default:
-			err := txn.SetEntry(&badger.Entry{
-				Key:      key,
-				Value:    val,
-				UserMeta: meta,
-			})
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+	entry := &badger.Entry{
+		Key:      key,
+		Value:    val,
+		UserMeta: meta,
+	}
+	switch meta {
+	case BitCompletePosting, BitEmptyPosting, BitForbidPosting:
+		entry = entry.WithDiscard()
+	default:
+	}
+	return w.wb.SetEntryAt(entry, ts)
 }
 
 // Flush waits until all operations are done and all data is written to disk.
 func (w *TxnWriter) Flush() error {
 	// No need to call Sync here.
-	return w.Wait()
-}
-
-func (w *TxnWriter) Wait() error {
-	w.wg.Wait()
-	select {
-	case err := <-w.che:
-		return err
-	default:
-		return nil
-	}
+	return w.wb.Flush()
 }

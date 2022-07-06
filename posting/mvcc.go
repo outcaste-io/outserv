@@ -462,7 +462,7 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 		lCache.Set(key, uint64(1), 0)
 	}
 
-	txn := pstore.NewTransactionAt(readTs, false)
+	txn := pstore.NewReadTxn(readTs)
 	defer txn.Discard()
 
 	// When we do rollups, an older version would go to the top of the LSM tree, which can cause

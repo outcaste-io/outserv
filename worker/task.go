@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/outcaste-io/outserv/badger"
 	"github.com/outcaste-io/outserv/algo"
+	"github.com/outcaste-io/outserv/badger"
 	"github.com/outcaste-io/outserv/codec"
 	"github.com/outcaste-io/outserv/conn"
 	"github.com/outcaste-io/outserv/posting"
@@ -1695,7 +1695,7 @@ func (qs *queryState) evaluate(cp countParams, out *pb.Result) error {
 	x.AssertTrue(countl >= 1)
 	countKey = x.CountKey(cp.attr, uint32(countl))
 
-	txn := pstore.NewTransactionAt(cp.readTs, false)
+	txn := pstore.NewReadTxn(cp.readTs)
 	defer txn.Discard()
 
 	pk := x.ParsedKey{Attr: cp.attr}
@@ -1741,7 +1741,7 @@ func (qs *queryState) handleHasFunction(ctx context.Context, q *pb.Query, out *p
 		glog.Infof("handleHasFunction query: %+v\n", q)
 	}
 
-	txn := pstore.NewTransactionAt(q.ReadTs, false)
+	txn := pstore.NewReadTxn(q.ReadTs)
 	defer txn.Discard()
 
 	initKey := x.ParsedKey{

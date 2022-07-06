@@ -276,7 +276,7 @@ func movePredicateHelper(ctx context.Context, in *pb.MovePredicatePayload) error
 		return errors.Wrapf(err, "while calling ReceivePredicate")
 	}
 
-	txn := pstore.NewTransactionAt(in.ReadTs, false)
+	txn := pstore.NewReadTxn(in.ReadTs)
 	defer txn.Discard()
 
 	// Send schema first.

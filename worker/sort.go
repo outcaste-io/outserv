@@ -222,7 +222,7 @@ func sortWithIndex(ctx context.Context, ts *pb.SortMessage) *sortresult {
 	iterOpt.PrefetchValues = false
 	iterOpt.Reverse = order.Desc
 	iterOpt.Prefix = x.IndexKey(order.Attr, string(prefix))
-	txn := pstore.NewTransactionAt(ts.ReadTs, false)
+	txn := pstore.NewReadTxn(ts.ReadTs)
 	defer txn.Discard()
 	var seekKey []byte
 	if !order.Desc {

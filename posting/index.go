@@ -389,7 +389,6 @@ func (r *rebuilder) Run(ctx context.Context) error {
 	glog.V(1).Infof("Rebuilding indexes using the temp folder %s\n", tmpIndexDir)
 
 	dbOpts := badger.DefaultOptions(tmpIndexDir).
-		WithSyncWrites(false).
 		WithNumVersionsToKeep(math.MaxInt32).
 		WithLogger(&x.ToGlog{}).
 		WithCompression(options.None).
@@ -402,7 +401,7 @@ func (r *rebuilder) Run(ctx context.Context) error {
 		dbOpts.BlockCacheSize = 100 << 20
 		dbOpts.IndexCacheSize = 100 << 20
 	}
-	tmpDB, err := badger.OpenManaged(dbOpts)
+	tmpDB, err := badger.Open(dbOpts)
 	if err != nil {
 		return errors.Wrap(err, "error opening temp badger for reindexing")
 	}
@@ -416,7 +415,7 @@ func (r *rebuilder) Run(ctx context.Context) error {
 	// We set it to 1 in case there are no keys found and NewStreamAt is called with ts=0.
 	var counter uint64 = 1
 
-	tmpWriter := tmpDB.NewManagedWriteBatch()
+	tmpWriter := tmpDB.NewWriteBatch()
 	stream := pstore.NewStreamAt(r.startTs)
 	stream.LogPrefix = fmt.Sprintf("Rebuilding index for predicate %s (1/2):", r.attr)
 	stream.Prefix = r.prefix
@@ -490,7 +489,7 @@ func (r *rebuilder) Run(ctx context.Context) error {
 			r.attr, time.Since(start))
 	}()
 
-	writer := pstore.NewManagedWriteBatch()
+	writer := pstore.NewWriteBatch()
 	tmpStream := tmpDB.NewStreamAt(counter)
 	tmpStream.LogPrefix = fmt.Sprintf("Rebuilding index for predicate %s (2/2):", r.attr)
 	tmpStream.KeyToList = func(key []byte, itr *badger.Iterator) (*bpb.KVList, error) {
