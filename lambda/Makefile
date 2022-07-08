@@ -2,4 +2,4 @@
 build:
 	npm install
 	npm run-script build
-	cp -r dist ../dgraph/cmd/alpha/
+	cp -r dist ../outserv/cmd/alpha/

@@ -1394,6 +1394,7 @@ func getCustomHTTPConfig(f *Field, isQueryOrMutation bool, ns uint64) (*FieldHTT
 }
 
 func (f *Field) IsQueryOrMutation() bool {
+	return true // TODO(mrjn): HACK
 	isQueryOrMutation := f.Kind == QueryKind
 	if f.Kind == MutationKind {
 		isQueryOrMutation = true

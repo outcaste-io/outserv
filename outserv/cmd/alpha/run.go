@@ -440,6 +440,8 @@ func setupListener(addr string, port int) (net.Listener, error) {
 	return net.Listen("tcp", fmt.Sprintf("%s:%d", addr, port))
 }
 
+// TODO(mrjn): When a new lambda script comes up, looks like we might need to
+// restart the lambdas.
 func setupLambdaServer(closer *z.Closer) {
 	// If --lambda url is set, then don't launch the lambda servers from dgraph.
 	if len(x.Config.Lambda.Url) > 0 {
