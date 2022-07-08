@@ -12,21 +12,21 @@ import (
 	"log"
 	"math/big"
 	"net/http"
+	_ "net/http/pprof"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/pkg/errors"
 )
 
 var path = flag.String("geth", "", "Geth IPC path")
 var graphql = flag.String("gql", "http://localhost:8080", "GraphQL endpoint")
 var dryRun = flag.Bool("dry", false, "If true, don't send txns to GraphQL endpoint")
-var numGo = flag.Int("gor", 2, "Number of goroutines to use")
-var startBlock = flag.Int64("start", 50000, "Start at block")
+var numGo = flag.Int("gor", 4, "Number of goroutines to use")
+var startBlock = flag.Int64("start", 14900000, "Start at block")
 
 var txnMu = `
 mutation($Txns: [AddTxnInput!]!) {
@@ -96,7 +96,17 @@ func (b *Block) Fill() {
 		if txn.Value == 0 || len(txn.To.Hash) == 0 || len(txn.From.Hash) == 0 {
 			continue
 		}
-		b.txns = append(b.txns, txn)
+		// Only include txns from certain accounts.
+		include := true
+		// if farm.Fingerprint64([]byte(txn.To.Hash))%1000 == 0 {
+		// 	include = true
+		// }
+		// if farm.Fingerprint64([]byte(txn.From.Hash))%1000 == 0 {
+		// 	include = true
+		// }
+		if include {
+			b.txns = append(b.txns, txn)
+		}
 	}
 }
 
@@ -106,9 +116,10 @@ func (b *Block) Txns() []Txn {
 }
 
 type Chain struct {
-	blockId      int64
-	numProcessed uint64
-	blockCh      chan *Block
+	blockId   int64
+	numBlocks uint64
+	numTxns   uint64
+	blockCh   chan *Block
 }
 
 func (c *Chain) BlockingFill() {
@@ -117,7 +128,7 @@ func (c *Chain) BlockingFill() {
 	c.blockId = *startBlock - 1
 	for {
 		blockId := atomic.AddInt64(&c.blockId, 1)
-		if blockId >= 14e6 {
+		if blockId >= 15e6 {
 			return
 		}
 		b := &Block{Id: blockId}
@@ -151,9 +162,10 @@ func (c *Chain) processTxns(wg *sync.WaitGroup) {
 		txns = append(txns, block.Txns()...)
 		if len(txns) >= 100 {
 			check(sendTxns(txns))
+			atomic.AddUint64(&c.numTxns, uint64(len(txns)))
 			txns = txns[:0]
 		}
-		atomic.AddUint64(&c.numProcessed, 1)
+		atomic.AddUint64(&c.numBlocks, 1)
 	}
 	check(sendTxns(txns))
 }
@@ -162,16 +174,16 @@ func (c *Chain) printMetrics() {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
-	rm := y.NewRateMonitor(300)
+	rm := NewRateMonitor(300)
 	start := time.Now()
 	for range ticker.C {
 		maxBlockId := atomic.LoadInt64(&c.blockId)
-		num := atomic.LoadUint64(&c.numProcessed)
+		num := atomic.LoadUint64(&c.numBlocks)
 		rm.Capture(num)
 
 		dur := time.Since(start)
-		fmt.Printf("BlockId: %8d Processed: %5d [ %6s @ %5d blocks/min ]\n",
-			maxBlockId, num,
+		fmt.Printf("BlockId: %8d Processed: %5d blocks %5d txns [ %6s @ %5d blocks/min ]\n",
+			maxBlockId, num, atomic.LoadUint64(&c.numTxns),
 			dur.Round(time.Second), rm.Rate()*60.0)
 	}
 }
@@ -214,6 +226,10 @@ var chainID *big.Int
 func main() {
 	flag.Parse()
 
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+
 	var err error
 	client, err = ethclient.Dial(*path)
 	if err != nil {
@@ -244,4 +260,55 @@ func main() {
 	chain.BlockingFill()
 	wg.Wait()
 	fmt.Println("DONE")
+}
+
+type RateMonitor struct {
+	start       time.Time
+	lastSent    uint64
+	lastCapture time.Time
+	rates       []float64
+	idx         int
+}
+
+func NewRateMonitor(numSamples int) *RateMonitor {
+	return &RateMonitor{
+		start: time.Now(),
+		rates: make([]float64, numSamples),
+	}
+}
+
+const minRate = 0.0001
+
+// Capture captures the current number of sent bytes. This number should be monotonically
+// increasing.
+func (rm *RateMonitor) Capture(sent uint64) {
+	diff := sent - rm.lastSent
+	dur := time.Since(rm.lastCapture)
+	rm.lastCapture, rm.lastSent = time.Now(), sent
+
+	rate := float64(diff) / dur.Seconds()
+	if rate < minRate {
+		rate = minRate
+	}
+	rm.rates[rm.idx] = rate
+	rm.idx = (rm.idx + 1) % len(rm.rates)
+}
+
+// Rate returns the average rate of transmission smoothed out by the number of samples.
+func (rm *RateMonitor) Rate() uint64 {
+	var total float64
+	var den float64
+	for _, r := range rm.rates {
+		if r < minRate {
+			// Ignore this. We always set minRate, so this is a zero.
+			// Typically at the start of the rate monitor, we'd have zeros.
+			continue
+		}
+		total += r
+		den += 1.0
+	}
+	if den < minRate {
+		return 0
+	}
+	return uint64(total / den)
 }

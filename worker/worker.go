@@ -143,6 +143,9 @@ func StoreHandler(w http.ResponseWriter, r *http.Request) {
 		src.Left, src.Right = []byte{}, []byte{}
 		numTables := 0
 		for _, dst := range tables[i+1:] {
+			if dst.Level-src.Level > 1 {
+				continue
+			}
 			if y.CompareKeys(left, dst.Right) > 0 {
 				// no overlap
 			} else if y.CompareKeys(right, dst.Left) < 0 {
