@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -518,7 +519,9 @@ func rewriteDQLQuery(query *schema.Field) ([]*gql.GraphQuery, error) {
 		Str:       dgQuery,
 		Variables: vars,
 	}
+	glog.Infof("dqlReq: %+v\n", dqlReq)
 	parsedResult, err := gql.Parse(dqlReq)
+	glog.Infof("gql.Parse returned with: %+v. parsed: %+v\n", err, parsedResult)
 	for _, qry := range parsedResult.Query {
 		qry.Attr = qry.Alias
 		qry.Alias = ""
@@ -526,8 +529,9 @@ func rewriteDQLQuery(query *schema.Field) ([]*gql.GraphQuery, error) {
 	if err != nil {
 		return nil, err
 	}
+	return parsedResult.Query, nil
 
-	return rewriteDQLQueryWithAuth(parsedResult.Query, query.Schema())
+	// return rewriteDQLQueryWithAuth(parsedResult.Query, query.Schema())
 }
 
 // extractType tries to find out the queried type in the DQL query.
@@ -598,47 +602,45 @@ func extractTypeFromFunc(f *gql.Function) string {
 	return ""
 }
 
-// rewriteDQLQueryWithAuth adds @auth Rules to the DQL query.
-// It adds @auth rules independently on each query block.
-// It first try to find out the type queried at the root and if
-// it fails to find out then no @auth rule will be applied.
-// for eg: 	me(func: uid("0x1")) {
-//		 	}
-// The queries type is impossible to find. To enable @auth rules on
-// these type of queries, we should introduce some directive in the
-// DQL which tells us about the queried type at the root.
-func rewriteDQLQueryWithAuth(
-	dgQuery []*gql.GraphQuery,
-	sch *schema.Schema) ([]*gql.GraphQuery, error) {
-	var dgQueries []*gql.GraphQuery
-	// DQL query may contain multiple query blocks.
-	// Need to apply @auth rules on each of the block.
-	for _, qry := range dgQuery {
+//// rewriteDQLQueryWithAuth adds @auth Rules to the DQL query.
+//// It adds @auth rules independently on each query block.
+//// It first try to find out the type queried at the root and if
+//// it fails to find out then no @auth rule will be applied.
+//// for eg: 	me(func: uid("0x1")) {
+////		 	}
+//// The queries type is impossible to find. To enable @auth rules on
+//// these type of queries, we should introduce some directive in the
+//// DQL which tells us about the queried type at the root.
+//func rewriteDQLQueryWithAuth(
+//	dgQuery []*gql.GraphQuery,
+//	sch *schema.Schema) ([]*gql.GraphQuery, error) {
+//	var dgQueries []*gql.GraphQuery
+//	// DQL query may contain multiple query blocks.
+//	// Need to apply @auth rules on each of the block.
+//	for _, qry := range dgQuery {
 
-		typeName := extractType(qry)
-		typ := sch.Type(typeName)
+//		typeName := extractType(qry)
+//		typ := sch.Type(typeName)
 
-		// if unable to find the valid type then
-		// no @auth rules are applied.
-		if typ == nil {
-			dgQueries = append(dgQueries, qry)
-			continue
-		}
+//		// if unable to find the valid type then
+//		// no @auth rules are applied.
+//		if typ == nil {
+//			dgQueries = append(dgQueries, qry)
+//			continue
+//		}
 
-		fldAuthQueries := addAuthQueriesOnSelectionSet(qry, typ)
+//		qryWithAuth := []*gql.GraphQuery{qry}
+//		if typ.IsInterface() && len(qryWithAuth) == 1 && qryWithAuth[0].Attr == qry.Attr+"()" {
+//			return qryWithAuth, nil
+//		}
 
-		qryWithAuth := []*gql.GraphQuery{qry}
-		if typ.IsInterface() && len(qryWithAuth) == 1 && qryWithAuth[0].Attr == qry.Attr+"()" {
-			return qryWithAuth, nil
-		}
-
-		dgQueries = append(dgQueries, qryWithAuth...)
-		if len(fldAuthQueries) > 0 {
-			dgQueries = append(dgQueries, fldAuthQueries...)
-		}
-	}
-	return dgQueries, nil
-}
+//		dgQueries = append(dgQueries, qryWithAuth...)
+//		if len(fldAuthQueries) > 0 {
+//			dgQueries = append(dgQueries, fldAuthQueries...)
+//		}
+//	}
+//	return dgQueries, nil
+//}
 
 // Adds common RBAC and UID, Type rules to DQL query.
 // This function is used by rewriteAsQuery and aggregateQuery functions
@@ -992,32 +994,6 @@ func getFieldName(attr string) string {
 		return ""
 	}
 	return fldSplit[1]
-}
-
-// addAuthQueriesOnSelectionSet adds auth queries on fields
-// in the selection set of a DQL query. If any field doesn't
-// satisfy the @auth rules then it is removed from the query.
-func addAuthQueriesOnSelectionSet(
-	q *gql.GraphQuery,
-	typ *schema.Type) []*gql.GraphQuery {
-
-	var authQueries, children []*gql.GraphQuery
-
-	for _, f := range q.Children {
-		fldName := getFieldName(f.Attr)
-		fld := typ.Field(fldName)
-		var fldType *schema.Type
-		if fld != nil {
-			fldType = fld.Type()
-		}
-
-		if fldType == nil {
-			children = append(children, f)
-			continue
-		}
-	}
-	q.Children = children
-	return authQueries
 }
 
 func addOrder(q *gql.GraphQuery, field *schema.Field) {

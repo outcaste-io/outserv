@@ -337,7 +337,7 @@ func parseSchemaFromAlterOperation(ctx context.Context, op *pb.Operation) (*sche
 // data back. This is also used to capture the delete namespace operation during backup.
 func InsertDropRecord(ctx context.Context, dropOp string) error {
 	_, err := doQuery(context.WithValue(ctx, IsGraphql, true), &Request{
-		req: &pb.Request{
+		Req: &pb.Request{
 			Mutations: []*pb.Mutation{{
 				Edges: []*pb.Edge{{
 					Subject:     "_:r",
@@ -987,9 +987,9 @@ type queryContext struct {
 // It contains all the metadata required to execute a query.
 type Request struct {
 	// req is the incoming gRPC request
-	req *pb.Request
+	Req *pb.Request
 	// gqlField is the GraphQL field for which the request is being sent
-	gqlField *gqlSchema.Field
+	GqlField *gqlSchema.Field
 	// doAuth tells whether this request needs ACL authorization or not
 	doAuth AuthMode
 }
@@ -1096,11 +1096,11 @@ func getAuthMode(ctx context.Context) AuthMode {
 }
 
 // QueryGraphQL handles only GraphQL queries, neither mutations nor DQL.
-func QueryGraphQL(ctx context.Context, req *pb.Request,
-	field *gqlSchema.Field) (*pb.Response, error) {
+func QueryGraphQL(ctx context.Context, ereq *Request) (*pb.Response, error) {
 	// Add a timeout for queries which don't have a deadline set. We don't want to
 	// apply a timeout if it's a mutation, that's currently handled by flag
 	// "txn-abort-after".
+	req := ereq.Req
 	if req.GetMutations() == nil && x.Config.QueryTimeout != 0 {
 		if d, _ := ctx.Deadline(); d.IsZero() {
 			var cancel context.CancelFunc
@@ -1109,7 +1109,8 @@ func QueryGraphQL(ctx context.Context, req *pb.Request,
 		}
 	}
 	// no need to attach namespace here, it is already done by GraphQL layer
-	return doQuery(ctx, &Request{req: req, gqlField: field, doAuth: getAuthMode(ctx)})
+	ereq.doAuth = getAuthMode(ctx)
+	return doQuery(ctx, ereq)
 }
 
 // Query handles queries or mutations
@@ -1135,7 +1136,7 @@ func Query(ctx context.Context, req *pb.Request) (*pb.Response, error) {
 			defer cancel()
 		}
 	}
-	return doQuery(ctx, &Request{req: req, doAuth: getAuthMode(ctx)})
+	return doQuery(ctx, &Request{Req: req, doAuth: getAuthMode(ctx)})
 }
 
 var pendingQueries int64
@@ -1168,7 +1169,7 @@ func doQuery(ctx context.Context, req *Request) (resp *pb.Response, rerr error) 
 	}
 
 	if bool(glog.V(3)) || worker.LogRequestEnabled() {
-		glog.Infof("Got a query: %+v", req.req)
+		glog.Infof("Got a query: %+v", req.Req)
 	}
 
 	isGraphQL, _ := ctx.Value(IsGraphql).(bool)
@@ -1181,7 +1182,7 @@ func doQuery(ctx context.Context, req *Request) (resp *pb.Response, rerr error) 
 	l := &query.Latency{}
 	l.Start = time.Now()
 
-	isMutation := len(req.req.Mutations) > 0
+	isMutation := len(req.Req.Mutations) > 0
 	methodRequest := methodQuery
 	if isMutation {
 		methodRequest = methodMutate
@@ -1210,14 +1211,14 @@ func doQuery(ctx context.Context, req *Request) (resp *pb.Response, rerr error) 
 		return
 	}
 
-	req.req.Query = strings.TrimSpace(req.req.Query)
-	isQuery := len(req.req.Query) != 0
+	req.Req.Query = strings.TrimSpace(req.Req.Query)
+	isQuery := len(req.Req.Query) != 0
 	if !isQuery && !isMutation {
 		span.Annotate(nil, "empty request")
 		return nil, errors.Errorf("empty request")
 	}
 
-	span.Annotatef(nil, "Request received: %v", req.req)
+	span.Annotatef(nil, "Request received: %v", req.Req)
 	if isQuery {
 		ostats.Record(ctx, x.PendingQueries.M(1), x.NumQueries.M(1))
 		defer func() {
@@ -1239,11 +1240,11 @@ func doQuery(ctx context.Context, req *Request) (resp *pb.Response, rerr error) 
 	}
 
 	qc := &queryContext{
-		req:      req.req,
+		req:      req.Req,
 		latency:  l,
 		span:     span,
 		graphql:  isGraphQL,
-		gqlField: req.gqlField,
+		gqlField: req.GqlField,
 	}
 	// parseRequest converts mutation JSON to []Edge.
 	if rerr = parseRequest(qc); rerr != nil {

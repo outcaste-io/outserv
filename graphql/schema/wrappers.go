@@ -1563,20 +1563,6 @@ func (q *Field) RepresentationsArg() (*EntityRepresentations, error) {
 	return entityReprs, nil
 }
 
-func (q *Field) AuthFor(jwtVars map[string]interface{}) *Field {
-	// copy the template, so that multiple queries can run rewriting for the rule.
-	return &Field{
-		Kind:  QueryKind,
-		field: q.field,
-		op: &Operation{op: q.op.op,
-			query:    q.op.query,
-			doc:      q.op.doc,
-			inSchema: q.op.inSchema,
-			vars:     jwtVars,
-		},
-		sel: q.sel}
-}
-
 func (q *Field) Rename(newName string) {
 	q.field.Name = newName
 }
@@ -1662,11 +1648,12 @@ func (q *Field) QueryType() QueryType {
 }
 
 func (q *Field) DQLQuery() string {
-	if q.Kind != QueryKind {
+	if q.Kind == MutationKind {
 		panic("DQLQuery probably shouldn't have been called")
 	}
 	if customDir := q.op.inSchema.customDirectives["Query"][q.Name()]; customDir != nil {
 		if dqlArgument := customDir.Arguments.ForName(dqlArg); dqlArgument != nil {
+			glog.Infof("got DQL Query: %s\n", dqlArgument.Value.Raw)
 			return dqlArgument.Value.Raw
 		}
 	}

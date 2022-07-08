@@ -13,3 +13,25 @@ type Account {
   Incoming: [Txn]
   Outgoing: [Txn]
 }
+
+type AccountBal @remote {
+  Value: Int64
+}
+
+type Query {
+
+  queryAccountBalanceAtBlockNo: AccountBal @custom(dql: """
+query {
+  var(func: has(Account.Hash), first: 1) {
+    Account.Outgoing { outv as Txn.Value }
+    Account.Incoming { inv as Txn.Value }
+  }
+  queryAccountBalanceAtBlockNo() {
+    out as sum(val(outv))
+    in as sum(val(inv))
+    Value: math(in - out)
+  }
+}
+""")
+
+}

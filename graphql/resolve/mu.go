@@ -292,7 +292,12 @@ func handleAdd(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		glog.Infof("NQuads: %+v\n", mu.Edges)
 	}
 	start = time.Now()
-	resp, err := edgraph.QueryGraphQL(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}}, m)
+
+	ereq := &edgraph.Request{
+		Req:      &pb.Request{Mutations: []*pb.Mutation{mu}},
+		GqlField: m,
+	}
+	resp, err := edgraph.QueryGraphQL(ctx, ereq)
 	span.Annotatef(nil, "QueryGraphQL took %s", time.Since(start).Round(time.Millisecond))
 	if err != nil {
 		return nil, err
@@ -459,8 +464,9 @@ func handleDelete(ctx context.Context, m *schema.Field) ([]uint64, error) {
 
 	req := &pb.Request{}
 	req.Mutations = append(req.Mutations, mu)
+	ereq := &edgraph.Request{Req: req, GqlField: m}
 
-	resp, err := edgraph.QueryGraphQL(ctx, req, m)
+	resp, err := edgraph.QueryGraphQL(ctx, ereq)
 	if err != nil {
 		return nil, errors.Wrapf(err, "while executing deletions")
 	}
@@ -756,7 +762,11 @@ func handleUpdate(ctx context.Context, m *schema.Field) ([]uint64, error) {
 		}
 	}
 
-	resp, err := edgraph.QueryGraphQL(ctx, &pb.Request{Mutations: []*pb.Mutation{mu}}, m)
+	ereq := &edgraph.Request{
+		Req:      &pb.Request{Mutations: []*pb.Mutation{mu}},
+		GqlField: m,
+	}
+	resp, err := edgraph.QueryGraphQL(ctx, ereq)
 	if err != nil {
 		return nil, errors.Wrapf(err, "while executing updates")
 	}
@@ -880,7 +890,12 @@ func (mr *dgraphResolver) Resolve(ctx context.Context, m *schema.Field) (*Resolv
 		dgQuery = append(dgQuery, addSelectionSetFrom(dgQuery[0], field)...)
 
 		q := dgraph.AsString(dgQuery)
-		resp, err := (&DgraphEx{}).Execute(ctx, &pb.Request{Query: q}, field)
+
+		req := &edgraph.Request{
+			Req:      &pb.Request{Query: q},
+			GqlField: field,
+		}
+		resp, err := (&DgraphEx{}).Execute(ctx, req)
 		return resp, err
 	}
 

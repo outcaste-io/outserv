@@ -75,13 +75,15 @@ type DgraphEx struct{}
 
 // Execute is the underlying dgraph implementation of Dgraph execution.
 // If field is nil, returned response has JSON in DQL form, otherwise it will be in GraphQL form.
-func (dg *DgraphEx) Execute(ctx context.Context, req *pb.Request,
-	field *schema.Field) (*pb.Response, error) {
+func (dg *DgraphEx) Execute(ctx context.Context,
+	ereq *edgraph.Request) (*pb.Response, error) {
 
 	span := trace.FromContext(ctx)
 	stop := x.SpanTimer(span, "dgraph.Execute")
 	defer stop()
 
+	// TODO: Gotta add the queries to it directly.
+	req := ereq.Req
 	if req == nil || (req.Query == "" && len(req.Mutations) == 0) {
 		return nil, nil
 	}
@@ -97,7 +99,7 @@ func (dg *DgraphEx) Execute(ctx context.Context, req *pb.Request,
 	}
 
 	ctx = context.WithValue(ctx, edgraph.IsGraphql, true)
-	resp, err := edgraph.QueryGraphQL(ctx, req, field)
+	resp, err := edgraph.QueryGraphQL(ctx, ereq)
 	if !x.IsGqlErrorList(err) {
 		err = schema.GQLWrapf(err, "Dgraph execution failed")
 	}
