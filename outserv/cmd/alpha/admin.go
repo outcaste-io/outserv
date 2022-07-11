@@ -75,7 +75,10 @@ func adminAuthHandler(next http.Handler) http.Handler {
 
 func getAdminMux() *http.ServeMux {
 	adminMux := http.NewServeMux()
+
 	adminMux.Handle("/admin/schema", adminAuthHandler(http.HandlerFunc(adminSchemaHandler)))
+	adminMux.Handle("/admin/lambda", adminAuthHandler(http.HandlerFunc(lambdaUpdateHandler)))
+
 	adminMux.Handle("/admin/schema/validate", schemaValidateHandler())
 	adminMux.Handle("/admin/shutdown", allowedMethodsHandler(allowedMethods{http.MethodGet: true},
 		adminAuthHandler(http.HandlerFunc(shutDownHandler))))

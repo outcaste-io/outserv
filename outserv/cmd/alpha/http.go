@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -495,6 +496,55 @@ func adminSchemaHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	writeSuccessResponse(w, r)
+}
+
+func lambdaUpdateHandler(w http.ResponseWriter, r *http.Request) {
+	if commonHandler(w, r) {
+		return
+	}
+
+	data := readRequest(w, r)
+	if len(data) == 0 {
+		return
+	}
+	scr := base64.StdEncoding.EncodeToString(data)
+
+	gqlReq := &schema.Request{
+		Query: `
+mutation updateLambda($scr: String!) {
+updateLambdaScript(input: {set: {script: $scr }}) {
+		lambdaScript { script }
+	}}`,
+		Variables: map[string]interface{}{"scr": scr},
+	}
+
+	resp := resolveWithAdminServer(gqlReq, r, adminServer)
+	if len(resp.Errors) > 0 {
+		x.SetStatus(w, x.Error, resp.Errors.Error())
+		return
+	}
+
+	type script struct {
+		Script string `json:"script"`
+	}
+	type uls struct {
+		LambdaScript script `json:"lambdaScript"`
+	}
+	type D struct {
+		Uls uls `json:"updateLambdaScript"`
+	}
+
+	var d D
+	if err := json.Unmarshal(resp.Data.Bytes(), &d); err != nil {
+		x.SetStatus(w, x.Error, fmt.Sprintf("Error while unmarshal of response: %s", err))
+		return
+	}
+	if got := d.Uls.LambdaScript.Script; got != scr {
+		glog.Errorf("Lambda Update Failed. Wanted:\n%s\nGot:\n%s\n", scr, got)
+		x.SetStatus(w, x.Error, fmt.Sprintf("Script doesn't match. Update Failed."))
+		return
+	}
 	writeSuccessResponse(w, r)
 }
 
