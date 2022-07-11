@@ -21,7 +21,6 @@ import (
 	"github.com/outcaste-io/outserv/outserv/cmd/debug"
 	"github.com/outcaste-io/outserv/outserv/cmd/debuginfo"
 	"github.com/outcaste-io/outserv/outserv/cmd/decrypt"
-	"github.com/outcaste-io/outserv/outserv/cmd/migrate"
 	"github.com/outcaste-io/outserv/outserv/cmd/version"
 	"github.com/outcaste-io/outserv/outserv/cmd/wallet"
 	"github.com/outcaste-io/outserv/x"
@@ -68,8 +67,8 @@ var subcommands = []*x.SubCommand{
 	// TODO: Consider if we need bulk loader.
 	// TODO: Consider if we need live loader.
 	&cert.Cert,
-	&alpha.Alpha, &version.Version, &debug.Debug, &migrate.Migrate,
-	&debuginfo.DebugInfo, &decrypt.Decrypt, &wallet.Wallet,
+	&alpha.Alpha, &version.Version, &debug.Debug,
+	&debuginfo.Profile, &decrypt.Decrypt, &wallet.Wallet,
 }
 
 func initCmds() {
@@ -192,9 +191,7 @@ func setGlogFlags(conf *viper.Viper) {
 }
 
 func shellCompletionCmd() *cobra.Command {
-
 	cmd := &cobra.Command{
-
 		Use:         "completion",
 		Short:       "Generates shell completion scripts for bash or zsh",
 		Annotations: map[string]string{"group": "tool"},

@@ -436,14 +436,8 @@ func (as *adminServer) resetSchema(ns uint64, gqlSchema *schema.Schema) {
 	as.gqlServer.Set(ns, as.getGlobalEpoch(ns), resolvers)
 }
 
-func (as *adminServer) lazyLoadSchema(namespace uint64) error {
-	// if the schema is already in memory, no need to fetch it from disk
-	if _, ok := as.gqlSchemas.GetCurrent(namespace); ok {
-		return nil
-	}
-	glog.Infof("Unable to find schema in cache for %d. Fetching...\n", namespace)
-
-	// otherwise, fetch the schema from disk
+func (as *adminServer) loadSchema(namespace uint64) error {
+	glog.Infof("LoadSchema: Fetching schema from disk for ns: %#x\n", namespace)
 	cur, err := getCurrentGraphQLSchema(namespace)
 	if err != nil {
 		glog.Errorf("namespace: %d. Error reading GraphQL schema: %s.", namespace, err)
@@ -470,20 +464,18 @@ func (as *adminServer) lazyLoadSchema(namespace uint64) error {
 	as.gqlSchemas.Set(namespace, cur)
 	as.resetSchema(namespace, generatedSchema)
 
-	glog.Infof("namespace: %d. Successfully lazy-loaded GraphQL schema.", namespace)
+	glog.Infof("LoadSchema: Successfully loaded GraphQL schema for ns: %#x", namespace)
 	return nil
 }
 
-func LazyLoadSchema(namespace uint64) error {
-	if err := adminServerVar.lazyLoadSchema(namespace); err != nil {
+func LoadSchema(namespace uint64) error {
+	if err := adminServerVar.loadSchema(namespace); err != nil {
 		return err
 	}
 
-	// If script is already loaded in memory, no need to fetch from disk.
-	if _, ok := worker.Lambda().GetCurrent(namespace); ok {
-		return nil
-	}
-	glog.Infof("Fetching lambda script from disk")
+	// Even if the script is already in memory, we should fetch from disk
+	// because we have updated it.
+	glog.Infof("LoadSchema: Fetching lambda script from disk for ns: %#x", namespace)
 	// Otherwise, fetch it from disk.
 	script, err := edgraph.GetLambdaScript(namespace)
 	if err != nil {

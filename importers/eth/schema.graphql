@@ -22,4 +22,5 @@ type AccountBal @remote {
 
 type Query {
   Balance(Hash: String!, Block: Int64): AccountBal @lambda
+  Test: String @lambda
 }

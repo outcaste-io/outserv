@@ -49,7 +49,7 @@ func saveMetrics(addr, pathPrefix string, seconds uint32, metricTypes []string) 
 		case "trace":
 			source += fmt.Sprintf("%s%d", "?seconds=", seconds)
 		}
-		savePath := fmt.Sprintf("%s%s.gz", pathPrefix, metricType)
+		savePath := fmt.Sprintf("%s%s.txt", pathPrefix, metricType)
 		if err := saveDebug(source, savePath, duration); err != nil {
 			glog.Errorf("error while saving metric from %s: %s", source, err)
 			continue

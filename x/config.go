@@ -135,7 +135,7 @@ type WorkerOptions struct {
 	// whitelist string - comma separated IP addresses
 	// token string - if set, all Admin requests to Dgraph will have this token.
 	Security *z.SuperFlag
-	// EncryptionKey is the key used for encryption at rest, backups, exports. Enterprise only feature.
+	// EncryptionKey is the key used for encryption at rest, backups, exports.
 	EncryptionKey Sensitive
 	// LogRequest indicates whether alpha should log all query/mutation requests coming to it.
 	// Ideally LogRequest should be a bool value. But we are reading it using atomics across

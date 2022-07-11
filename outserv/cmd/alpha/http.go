@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -494,7 +495,67 @@ func adminSchemaHandler(w http.ResponseWriter, r *http.Request) {
 		x.SetStatus(w, x.Error, response.Errors.Error())
 		return
 	}
+	if err := admin.LoadSchema(0); err != nil {
+		glog.Errorf("LoadSchema: Unable to load schema. Error: %v", err)
+		x.SetStatus(w, x.Error,
+			fmt.Sprintf("LoadSchema: Stored schema, but unable to load. Error: %v", err))
+		return
+	}
+	writeSuccessResponse(w, r)
+}
 
+func lambdaUpdateHandler(w http.ResponseWriter, r *http.Request) {
+	if commonHandler(w, r) {
+		return
+	}
+
+	data := readRequest(w, r)
+	if len(data) == 0 {
+		return
+	}
+	scr := base64.StdEncoding.EncodeToString(data)
+
+	gqlReq := &schema.Request{
+		Query: `
+mutation updateLambda($scr: String!) {
+updateLambdaScript(input: {set: {script: $scr }}) {
+		lambdaScript { script }
+	}}`,
+		Variables: map[string]interface{}{"scr": scr},
+	}
+
+	resp := resolveWithAdminServer(gqlReq, r, adminServer)
+	if len(resp.Errors) > 0 {
+		x.SetStatus(w, x.Error, resp.Errors.Error())
+		return
+	}
+
+	type script struct {
+		Script string `json:"script"`
+	}
+	type uls struct {
+		LambdaScript script `json:"lambdaScript"`
+	}
+	type D struct {
+		Uls uls `json:"updateLambdaScript"`
+	}
+
+	var d D
+	if err := json.Unmarshal(resp.Data.Bytes(), &d); err != nil {
+		x.SetStatus(w, x.Error, fmt.Sprintf("Error while unmarshal of response: %s", err))
+		return
+	}
+	if got := d.Uls.LambdaScript.Script; got != scr {
+		glog.Errorf("Lambda Update Failed. Wanted:\n%s\nGot:\n%s\n", scr, got)
+		x.SetStatus(w, x.Error, fmt.Sprintf("Script doesn't match. Update Failed."))
+		return
+	}
+	if err := admin.LoadSchema(0); err != nil {
+		glog.Errorf("LoadSchema: Unable to load lambda script. Error: %v", err)
+		x.SetStatus(w, x.Error,
+			fmt.Sprintf("LoadSchema: Stored lambda script, but unable to load. Error: %v", err))
+		return
+	}
 	writeSuccessResponse(w, r)
 }
 
@@ -505,7 +566,7 @@ func graphqlProbeHandler(gqlHealthStore *admin.GraphQLHealthStore, globalEpoch m
 		// lazy load the schema so that just by making a probe request,
 		// one can boot up GraphQL for their namespace
 		namespace := x.ExtractNamespaceHTTP(r)
-		if err := admin.LazyLoadSchema(namespace); err != nil {
+		if err := admin.LoadSchema(namespace); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			x.Check2(w.Write([]byte(fmt.Sprintf(`{"error":"%s"}`, err))))
 			return

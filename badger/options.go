@@ -87,11 +87,6 @@ type Options struct {
 	// AllowStopTheWorld determines whether the DropPrefix will be blocking/non-blocking.
 	AllowStopTheWorld bool
 
-	// DetectConflicts determines whether the transactions would be checked for
-	// conflicts. The transactions can be processed at a higher rate when
-	// conflict detection is disabled.
-	DetectConflicts bool
-
 	// NamespaceOffset specifies the offset from where the next 8 bytes contains the namespace.
 	NamespaceOffset int
 
@@ -151,7 +146,6 @@ func DefaultOptions(path string) Options {
 		Logger:                        defaultLogger(INFO),
 		EncryptionKey:                 []byte{},
 		EncryptionKeyRotationDuration: 10 * 24 * time.Hour, // Default 10 days.
-		DetectConflicts:               true,
 		NamespaceOffset:               -1,
 	}
 }
@@ -648,20 +642,6 @@ func (opt Options) WithBypassLockGuard(b bool) Options {
 // memory.
 func (opt Options) WithIndexCacheSize(size int64) Options {
 	opt.IndexCacheSize = size
-	return opt
-}
-
-// WithDetectConflicts returns a new Options value with DetectConflicts set to the given value.
-//
-// Detect conflicts options determines if the transactions would be checked for
-// conflicts before committing them. When this option is set to false
-// (detectConflicts=false) badger can process transactions at a higher rate.
-// Setting this options to false might be useful when the user application
-// deals with conflict detection and resolution.
-//
-// The default value of Detect conflicts is True.
-func (opt Options) WithDetectConflicts(b bool) Options {
-	opt.DetectConflicts = b
 	return opt
 }
 

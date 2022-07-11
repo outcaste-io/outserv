@@ -55,20 +55,6 @@ func InitServerState() {
 	State.initStorage()
 }
 
-func setBadgerOptions(opt badger.Options) badger.Options {
-	opt = opt.WithLogger(&x.ToGlog{}).
-		WithEncryptionKey(x.WorkerConfig.EncryptionKey)
-
-	// Disable conflict detection in badger. Alpha runs in managed mode and
-	// perform its own conflict detection so we don't need badger's conflict
-	// detection. Using badger's conflict detection uses memory which can be
-	// saved by disabling it.
-	opt.DetectConflicts = false
-
-	// Settings for the data directory.
-	return opt
-}
-
 func (s *ServerState) initStorage() {
 	var err error
 
@@ -89,13 +75,16 @@ func (s *ServerState) initStorage() {
 			WithDir(pdir).
 			WithNumVersionsToKeep(math.MaxInt32).
 			WithNamespaceOffset(x.NamespaceOffset).
-			WithExternalMagic(x.MagicVersion)
-		opt = setBadgerOptions(opt)
+			WithExternalMagic(x.MagicVersion).
+			WithLogger(&x.ToGlog{}).
+			WithEncryptionKey(x.WorkerConfig.EncryptionKey)
 
 		// Print the options w/o exposing key.
 		// TODO: Build a stringify interface in Badger options, which is used to print nicely here.
 		key := opt.EncryptionKey
-		opt.EncryptionKey = nil
+		if len(key) > 0 {
+			opt.EncryptionKey = []byte("encrypted")
+		}
 		glog.Infof("Opening postings BadgerDB with options: %+v\n", opt)
 		opt.EncryptionKey = key
 

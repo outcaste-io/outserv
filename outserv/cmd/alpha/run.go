@@ -236,41 +236,41 @@ func init() {
 			"Restarts the lambda server after given duration of unresponsiveness").
 		String())
 
-	flag.String("cdc", worker.CDCDefaults, z.NewSuperFlagHelp(worker.CDCDefaults).
-		Head("Change Data Capture options").
-		Flag("file",
-			"The path where audit logs will be stored.").
-		Flag("kafka",
-			"A comma separated list of Kafka hosts.").
-		Flag("sasl-user",
-			"The SASL username for Kafka.").
-		Flag("sasl-password",
-			"The SASL password for Kafka.").
-		Flag("sasl-mechanism",
-			"The SASL mechanism for Kafka (PLAIN, SCRAM-SHA-256 or SCRAM-SHA-512)").
-		Flag("ca-cert",
-			"The path to CA cert file for TLS encryption.").
-		Flag("client-cert",
-			"The path to client cert file for TLS encryption.").
-		Flag("client-key",
-			"The path to client key file for TLS encryption.").
-		String())
+	// flag.String("cdc", worker.CDCDefaults, z.NewSuperFlagHelp(worker.CDCDefaults).
+	// 	Head("Change Data Capture options").
+	// 	Flag("file",
+	// 		"The path where audit logs will be stored.").
+	// 	Flag("kafka",
+	// 		"A comma separated list of Kafka hosts.").
+	// 	Flag("sasl-user",
+	// 		"The SASL username for Kafka.").
+	// 	Flag("sasl-password",
+	// 		"The SASL password for Kafka.").
+	// 	Flag("sasl-mechanism",
+	// 		"The SASL mechanism for Kafka (PLAIN, SCRAM-SHA-256 or SCRAM-SHA-512)").
+	// 	Flag("ca-cert",
+	// 		"The path to CA cert file for TLS encryption.").
+	// 	Flag("client-cert",
+	// 		"The path to client cert file for TLS encryption.").
+	// 	Flag("client-key",
+	// 		"The path to client key file for TLS encryption.").
+	// 	String())
 
-	flag.String("audit", worker.AuditDefaults, z.NewSuperFlagHelp(worker.AuditDefaults).
-		Head("Audit options").
-		Flag("output",
-			`[stdout, /path/to/dir] This specifies where audit logs should be output to.
-			"stdout" is for standard output. You can also specify the directory where audit logs
-			will be saved. When stdout is specified as output other fields will be ignored.`).
-		Flag("compress",
-			"Enables the compression of old audit logs.").
-		Flag("encrypt-file",
-			"The path to the key file to be used for audit log encryption.").
-		Flag("days",
-			"The number of days audit logs will be preserved.").
-		Flag("size",
-			"The audit log max size in MB after which it will be rolled over.").
-		String())
+	// flag.String("audit", worker.AuditDefaults, z.NewSuperFlagHelp(worker.AuditDefaults).
+	// 	Head("Audit options").
+	// 	Flag("output",
+	// 		`[stdout, /path/to/dir] This specifies where audit logs should be output to.
+	// 		"stdout" is for standard output. You can also specify the directory where audit logs
+	// 		will be saved. When stdout is specified as output other fields will be ignored.`).
+	// 	Flag("compress",
+	// 		"Enables the compression of old audit logs.").
+	// 	Flag("encrypt-file",
+	// 		"The path to the key file to be used for audit log encryption.").
+	// 	Flag("days",
+	// 		"The number of days audit logs will be preserved.").
+	// 	Flag("size",
+	// 		"The audit log max size in MB after which it will be rolled over.").
+	// 	String())
 
 	flag.String("wallet", billing.WalletDefaults, z.NewSuperFlagHelp(billing.WalletDefaults).
 		Head("Wallet options").
@@ -633,13 +633,14 @@ func setupServer() {
 	var gqlHealthStore *admin.GraphQLHealthStore
 	mainServer, adminServer, gqlHealthStore = admin.NewServers(introspection, globalEpoch)
 
+	// Load schema for namespace 0.
+	x.Checkf(admin.LoadSchema(0), "Unable to load GraphQL schema")
+
 	baseMux.HandleFunc("/graphql", func(w http.ResponseWriter, r *http.Request) {
 		namespace := x.ExtractNamespaceHTTP(r)
 		r.Header.Set("resolver", strconv.FormatUint(namespace, 10))
-		if err := admin.LazyLoadSchema(namespace); err != nil {
-			admin.WriteErrorResponse(w, r, err)
-			return
-		}
+		// No need to load schema here. It should be loaded when schema is
+		// updated, or /probe/graphql is called.
 		mainServer.HTTPHandler().ServeHTTP(w, r)
 	})
 	baseMux.Handle("/probe/graphql", graphqlProbeHandler(gqlHealthStore, globalEpoch))
@@ -648,7 +649,7 @@ func setupServer() {
 		r.Header.Set("resolver", "0")
 		// We don't need to load the schema for all the admin operations.
 		// Only a few like getUser, queryGroup require this. So, this can be optimized.
-		if err := admin.LazyLoadSchema(x.ExtractNamespaceHTTP(r)); err != nil {
+		if err := admin.LoadSchema(x.ExtractNamespaceHTTP(r)); err != nil {
 			admin.WriteErrorResponse(w, r, err)
 			return
 		}
@@ -780,7 +781,7 @@ func run() {
 	x.WorkerConfig.Parse(Alpha.Conf)
 
 	if telemetry.GetBool("reports") {
-		go edgraph.PeriodicallyPostTelemetry()
+		go edgraph.PeriodicallyPostTelemetry_XXX()
 	}
 
 	// Set the directory for temporary buffers.

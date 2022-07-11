@@ -1,7 +1,8 @@
-# Outserv: GraphQL Indexing and Serving System
+# Outserv: Blockchain Search
 
-Outserv is a GraphQL Indexing and Serving System, built to make it easier to
-deploy a fast, scalable, production grade system to serve data via GraphQL.
+Outserv indexes Blockchain data to enable search and provides customizable GraphQL APIs to serve Blockchain data.
+
+// TODO: Why Outserv.
 
 ## What is the motivation behind Outserv?
 

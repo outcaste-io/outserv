@@ -55,9 +55,9 @@ const (
 )
 
 func RegisterAclAndEncFlags(flag *pflag.FlagSet) {
-	registerAclFlag(flag)
+	// registerAclFlag(flag)
 	registerEncFlag(flag)
-	registerVaultFlag(flag, true, true)
+	// registerVaultFlag(flag, true, true)
 }
 
 func RegisterEncFlag(flag *pflag.FlagSet) {
@@ -137,7 +137,7 @@ func registerAclFlag(flag *pflag.FlagSet) {
 
 func registerEncFlag(flag *pflag.FlagSet) {
 	helpText := z.NewSuperFlagHelp(EncDefaults).
-		Head("[Enterprise Feature] Encryption At Rest options").
+		Head("Encryption At Rest options").
 		Flag("key-file", "The file that stores the symmetric key of length 16, 24, or 32 bytes."+
 			"The key size determines the chosen AES cipher (AES-128, AES-192, and AES-256 respectively).").
 		String()
