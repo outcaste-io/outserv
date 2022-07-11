@@ -91,7 +91,7 @@ type existingGQLSchemaQryResp struct {
 }
 
 // PeriodicallyPostTelemetry periodically reports telemetry data for alpha.
-func PeriodicallyPostTelemetry() {
+func PeriodicallyPostTelemetry_XXX() {
 	glog.V(2).Infof("Starting telemetry data collection for alpha...")
 
 	start := time.Now()

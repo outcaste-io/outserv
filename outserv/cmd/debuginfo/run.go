@@ -1,18 +1,5 @@
-/*
- * Copyright 2019-2021 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2019-2021 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Sustainable License v1.0.
 
 package debuginfo
 
@@ -27,8 +14,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type debugInfoCmdOpts struct {
-	alphaAddr   string
+type profileOpts struct {
+	outservAddr string
 	zeroAddr    string
 	archive     bool
 	directory   string
@@ -37,119 +24,109 @@ type debugInfoCmdOpts struct {
 }
 
 var (
-	DebugInfo    x.SubCommand
-	debugInfoCmd = debugInfoCmdOpts{}
+	Profile    x.SubCommand
+	profileCmd = profileOpts{}
 )
 
 var metricMap = map[string]string{
-	"jemalloc":     "/debug/jemalloc",
-	"state":        "/state",
-	"health":       "/health",
-	"vars":         "/debug/vars",
-	"metrics":      "/metrics",
-	"heap":         "/debug/pprof/heap",
-	"goroutine":    "/debug/pprof/goroutine?debug=2",
-	"threadcreate": "/debug/pprof/threadcreate",
 	"block":        "/debug/pprof/block",
-	"mutex":        "/debug/pprof/mutex",
 	"cpu":          "/debug/pprof/profile",
+	"goroutine":    "/debug/pprof/goroutine?debug=2",
+	"health":       "/health",
+	"heap":         "/debug/pprof/heap",
+	"jemalloc":     "/debug/jemalloc",
+	"metrics":      "/metrics",
+	"mutex":        "/debug/pprof/mutex",
+	"state":        "/state",
+	"threadcreate": "/debug/pprof/threadcreate",
 	"trace":        "/debug/pprof/trace",
+	"vars":         "/debug/vars",
 }
 
 var metricList = []string{
-	"heap",
-	"cpu",
-	"state",
-	"health",
-	"jemalloc",
-	"trace",
-	"metrics",
-	"vars",
-	"trace",
-	"goroutine",
 	"block",
+	"cpu",
+	"goroutine",
+	"health",
+	"heap",
+	"jemalloc",
+	"metrics",
 	"mutex",
+	"state",
 	"threadcreate",
+	"trace",
+	"vars",
 }
 
 func init() {
-	DebugInfo.Cmd = &cobra.Command{
-		Use:   "debuginfo",
-		Short: "Generate debug information on the current node",
+	Profile.Cmd = &cobra.Command{
+		Use:   "profile",
+		Short: "Collect profile and debug info from given Outserv instance",
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := collectDebugInfo(); err != nil {
-				glog.Errorf("error while collecting dgraph debug info: %s", err)
+				glog.Errorf("error while collecting Outserv profile: %s", err)
 				os.Exit(1)
 			}
 		},
 		Annotations: map[string]string{"group": "debug"},
 	}
 
-	DebugInfo.EnvPrefix = "DGRAPH_AGENT_DEBUGINFO"
-	DebugInfo.Cmd.SetHelpTemplate(x.NonRootTemplate)
+	Profile.EnvPrefix = "OUTSERV_AGENT_DEBUGINFO"
+	Profile.Cmd.SetHelpTemplate(x.NonRootTemplate)
 
-	flags := DebugInfo.Cmd.Flags()
-	flags.StringVarP(&debugInfoCmd.alphaAddr, "alpha", "a", "localhost:8080",
-		"Address of running dgraph alpha.")
-	flags.StringVarP(&debugInfoCmd.zeroAddr, "zero", "z", "", "Address of running dgraph zero.")
-	flags.StringVarP(&debugInfoCmd.directory, "directory", "d", "",
+	flags := Profile.Cmd.Flags()
+	flags.StringVarP(&profileCmd.outservAddr, "outserv", "o", "localhost:8080",
+		"HTTP address of running Outserv instance.")
+	flags.StringVarP(&profileCmd.directory, "directory", "d", "",
 		"Directory to write the debug info into.")
-	flags.BoolVarP(&debugInfoCmd.archive, "archive", "x", true,
+	flags.BoolVarP(&profileCmd.archive, "archive", "x", true,
 		"Whether to archive the generated report")
-	flags.Uint32VarP(&debugInfoCmd.seconds, "seconds", "s", 30,
+	flags.Uint32VarP(&profileCmd.seconds, "seconds", "s", 30,
 		"Duration for time-based metric collection.")
-	flags.StringSliceVarP(&debugInfoCmd.metricTypes, "metrics", "m", metricList,
+	flags.StringSliceVarP(&profileCmd.metricTypes, "metrics", "m", metricList,
 		"List of metrics & profile to dump in the report.")
-
 }
 
 func collectDebugInfo() (err error) {
-	if debugInfoCmd.directory == "" {
-		debugInfoCmd.directory, err = ioutil.TempDir("/tmp", "dgraph-debuginfo")
+	if profileCmd.directory == "" {
+		profileCmd.directory, err = ioutil.TempDir("/tmp", "outserv-debuginfo")
 		if err != nil {
 			return fmt.Errorf("error while creating temporary directory: %s", err)
 		}
 	} else {
-		err = os.MkdirAll(debugInfoCmd.directory, 0644)
+		err = os.MkdirAll(profileCmd.directory, 0644)
 		if err != nil {
 			return err
 		}
 	}
-	glog.Infof("using directory %s for debug info dump.", debugInfoCmd.directory)
+	glog.Infof("using directory %s for debug info dump.", profileCmd.directory)
 
 	collectDebug()
 
-	if debugInfoCmd.archive {
+	if profileCmd.archive {
 		return archiveDebugInfo()
 	}
 	return nil
 }
 
 func collectDebug() {
-	if debugInfoCmd.alphaAddr != "" {
-		filePrefix := filepath.Join(debugInfoCmd.directory, "alpha_")
+	if profileCmd.outservAddr != "" {
+		filePrefix := filepath.Join(profileCmd.directory, "alpha_")
 
-		saveMetrics(debugInfoCmd.alphaAddr, filePrefix, debugInfoCmd.seconds, debugInfoCmd.metricTypes)
-
-	}
-
-	if debugInfoCmd.zeroAddr != "" {
-		filePrefix := filepath.Join(debugInfoCmd.directory, "zero_")
-
-		saveMetrics(debugInfoCmd.zeroAddr, filePrefix, debugInfoCmd.seconds, debugInfoCmd.metricTypes)
+		saveMetrics(profileCmd.outservAddr, filePrefix, profileCmd.seconds, profileCmd.metricTypes)
 
 	}
 }
 
 func archiveDebugInfo() error {
-	archivePath, err := createGzipArchive(debugInfoCmd.directory)
+	archivePath, err := createGzipArchive(profileCmd.directory)
 	if err != nil {
 		return fmt.Errorf("error while archiving debuginfo directory: %s", err)
 	}
 
 	glog.Infof("Debuginfo archive successful: %s", archivePath)
 
-	if err = os.RemoveAll(debugInfoCmd.directory); err != nil {
+	if err = os.RemoveAll(profileCmd.directory); err != nil {
 		glog.Warningf("error while removing debuginfo directory: %s", err)
 	}
 	return nil
