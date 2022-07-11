@@ -495,7 +495,12 @@ func adminSchemaHandler(w http.ResponseWriter, r *http.Request) {
 		x.SetStatus(w, x.Error, response.Errors.Error())
 		return
 	}
-
+	if err := admin.LoadSchema(0); err != nil {
+		glog.Errorf("LoadSchema: Unable to load schema. Error: %v", err)
+		x.SetStatus(w, x.Error,
+			fmt.Sprintf("LoadSchema: Stored schema, but unable to load. Error: %v", err))
+		return
+	}
 	writeSuccessResponse(w, r)
 }
 
@@ -545,6 +550,12 @@ updateLambdaScript(input: {set: {script: $scr }}) {
 		x.SetStatus(w, x.Error, fmt.Sprintf("Script doesn't match. Update Failed."))
 		return
 	}
+	if err := admin.LoadSchema(0); err != nil {
+		glog.Errorf("LoadSchema: Unable to load lambda script. Error: %v", err)
+		x.SetStatus(w, x.Error,
+			fmt.Sprintf("LoadSchema: Stored lambda script, but unable to load. Error: %v", err))
+		return
+	}
 	writeSuccessResponse(w, r)
 }
 
@@ -555,7 +566,7 @@ func graphqlProbeHandler(gqlHealthStore *admin.GraphQLHealthStore, globalEpoch m
 		// lazy load the schema so that just by making a probe request,
 		// one can boot up GraphQL for their namespace
 		namespace := x.ExtractNamespaceHTTP(r)
-		if err := admin.LazyLoadSchema(namespace); err != nil {
+		if err := admin.LoadSchema(namespace); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			x.Check2(w.Write([]byte(fmt.Sprintf(`{"error":"%s"}`, err))))
 			return
