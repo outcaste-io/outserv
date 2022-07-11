@@ -631,13 +631,14 @@ func setupServer() {
 	var gqlHealthStore *admin.GraphQLHealthStore
 	mainServer, adminServer, gqlHealthStore = admin.NewServers(introspection, globalEpoch)
 
+	// Load schema for namespace 0.
+	x.Checkf(admin.LoadSchema(0), "Unable to load GraphQL schema")
+
 	baseMux.HandleFunc("/graphql", func(w http.ResponseWriter, r *http.Request) {
 		namespace := x.ExtractNamespaceHTTP(r)
 		r.Header.Set("resolver", strconv.FormatUint(namespace, 10))
-		if err := admin.LazyLoadSchema(namespace); err != nil {
-			admin.WriteErrorResponse(w, r, err)
-			return
-		}
+		// No need to load schema here. It should be loaded when schema is
+		// updated, or /probe/graphql is called.
 		mainServer.HTTPHandler().ServeHTTP(w, r)
 	})
 	baseMux.Handle("/probe/graphql", graphqlProbeHandler(gqlHealthStore, globalEpoch))
@@ -646,7 +647,7 @@ func setupServer() {
 		r.Header.Set("resolver", "0")
 		// We don't need to load the schema for all the admin operations.
 		// Only a few like getUser, queryGroup require this. So, this can be optimized.
-		if err := admin.LazyLoadSchema(x.ExtractNamespaceHTTP(r)); err != nil {
+		if err := admin.LoadSchema(x.ExtractNamespaceHTTP(r)); err != nil {
 			admin.WriteErrorResponse(w, r, err)
 			return
 		}
