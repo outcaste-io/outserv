@@ -13,3 +13,14 @@ type Account {
   Incoming: [Txn]
   Outgoing: [Txn]
 }
+
+type AccountBal @remote {
+  Value: Int64
+  Name: String
+  Hash: String
+}
+
+type Query {
+  Balance(Hash: String!, Block: Int64): AccountBal @lambda
+  Test: String @lambda
+}
