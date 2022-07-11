@@ -637,11 +637,8 @@ func setupServer() {
 	baseMux.HandleFunc("/graphql", func(w http.ResponseWriter, r *http.Request) {
 		namespace := x.ExtractNamespaceHTTP(r)
 		r.Header.Set("resolver", strconv.FormatUint(namespace, 10))
-		// glog.Infof("/graphql endpoint was called. I'll do some lazy loading")
-		// if err := admin.LazyLoadSchema(namespace); err != nil {
-		// 	admin.WriteErrorResponse(w, r, err)
-		// 	return
-		// }
+		// No need to load schema here. It should be loaded when schema is
+		// updated, or /probe/graphql is called.
 		mainServer.HTTPHandler().ServeHTTP(w, r)
 	})
 	baseMux.Handle("/probe/graphql", graphqlProbeHandler(gqlHealthStore, globalEpoch))
