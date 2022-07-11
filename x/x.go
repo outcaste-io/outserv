@@ -1149,12 +1149,8 @@ func ToHexString(i uint64) string {
 
 // TODO: Fix this all up.
 // RootTemplate defines the help template for dgraph command.
-var RootTemplate string = `Dgraph is a horizontally scalable and distributed graph database,
-providing ACID transactions, consistent replication and linearizable reads.
-It's built from the ground up to perform for a rich set of queries. Being a native
-graph database, it tightly controls how the data is arranged on disk to optimize
-for query performance and throughput, reducing disk seeks and network calls in a
-cluster.` + BuildDetails() +
+var RootTemplate string = `**Blockchain Search: Powered by Outserv GraphQL**
+` + BuildDetails() +
 	`Usage:{{if .Runnable}}
   {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
   {{.CommandPath}} [command]{{end}} {{if .HasAvailableSubCommands}}

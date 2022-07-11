@@ -41,9 +41,9 @@ func FillCommonFlags(flag *pflag.FlagSet) {
 			`guaranteeing no data loss in case of hard reboot.`+"\n    "+
 			`Most users should be OK with choosing "process".`)
 
-	flag.String("telemetry", TelemetryDefaults, z.NewSuperFlagHelp(TelemetryDefaults).
-		Head("Telemetry (diagnostic) options").
-		Flag("reports",
-			"Send anonymous telemetry data to Dgraph devs.").
-		String())
+	// flag.String("telemetry", TelemetryDefaults, z.NewSuperFlagHelp(TelemetryDefaults).
+	// 	Head("Telemetry (diagnostic) options").
+	// 	Flag("reports",
+	// 		"Send anonymous telemetry data to Dgraph devs.").
+	// 	String())
 }
