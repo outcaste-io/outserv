@@ -2,6 +2,7 @@ type Txn {
   Oid: ID!
   Hash: String! @id
   Value: Int64 @search
+  Fee: Int64 @search
   Block: Int64 @search
   To: Account @hasInverse(field: Incoming)
   From: Account @hasInverse(field: Outgoing)

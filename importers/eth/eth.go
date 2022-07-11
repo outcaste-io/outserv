@@ -42,6 +42,7 @@ type Account struct {
 type Txn struct {
 	Hash  string
 	Value int64
+	Fee   int64
 	Block int64
 	To    Account
 	From  Account
@@ -72,6 +73,8 @@ type Block struct {
 	txns []Txn
 }
 
+var gwei = big.NewInt(1e9)
+
 func (b *Block) Fill() {
 	defer b.Wg.Done()
 	blockNumber := big.NewInt(b.Id)
@@ -86,9 +89,14 @@ func (b *Block) Fill() {
 		if tx.To() != nil {
 			to.Hash = tx.To().Hex()
 		}
+
+		valGwei := new(big.Int).Div(tx.Value(), gwei)
+		costGwei := new(big.Int).Div(tx.Cost(), gwei)
+		feeGwei := new(big.Int).Sub(costGwei, valGwei)
 		txn := Txn{
 			Hash:  tx.Hash().Hex(),
-			Value: tx.Value().Int64(),
+			Value: valGwei.Int64(),
+			Fee:   feeGwei.Int64(),
 			Block: blockNumber.Int64(),
 			To:    to,
 			From:  from,
