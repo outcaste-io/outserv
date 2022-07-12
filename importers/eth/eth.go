@@ -13,6 +13,8 @@ import (
 	"math/big"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -22,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var path = flag.String("geth", "", "Geth IPC path")
+var path = flag.String("geth", "", "Geth IPC path or GraphQL Address")
 var graphql = flag.String("gql", "http://localhost:8080", "GraphQL endpoint")
 var dryRun = flag.Bool("dry", false, "If true, don't send txns to GraphQL endpoint")
 var numGo = flag.Int("gor", 4, "Number of goroutines to use")
@@ -37,7 +39,7 @@ mutation($Txns: [AddTxnInput!]!) {
 `
 
 type Account struct {
-	Hash string
+	Address string
 }
 type Txn struct {
 	Hash  string
@@ -46,7 +48,13 @@ type Txn struct {
 	Block int64
 	To    Account
 	From  Account
+
+	// The following fields are used by ETH. But, not part of Outserv's GraphQL Schema.
+	ValueStr string `json:"value_str,omitempty"`
+	GasUsed  int64  `json:"gasUsed,omitempty"`
+	GasPrice string `json:"gasPrice,omitempty"`
 }
+
 type Batch struct {
 	Txns []Txn `json:"Txns"`
 }
@@ -68,16 +76,15 @@ type WResp struct {
 	Errors []ErrorResp `json:"errors"`
 }
 type Block struct {
-	Wg   sync.WaitGroup
-	Id   int64
-	txns []Txn
+	wg           sync.WaitGroup
+	Number       int64
+	Transactions []Txn `json:"transactions"`
 }
 
 var gwei = big.NewInt(1e9)
 
-func (b *Block) Fill() {
-	defer b.Wg.Done()
-	blockNumber := big.NewInt(b.Id)
+func (b *Block) fillViaClient() {
+	blockNumber := big.NewInt(b.Number)
 	block, err := client.BlockByNumber(context.Background(), blockNumber)
 	check(err)
 	for _, tx := range block.Transactions() {
@@ -91,11 +98,11 @@ func (b *Block) Fill() {
 
 		var to, from Account
 		if msg, err := tx.AsMessage(types.NewEIP155Signer(chainID), nil); err == nil {
-			from.Hash = msg.From().Hex()
+			from.Address = msg.From().Hex()
 		}
 
 		if tx.To() != nil {
-			to.Hash = tx.To().Hex()
+			to.Address = tx.To().Hex()
 		}
 
 		valGwei := new(big.Int).Div(tx.Value(), gwei)
@@ -109,7 +116,7 @@ func (b *Block) Fill() {
 			To:    to,
 			From:  from,
 		}
-		if txn.Value == 0 || len(txn.To.Hash) == 0 || len(txn.From.Hash) == 0 {
+		if txn.Value == 0 || len(txn.To.Address) == 0 || len(txn.From.Address) == 0 {
 			continue
 		}
 		// Only include txns from certain accounts.
@@ -121,14 +128,95 @@ func (b *Block) Fill() {
 		// 	include = true
 		// }
 		if include {
-			b.txns = append(b.txns, txn)
+			b.Transactions = append(b.Transactions, txn)
 		}
 	}
 }
 
+func (b *Block) fillViaGraphQL() {
+	q := fmt.Sprintf(`
+{
+	block(number: %d) {
+		number
+		transactions {
+			Hash: hash
+			From: from { Address: address }
+			To: to { Address: address }
+			value_str: value
+			gasPrice
+			gasUsed
+		}
+	}
+}`, b.Number)
+
+	type httpReq struct {
+		Query string
+	}
+	req := httpReq{Query: q}
+	reqData, err := json.Marshal(req)
+	check(err)
+
+	buf := bytes.NewBuffer(reqData)
+	resp, err := http.Post(*path, "application/graphql", buf)
+	check(err)
+
+	data, err := ioutil.ReadAll(resp.Body)
+	check(err)
+	check(resp.Body.Close())
+
+	type eResp struct {
+		Data struct {
+			Block Block
+		} `json:"data"`
+	}
+	var eresp eResp
+	check(json.Unmarshal(data, &eresp))
+
+	blk := eresp.Data.Block
+	if blk.Number != b.Number {
+		fmt.Printf("Invalid response from ETH. Expected: %d Got: %d\n", b.Number, blk.Number)
+		os.Exit(1)
+	}
+	for _, txn := range blk.Transactions {
+		val, ok := new(big.Int).SetString(txn.ValueStr, 0)
+		if !ok {
+			val = new(big.Int).SetInt64(0)
+		}
+		txn.Value = new(big.Int).Div(val, gwei).Int64()
+
+		price, ok := new(big.Int).SetString(txn.GasPrice, 0)
+		if !ok {
+			price = new(big.Int).SetInt64(0)
+		}
+		fee := new(big.Int).Mul(price, new(big.Int).SetInt64(txn.GasUsed))
+		feeGwei := new(big.Int).Div(fee, gwei)
+		txn.Fee = feeGwei.Int64()
+		txn.Block = b.Number
+		if txn.Value == 0 || len(txn.To.Address) == 0 || len(txn.From.Address) == 0 {
+			continue
+		}
+
+		// Zero out the following fields, so they don't get marshalled when
+		// sending to Outserv.
+		txn.ValueStr = ""
+		txn.GasUsed = 0
+		txn.GasPrice = ""
+		b.Transactions = append(b.Transactions, txn)
+	}
+}
+
+func (b *Block) Fill() {
+	defer b.wg.Done()
+	if isGraphQL {
+		b.fillViaGraphQL()
+	} else {
+		b.fillViaClient()
+	}
+}
+
 func (b *Block) Txns() []Txn {
-	b.Wg.Wait()
-	return b.txns
+	b.wg.Wait()
+	return b.Transactions
 }
 
 type Chain struct {
@@ -147,8 +235,8 @@ func (c *Chain) BlockingFill() {
 		if blockId >= 15e6 {
 			return
 		}
-		b := &Block{Id: blockId}
-		b.Wg.Add(1)
+		b := &Block{Number: blockId}
+		b.wg.Add(1)
 		go b.Fill()
 		c.blockCh <- b
 	}
@@ -223,6 +311,7 @@ func sendRequest(data []byte) error {
 	}
 	for _, werr := range wr.Errors {
 		if len(werr.Message) > 0 {
+			fmt.Printf("REQUEST was:\n%s\n", data)
 			return fmt.Errorf("Got error from GraphQL: %s\n", werr.Message)
 		}
 	}
@@ -236,6 +325,7 @@ func check(err error) {
 	}
 }
 
+var isGraphQL bool
 var client *ethclient.Client
 var chainID *big.Int
 
@@ -246,22 +336,31 @@ func main() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
-	var err error
-	client, err = ethclient.Dial(*path)
-	if err != nil {
-		log.Fatal(err)
+	if strings.HasSuffix(*path, "/graphql") {
+		isGraphQL = true
+	} else {
+		var err error
+		client, err = ethclient.Dial(*path)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
-	chainID, err = client.NetworkID(context.Background())
-	if err != nil {
-		log.Fatal(err)
-	}
+	if isGraphQL {
 
-	header, err := client.HeaderByNumber(context.Background(), nil)
-	if err != nil {
-		log.Fatal(err)
+	} else {
+		var err error
+		chainID, err = client.NetworkID(context.Background())
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		header, err := client.HeaderByNumber(context.Background(), nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("Latest: %08d\n", header.Number)
 	}
-	fmt.Printf("Latest: %08d\n", header.Number)
 	fmt.Printf("Using %d goroutines.\n", *numGo)
 
 	chain := Chain{

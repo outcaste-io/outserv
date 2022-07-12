@@ -10,7 +10,7 @@ type Txn {
 
 type Account {
   Oid: ID!
-  Hash: String! @id
+  Address: String! @id
   Incoming: [Txn]
   Outgoing: [Txn]
 }
