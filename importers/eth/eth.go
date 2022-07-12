@@ -81,6 +81,14 @@ func (b *Block) Fill() {
 	block, err := client.BlockByNumber(context.Background(), blockNumber)
 	check(err)
 	for _, tx := range block.Transactions() {
+		receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
+		check(err)
+		gasUsed := new(big.Int).SetUint64(receipt.GasUsed)
+		if receipt.Status != 1 {
+			// Skip failed transactions.
+			continue
+		}
+
 		var to, from Account
 		if msg, err := tx.AsMessage(types.NewEIP155Signer(chainID), nil); err == nil {
 			from.Hash = msg.From().Hex()
@@ -91,8 +99,8 @@ func (b *Block) Fill() {
 		}
 
 		valGwei := new(big.Int).Div(tx.Value(), gwei)
-		costGwei := new(big.Int).Div(tx.Cost(), gwei)
-		feeGwei := new(big.Int).Sub(costGwei, valGwei)
+		fee := new(big.Int).Mul(tx.GasPrice(), gasUsed)
+		feeGwei := new(big.Int).Div(fee, gwei)
 		txn := Txn{
 			Hash:  tx.Hash().Hex(),
 			Value: valGwei.Int64(),
