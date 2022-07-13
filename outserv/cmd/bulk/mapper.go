@@ -12,16 +12,12 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 
 	farm "github.com/dgryski/go-farm"
 	"github.com/golang/snappy"
-	"github.com/outcaste-io/dgo/v210/protos/api"
 	"github.com/outcaste-io/outserv/chunker"
-	"github.com/outcaste-io/outserv/ee/acl"
-	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/tok"
@@ -216,26 +212,12 @@ func (m *mapper) run(inputFormat chunker.InputFormat) {
 				}
 			}
 		}
-		once.Do(func() {
-			if m.opt.Namespace != math.MaxUint64 && m.opt.Namespace != x.GalaxyNamespace {
-				// Insert ACL related RDFs force uploading the data into non-galaxy namespace.
-				aclNquads := make([]*api.NQuad, 0)
-				aclNquads = append(aclNquads, acl.CreateGroupNQuads(x.GuardiansId)...)
-				aclNquads = append(aclNquads, acl.CreateUserNQuads(x.GrootId, "password")...)
-				aclNquads = append(aclNquads, &api.NQuad{
-					Subject:   "_:newuser",
-					Predicate: "dgraph.user.group",
-					ObjectId:  "_:newgroup",
-				})
-				nquads.Push(aclNquads...)
-			}
-		})
 		nquads.Flush()
 	}()
 
 	for nqs := range nquads.Ch() {
 		for _, nq := range nqs {
-			m.processNQuad(gql.NQuad{NQuad: nq})
+			m.processNQuad(nq)
 			atomic.AddInt64(&m.prog.nquadCount, 1)
 		}
 
@@ -281,7 +263,7 @@ func (m *mapper) addMapEntry(key []byte, p *pb.Posting, shard int) {
 	marshalMapEntry(dst, uid, key, p)
 }
 
-func (m *mapper) processNQuad(nq gql.NQuad) {
+func (m *mapper) processNQuad(nq *pb.Edge) {
 	if m.opt.Namespace != math.MaxUint64 {
 		// Use the specified namespace passed through '--force-namespace' flag.
 		nq.Namespace = m.opt.Namespace
@@ -291,33 +273,36 @@ func (m *mapper) processNQuad(nq gql.NQuad) {
 		panic(fmt.Sprintf("invalid UID with value 0 for %v", nq.GetSubject()))
 	}
 	var oid uint64
-	var de *pb.DirectedEdge
+	var de *pb.Edge
 	if nq.GetObjectValue() == nil {
 		oid = m.uid(nq.GetObjectId(), nq.Namespace)
 		if oid == 0 {
 			panic(fmt.Sprintf("invalid UID with value 0 for %v", nq.GetObjectId()))
 		}
-		de = nq.CreateUidEdge(sid, oid)
+		de = &pb.Edge{
+			Subject:   x.ToHexString(sid),
+			Predicate: nq.Predicate,
+			ObjectId:  x.ToHexString(oid),
+			Namespace: nq.Namespace,
+		}
 	} else {
-		var err error
-		de, err = nq.CreateValueEdge(sid)
-		x.Check(err)
+		de = &pb.Edge{
+			Subject:     x.ToHexString(sid),
+			Predicate:   nq.Predicate,
+			ObjectValue: nq.ObjectValue,
+			Namespace:   nq.Namespace,
+		}
 	}
 
 	m.schema.checkAndSetInitialSchema(nq.Namespace)
 
 	// Appropriate schema must exist for the nquad's namespace by this time.
-	de.Attr = x.NamespaceAttr(de.Namespace, de.Attr)
-	fwd, rev := m.createPostings(nq, de)
-	shard := m.state.shards.shardFor(de.Attr)
-	key := x.DataKey(de.Attr, sid)
+	de.Predicate = x.NamespaceAttr(de.Namespace, de.Predicate)
+	fwd := m.createPostings(nq)
+	shard := m.state.shards.shardFor(de.Predicate)
+	key := x.DataKey(de.Predicate, sid)
 	m.addMapEntry(key, fwd, shard)
-
-	if rev != nil {
-		key = x.ReverseKey(de.Attr, oid)
-		m.addMapEntry(key, rev, shard)
-	}
-	m.addIndexMapEntries(nq, de)
+	m.addIndexMapEntries(nq)
 }
 
 func (m *mapper) uid(xid string, ns uint64) uint64 {
@@ -347,79 +332,47 @@ func (m *mapper) lookupUid(xid string, ns uint64) uint64 {
 	// uid, isNew := m.xids.AssignUid(sb.String())
 
 	// There might be a case where Nquad from different namespace have the same xid.
-	uid, isNew := m.xids.AssignUid(x.NamespaceAttr(ns, xid))
-	if !m.opt.StoreXids || !isNew {
-		return uid
-	}
-	if strings.HasPrefix(xid, "_:") {
-		// Don't store xids for blank nodes.
-		return uid
-	}
-	nq := gql.NQuad{NQuad: &api.NQuad{
-		Subject:   xid,
-		Predicate: "xid",
-		ObjectValue: &api.Value{
-			Val: &api.Value_StrVal{StrVal: xid},
-		},
-		Namespace: ns,
-	}}
-	m.processNQuad(nq)
+	uid, _ := m.xids.AssignUid(x.NamespaceAttr(ns, xid))
 	return uid
 }
 
-func (m *mapper) createPostings(nq gql.NQuad,
-	de *pb.DirectedEdge) (*pb.Posting, *pb.Posting) {
+func (m *mapper) createPostings(nq *pb.Edge) *pb.Posting {
+	// 	m.schema.validateType(de, nq.ObjectValue == nil)
+	// TODO: Understand the above.
 
-	m.schema.validateType(de, nq.ObjectValue == nil)
+	p, err := posting.NewPosting(nq)
+	x.Check(err)
 
-	p := posting.NewPosting(de)
 	sch := m.schema.getSchema(x.NamespaceAttr(nq.GetNamespace(), nq.GetPredicate()))
 	if nq.GetObjectValue() != nil {
 		switch {
+		// TODO(mrjn): We should stop assigning Uids to values.
 		case sch.List:
-			p.Uid = farm.Fingerprint64(de.Value)
+			p.Uid = farm.Fingerprint64(nq.ObjectValue)
 		default:
 			p.Uid = math.MaxUint64
 		}
 	}
 
 	// Early exit for no reverse edge.
-	if sch.GetDirective() != pb.SchemaUpdate_REVERSE {
-		return p, nil
-	}
-
-	// Reverse predicate
-	x.AssertTruef(nq.GetObjectValue() == nil, "only has reverse schema if object is UID")
-	de.Entity, de.ValueId = de.ValueId, de.Entity
-	m.schema.validateType(de, true)
-	rp := posting.NewPosting(de)
-
-	de.Entity, de.ValueId = de.ValueId, de.Entity // de reused so swap back.
-
-	return p, rp
+	return p
 }
 
-func (m *mapper) addIndexMapEntries(nq gql.NQuad, de *pb.DirectedEdge) {
+func (m *mapper) addIndexMapEntries(nq *pb.Edge) {
 	if nq.GetObjectValue() == nil {
 		return // Cannot index UIDs
 	}
 
 	sch := m.schema.getSchema(x.NamespaceAttr(nq.GetNamespace(), nq.GetPredicate()))
-	for _, tokerName := range sch.GetTokenizer() {
+	for _, tokName := range sch.GetTokenizer() {
 		// Find tokeniser.
-		toker, ok := tok.GetTokenizer(tokerName)
+		toker, ok := tok.GetTokenizer(tokName)
 		if !ok {
-			log.Fatalf("unknown tokenizer %q", tokerName)
-		}
-
-		// Create storage value.
-		storageVal := types.Val{
-			Tid:   types.TypeID(de.GetValueType()),
-			Value: de.GetValue(),
+			log.Fatalf("unknown tokenizer %q", tokName)
 		}
 
 		// Convert from storage type to schema type.
-		schemaVal, err := types.Convert(storageVal, types.TypeID(sch.GetValueType()))
+		schemaVal, err := types.Convert(nq.ObjectValue, types.TypeID(sch.GetValueType()))
 		// Shouldn't error, since we've already checked for convertibility when
 		// doing edge postings. So okay to be fatal.
 		x.Check(err)
@@ -434,7 +387,7 @@ func (m *mapper) addIndexMapEntries(nq gql.NQuad, de *pb.DirectedEdge) {
 			m.addMapEntry(
 				x.IndexKey(attr, t),
 				&pb.Posting{
-					Uid:         de.GetEntity(),
+					Uid:         x.FromHex(nq.Subject),
 					PostingType: pb.Posting_REF,
 				},
 				m.state.shards.shardFor(attr),

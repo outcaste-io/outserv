@@ -154,7 +154,6 @@ func run() {
 		CleanupTmp:       Bulk.Conf.GetBool("cleanup_tmp"),
 		NumReducers:      Bulk.Conf.GetInt("reducers"),
 		Version:          Bulk.Conf.GetBool("version"),
-		StoreXids:        Bulk.Conf.GetBool("store_xids"),
 		ZeroAddr:         Bulk.Conf.GetString("zero"),
 		HttpAddr:         Bulk.Conf.GetString("http"),
 		IgnoreErrors:     Bulk.Conf.GetBool("ignore_errors"),
@@ -317,16 +316,13 @@ func run() {
 
 		loader.prog.mapEdgeCount = bulkMeta.EdgeCount
 		loader.schema.schemaMap = bulkMeta.SchemaMap
-		loader.schema.types = bulkMeta.Types
 	} else {
 		loader.mapStage()
 		mergeMapShardsIntoReduceShards(&opt)
-		loader.leaseNamespaces()
 
 		bulkMeta := pb.BulkMeta{
 			EdgeCount: loader.prog.mapEdgeCount,
 			SchemaMap: loader.schema.schemaMap,
-			Types:     loader.schema.types,
 		}
 		bulkMetaData, err := bulkMeta.Marshal()
 		if err != nil {

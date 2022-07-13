@@ -6,7 +6,6 @@ package bulk
 import (
 	"bytes"
 	"compress/gzip"
-	"context"
 	"encoding/json"
 	"fmt"
 	"hash/adler32"
@@ -28,7 +27,6 @@ import (
 	"github.com/outcaste-io/outserv/chunker"
 	"github.com/outcaste-io/outserv/ee/enc"
 	"github.com/outcaste-io/outserv/filestore"
-	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/outserv/xidmap"
@@ -51,7 +49,6 @@ type options struct {
 	CleanupTmp       bool
 	NumReducers      int
 	Version          bool
-	StoreXids        bool
 	ZeroAddr         string
 	HttpAddr         string
 	IgnoreErrors     bool
@@ -99,10 +96,6 @@ func newLoader(opt *options) *loader {
 		log.Fatalf("Cannot create loader with nil options.")
 	}
 
-	fmt.Printf("Connecting to zero at %s\n", opt.ZeroAddr)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
 	tlsConf, err := x.LoadClientTLSConfigForInternalPort(Bulk.Conf)
 	x.Check(err)
 	dialOpts := []grpc.DialOption{
@@ -113,8 +106,6 @@ func newLoader(opt *options) *loader {
 	} else {
 		dialOpts = append(dialOpts, grpc.WithInsecure())
 	}
-	zero, err := grpc.DialContext(ctx, opt.ZeroAddr, dialOpts...)
-	x.Checkf(err, "Unable to connect to zero, Is it running at %s?", opt.ZeroAddr)
 	st := &state{
 		opt:    opt,
 		prog:   newProgress(),
@@ -128,7 +119,6 @@ func newLoader(opt *options) *loader {
 	ld := &loader{
 		state:   st,
 		mappers: make([]*mapper, opt.NumGoroutines),
-		zero:    zero,
 	}
 	for i := 0; i < opt.NumGoroutines; i++ {
 		ld.mappers[i] = newMapper(st)
@@ -139,36 +129,6 @@ func newLoader(opt *options) *loader {
 
 func getWriteTimestamp() uint64 {
 	return x.Timestamp(uint64(time.Now().Unix())<<32, 0)
-}
-
-// leaseNamespace is called at the end of map phase. It leases the namespace ids till the maximum
-// seen namespace id.
-func (ld *loader) leaseNamespaces() {
-	var maxNs uint64
-	ld.namespaces.Range(func(key, value interface{}) bool {
-		if ns := key.(uint64); ns > maxNs {
-			maxNs = ns
-		}
-		return true
-	})
-
-	// If only the default namespace is seen, do nothing.
-	if maxNs == 0 {
-		return
-	}
-
-	client := pb.NewZeroClient(ld.zero)
-	for {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		ns, err := client.AssignIds(ctx, &pb.Num{Val: maxNs, Type: pb.Num_NS_ID})
-		cancel()
-		if err == nil {
-			fmt.Printf("Assigned namespaces till %d", ns.GetEndId())
-			return
-		}
-		fmt.Printf("Error communicating with dgraph zero, retrying: %v", err)
-		time.Sleep(time.Second)
-	}
 }
 
 func readSchema(opt *options) *schema.ParsedSchema {
@@ -206,9 +166,8 @@ func (ld *loader) mapStage() {
 		x.Checkf(err, "Error while creating badger KV posting store")
 	}
 	ld.xids = xidmap.New(xidmap.XidMapOptions{
-		UidAssigner: ld.zero,
-		DB:          db,
-		Dir:         filepath.Join(ld.opt.TmpDir, bufferDir),
+		DB:  db,
+		Dir: filepath.Join(ld.opt.TmpDir, bufferDir),
 	})
 
 	fs := filestore.NewFileStore(ld.opt.DataFiles)

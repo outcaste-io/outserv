@@ -26,14 +26,12 @@ import (
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/schema"
-	wk "github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
 )
 
 type schemaStore struct {
 	sync.RWMutex
 	schemaMap map[string]*pb.SchemaUpdate
-	types     []*pb.TypeUpdate
 	*state
 }
 
@@ -51,7 +49,6 @@ func newSchemaStore(initial *schema.ParsedSchema, opt *options, state *state) *s
 	// whenever we see data for a new namespace.
 	s.checkAndSetInitialSchema(x.GalaxyNamespace)
 
-	s.types = initial.Types
 	// This is from the schema read from the schema file.
 	for _, sch := range initial.Preds {
 		p := sch.Predicate
@@ -101,47 +98,40 @@ func (s *schemaStore) checkAndSetInitialSchema(namespace uint64) {
 	for _, update := range schema.CompleteInitialSchema(namespace) {
 		s.schemaMap[update.Predicate] = update
 	}
-	s.types = append(s.types, schema.CompleteInitialTypes(namespace)...)
 
-	if s.opt.StoreXids {
-		s.schemaMap[x.NamespaceAttr(namespace, "xid")] = &pb.SchemaUpdate{
-			ValueType: pb.Posting_STRING,
-			Tokenizer: []string{"hash"},
-		}
-	}
 	s.namespaces.Store(namespace, struct{}{})
 	return
 }
 
-func (s *schemaStore) validateType(de *pb.DirectedEdge, objectIsUID bool) {
-	if objectIsUID {
-		de.ValueType = pb.Posting_UID
-	}
+// func (s *schemaStore) validateTypeXXX(de *pb.Edge, objectIsUID bool) {
+// 	if objectIsUID {
+// 		de.ValueType = pb.Posting_UID
+// 	}
 
-	s.RLock()
-	sch, ok := s.schemaMap[de.Attr]
-	s.RUnlock()
-	if !ok {
-		s.Lock()
-		sch, ok = s.schemaMap[de.Attr]
-		if !ok {
-			sch = &pb.SchemaUpdate{ValueType: de.ValueType}
-			if objectIsUID {
-				sch.List = true
-			}
-			s.schemaMap[de.Attr] = sch
-		}
-		s.Unlock()
-	}
+// 	s.RLock()
+// 	sch, ok := s.schemaMap[de.Attr]
+// 	s.RUnlock()
+// 	if !ok {
+// 		s.Lock()
+// 		sch, ok = s.schemaMap[de.Attr]
+// 		if !ok {
+// 			sch = &pb.SchemaUpdate{ValueType: de.ValueType}
+// 			if objectIsUID {
+// 				sch.List = true
+// 			}
+// 			s.schemaMap[de.Attr] = sch
+// 		}
+// 		s.Unlock()
+// 	}
 
-	err := wk.ValidateAndConvert(de, sch)
-	if err != nil {
-		log.Fatalf("RDF doesn't match schema: %v", err)
-	}
-}
+// 	err := wk.ValidateAndConvert(de, sch)
+// 	if err != nil {
+// 		log.Fatalf("RDF doesn't match schema: %v", err)
+// 	}
+// }
 
 func (s *schemaStore) getPredicates(db *badger.DB) []string {
-	txn := db.NewTransactionAt(math.MaxUint64, false)
+	txn := db.NewReadTxn(math.MaxUint64)
 	defer txn.Discard()
 
 	opts := badger.DefaultIteratorOptions
@@ -178,14 +168,6 @@ func (s *schemaStore) write(db *badger.DB, preds []string) {
 		x.Check(err)
 		// Write schema and types always at timestamp 1, s.state.writeTs may not be equal to 1
 		// if bulk loader was restarted or other similar scenarios.
-		x.Check(w.SetAt(k, v, posting.BitSchemaPosting, 1))
-	}
-
-	// Write all the types as all groups should have access to all the types.
-	for _, typ := range s.types {
-		k := x.TypeKey(typ.TypeName)
-		v, err := typ.Marshal()
-		x.Check(err)
 		x.Check(w.SetAt(k, v, posting.BitSchemaPosting, 1))
 	}
 

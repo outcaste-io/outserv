@@ -44,6 +44,7 @@ import (
 	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
 	"github.com/outcaste-io/sroar"
@@ -130,8 +131,7 @@ func (r *reducer) createBadgerInternal(dir string, compression bool) *badger.DB 
 	}
 
 	opt := r.state.opt.Badger.
-		WithDir(dir).WithValueDir(dir).
-		WithSyncWrites(false).
+		WithDir(dir).
 		WithEncryptionKey(key).
 		WithExternalMagic(x.MagicVersion)
 
@@ -143,7 +143,7 @@ func (r *reducer) createBadgerInternal(dir string, compression bool) *badger.DB 
 		opt.ZSTDCompressionLevel = r.state.opt.Badger.ZSTDCompressionLevel
 	}
 
-	db, err := badger.OpenManaged(opt)
+	db, err := badger.Open(opt)
 	x.Check(err)
 
 	// Zero out the key from memory.
@@ -584,7 +584,7 @@ func (r *reducer) toList(req *encodeRequest) {
 		x.AssertTrue(len(pk.Attr) > 0)
 
 		// We might not need to track count index every time.
-		if pk.IsData() || pk.IsReverse() {
+		if pk.IsData() {
 			doCount, ok := trackCountIndex[pk.Attr]
 			if !ok {
 				doCount = r.schema.getSchema(pk.Attr).GetCount()
@@ -592,7 +592,7 @@ func (r *reducer) toList(req *encodeRequest) {
 			}
 			if doCount {
 				// Calculate count entries.
-				ck := x.CountKey(pk.Attr, uint32(num), pk.IsReverse())
+				ck := x.CountKey(pk.Attr, uint32(num))
 				dst := req.countBuf.SliceAllocate(countEntrySize(ck))
 				marshalCountEntry(dst, ck, pk.Uid)
 			}
@@ -646,7 +646,7 @@ func (r *reducer) toList(req *encodeRequest) {
 		x.Check(err)
 		if parsedKey.IsData() {
 			schema := r.state.schema.getSchema(parsedKey.Attr)
-			if schema.GetValueType() == pb.Posting_UID && !schema.GetList() && numUids > 1 {
+			if schema.GetValueType() == types.TypeUid.Int() && !schema.GetList() && numUids > 1 {
 				fmt.Printf("Schema for pred %s specifies that this is not a list but more than  "+
 					"one UID has been found. Forcing the schema to be a list to avoid any "+
 					"data loss. Please fix the data to your specifications once Dgraph is up.\n",
