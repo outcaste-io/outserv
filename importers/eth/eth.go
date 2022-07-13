@@ -39,15 +39,16 @@ mutation($Txns: [AddTxnInput!]!) {
 `
 
 type Account struct {
-	Address string
+	Address string `json:"address"`
 }
 type Txn struct {
-	Hash  string
-	Value int64
-	Fee   int64
-	Block int64
-	To    Account
-	From  Account
+	Hash        string  `json:"hash"`
+	Value       int64   `json:"value"`
+	Fee         int64   `json:"fee"`
+	BlockNumber int64   `json:"blockNumber"`
+	Block       Block   `json:"block"`
+	To          Account `json:"to"`
+	From        Account `json:"from"`
 
 	// The following fields are used by ETH. But, not part of Outserv's GraphQL Schema.
 	ValueStr string `json:"value_str,omitempty"`
@@ -77,8 +78,8 @@ type WResp struct {
 }
 type Block struct {
 	wg           sync.WaitGroup
-	Number       int64
-	Transactions []Txn `json:"transactions"`
+	Number       int64 `json:"number"`
+	Transactions []Txn `json:"transactions,omitempty"`
 }
 
 var gwei = big.NewInt(1e9)
@@ -109,27 +110,18 @@ func (b *Block) fillViaClient() {
 		fee := new(big.Int).Mul(tx.GasPrice(), gasUsed)
 		feeGwei := new(big.Int).Div(fee, gwei)
 		txn := Txn{
-			Hash:  tx.Hash().Hex(),
-			Value: valGwei.Int64(),
-			Fee:   feeGwei.Int64(),
-			Block: blockNumber.Int64(),
-			To:    to,
-			From:  from,
+			Hash:        tx.Hash().Hex(),
+			Value:       valGwei.Int64(),
+			Fee:         feeGwei.Int64(),
+			BlockNumber: b.Number,
+			Block:       Block{Number: b.Number},
+			To:          to,
+			From:        from,
 		}
 		if txn.Value == 0 || len(txn.To.Address) == 0 || len(txn.From.Address) == 0 {
 			continue
 		}
-		// Only include txns from certain accounts.
-		include := true
-		// if farm.Fingerprint64([]byte(txn.To.Hash))%1000 == 0 {
-		// 	include = true
-		// }
-		// if farm.Fingerprint64([]byte(txn.From.Hash))%1000 == 0 {
-		// 	include = true
-		// }
-		if include {
-			b.Transactions = append(b.Transactions, txn)
-		}
+		b.Transactions = append(b.Transactions, txn)
 	}
 }
 
@@ -139,9 +131,9 @@ func (b *Block) fillViaGraphQL() {
 	block(number: %d) {
 		number
 		transactions {
-			Hash: hash
-			From: from { Address: address }
-			To: to { Address: address }
+			hash
+			from { address }
+			to { address }
 			value_str: value
 			gasPrice
 			gasUsed
@@ -183,6 +175,9 @@ func (b *Block) fillViaGraphQL() {
 			val = new(big.Int).SetInt64(0)
 		}
 		txn.Value = new(big.Int).Div(val, gwei).Int64()
+		if txn.Value == 0 || len(txn.To.Address) == 0 || len(txn.From.Address) == 0 {
+			continue
+		}
 
 		price, ok := new(big.Int).SetString(txn.GasPrice, 0)
 		if !ok {
@@ -191,10 +186,8 @@ func (b *Block) fillViaGraphQL() {
 		fee := new(big.Int).Mul(price, new(big.Int).SetInt64(txn.GasUsed))
 		feeGwei := new(big.Int).Div(fee, gwei)
 		txn.Fee = feeGwei.Int64()
-		txn.Block = b.Number
-		if txn.Value == 0 || len(txn.To.Address) == 0 || len(txn.From.Address) == 0 {
-			continue
-		}
+		txn.BlockNumber = b.Number
+		txn.Block = Block{Number: b.Number}
 
 		// Zero out the following fields, so they don't get marshalled when
 		// sending to Outserv.
