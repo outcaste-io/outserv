@@ -1,19 +1,21 @@
 async function accountBal({args, graphql, dql}) {
-  console.log("accountBal args: ", args);
-  const results = await graphql(`
-  query q($address: String) {
-    queryAccount(filter: {address: {eq: $address}}) {
-      incomingAggregate { valueSum }
-      outgoingAggregate { valueSum }
-    }
-  }`, {"address": args.address })
+  if (args.blockNumber == 0) {
+    // TODO: This can be optimized by removing the filter altogether.
+    args.blockNumber = 1000000
+  }
 
-  console.log("accountBal data:", results.data);
+  const results = await graphql(`
+  query q($address: String, $blockNumber: Int64) {
+    queryAccount(filter: {address: {eq: $address}}) {
+      incomingAggregate(filter: {blockNumber: {le: $blockNumber}}) { valueSum }
+      outgoingAggregate(filter: {blockNumber: {le: $blockNumber}}) { valueSum }
+    }
+  }`, {"address": args.address, "blockNumber": args.blockNumber })
+
   if (results.data.queryAccount.length == 0) {
-    return {"Value": 0}
+    return {"address": args.address, "value": 0}
   }
   acc = results.data.queryAccount[0]
-  console.log("accountBal:", acc);
   inc = acc.incomingAggregate.valueSum;
   if (inc == null) {
     inc = 0;
@@ -23,12 +25,11 @@ async function accountBal({args, graphql, dql}) {
     out = 0;
   }
   diff = inc - out
-  console.log("accountBal diff:", diff);
   return {"address": args.address, "value": diff}
 }
 
 async function test({args, graphql, dql}) {
-  return "hey there, I'm just Manish. this is a test"
+  return "Hello, World! This is a test."
 }
 
 async function latestBlock({args, graphql}) {
