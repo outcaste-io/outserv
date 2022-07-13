@@ -20,6 +20,7 @@ import (
 	"github.com/outcaste-io/outserv/badger"
 	"github.com/outcaste-io/outserv/ee"
 	"github.com/outcaste-io/outserv/filestore"
+	gqlSchema "github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/ristretto/z"
@@ -39,7 +40,7 @@ const BulkBadgerDefaults = "compression=snappy; numgoroutines=8;"
 func init() {
 	Bulk.Cmd = &cobra.Command{
 		Use:   "bulk",
-		Short: "Run Dgraph Bulk Loader",
+		Short: "Run Outserv Bulk Loader",
 		Run: func(cmd *cobra.Command, args []string) {
 			defer x.StartProfile(Bulk.Conf).Stop()
 			run()
@@ -47,22 +48,12 @@ func init() {
 		Annotations: map[string]string{"group": "data-load"},
 	}
 	Bulk.Cmd.SetHelpTemplate(x.NonRootTemplate)
-	Bulk.EnvPrefix = "DGRAPH_BULK"
+	Bulk.EnvPrefix = "OUTSERV_BULK"
 
 	flag := Bulk.Cmd.Flags()
 	flag.StringP("files", "f", "",
-		"Location of *.rdf(.gz) or *.json(.gz) file(s) to load.")
-	flag.StringP("schema", "s", "",
-		"Location of schema file.")
-	flag.StringP("graphql_schema", "g", "", "Location of the GraphQL schema file.")
-	flag.String("format", "",
-		"Specify file format (rdf or json) instead of getting it from filename.")
-	flag.Bool("encrypted", false,
-		"Flag to indicate whether schema and data files are encrypted. "+
-			"Must be specified with --encryption or vault option(s).")
-	flag.Bool("encrypted_out", false,
-		"Flag to indicate whether to encrypt the output. "+
-			"Must be specified with --encryption or vault option(s).")
+		"Location of *.json(.gz) file(s) to load.")
+	flag.StringP("schema", "s", "", "Location of the GraphQL schema file.")
 	flag.String("out", defaultOutDir,
 		"Location to write the final dgraph data directories.")
 	flag.Bool("replace_out", false,
@@ -85,8 +76,6 @@ func init() {
 		"Number of reducers to run concurrently. Increasing this can improve performance, and "+
 			"must be less than or equal to the number of reduce shards.")
 	flag.Bool("version", false, "Prints the version of Dgraph Bulk Loader.")
-	flag.Bool("store_xids", false, "Generate an xid edge for each node.")
-	flag.StringP("zero", "z", "localhost:5080", "gRPC address for Dgraph zero")
 	flag.String("xidmap", "", "Directory to store xid to uid mapping")
 	// TODO: Potentially move http server to main.
 	flag.String("http", "localhost:8080",
@@ -102,9 +91,7 @@ func init() {
 			"more parallelism, but increases memory usage.")
 	flag.String("custom_tokenizers", "",
 		"Comma separated list of tokenizer plugins")
-	flag.Bool("new_uids", false,
-		"Ignore UIDs in load files and assign new ones.")
-	flag.Uint64("force-namespace", math.MaxUint64,
+	flag.Uint64("force-namespace", 0,
 		"Namespace onto which to load the data. If not set, will preserve the namespace."+
 			" When using this flag to load data into specific namespace, make sure that the "+
 			"load data do not have ACL data.")
@@ -120,10 +107,6 @@ func init() {
 		Flag("numgoroutines",
 			"The number of goroutines to use in badger.Stream.").
 		String())
-
-	x.RegisterClientTLSFlags(flag)
-	// Encryption and Vault options
-	ee.RegisterEncFlag(flag)
 }
 
 func run() {
@@ -140,10 +123,7 @@ func run() {
 		DataFiles:        Bulk.Conf.GetString("files"),
 		DataFormat:       Bulk.Conf.GetString("format"),
 		EncryptionKey:    keys.EncKey,
-		SchemaFile:       Bulk.Conf.GetString("schema"),
-		GqlSchemaFile:    Bulk.Conf.GetString("graphql_schema"),
-		Encrypted:        Bulk.Conf.GetBool("encrypted"),
-		EncryptedOut:     Bulk.Conf.GetBool("encrypted_out"),
+		GqlSchemaFile:    Bulk.Conf.GetString("schema"),
 		OutDir:           Bulk.Conf.GetString("out"),
 		ReplaceOutDir:    Bulk.Conf.GetBool("replace_out"),
 		TmpDir:           Bulk.Conf.GetString("tmp"),
@@ -160,7 +140,6 @@ func run() {
 		MapShards:        Bulk.Conf.GetInt("map_shards"),
 		ReduceShards:     Bulk.Conf.GetInt("reduce_shards"),
 		CustomTokenizers: Bulk.Conf.GetString("custom_tokenizers"),
-		NewUids:          Bulk.Conf.GetBool("new_uids"),
 		ClientDir:        Bulk.Conf.GetString("xidmap"),
 		Namespace:        Bulk.Conf.GetUint64("force-namespace"),
 		Badger:           bopts,
@@ -175,41 +154,20 @@ func run() {
 		os.Exit(0)
 	}
 
-	if len(opt.EncryptionKey) == 0 {
-		if opt.Encrypted || opt.EncryptedOut {
-			fmt.Fprint(os.Stderr, "Must use --encryption or vault option(s).\n")
-			os.Exit(1)
-		}
+	if !filestore.Exists(opt.GqlSchemaFile) {
+		fmt.Fprintf(os.Stderr, "Schema path(%v) does not exist.\n", opt.GqlSchemaFile)
+		os.Exit(1)
 	} else {
-		requiredFlags := Bulk.Cmd.Flags().Changed("encrypted") &&
-			Bulk.Cmd.Flags().Changed("encrypted_out")
-		if !requiredFlags {
-			fmt.Fprint(os.Stderr,
-				"Must specify --encrypted and --encrypted_out when providing encryption key.\n")
-			os.Exit(1)
-		}
-		if !opt.Encrypted && !opt.EncryptedOut {
-			fmt.Fprint(os.Stderr,
-				"Must set --encrypted and/or --encrypted_out to true when providing encryption key.\n")
-			os.Exit(1)
-		}
-
-		tlsConf, err := x.LoadClientTLSConfigForInternalPort(Bulk.Conf)
+		data, err := ioutil.ReadFile(opt.GqlSchemaFile)
 		x.Check(err)
-		// Need to set zero addr in WorkerConfig before checking the license.
-		x.WorkerConfig.PeerAddr = []string{opt.ZeroAddr}
-		x.WorkerConfig.TLSClientConfig = tlsConf
+		x.Config.Lambda.Url = "http://dummy" // To satisfy some checks.
+		handler, err := gqlSchema.NewHandler(string(data))
+		x.Check(err)
+		dgSchema := handler.DGSchema()
+		fmt.Printf("schema parsed is:\n%s\n", dgSchema)
+		opt.schema = handler.DGSchema()
 	}
-	fmt.Printf("Encrypted input: %v; Encrypted output: %v\n", opt.Encrypted, opt.EncryptedOut)
 
-	if opt.SchemaFile == "" {
-		fmt.Fprint(os.Stderr, "Schema file must be specified.\n")
-		os.Exit(1)
-	}
-	if !filestore.Exists(opt.SchemaFile) {
-		fmt.Fprintf(os.Stderr, "Schema path(%v) does not exist.\n", opt.SchemaFile)
-		os.Exit(1)
-	}
 	if opt.DataFiles == "" {
 		fmt.Fprint(os.Stderr, "JSON file(s) location must be specified.\n")
 		os.Exit(1)

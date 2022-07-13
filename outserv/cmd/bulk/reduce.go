@@ -125,14 +125,8 @@ func (r *reducer) run() error {
 }
 
 func (r *reducer) createBadgerInternal(dir string, compression bool) *badger.DB {
-	key := r.opt.EncryptionKey
-	if !r.opt.EncryptedOut {
-		key = nil
-	}
-
 	opt := r.state.opt.Badger.
 		WithDir(dir).
-		WithEncryptionKey(key).
 		WithExternalMagic(x.MagicVersion)
 
 	opt.Compression = bo.None

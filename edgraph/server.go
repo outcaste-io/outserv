@@ -532,7 +532,7 @@ func validateDQLSchemaForGraphQL(ctx context.Context,
 	}
 
 	// convert the existing GraphQL schema to a DQL schema
-	handler, err := gqlSchema.NewHandler(existingGQLSch, false)
+	handler, err := gqlSchema.NewHandler(existingGQLSch)
 	if err != nil {
 		return err
 	}

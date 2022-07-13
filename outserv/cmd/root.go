@@ -17,6 +17,7 @@ import (
 	"unicode"
 
 	"github.com/outcaste-io/outserv/outserv/cmd/alpha"
+	"github.com/outcaste-io/outserv/outserv/cmd/bulk"
 	"github.com/outcaste-io/outserv/outserv/cmd/cert"
 	"github.com/outcaste-io/outserv/outserv/cmd/debug"
 	"github.com/outcaste-io/outserv/outserv/cmd/debuginfo"
@@ -67,7 +68,7 @@ var subcommands = []*x.SubCommand{
 	// TODO: Consider if we need bulk loader.
 	// TODO: Consider if we need live loader.
 	&cert.Cert,
-	&alpha.Alpha, &version.Version, &debug.Debug,
+	&alpha.Alpha, &version.Version, &debug.Debug, &bulk.Bulk,
 	&debuginfo.Profile, &decrypt.Decrypt, &wallet.Wallet,
 }
 

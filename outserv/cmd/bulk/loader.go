@@ -19,8 +19,6 @@ import (
 	"sync"
 	"time"
 
-	"google.golang.org/grpc/credentials"
-
 	"github.com/outcaste-io/outserv/badger"
 	"github.com/outcaste-io/outserv/badger/y"
 
@@ -30,14 +28,12 @@ import (
 	"github.com/outcaste-io/outserv/schema"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/outserv/xidmap"
-
-	"google.golang.org/grpc"
 )
 
 type options struct {
 	DataFiles        string
 	DataFormat       string
-	SchemaFile       string
+	schema           string
 	GqlSchemaFile    string
 	OutDir           string
 	ReplaceOutDir    bool
@@ -55,8 +51,6 @@ type options struct {
 	CustomTokenizers string
 	NewUids          bool
 	ClientDir        string
-	Encrypted        bool
-	EncryptedOut     bool
 
 	MapShards    int
 	ReduceShards int
@@ -96,16 +90,6 @@ func newLoader(opt *options) *loader {
 		log.Fatalf("Cannot create loader with nil options.")
 	}
 
-	tlsConf, err := x.LoadClientTLSConfigForInternalPort(Bulk.Conf)
-	x.Check(err)
-	dialOpts := []grpc.DialOption{
-		grpc.WithBlock(),
-	}
-	if tlsConf != nil {
-		dialOpts = append(dialOpts, grpc.WithTransportCredentials(credentials.NewTLS(tlsConf)))
-	} else {
-		dialOpts = append(dialOpts, grpc.WithInsecure())
-	}
 	st := &state{
 		opt:    opt,
 		prog:   newProgress(),
@@ -132,25 +116,7 @@ func getWriteTimestamp() uint64 {
 }
 
 func readSchema(opt *options) *schema.ParsedSchema {
-	f, err := filestore.Open(opt.SchemaFile)
-	x.Check(err)
-	defer f.Close()
-
-	key := opt.EncryptionKey
-	if !opt.Encrypted {
-		key = nil
-	}
-	r, err := enc.GetReader(key, f)
-	x.Check(err)
-	if filepath.Ext(opt.SchemaFile) == ".gz" {
-		r, err = gzip.NewReader(r)
-		x.Check(err)
-	}
-
-	buf, err := ioutil.ReadAll(r)
-	x.Check(err)
-
-	result, err := schema.ParseWithNamespace(string(buf), opt.Namespace)
+	result, err := schema.ParseWithNamespace(opt.schema, opt.Namespace)
 	x.Check(err)
 	return result
 }
@@ -206,11 +172,7 @@ func (ld *loader) mapStage() {
 		go func(file string) {
 			defer thr.Done(nil)
 
-			key := ld.opt.EncryptionKey
-			if !ld.opt.Encrypted {
-				key = nil
-			}
-			r, cleanup := fs.ChunkReader(file, key)
+			r, cleanup := fs.ChunkReader(file, nil)
 			defer cleanup()
 
 			chunk := chunker.NewChunker(loadType, 1000)
@@ -278,11 +240,7 @@ func (ld *loader) processGqlSchema(loadType chunker.InputFormat) {
 	x.Check(err)
 	defer f.Close()
 
-	key := ld.opt.EncryptionKey
-	if !ld.opt.Encrypted {
-		key = nil
-	}
-	r, err := enc.GetReader(key, f)
+	r, err := enc.GetReader(nil, f)
 	x.Check(err)
 	if filepath.Ext(ld.opt.GqlSchemaFile) == ".gz" {
 		r, err = gzip.NewReader(r)
