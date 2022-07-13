@@ -12,6 +12,7 @@ import (
 	"github.com/golang/glog"
 	otrace "go.opencensus.io/trace"
 
+	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -98,11 +99,16 @@ func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query *schema.Fi
 			query.ResponseName()))
 	}
 	qry := dgraph.AsString(dgQuery)
-	glog.V(2).Infof("DQL Query: %s\n", qry)
+	glog.Infof("DQL Query: %s\n", qry)
 
 	queryTimer := newtimer(ctx, &dgraphQueryDuration.OffsetDuration)
 	queryTimer.Start()
-	resp, err := qr.executor.Execute(ctx, &pb.Request{Query: qry, ReadOnly: true}, query)
+
+	req := &edgraph.Request{
+		Req:      &pb.Request{Query: qry, ReadOnly: true},
+		GqlField: query,
+	}
+	resp, err := qr.executor.Execute(ctx, req)
 	queryTimer.Stop()
 
 	if err != nil && !x.IsGqlErrorList(err) {
@@ -175,8 +181,10 @@ func (qr *customDQLQueryResolver) rewriteAndExecute(ctx context.Context,
 	queryTimer := newtimer(ctx, &dgraphQueryDuration.OffsetDuration)
 	queryTimer.Start()
 
-	resp, err := qr.executor.Execute(ctx, &pb.Request{Query: qry, Vars: vars,
-		ReadOnly: true}, nil)
+	req := &edgraph.Request{
+		Req: &pb.Request{Query: qry, Vars: vars, ReadOnly: true},
+	}
+	resp, err := qr.executor.Execute(ctx, req)
 	queryTimer.Stop()
 
 	if err != nil {

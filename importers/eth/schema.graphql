@@ -1,26 +1,33 @@
 type Txn {
-  Oid: ID!
-  Hash: String! @id
-  Value: Int64 @search
-  Block: Int64 @search
-  To: Account @hasInverse(field: Incoming)
-  From: Account @hasInverse(field: Outgoing)
+  oid: ID!
+  hash: String! @id
+  value: Int64 @search
+  fee: Int64 @search
+  blockNumber: Int64 @search
+  block: Block @hasInverse(field: transactions)
+  to: Account @hasInverse(field: incoming)
+  from: Account @hasInverse(field: outgoing)
 }
 
 type Account {
-  Oid: ID!
-  Hash: String! @id
-  Incoming: [Txn]
-  Outgoing: [Txn]
+  oid: ID!
+  address: String! @id
+  incoming: [Txn]
+  outgoing: [Txn]
 }
 
 type AccountBal @remote {
-  Value: Int64
-  Name: String
-  Hash: String
+  address: String
+  value: Int64
+}
+
+type Block {
+  number: Int64 @id
+  transactions: [Txn]
 }
 
 type Query {
-  Balance(Hash: String!, Block: Int64): AccountBal @lambda
-  Test: String @lambda
+  accountBalance(address: String!, blockNumber: Int64): AccountBal @lambda
+  test: String @lambda
+  latestBlock: Int64 @lambda
 }

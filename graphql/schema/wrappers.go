@@ -1394,11 +1394,14 @@ func getCustomHTTPConfig(f *Field, isQueryOrMutation bool, ns uint64) (*FieldHTT
 }
 
 func (f *Field) IsQueryOrMutation() bool {
-	isQueryOrMutation := f.Kind == QueryKind
-	if f.Kind == MutationKind {
-		isQueryOrMutation = true
-	}
-	return isQueryOrMutation
+	// Not sure what else can it be except a query or a mutation.
+	return true
+
+	// isQueryOrMutation := f.Kind == QueryKind
+	// if f.Kind == MutationKind {
+	// 	isQueryOrMutation = true
+	// }
+	// return isQueryOrMutation
 }
 func (f *Field) CustomHTTPConfig(ns uint64) (*FieldHTTPConfig, error) {
 	return getCustomHTTPConfig(f, f.IsQueryOrMutation(), ns)
@@ -1563,20 +1566,6 @@ func (q *Field) RepresentationsArg() (*EntityRepresentations, error) {
 	return entityReprs, nil
 }
 
-func (q *Field) AuthFor(jwtVars map[string]interface{}) *Field {
-	// copy the template, so that multiple queries can run rewriting for the rule.
-	return &Field{
-		Kind:  QueryKind,
-		field: q.field,
-		op: &Operation{op: q.op.op,
-			query:    q.op.query,
-			doc:      q.op.doc,
-			inSchema: q.op.inSchema,
-			vars:     jwtVars,
-		},
-		sel: q.sel}
-}
-
 func (q *Field) Rename(newName string) {
 	q.field.Name = newName
 }
@@ -1662,7 +1651,7 @@ func (q *Field) QueryType() QueryType {
 }
 
 func (q *Field) DQLQuery() string {
-	if q.Kind != QueryKind {
+	if q.Kind == MutationKind {
 		panic("DQLQuery probably shouldn't have been called")
 	}
 	if customDir := q.op.inSchema.customDirectives["Query"][q.Name()]; customDir != nil {

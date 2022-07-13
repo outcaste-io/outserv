@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/gql"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/x"
@@ -82,6 +83,10 @@ func writeQuery(b *strings.Builder, query *gql.GraphQuery, prefix string) {
 		x.Check2(b.WriteString("val("))
 		writeNeedVar(b, query)
 		x.Check2(b.WriteRune(')'))
+	}
+
+	if query.MathExp != nil {
+		glog.Warningf("MathExp is not being handled")
 	}
 
 	if query.Func != nil {

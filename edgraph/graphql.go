@@ -58,7 +58,7 @@ func ProcessPersistedQuery(ctx context.Context, gqlReq *schema.Request) error {
 		"$join": join,
 	}
 	req := &Request{
-		req: &pb.Request{
+		Req: &pb.Request{
 			Query:    queryForSHA,
 			Vars:     variables,
 			ReadOnly: true,
@@ -96,7 +96,7 @@ func ProcessPersistedQuery(ctx context.Context, gqlReq *schema.Request) error {
 		}
 
 		req = &Request{
-			req: &pb.Request{
+			Req: &pb.Request{
 				Mutations: []*pb.Mutation{
 					{
 						Edges: []*pb.Edge{

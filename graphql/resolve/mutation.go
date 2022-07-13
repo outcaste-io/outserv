@@ -6,6 +6,7 @@ package resolve
 import (
 	"context"
 
+	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/protos/pb"
 )
@@ -48,7 +49,7 @@ type DgraphExecutor interface {
 	// Execute performs the actual query/mutation and returns a Dgraph response. If an error
 	// occurs, that indicates that the execution failed in some way significant enough
 	// way as to not continue processing this query/mutation or others in the same request.
-	Execute(ctx context.Context, req *pb.Request, field *schema.Field) (*pb.Response, error)
+	Execute(ctx context.Context, req *edgraph.Request) (*pb.Response, error)
 }
 
 // MutationResolverFunc is an adapter that allows to build a MutationResolver from
