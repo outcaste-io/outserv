@@ -51,6 +51,7 @@ type Txn struct {
 	From        Account `json:"from"`
 
 	// The following fields are used by ETH. But, not part of Outserv's GraphQL Schema.
+	Status   int64  `json:"status,omitempty"`
 	ValueStr string `json:"value_str,omitempty"`
 	GasUsed  int64  `json:"gasUsed,omitempty"`
 	GasPrice string `json:"gasPrice,omitempty"`
@@ -131,6 +132,7 @@ func (b *Block) fillViaGraphQL() {
 	block(number: %d) {
 		number
 		transactions {
+			status
 			hash
 			from { address }
 			to { address }
@@ -175,7 +177,9 @@ func (b *Block) fillViaGraphQL() {
 			val = new(big.Int).SetInt64(0)
 		}
 		txn.Value = new(big.Int).Div(val, gwei).Int64()
-		if txn.Value == 0 || len(txn.To.Address) == 0 || len(txn.From.Address) == 0 {
+
+		if txn.Status != 1 || txn.Value == 0 ||
+			len(txn.To.Address) == 0 || len(txn.From.Address) == 0 {
 			continue
 		}
 
@@ -191,6 +195,7 @@ func (b *Block) fillViaGraphQL() {
 
 		// Zero out the following fields, so they don't get marshalled when
 		// sending to Outserv.
+		txn.Status = 0
 		txn.ValueStr = ""
 		txn.GasUsed = 0
 		txn.GasPrice = ""
