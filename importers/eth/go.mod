@@ -3,7 +3,6 @@ module eth
 go 1.17
 
 require (
-	github.com/dgryski/go-farm v0.0.0-20190423205320-6a90982ecee2
 	github.com/ethereum/go-ethereum v1.10.17
 	github.com/pkg/errors v0.9.1
 )

@@ -82,7 +82,9 @@ func (dg *DgraphEx) Execute(ctx context.Context,
 	stop := x.SpanTimer(span, "dgraph.Execute")
 	defer stop()
 
-	// TODO: Gotta add the queries to it directly.
+	// TODO(mrjn): Ideally, we can set parsed queries directly. But, that part
+	// of the code is old and easy to mess up, so it would take time. Also, I
+	// doubt I want to continue exposing DQL.
 	req := ereq.Req
 	if req == nil || (req.Query == "" && len(req.Mutations) == 0) {
 		return nil, nil

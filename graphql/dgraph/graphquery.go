@@ -86,7 +86,7 @@ func writeQuery(b *strings.Builder, query *gql.GraphQuery, prefix string) {
 	}
 
 	if query.MathExp != nil {
-		glog.Infof("math tree: %+v\n", query.MathExp)
+		glog.Warningf("MathExp is not being handled")
 	}
 
 	if query.Func != nil {

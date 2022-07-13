@@ -1394,12 +1394,14 @@ func getCustomHTTPConfig(f *Field, isQueryOrMutation bool, ns uint64) (*FieldHTT
 }
 
 func (f *Field) IsQueryOrMutation() bool {
-	return true // TODO(mrjn): HACK
-	isQueryOrMutation := f.Kind == QueryKind
-	if f.Kind == MutationKind {
-		isQueryOrMutation = true
-	}
-	return isQueryOrMutation
+	// Not sure what else can it be except a query or a mutation.
+	return true
+
+	// isQueryOrMutation := f.Kind == QueryKind
+	// if f.Kind == MutationKind {
+	// 	isQueryOrMutation = true
+	// }
+	// return isQueryOrMutation
 }
 func (f *Field) CustomHTTPConfig(ns uint64) (*FieldHTTPConfig, error) {
 	return getCustomHTTPConfig(f, f.IsQueryOrMutation(), ns)
@@ -1654,7 +1656,6 @@ func (q *Field) DQLQuery() string {
 	}
 	if customDir := q.op.inSchema.customDirectives["Query"][q.Name()]; customDir != nil {
 		if dqlArgument := customDir.Arguments.ForName(dqlArg); dqlArgument != nil {
-			glog.Infof("got DQL Query: %s\n", dqlArgument.Value.Raw)
 			return dqlArgument.Value.Raw
 		}
 	}

@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/graphql/authorization"
 	"github.com/outcaste-io/outserv/worker"
 
@@ -169,6 +168,5 @@ func GetBodyForLambda(ctx context.Context, field *Field, parents,
 	if args != nil {
 		body["args"] = args
 	}
-	glog.Infof("GetBodyForLambda: %+v\n", body)
 	return body
 }

@@ -72,7 +72,6 @@ func (qr *queryResolver) Resolve(ctx context.Context, query *schema.Field) *Reso
 	defer timer.Stop()
 
 	resolved := qr.rewriteAndExecute(ctx, query)
-	glog.Infof("Resolved: %s\n", resolved.Data)
 	qr.resultCompleter.Complete(ctx, resolved)
 	return resolved
 }
@@ -94,10 +93,8 @@ func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query *schema.Fi
 		}
 	}
 
-	glog.Infof("Calling Rewrite for %+v\n", query)
 	dgQuery, err := qr.queryRewriter.Rewrite(ctx, query)
 	if err != nil {
-		glog.Infof("Got error in rewriteAndExecute: %v\n", err)
 		return emptyResult(schema.GQLWrapf(err, "couldn't rewrite query %s",
 			query.ResponseName()))
 	}
@@ -113,7 +110,6 @@ func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query *schema.Fi
 	}
 	resp, err := qr.executor.Execute(ctx, req)
 	queryTimer.Stop()
-	glog.Infof("executor.Execute result: %s ERR: %v\n", resp.GetJson(), err)
 
 	if err != nil && !x.IsGqlErrorList(err) {
 		err = schema.GQLWrapf(err, "Dgraph query failed")
@@ -176,13 +172,11 @@ func (qr *customDQLQueryResolver) rewriteAndExecute(ctx context.Context,
 	}
 
 	dgQuery, err := qr.queryRewriter.Rewrite(ctx, query)
-	glog.Infof("custom.rewriteAndExecute: %v. dgQuery: %+v\n", err, dgQuery)
 	if err != nil {
 		return emptyResult(schema.GQLWrapf(err, "got error while rewriting DQL query"))
 	}
 
 	qry := dgraph.AsString(dgQuery)
-	glog.Infof("custom.rewriteAndExecute. query: %s\n", qry)
 
 	queryTimer := newtimer(ctx, &dgraphQueryDuration.OffsetDuration)
 	queryTimer.Start()
@@ -192,7 +186,6 @@ func (qr *customDQLQueryResolver) rewriteAndExecute(ctx context.Context,
 	}
 	resp, err := qr.executor.Execute(ctx, req)
 	queryTimer.Stop()
-	glog.Infof("custom.executor.Execute: %s ERR: %v\n", resp.GetJson(), err)
 
 	if err != nil {
 		return emptyResult(schema.GQLWrapf(err, "Dgraph query failed"))
