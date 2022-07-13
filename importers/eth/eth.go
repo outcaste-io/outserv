@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"flag"
@@ -14,6 +15,8 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -25,7 +28,8 @@ import (
 )
 
 var path = flag.String("geth", "", "Geth IPC path or GraphQL Address")
-var graphql = flag.String("gql", "http://localhost:8080", "GraphQL endpoint")
+var graphql = flag.String("gql", "http://localhost:8080", "Outserv GraphQL endpoint")
+var outDir = flag.String("dir", "", "Output to dir as JSON.GZ files instead of sending to Outserv.")
 var dryRun = flag.Bool("dry", false, "If true, don't send txns to GraphQL endpoint")
 var numGo = flag.Int("gor", 4, "Number of goroutines to use")
 var startBlock = flag.Int64("start", 14900000, "Start at block")
@@ -39,19 +43,21 @@ mutation($Txns: [AddTxnInput!]!) {
 `
 
 type Account struct {
+	Uid     string `json:"uid,omitempty"`
 	Address string `json:"address"`
 }
 type Txn struct {
+	Uid         string  `json:"uid,omitempty"`
 	Hash        string  `json:"hash"`
 	Value       int64   `json:"value"`
 	Fee         int64   `json:"fee"`
 	BlockNumber int64   `json:"blockNumber"`
+	Timestamp   int64   `json:"timestamp"`
 	Block       Block   `json:"block"`
 	To          Account `json:"to"`
 	From        Account `json:"from"`
 
 	// The following fields are used by ETH. But, not part of Outserv's GraphQL Schema.
-	Status   int64  `json:"status,omitempty"`
 	ValueStr string `json:"value_str,omitempty"`
 	GasUsed  int64  `json:"gasUsed,omitempty"`
 	GasPrice string `json:"gasPrice,omitempty"`
@@ -79,8 +85,10 @@ type WResp struct {
 }
 type Block struct {
 	wg           sync.WaitGroup
-	Number       int64 `json:"number"`
-	Transactions []Txn `json:"transactions,omitempty"`
+	Uid          string `json:"uid,omitempty"`
+	Number       int64  `json:"number"`
+	Timestamp    string `json:"timestamp,omitempty"`
+	Transactions []Txn  `json:"transactions,omitempty"`
 }
 
 var gwei = big.NewInt(1e9)
@@ -119,7 +127,7 @@ func (b *Block) fillViaClient() {
 			To:          to,
 			From:        from,
 		}
-		if txn.Value == 0 || len(txn.To.Address) == 0 || len(txn.From.Address) == 0 {
+		if len(txn.To.Address) == 0 || len(txn.From.Address) == 0 {
 			continue
 		}
 		b.Transactions = append(b.Transactions, txn)
@@ -131,8 +139,8 @@ func (b *Block) fillViaGraphQL() {
 {
 	block(number: %d) {
 		number
+		timestamp
 		transactions {
-			status
 			hash
 			from { address }
 			to { address }
@@ -171,6 +179,11 @@ func (b *Block) fillViaGraphQL() {
 		fmt.Printf("Invalid response from ETH. Expected: %d Got: %d\n", b.Number, blk.Number)
 		os.Exit(1)
 	}
+	ts, err := strconv.ParseInt(blk.Timestamp, 0, 64)
+	if err != nil {
+		fmt.Printf("Unable to parse timestamp: %s\n", blk.Timestamp)
+		ts = 0
+	}
 	for _, txn := range blk.Transactions {
 		val, ok := new(big.Int).SetString(txn.ValueStr, 0)
 		if !ok {
@@ -178,10 +191,11 @@ func (b *Block) fillViaGraphQL() {
 		}
 		txn.Value = new(big.Int).Div(val, gwei).Int64()
 
-		if txn.Status != 1 || txn.Value == 0 ||
-			len(txn.To.Address) == 0 || len(txn.From.Address) == 0 {
+		if len(txn.To.Address) == 0 || len(txn.From.Address) == 0 {
 			continue
 		}
+		txn.To.Uid = fmt.Sprintf("_:%s", txn.To.Address)
+		txn.From.Uid = fmt.Sprintf("_:%s", txn.From.Address)
 
 		price, ok := new(big.Int).SetString(txn.GasPrice, 0)
 		if !ok {
@@ -191,11 +205,13 @@ func (b *Block) fillViaGraphQL() {
 		feeGwei := new(big.Int).Div(fee, gwei)
 		txn.Fee = feeGwei.Int64()
 		txn.BlockNumber = b.Number
-		txn.Block = Block{Number: b.Number}
+
+		txn.Timestamp = ts
+		txn.Block = Block{Number: b.Number, Uid: fmt.Sprintf("_:%08d", b.Number)}
+		txn.Uid = fmt.Sprintf("_:%s", txn.Hash)
 
 		// Zero out the following fields, so they don't get marshalled when
 		// sending to Outserv.
-		txn.Status = 0
 		txn.ValueStr = ""
 		txn.GasUsed = 0
 		txn.GasPrice = ""
@@ -240,14 +256,35 @@ func (c *Chain) BlockingFill() {
 	}
 }
 
-func (c *Chain) processTxns(wg *sync.WaitGroup) {
+func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 	defer wg.Done()
+
+	var writer *gzip.Writer
+	if len(*outDir) > 0 {
+		f, err := os.Create(filepath.Join(*outDir, fmt.Sprintf("%02d.json.gz", gid)))
+		check(err)
+
+		writer = gzip.NewWriter(f)
+		defer func() {
+			writer.Flush()
+			writer.Close()
+			f.Sync()
+			f.Close()
+		}()
+	}
 
 	var txns []Txn
 	sendTxns := func(txns []Txn) error {
 		if len(txns) == 0 {
 			return nil
 		}
+		if writer != nil {
+			data, err := json.Marshal(txns)
+			check(err)
+			_, err = writer.Write(data)
+			return err
+		}
+
 		q := GQL{
 			Query:     txnMu,
 			Variables: Batch{Txns: txns},
@@ -343,10 +380,12 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+	if len(*outDir) > 0 {
+		fmt.Printf("Outputting JSON files to %q\n", *outDir)
+		*graphql = ""
+	}
 
-	if isGraphQL {
-
-	} else {
+	if !isGraphQL {
 		var err error
 		chainID, err = client.NetworkID(context.Background())
 		if err != nil {
@@ -367,7 +406,7 @@ func main() {
 	var wg sync.WaitGroup
 	for i := 0; i < *numGo; i++ {
 		wg.Add(1)
-		go chain.processTxns(&wg)
+		go chain.processTxns(i, &wg)
 	}
 	go chain.printMetrics()
 	chain.BlockingFill()
