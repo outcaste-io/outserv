@@ -409,6 +409,7 @@ func rewriteAsQueryByIds(
 // filter, order and pagination.
 func addArgumentsToField(dgQuery *gql.GraphQuery, field *schema.Field) {
 	filter, _ := field.ArgValue("filter").(map[string]interface{})
+
 	_ = addFilter(dgQuery, field.Type(), filter)
 	addOrder(dgQuery, field)
 	addPagination(dgQuery, field)
@@ -626,7 +627,9 @@ func addCommonRules(
 }
 
 func rewriteAsQuery(field *schema.Field) []*gql.GraphQuery {
+	// addCommonRules would always add a type func, unless UIDs are provided.
 	dgQuery := addCommonRules(field, field.Type())
+
 	addArgumentsToField(dgQuery[0], field)
 
 	selectionAuth := addSelectionSetFrom(dgQuery[0], field)
@@ -641,18 +644,46 @@ func rewriteAsQuery(field *schema.Field) []*gql.GraphQuery {
 
 func rootQueryOptimization(dgQuery []*gql.GraphQuery) []*gql.GraphQuery {
 	q := dgQuery[0]
-	if q.Filter != nil && q.Filter.Func != nil &&
-		q.Filter.Func.Name == "eq" && q.Func.Name == "type" {
-		rootFunc := q.Func
-		q.Func = q.Filter.Func
-		q.Filter.Func = rootFunc
+	if q.Filter == nil || q.Func == nil {
+		// If we don't have any filter or root func, then we have to use
+		// whatever we got.
+		return dgQuery
 	}
-	// We can skip the type(..) filter.
-	if q.Func != nil && q.Filter != nil && q.Filter.Func != nil {
-		fn := q.Filter.Func
-		if fn.Name == "type" {
-			q.Filter = nil
+	if q.Func.Name != "type" {
+		// No need to do anything.
+		return dgQuery
+	}
+
+	if q.Filter.Func != nil {
+		// Set q.Func to the filter. Set filter to nil
+		q.Func = q.Filter.Func
+		q.Filter = nil
+		return dgQuery
+	}
+
+	if q.Filter.Op == "and" {
+		grandKids := false
+		for _, child := range q.Filter.Child {
+			if len(child.Child) > 0 {
+				grandKids = true
+			}
 		}
+		if grandKids {
+			// Don't do anything here yet.
+			return dgQuery
+		}
+		for idx, child := range q.Filter.Child {
+			if child.Func != nil {
+				q.Func = child.Func
+				child.Func = nil
+				q.Filter.Child = append(q.Filter.Child[:idx], q.Filter.Child[idx+1:]...)
+				break
+			}
+		}
+		if len(q.Filter.Child) == 1 {
+			q.Filter = q.Filter.Child[0]
+		}
+		return dgQuery
 	}
 	return dgQuery
 }

@@ -224,8 +224,8 @@ func writeRoot(b *strings.Builder, q *gql.GraphQuery) {
 		writeUIDFunc(b, q.Func.UID, q.Func.Args, q.Func.NeedsVar)
 	case q.Func.Name == "type" && len(q.Func.Args) == 1:
 		x.Check2(b.WriteString(fmt.Sprintf("(func: type(%s)", q.Func.Args[0].Value)))
-	case q.Func.Name == "eq":
-		x.Check2(b.WriteString("(func: eq("))
+	default:
+		b.WriteString(fmt.Sprintf("(func: %s(", q.Func.Name))
 		writeFilterArguments(b, q.Func)
 		x.Check2(b.WriteRune(')'))
 	}
