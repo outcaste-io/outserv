@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -200,8 +201,8 @@ func (m *mapper) writeMapEntriesToFile(cbuf *z.Buffer, shardIdx int) {
 
 var once sync.Once
 
-func (m *mapper) run(inputFormat chunker.InputFormat) {
-	chunk := chunker.NewChunker(inputFormat, 1000)
+func (m *mapper) run() {
+	chunk := chunker.NewChunker(chunker.JsonFormat, 1000)
 	nquads := chunk.NQuads()
 	go func() {
 		for chunkBuf := range m.readerChunkCh {
@@ -268,6 +269,10 @@ func (m *mapper) processNQuad(nq *pb.Edge) {
 		// Use the specified namespace passed through '--force-namespace' flag.
 		nq.Namespace = m.opt.Namespace
 	}
+	var typ string
+	if strings.HasPrefix(nq.GetSubject(), "_:") {
+		typ = strings.SplitN(nq.Subject[2:], ".", 2)[0]
+	}
 	sid := m.uid(nq.GetSubject(), nq.Namespace)
 	if sid == 0 {
 		panic(fmt.Sprintf("invalid UID with value 0 for %v", nq.GetSubject()))
@@ -281,14 +286,14 @@ func (m *mapper) processNQuad(nq *pb.Edge) {
 		}
 		de = &pb.Edge{
 			Subject:   x.ToHexString(sid),
-			Predicate: nq.Predicate,
+			Predicate: typ + "." + nq.Predicate,
 			ObjectId:  x.ToHexString(oid),
 			Namespace: nq.Namespace,
 		}
 	} else {
 		de = &pb.Edge{
 			Subject:     x.ToHexString(sid),
-			Predicate:   nq.Predicate,
+			Predicate:   typ + "." + nq.Predicate,
 			ObjectValue: nq.ObjectValue,
 			Namespace:   nq.Namespace,
 		}
@@ -298,19 +303,18 @@ func (m *mapper) processNQuad(nq *pb.Edge) {
 
 	// Appropriate schema must exist for the nquad's namespace by this time.
 	de.Predicate = x.NamespaceAttr(de.Namespace, de.Predicate)
-	fwd := m.createPostings(nq)
+	fwd := m.createPostings(de)
+
 	shard := m.state.shards.shardFor(de.Predicate)
 	key := x.DataKey(de.Predicate, sid)
 	m.addMapEntry(key, fwd, shard)
-	m.addIndexMapEntries(nq)
+	m.addIndexMapEntries(de)
 }
 
 func (m *mapper) uid(xid string, ns uint64) uint64 {
-	if !m.opt.NewUids {
-		if uid, err := strconv.ParseUint(xid, 0, 64); err == nil {
-			m.xids.BumpTo(uid)
-			return uid
-		}
+	if uid, err := strconv.ParseUint(xid, 0, 64); err == nil {
+		m.xids.BumpPast(uid)
+		return uid
 	}
 
 	return m.lookupUid(xid, ns)
@@ -343,7 +347,12 @@ func (m *mapper) createPostings(nq *pb.Edge) *pb.Posting {
 	p, err := posting.NewPosting(nq)
 	x.Check(err)
 
-	sch := m.schema.getSchema(x.NamespaceAttr(nq.GetNamespace(), nq.GetPredicate()))
+	sch := m.schema.getSchema(nq.Predicate)
+	if sch == nil {
+		fmt.Printf("schema: %+v\n", m.schema.schemaMap)
+		fmt.Printf("asking for: %q\n", nq.Predicate)
+		x.AssertTrue(sch != nil)
+	}
 	if nq.GetObjectValue() != nil {
 		switch {
 		// TODO(mrjn): We should stop assigning Uids to values.
@@ -363,7 +372,7 @@ func (m *mapper) addIndexMapEntries(nq *pb.Edge) {
 		return // Cannot index UIDs
 	}
 
-	sch := m.schema.getSchema(x.NamespaceAttr(nq.GetNamespace(), nq.GetPredicate()))
+	sch := m.schema.getSchema(nq.Predicate)
 	for _, tokName := range sch.GetTokenizer() {
 		// Find tokeniser.
 		toker, ok := tok.GetTokenizer(tokName)
@@ -381,16 +390,15 @@ func (m *mapper) addIndexMapEntries(nq *pb.Edge) {
 		toks, err := tok.BuildTokens(schemaVal.Value, toker)
 		x.Check(err)
 
-		attr := x.NamespaceAttr(nq.Namespace, nq.Predicate)
 		// Store index posting.
 		for _, t := range toks {
 			m.addMapEntry(
-				x.IndexKey(attr, t),
+				x.IndexKey(nq.Predicate, t),
 				&pb.Posting{
 					Uid:         x.FromHex(nq.Subject),
 					PostingType: pb.Posting_REF,
 				},
-				m.state.shards.shardFor(attr),
+				m.state.shards.shardFor(nq.Predicate),
 			)
 		}
 	}

@@ -194,8 +194,8 @@ func (b *Block) fillViaGraphQL() {
 		if len(txn.To.Address) == 0 || len(txn.From.Address) == 0 {
 			continue
 		}
-		txn.To.Uid = fmt.Sprintf("_:%s", txn.To.Address)
-		txn.From.Uid = fmt.Sprintf("_:%s", txn.From.Address)
+		txn.To.Uid = fmt.Sprintf("_:Account.%s", txn.To.Address)
+		txn.From.Uid = fmt.Sprintf("_:Account.%s", txn.From.Address)
 
 		price, ok := new(big.Int).SetString(txn.GasPrice, 0)
 		if !ok {
@@ -207,8 +207,8 @@ func (b *Block) fillViaGraphQL() {
 		txn.BlockNumber = b.Number
 
 		txn.Timestamp = ts
-		txn.Block = Block{Number: b.Number, Uid: fmt.Sprintf("_:%08d", b.Number)}
-		txn.Uid = fmt.Sprintf("_:%s", txn.Hash)
+		txn.Block = Block{Number: b.Number, Uid: fmt.Sprintf("_:Block.%08d", b.Number)}
+		txn.Uid = fmt.Sprintf("_:Txn.%s", txn.Hash)
 
 		// Zero out the following fields, so they don't get marshalled when
 		// sending to Outserv.
