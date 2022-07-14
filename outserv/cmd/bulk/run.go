@@ -20,7 +20,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/outcaste-io/outserv/badger"
 	"github.com/outcaste-io/outserv/badger/y"
@@ -165,15 +164,6 @@ func run() {
 	if !filestore.Exists(opt.GqlSchemaFile) {
 		fmt.Fprintf(os.Stderr, "Schema path(%v) does not exist.\n", opt.GqlSchemaFile)
 		os.Exit(1)
-	} else {
-		data, err := ioutil.ReadFile(opt.GqlSchemaFile)
-		x.Check(err)
-		x.Config.Lambda.Url = "http://dummy" // To satisfy some checks.
-		handler, err := gqlSchema.NewHandler(string(data))
-		x.Check(err)
-		dgSchema := handler.DGSchema()
-		fmt.Printf("schema parsed is:\n%s\n", dgSchema)
-		opt.schema = handler.DGSchema()
 	}
 
 	if opt.DataFiles == "" {
@@ -281,14 +271,14 @@ func run() {
 		}
 
 		loader.prog.mapEdgeCount = bulkMeta.EdgeCount
-		loader.schema.schemaMap = bulkMeta.SchemaMap
+		loader.dqlSchema.schemaMap = bulkMeta.SchemaMap
 	} else {
 		loader.mapStage()
 		mergeMapShardsIntoReduceShards(&opt)
 
 		bulkMeta := pb.BulkMeta{
 			EdgeCount: loader.prog.mapEdgeCount,
-			SchemaMap: loader.schema.schemaMap,
+			SchemaMap: loader.dqlSchema.schemaMap,
 		}
 		bulkMetaData, err := bulkMeta.Marshal()
 		if err != nil {
@@ -300,9 +290,21 @@ func run() {
 			os.Exit(1)
 		}
 	}
+
+	maxUid := loader.xids.AllocateUid()
+	for i := 0; i < opt.ReduceShards; i++ {
+		dir := filepath.Join(opt.OutDir, strconv.Itoa(i), "p")
+		x.Check(writeUIDFile(dir, maxUid))
+	}
+
 	loader.reduceStage()
 	loader.writeSchema()
 	loader.cleanup()
+}
+
+func writeUIDFile(pdir string, maxUid uint64) error {
+	uidFile := filepath.Join(pdir, "max_uid")
+	return os.WriteFile(uidFile, []byte(fmt.Sprintf("%#x\n", maxUid)), 0600)
 }
 
 func maxOpenFilesWarning() {
@@ -329,7 +331,6 @@ func maxOpenFilesWarning() {
 
 type options struct {
 	DataFiles        string
-	schema           string
 	GqlSchemaFile    string
 	OutDir           string
 	ReplaceOutDir    bool
@@ -346,6 +347,9 @@ type options struct {
 	IgnoreErrors     bool
 	CustomTokenizers string
 	ClientDir        string
+
+	dqlSchema string
+	gqlSchema *gqlSchema.Schema
 
 	MapShards    int
 	ReduceShards int
@@ -365,7 +369,8 @@ type state struct {
 	opt           *options
 	prog          *progress
 	xids          *xidmap.XidMap
-	schema        *schemaStore
+	dqlSchema     *schemaStore
+	gqlSchema     *gqlSchema.Schema
 	shards        *shardMap
 	readerChunkCh chan *bytes.Buffer
 	mapFileId     uint32 // Used atomically to name the output files of the mappers.
@@ -385,16 +390,29 @@ func newLoader(opt *options) *loader {
 		log.Fatalf("Cannot create loader with nil options.")
 	}
 
+	data, err := ioutil.ReadFile(opt.GqlSchemaFile)
+	x.Check(err)
+	x.Config.Lambda.Url = "http://dummy" // To satisfy some checks.
+	handler, err := gqlSchema.NewHandler(string(data))
+	x.Check(err)
+	dgSchema := handler.DGSchema()
+	fmt.Printf("schema parsed is:\n%s\n", dgSchema)
+	opt.dqlSchema = handler.DGSchema()
+
+	gsch, err := gqlSchema.FromString(handler.GQLSchema(), 0)
+	x.Check(err)
+
 	st := &state{
-		opt:    opt,
-		prog:   newProgress(),
-		shards: newShardMap(opt.MapShards),
+		opt:       opt,
+		gqlSchema: gsch,
+		prog:      newProgress(),
+		shards:    newShardMap(opt.MapShards),
 		// Lots of gz readers, so not much channel buffer needed.
 		readerChunkCh: make(chan *bytes.Buffer, opt.NumGoroutines),
 		writeTs:       getWriteTimestamp(),
 		namespaces:    &sync.Map{},
 	}
-	st.schema = newSchemaStore(readSchema(opt), opt, st)
+	st.dqlSchema = newSchemaStore(readSchema(opt), opt, st)
 	ld := &loader{
 		state:   st,
 		mappers: make([]*mapper, opt.NumGoroutines),
@@ -407,11 +425,14 @@ func newLoader(opt *options) *loader {
 }
 
 func getWriteTimestamp() uint64 {
-	return x.Timestamp(uint64(time.Now().Unix())<<32, 0)
+	// It seems better to use a fixed timestamp here. So, when Outserv loads up,
+	// this timestamp would always be lower than whatever Outserv uses.
+	return 1
+	// return x.Timestamp(uint64(time.Now().Unix())<<32, 0)
 }
 
 func readSchema(opt *options) *schema.ParsedSchema {
-	result, err := schema.ParseWithNamespace(opt.schema, opt.Namespace)
+	result, err := schema.ParseWithNamespace(opt.dqlSchema, opt.Namespace)
 	x.Check(err)
 	return result
 }
@@ -490,7 +511,7 @@ func (ld *loader) mapStage() {
 	if db != nil {
 		x.Check(db.Close())
 	}
-	ld.xids = nil
+	// ld.xids = nil
 }
 
 func parseGqlSchema(s string) map[uint64]*x.ExportedGQLSchema {
@@ -530,7 +551,7 @@ func (ld *loader) processGqlSchemaXXX() {
 
 	process := func(ns uint64, schema *x.ExportedGQLSchema) {
 		// Ignore the schema if the namespace is not already seen.
-		if _, ok := ld.schema.namespaces.Load(ns); !ok {
+		if _, ok := ld.dqlSchema.namespaces.Load(ns); !ok {
 			fmt.Printf("No data exist for namespace: %d. Cannot load the graphql schema.", ns)
 			return
 		}
@@ -594,7 +615,7 @@ func (ld *loader) writeSchema() {
 	// Get all predicates that have data in some DB.
 	m := make(map[string]struct{})
 	for i, db := range ld.dbs {
-		preds[i] = ld.schema.getPredicates(db)
+		preds[i] = ld.dqlSchema.getPredicates(db)
 		for _, p := range preds[i] {
 			m[p] = struct{}{}
 		}
@@ -602,7 +623,7 @@ func (ld *loader) writeSchema() {
 
 	// Find any predicates that don't have data in any DB
 	// and distribute them among all the DBs.
-	for p := range ld.schema.schemaMap {
+	for p := range ld.dqlSchema.schemaMap {
 		if _, ok := m[p]; !ok {
 			i := adler32.Checksum([]byte(p)) % numDBs
 			preds[i] = append(preds[i], p)
@@ -611,7 +632,7 @@ func (ld *loader) writeSchema() {
 
 	// Write out each DB's final predicate list.
 	for i, db := range ld.dbs {
-		ld.schema.write(db, preds[i])
+		ld.dqlSchema.write(db, preds[i])
 	}
 }
 

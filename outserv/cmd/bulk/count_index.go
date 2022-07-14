@@ -97,7 +97,7 @@ func (c *countIndexer) addCountEntry(ce countEntry) {
 			c.countBuf = getBuf(c.opt.TmpDir)
 		}
 		c.cur.pred = pk.Attr
-		c.cur.track = c.schema.getSchema(pk.Attr).GetCount()
+		c.cur.track = c.dqlSchema.getSchema(pk.Attr).GetCount()
 	}
 	if c.cur.track {
 		dst := c.countBuf.SliceAllocate(len(ce))

@@ -581,7 +581,7 @@ func (r *reducer) toList(req *encodeRequest) {
 		if pk.IsData() {
 			doCount, ok := trackCountIndex[pk.Attr]
 			if !ok {
-				doCount = r.schema.getSchema(pk.Attr).GetCount()
+				doCount = r.dqlSchema.getSchema(pk.Attr).GetCount()
 				trackCountIndex[pk.Attr] = doCount
 			}
 			if doCount {
@@ -639,13 +639,13 @@ func (r *reducer) toList(req *encodeRequest) {
 		parsedKey, err := x.Parse(currentKey)
 		x.Check(err)
 		if parsedKey.IsData() {
-			schema := r.state.schema.getSchema(parsedKey.Attr)
+			schema := r.state.dqlSchema.getSchema(parsedKey.Attr)
 			if schema.GetValueType() == types.TypeUid.Int() && !schema.GetList() && numUids > 1 {
 				fmt.Printf("Schema for pred %s specifies that this is not a list but more than  "+
 					"one UID has been found. Forcing the schema to be a list to avoid any "+
 					"data loss. Please fix the data to your specifications once Dgraph is up.\n",
 					parsedKey.Attr)
-				r.state.schema.setSchemaAsList(parsedKey.Attr)
+				r.state.dqlSchema.setSchemaAsList(parsedKey.Attr)
 			}
 		}
 

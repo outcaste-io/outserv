@@ -273,6 +273,7 @@ func (m *mapper) processNQuad(nq *pb.Edge) {
 	if strings.HasPrefix(nq.GetSubject(), "_:") {
 		typ = strings.SplitN(nq.Subject[2:], ".", 2)[0]
 	}
+
 	sid := m.uid(nq.GetSubject(), nq.Namespace)
 	if sid == 0 {
 		panic(fmt.Sprintf("invalid UID with value 0 for %v", nq.GetSubject()))
@@ -299,16 +300,31 @@ func (m *mapper) processNQuad(nq *pb.Edge) {
 		}
 	}
 
-	m.schema.checkAndSetInitialSchema(nq.Namespace)
+	m.dqlSchema.checkAndSetInitialSchema(nq.Namespace)
 
 	// Appropriate schema must exist for the nquad's namespace by this time.
 	de.Predicate = x.NamespaceAttr(de.Namespace, de.Predicate)
-	fwd := m.createPostings(de)
 
-	shard := m.state.shards.shardFor(de.Predicate)
-	key := x.DataKey(de.Predicate, sid)
-	m.addMapEntry(key, fwd, shard)
-	m.addIndexMapEntries(de)
+	createEntries := func(de *pb.Edge) {
+		fwd := m.createPostings(de)
+		shard := m.state.shards.shardFor(de.Predicate)
+		key := x.DataKey(de.Predicate, x.FromHex(de.Subject))
+		m.addMapEntry(key, fwd, shard)
+		m.addIndexMapEntries(de)
+	}
+
+	createEntries(de)
+
+	gqlType := m.gqlSchema.Type(typ)
+	if fd := gqlType.Field(nq.Predicate); fd.Inverse() != nil {
+		re := &pb.Edge{
+			Subject:   x.ToHexString(oid),
+			Predicate: x.NamespaceAttr(de.Namespace, fd.Inverse().DgraphPredicate()),
+			ObjectId:  x.ToHexString(sid),
+			Namespace: nq.Namespace,
+		}
+		createEntries(re)
+	}
 }
 
 func (m *mapper) uid(xid string, ns uint64) uint64 {
@@ -347,9 +363,9 @@ func (m *mapper) createPostings(nq *pb.Edge) *pb.Posting {
 	p, err := posting.NewPosting(nq)
 	x.Check(err)
 
-	sch := m.schema.getSchema(nq.Predicate)
+	sch := m.dqlSchema.getSchema(nq.Predicate)
 	if sch == nil {
-		fmt.Printf("schema: %+v\n", m.schema.schemaMap)
+		fmt.Printf("schema: %+v\n", m.dqlSchema.schemaMap)
 		fmt.Printf("asking for: %q\n", nq.Predicate)
 		x.AssertTrue(sch != nil)
 	}
@@ -372,7 +388,7 @@ func (m *mapper) addIndexMapEntries(nq *pb.Edge) {
 		return // Cannot index UIDs
 	}
 
-	sch := m.schema.getSchema(nq.Predicate)
+	sch := m.dqlSchema.getSchema(nq.Predicate)
 	for _, tokName := range sch.GetTokenizer() {
 		// Find tokeniser.
 		toker, ok := tok.GetTokenizer(tokName)
