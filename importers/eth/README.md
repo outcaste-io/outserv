@@ -3,8 +3,11 @@
 ## Notes from Field Test
 
 
-Bulk loader could take 48 GBs of memory to store the Hash -> Outserv UIDs
-mapping.
+Bulk loader could take 48 GBs of memory just to store the Hash -> Outserv UIDs
+mapping. It is recommended to use a 64 GB RAM machine.
+
+Assuming a fast connection to Geth, this import process is CPU bound. So,
+recommendation is to use at least a 16-core machine, preferrably a 32-core.
 
 ```
 $ curl localhost:8080/jemalloc

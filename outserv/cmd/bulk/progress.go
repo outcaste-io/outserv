@@ -91,8 +91,8 @@ func (p *progress) reportOnce() {
 		rdfCount := atomic.LoadInt64(&p.nquadCount)
 		errCount := atomic.LoadInt64(&p.errCount)
 		elapsed := time.Since(p.start)
-		fmt.Printf("[%s] MAP %s Record count:%s speed:%s/sec | "+
-			"Edge count:%s speed:%s/sec | Errors: %s | Jemalloc: %s \n",
+		fmt.Printf("[%s] MAP %s IN count:%s speed:%s/sec | "+
+			"OUT count:%s speed:%s/sec | Errors: %s | Jemalloc: %s \n",
 			timestamp,
 			x.FixedDuration(elapsed),
 			niceFloat(float64(rdfCount)),
@@ -116,7 +116,7 @@ func (p *progress) reportOnce() {
 			pct = fmt.Sprintf("%.2f%% ", 100*float64(reduceEdgeCount)/float64(mapEdgeCount))
 		}
 		fmt.Printf("[%s] REDUCE %s %s| IN count: %s speed: %s/sec "+
-			"| OUT count: %s speed: %s/sec | Encoding MBs: %d | Jemalloc: %s \n",
+			"| OUT count: %s speed: %s/sec | Encoding MBs: %4d | Jemalloc: %s \n",
 			timestamp,
 			x.FixedDuration(now.Sub(p.start)),
 			pct,

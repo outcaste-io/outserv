@@ -426,8 +426,8 @@ func newLoader(opt *options) *loader {
 func getWriteTimestamp() uint64 {
 	// It seems better to use a fixed timestamp here. So, when Outserv loads up,
 	// this timestamp would always be lower than whatever Outserv uses.
-	return 1
 	// return x.Timestamp(uint64(time.Now().Unix())<<32, 0)
+	return 1
 }
 
 func readSchema(opt *options) *schema.ParsedSchema {
@@ -475,8 +475,8 @@ func (ld *loader) blockingFileReader() {
 	close(ld.readerChunkCh)
 }
 
-func (ld *loader) blockingSocketReader() {
-	fmt.Printf("Reading from socket: %s\n", ld.opt.DataIPC)
+func (ld *loader) blockingIPCReader() {
+	fmt.Printf("Reading from IPC: %s\n", ld.opt.DataIPC)
 	files := x.FindDataFiles(ld.opt.DataIPC, []string{".ipc"})
 	fmt.Printf("Found files: %v\n", files)
 
@@ -537,11 +537,10 @@ func (ld *loader) mapStage() {
 	}
 
 	// Send the graphql triples
-	// ld.processGqlSchema()
 	if len(ld.opt.DataFiles) > 0 {
 		ld.blockingFileReader()
 	} else if len(ld.opt.DataIPC) > 0 {
-		ld.blockingSocketReader()
+		ld.blockingIPCReader()
 	} else {
 		fmt.Printf("No input provided. Must be one of files or socket")
 		os.Exit(1)
@@ -582,67 +581,6 @@ func parseGqlSchema(s string) map[uint64]*x.ExportedGQLSchema {
 		schemaMap[schema.Namespace] = schema
 	}
 	return schemaMap
-}
-
-func (ld *loader) processGqlSchemaXXX() {
-	x.AssertTrue(len(ld.opt.GqlSchemaFile) > 0)
-	buf, err := ioutil.ReadFile(ld.opt.GqlSchemaFile)
-	x.Check(err)
-
-	jsonSchema := `{
-		"namespace": "%#x",
-		"dgraph.type": "dgraph.graphql",
-		"dgraph.graphql.xid": "dgraph.graphql.schema",
-		"dgraph.graphql.schema": %s
-	}`
-
-	process := func(ns uint64, schema *x.ExportedGQLSchema) {
-		// Ignore the schema if the namespace is not already seen.
-		if _, ok := ld.dqlSchema.namespaces.Load(ns); !ok {
-			fmt.Printf("No data exist for namespace: %d. Cannot load the graphql schema.", ns)
-			return
-		}
-		gqlBuf := &bytes.Buffer{}
-		sch := x.GQL{
-			Schema: schema.Schema,
-			Script: schema.Script,
-		}
-		b, err := json.Marshal(sch)
-		if err != nil {
-			fmt.Printf("Error while marshalling schema for the namespace: %d. err: %v", ns, err)
-			return
-		}
-		quotedSch := strconv.Quote(string(b))
-		x.Check2(gqlBuf.Write([]byte(fmt.Sprintf(jsonSchema, ns, quotedSch))))
-		ld.readerChunkCh <- gqlBuf
-	}
-
-	schemas := parseGqlSchema(string(buf))
-	if ld.opt.Namespace == 0 {
-		// Preserve the namespace.
-		for ns, schema := range schemas {
-			process(ns, schema)
-		}
-		return
-	}
-
-	switch len(schemas) {
-	case 1:
-		// User might have exported from a different namespace. So, schema.Namespace will not be
-		// having the correct value.
-		for _, schema := range schemas {
-			process(ld.opt.Namespace, schema)
-		}
-	default:
-		if _, ok := schemas[ld.opt.Namespace]; !ok {
-			// We expect only a single GraphQL schema when loading into specfic namespace.
-			fmt.Printf("Didn't find GraphQL schema for namespace %d. Not loading GraphQL schema.",
-				ld.opt.Namespace)
-			return
-		}
-		process(ld.opt.Namespace, schemas[ld.opt.Namespace])
-	}
-	return
 }
 
 func (ld *loader) reduceStage() {
