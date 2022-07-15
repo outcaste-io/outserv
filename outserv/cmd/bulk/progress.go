@@ -91,15 +91,15 @@ func (p *progress) reportOnce() {
 		rdfCount := atomic.LoadInt64(&p.nquadCount)
 		errCount := atomic.LoadInt64(&p.errCount)
 		elapsed := time.Since(p.start)
-		fmt.Printf("[%s] MAP %s nquad_count:%s err_count:%s nquad_speed:%s/sec "+
-			"edge_count:%s edge_speed:%s/sec jemalloc: %s \n",
+		fmt.Printf("[%s] MAP %s Record count:%s speed:%s/sec | "+
+			"Edge count:%s speed:%s/sec | Errors: %s | Jemalloc: %s \n",
 			timestamp,
 			x.FixedDuration(elapsed),
 			niceFloat(float64(rdfCount)),
-			niceFloat(float64(errCount)),
 			niceFloat(float64(rdfCount)/elapsed.Seconds()),
 			niceFloat(float64(mapEdgeCount)),
 			niceFloat(float64(mapEdgeCount)/elapsed.Seconds()),
+			niceFloat(float64(errCount)),
 			humanize.IBytes(uint64(z.NumAllocBytes())),
 		)
 	case reducePhase:

@@ -263,9 +263,9 @@ func (c *Chain) BlockingFill() {
 func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	var bytesWritten int64
+	var writtenMB float64
 	defer func() {
-		fmt.Printf("Process %d wrote %d MBs of data\n", gid, bytesWritten/1<<20)
+		fmt.Printf("Process %d wrote %.2f GBs of data\n", gid, writtenMB/(1<<10))
 	}()
 
 	var writer io.Writer
@@ -308,7 +308,7 @@ func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 			data, err := json.Marshal(txns)
 			check(err)
 			n, err := writer.Write(data)
-			bytesWritten += int64(n)
+			writtenMB += float64(n) / (1 << 20)
 			return err
 		}
 
