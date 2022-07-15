@@ -967,7 +967,7 @@ func applyFieldValidations(typ *ast.Definition, field *ast.FieldDefinition) gqle
 // query/mutation/update for all the types mentioned in the schema.
 // In case of Apollo service Query, input types from queries and mutations
 // are excluded due to the limited support currently.
-func completeSchema(sch *ast.Schema, definitions []string, providesFieldsMap map[string]map[string]bool, apolloServiceQuery bool) {
+func completeSchema(sch *ast.Schema, definitions []string, providesFieldsMap map[string]map[string]bool) {
 	query := sch.Types["Query"]
 	if query != nil {
 		query.Kind = ast.Object
@@ -1066,17 +1066,15 @@ func completeSchema(sch *ast.Schema, definitions []string, providesFieldsMap map
 		// types and inputs needed for query and search
 		addFilterType(sch, defn, providesTypeMap)
 		addTypeOrderable(sch, defn, providesTypeMap)
-		addFieldFilters(sch, defn, providesTypeMap, apolloServiceQuery)
+		addFieldFilters(sch, defn, providesTypeMap)
 		addAggregationResultType(sch, defn, providesTypeMap)
 		// Don't expose queries for the @extends type to the gateway
 		// as it is resolved through `_entities` resolver.
-		if !(apolloServiceQuery && hasExtends(defn)) {
-			addQueries(sch, defn, providesTypeMap, params)
-		}
+		addQueries(sch, defn, providesTypeMap, params)
 		addTypeHasFilter(sch, defn, providesTypeMap)
 		// We need to call this at last as aggregateFields
 		// should not be part of HasFilter or UpdatePayloadType etc.
-		addAggregateFields(sch, defn, apolloServiceQuery)
+		addAggregateFields(sch, defn)
 	}
 }
 
@@ -1357,16 +1355,11 @@ func addPatchType(schema *ast.Schema, defn *ast.Definition, providesTypeMap map[
 //     ...
 //   }
 // }
-func addFieldFilters(schema *ast.Schema, defn *ast.Definition, providesTypeMap map[string]bool, apolloServiceQuery bool) {
+func addFieldFilters(schema *ast.Schema, defn *ast.Definition, providesTypeMap map[string]bool) {
 	for _, fld := range defn.Fields {
 		// Filtering and ordering for fields with @custom/@lambda directive is handled by the remote
 		// endpoint.
 		if hasCustomOrLambda(fld) || isMultiLangField(fld, false) {
-			continue
-		}
-
-		// Don't add Filters for @extended types as they can't be filtered.
-		if apolloServiceQuery && hasExtends(schema.Types[fld.Type.Name()]) {
 			continue
 		}
 
@@ -1393,14 +1386,9 @@ func addFieldFilters(schema *ast.Schema, defn *ast.Definition, providesTypeMap m
 // The following aggregate field is added to type T
 // fieldAAggregate(filter : AFilter) : AAggregateResult
 // These fields are added to support aggregate queries like count, avg, min
-func addAggregateFields(schema *ast.Schema, defn *ast.Definition, apolloServiceQuery bool) {
+func addAggregateFields(schema *ast.Schema, defn *ast.Definition) {
 	for _, fld := range defn.Fields {
 
-		// Don't generate Aggregate Queries for field whose types are extended
-		// in the schema.
-		if apolloServiceQuery && hasExtends(schema.Types[fld.Type.Name()]) {
-			continue
-		}
 		// Aggregate Fields only makes sense for fields of
 		// list types of kind Object or Interface
 		// (not scalar lists or not singleton types or lists of other kinds).

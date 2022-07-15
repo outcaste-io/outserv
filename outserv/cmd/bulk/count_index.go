@@ -65,7 +65,6 @@ func (ci countEntry) less(oe countEntry) bool {
 
 type current struct {
 	pred  string
-	rev   bool
 	track bool
 }
 
@@ -86,7 +85,7 @@ func (c *countIndexer) addCountEntry(ce countEntry) {
 	pk, err := x.Parse(ce.Key())
 	x.Check(err)
 
-	sameIndexKey := pk.Attr == c.cur.pred && pk.IsReverse() == c.cur.rev
+	sameIndexKey := pk.Attr == c.cur.pred
 	if sameIndexKey && !c.cur.track {
 		return
 	}
@@ -98,8 +97,7 @@ func (c *countIndexer) addCountEntry(ce countEntry) {
 			c.countBuf = getBuf(c.opt.TmpDir)
 		}
 		c.cur.pred = pk.Attr
-		c.cur.rev = pk.IsReverse()
-		c.cur.track = c.schema.getSchema(pk.Attr).GetCount()
+		c.cur.track = c.dqlSchema.getSchema(pk.Attr).GetCount()
 	}
 	if c.cur.track {
 		dst := c.countBuf.SliceAllocate(len(ce))
@@ -128,7 +126,7 @@ func (c *countIndexer) writeIndex(buf *z.Buffer) {
 	{
 		pk, err := x.Parse(lastCe.Key())
 		x.Check(err)
-		fmt.Printf("Writing count index for %q rev=%v\n", pk.Attr, pk.IsReverse())
+		fmt.Printf("Writing count index for %q\n", pk.Attr)
 	}
 
 	alloc := z.NewAllocator(8<<20, "CountIndexer.WriteIndex")

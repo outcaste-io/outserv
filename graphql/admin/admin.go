@@ -122,7 +122,7 @@ var (
 )
 
 func SchemaValidate(sch string) error {
-	schHandler, err := schema.NewHandler(sch, false)
+	schHandler, err := schema.NewHandler(sch)
 	if err != nil {
 		return err
 	}
@@ -308,7 +308,7 @@ func getCurrentGraphQLSchema(namespace uint64) (*worker.GqlSchema, error) {
 }
 
 func generateGQLSchema(sch *worker.GqlSchema, ns uint64) (*schema.Schema, error) {
-	schHandler, err := schema.NewHandler(sch.Schema, false)
+	schHandler, err := schema.NewHandler(sch.Schema)
 	if err != nil {
 		return nil, err
 	}

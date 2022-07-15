@@ -264,7 +264,7 @@ func parseMetaInfo(sch string) (*metaInfo, error) {
 
 // NewHandler processes the input schema. If there are no errors, it returns
 // a valid Handler, otherwise it returns nil and an error.
-func NewHandler(input string, apolloServiceQuery bool) (*Handler, error) {
+func NewHandler(input string) (*Handler, error) {
 	if input == "" {
 		return nil, gqlerror.Errorf("No schema specified")
 	}
@@ -381,7 +381,7 @@ func NewHandler(input string, apolloServiceQuery bool) (*Handler, error) {
 
 	metaInfo.extraCorsHeaders = getAllowedHeaders(sch, defns, authHeader)
 	dgSchema := genDgSchema(sch, typesToComplete, providesFieldsMap)
-	completeSchema(sch, typesToComplete, providesFieldsMap, apolloServiceQuery)
+	completeSchema(sch, typesToComplete, providesFieldsMap)
 	cleanSchema(sch)
 
 	if len(sch.Query.Fields) == 0 && len(sch.Mutation.Fields) == 0 {

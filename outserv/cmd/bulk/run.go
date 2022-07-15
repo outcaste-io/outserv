@@ -4,8 +4,12 @@
 package bulk
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"hash/adler32"
+	"io"
 	"io/ioutil"
 	"log"
 	"math"
@@ -16,12 +20,18 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/outcaste-io/outserv/badger"
+	"github.com/outcaste-io/outserv/badger/y"
+	"github.com/outcaste-io/outserv/chunker"
 	"github.com/outcaste-io/outserv/ee"
 	"github.com/outcaste-io/outserv/filestore"
+	gqlSchema "github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
+	"github.com/outcaste-io/outserv/schema"
+	"github.com/outcaste-io/outserv/xidmap"
 	"github.com/outcaste-io/ristretto/z"
 
 	"github.com/outcaste-io/outserv/tok"
@@ -39,7 +49,7 @@ const BulkBadgerDefaults = "compression=snappy; numgoroutines=8;"
 func init() {
 	Bulk.Cmd = &cobra.Command{
 		Use:   "bulk",
-		Short: "Run Dgraph Bulk Loader",
+		Short: "Run Outserv Bulk Loader",
 		Run: func(cmd *cobra.Command, args []string) {
 			defer x.StartProfile(Bulk.Conf).Stop()
 			run()
@@ -47,22 +57,13 @@ func init() {
 		Annotations: map[string]string{"group": "data-load"},
 	}
 	Bulk.Cmd.SetHelpTemplate(x.NonRootTemplate)
-	Bulk.EnvPrefix = "DGRAPH_BULK"
+	Bulk.EnvPrefix = "OUTSERV_BULK"
 
 	flag := Bulk.Cmd.Flags()
+	flag.StringP("ipc", "i", "", "Directory or path of IPC files.")
 	flag.StringP("files", "f", "",
-		"Location of *.rdf(.gz) or *.json(.gz) file(s) to load.")
-	flag.StringP("schema", "s", "",
-		"Location of schema file.")
-	flag.StringP("graphql_schema", "g", "", "Location of the GraphQL schema file.")
-	flag.String("format", "",
-		"Specify file format (rdf or json) instead of getting it from filename.")
-	flag.Bool("encrypted", false,
-		"Flag to indicate whether schema and data files are encrypted. "+
-			"Must be specified with --encryption or vault option(s).")
-	flag.Bool("encrypted_out", false,
-		"Flag to indicate whether to encrypt the output. "+
-			"Must be specified with --encryption or vault option(s).")
+		"Location of *.json(.gz) file(s) to load.")
+	flag.StringP("schema", "s", "", "Location of the GraphQL schema file.")
 	flag.String("out", defaultOutDir,
 		"Location to write the final dgraph data directories.")
 	flag.Bool("replace_out", false,
@@ -85,12 +86,9 @@ func init() {
 		"Number of reducers to run concurrently. Increasing this can improve performance, and "+
 			"must be less than or equal to the number of reduce shards.")
 	flag.Bool("version", false, "Prints the version of Dgraph Bulk Loader.")
-	flag.Bool("store_xids", false, "Generate an xid edge for each node.")
-	flag.StringP("zero", "z", "localhost:5080", "gRPC address for Dgraph zero")
 	flag.String("xidmap", "", "Directory to store xid to uid mapping")
 	// TODO: Potentially move http server to main.
-	flag.String("http", "localhost:8080",
-		"Address to serve http (pprof).")
+	flag.String("http", "localhost:8080", "Address to serve http (pprof).")
 	flag.Bool("ignore_errors", false, "ignore line parsing errors in rdf files")
 	flag.Int("map_shards", 1,
 		"Number of map output shards. Must be greater than or equal to the number of reduce "+
@@ -102,9 +100,7 @@ func init() {
 			"more parallelism, but increases memory usage.")
 	flag.String("custom_tokenizers", "",
 		"Comma separated list of tokenizer plugins")
-	flag.Bool("new_uids", false,
-		"Ignore UIDs in load files and assign new ones.")
-	flag.Uint64("force-namespace", math.MaxUint64,
+	flag.Uint64("force-namespace", 0,
 		"Namespace onto which to load the data. If not set, will preserve the namespace."+
 			" When using this flag to load data into specific namespace, make sure that the "+
 			"load data do not have ACL data.")
@@ -120,10 +116,6 @@ func init() {
 		Flag("numgoroutines",
 			"The number of goroutines to use in badger.Stream.").
 		String())
-
-	x.RegisterClientTLSFlags(flag)
-	// Encryption and Vault options
-	ee.RegisterEncFlag(flag)
 }
 
 func run() {
@@ -138,12 +130,9 @@ func run() {
 
 	opt := options{
 		DataFiles:        Bulk.Conf.GetString("files"),
-		DataFormat:       Bulk.Conf.GetString("format"),
+		DataIPC:          Bulk.Conf.GetString("ipc"),
 		EncryptionKey:    keys.EncKey,
-		SchemaFile:       Bulk.Conf.GetString("schema"),
-		GqlSchemaFile:    Bulk.Conf.GetString("graphql_schema"),
-		Encrypted:        Bulk.Conf.GetBool("encrypted"),
-		EncryptedOut:     Bulk.Conf.GetBool("encrypted_out"),
+		GqlSchemaFile:    Bulk.Conf.GetString("schema"),
 		OutDir:           Bulk.Conf.GetString("out"),
 		ReplaceOutDir:    Bulk.Conf.GetBool("replace_out"),
 		TmpDir:           Bulk.Conf.GetString("tmp"),
@@ -154,14 +143,12 @@ func run() {
 		CleanupTmp:       Bulk.Conf.GetBool("cleanup_tmp"),
 		NumReducers:      Bulk.Conf.GetInt("reducers"),
 		Version:          Bulk.Conf.GetBool("version"),
-		StoreXids:        Bulk.Conf.GetBool("store_xids"),
 		ZeroAddr:         Bulk.Conf.GetString("zero"),
 		HttpAddr:         Bulk.Conf.GetString("http"),
 		IgnoreErrors:     Bulk.Conf.GetBool("ignore_errors"),
 		MapShards:        Bulk.Conf.GetInt("map_shards"),
 		ReduceShards:     Bulk.Conf.GetInt("reduce_shards"),
 		CustomTokenizers: Bulk.Conf.GetString("custom_tokenizers"),
-		NewUids:          Bulk.Conf.GetBool("new_uids"),
 		ClientDir:        Bulk.Conf.GetString("xidmap"),
 		Namespace:        Bulk.Conf.GetUint64("force-namespace"),
 		Badger:           bopts,
@@ -176,45 +163,12 @@ func run() {
 		os.Exit(0)
 	}
 
-	if len(opt.EncryptionKey) == 0 {
-		if opt.Encrypted || opt.EncryptedOut {
-			fmt.Fprint(os.Stderr, "Must use --encryption or vault option(s).\n")
-			os.Exit(1)
-		}
-	} else {
-		requiredFlags := Bulk.Cmd.Flags().Changed("encrypted") &&
-			Bulk.Cmd.Flags().Changed("encrypted_out")
-		if !requiredFlags {
-			fmt.Fprint(os.Stderr,
-				"Must specify --encrypted and --encrypted_out when providing encryption key.\n")
-			os.Exit(1)
-		}
-		if !opt.Encrypted && !opt.EncryptedOut {
-			fmt.Fprint(os.Stderr,
-				"Must set --encrypted and/or --encrypted_out to true when providing encryption key.\n")
-			os.Exit(1)
-		}
+	if !filestore.Exists(opt.GqlSchemaFile) {
+		fmt.Fprintf(os.Stderr, "Schema path(%v) does not exist.\n", opt.GqlSchemaFile)
+		os.Exit(1)
+	}
 
-		tlsConf, err := x.LoadClientTLSConfigForInternalPort(Bulk.Conf)
-		x.Check(err)
-		// Need to set zero addr in WorkerConfig before checking the license.
-		x.WorkerConfig.PeerAddr = []string{opt.ZeroAddr}
-		x.WorkerConfig.TLSClientConfig = tlsConf
-	}
-	fmt.Printf("Encrypted input: %v; Encrypted output: %v\n", opt.Encrypted, opt.EncryptedOut)
-
-	if opt.SchemaFile == "" {
-		fmt.Fprint(os.Stderr, "Schema file must be specified.\n")
-		os.Exit(1)
-	}
-	if !filestore.Exists(opt.SchemaFile) {
-		fmt.Fprintf(os.Stderr, "Schema path(%v) does not exist.\n", opt.SchemaFile)
-		os.Exit(1)
-	}
-	if opt.DataFiles == "" {
-		fmt.Fprint(os.Stderr, "JSON file(s) location must be specified.\n")
-		os.Exit(1)
-	} else {
+	if len(opt.DataFiles) > 0 {
 		fileList := strings.Split(opt.DataFiles, ",")
 		for _, file := range fileList {
 			if !filestore.Exists(file) {
@@ -316,17 +270,14 @@ func run() {
 		}
 
 		loader.prog.mapEdgeCount = bulkMeta.EdgeCount
-		loader.schema.schemaMap = bulkMeta.SchemaMap
-		loader.schema.types = bulkMeta.Types
+		loader.dqlSchema.schemaMap = bulkMeta.SchemaMap
 	} else {
 		loader.mapStage()
 		mergeMapShardsIntoReduceShards(&opt)
-		loader.leaseNamespaces()
 
 		bulkMeta := pb.BulkMeta{
 			EdgeCount: loader.prog.mapEdgeCount,
-			SchemaMap: loader.schema.schemaMap,
-			Types:     loader.schema.types,
+			SchemaMap: loader.dqlSchema.schemaMap,
 		}
 		bulkMetaData, err := bulkMeta.Marshal()
 		if err != nil {
@@ -337,10 +288,21 @@ func run() {
 			fmt.Fprintln(os.Stderr, "Error writing to bulk meta file")
 			os.Exit(1)
 		}
+		maxUid := loader.xids.AllocateUid()
+		for i := 0; i < opt.ReduceShards; i++ {
+			dir := filepath.Join(opt.OutDir, strconv.Itoa(i), "p")
+			x.Check(writeUIDFile(dir, maxUid))
+		}
 	}
+
 	loader.reduceStage()
 	loader.writeSchema()
 	loader.cleanup()
+}
+
+func writeUIDFile(pdir string, maxUid uint64) error {
+	uidFile := filepath.Join(pdir, "max_uid")
+	return os.WriteFile(uidFile, []byte(fmt.Sprintf("%#x\n", maxUid)), 0600)
 }
 
 func maxOpenFilesWarning() {
@@ -363,4 +325,310 @@ func maxOpenFilesWarning() {
 		}
 		fmt.Println()
 	}
+}
+
+type options struct {
+	DataFiles        string
+	DataIPC          string
+	GqlSchemaFile    string
+	OutDir           string
+	ReplaceOutDir    bool
+	TmpDir           string
+	NumGoroutines    int
+	MapBufSize       uint64
+	PartitionBufSize int64
+	SkipMapPhase     bool
+	CleanupTmp       bool
+	NumReducers      int
+	Version          bool
+	ZeroAddr         string
+	HttpAddr         string
+	IgnoreErrors     bool
+	CustomTokenizers string
+	ClientDir        string
+
+	dqlSchema string
+	gqlSchema *gqlSchema.Schema
+
+	MapShards    int
+	ReduceShards int
+
+	Namespace uint64
+
+	shardOutputDirs []string
+
+	// ........... Badger options ..........
+	// EncryptionKey is the key used for encryption. Enterprise only feature.
+	EncryptionKey x.Sensitive
+	// Badger options.
+	Badger badger.Options
+}
+
+type state struct {
+	opt           *options
+	prog          *progress
+	xids          *xidmap.XidMap
+	dqlSchema     *schemaStore
+	gqlSchema     *gqlSchema.Schema
+	shards        *shardMap
+	readerChunkCh chan *bytes.Buffer
+	mapFileId     uint32 // Used atomically to name the output files of the mappers.
+	dbs           []*badger.DB
+	tmpDbs        []*badger.DB // Temporary DB to write the split lists to avoid ordering issues.
+	writeTs       uint64       // All badger writes use this timestamp
+	namespaces    *sync.Map    // To store the encountered namespaces.
+}
+
+type loader struct {
+	*state
+	mappers []*mapper
+}
+
+func newLoader(opt *options) *loader {
+	if opt == nil {
+		log.Fatalf("Cannot create loader with nil options.")
+	}
+
+	data, err := ioutil.ReadFile(opt.GqlSchemaFile)
+	x.Check(err)
+	x.Config.Lambda.Url = "http://dummy" // To satisfy some checks.
+	handler, err := gqlSchema.NewHandler(string(data))
+	x.Check(err)
+	dgSchema := handler.DGSchema()
+	fmt.Printf("schema parsed is:\n%s\n", dgSchema)
+	opt.dqlSchema = handler.DGSchema()
+
+	gsch, err := gqlSchema.FromString(handler.GQLSchema(), 0)
+	x.Check(err)
+
+	st := &state{
+		opt:       opt,
+		gqlSchema: gsch,
+		prog:      newProgress(),
+		shards:    newShardMap(opt.MapShards),
+		// Lots of gz readers, so not much channel buffer needed.
+		readerChunkCh: make(chan *bytes.Buffer, opt.NumGoroutines),
+		writeTs:       getWriteTimestamp(),
+		namespaces:    &sync.Map{},
+	}
+	st.dqlSchema = newSchemaStore(readSchema(opt), opt, st)
+	ld := &loader{
+		state:   st,
+		mappers: make([]*mapper, opt.NumGoroutines),
+	}
+	for i := 0; i < opt.NumGoroutines; i++ {
+		ld.mappers[i] = newMapper(st)
+	}
+	go ld.prog.report()
+	return ld
+}
+
+func getWriteTimestamp() uint64 {
+	// It seems better to use a fixed timestamp here. So, when Outserv loads up,
+	// this timestamp would always be lower than whatever Outserv uses.
+	// return x.Timestamp(uint64(time.Now().Unix())<<32, 0)
+	return 1
+}
+
+func readSchema(opt *options) *schema.ParsedSchema {
+	result, err := schema.ParseWithNamespace(opt.dqlSchema, opt.Namespace)
+	x.Check(err)
+	return result
+}
+
+func (ld *loader) blockingFileReader() {
+	fs := filestore.NewFileStore(ld.opt.DataFiles)
+
+	files := fs.FindDataFiles(ld.opt.DataFiles, []string{".json", ".json.gz"})
+	if len(files) == 0 {
+		fmt.Printf("No data files found in %s.\n", ld.opt.DataFiles)
+		os.Exit(1)
+	}
+
+	// This is the main map loop.
+	thr := y.NewThrottle(ld.opt.NumGoroutines)
+	for i, file := range files {
+		x.Check(thr.Do())
+		fmt.Printf("Processing file (%d out of %d): %s\n", i+1, len(files), file)
+
+		go func(file string) {
+			defer thr.Done(nil)
+
+			r, cleanup := fs.ChunkReader(file, nil)
+			defer cleanup()
+
+			chunk := chunker.NewChunker(chunker.JsonFormat, 1000)
+			for {
+				chunkBuf, err := chunk.Chunk(r)
+				if chunkBuf != nil && chunkBuf.Len() > 0 {
+					ld.readerChunkCh <- chunkBuf
+				}
+				if err == io.EOF {
+					break
+				} else if err != nil {
+					x.Check(err)
+				}
+			}
+		}(file)
+	}
+	x.Check(thr.Finish())
+	close(ld.readerChunkCh)
+}
+
+func (ld *loader) blockingIPCReader() {
+	fmt.Printf("Reading from IPC: %s\n", ld.opt.DataIPC)
+	files := x.FindDataFiles(ld.opt.DataIPC, []string{".ipc"})
+	fmt.Printf("Found files: %v\n", files)
+
+	var wg sync.WaitGroup
+	for _, file := range files {
+		wg.Add(1)
+		go func(file string) {
+			defer wg.Done()
+			// conn, err := net.Dial("unix", file)
+			// x.Check(err)
+			// defer conn.Close()
+			fd, err := os.OpenFile(file, os.O_RDONLY, os.ModeNamedPipe)
+			x.Check(err)
+			defer fd.Close()
+
+			r := bufio.NewReaderSize(fd, 32<<20)
+			chunk := chunker.NewChunker(chunker.JsonFormat, 1000)
+			for {
+				chunkBuf, err := chunk.Chunk(r)
+				if chunkBuf != nil && chunkBuf.Len() > 0 {
+					ld.readerChunkCh <- chunkBuf
+				}
+				if err == io.EOF {
+					fmt.Printf("io.EOF for IPC: %s\n", file)
+					return
+				} else if err != nil {
+					x.Check(err)
+				}
+			}
+		}(file)
+	}
+	wg.Wait()
+	close(ld.readerChunkCh)
+}
+
+func (ld *loader) mapStage() {
+	ld.prog.setPhase(mapPhase)
+	var db *badger.DB
+	if len(ld.opt.ClientDir) > 0 {
+		x.Check(os.MkdirAll(ld.opt.ClientDir, 0700))
+
+		var err error
+		db, err = badger.Open(badger.DefaultOptions(ld.opt.ClientDir))
+		x.Checkf(err, "Error while creating badger KV posting store")
+	}
+	ld.xids = xidmap.New(xidmap.XidMapOptions{
+		DB:  db,
+		Dir: filepath.Join(ld.opt.TmpDir, bufferDir),
+	})
+
+	var mapperWg sync.WaitGroup
+	mapperWg.Add(len(ld.mappers))
+	for _, m := range ld.mappers {
+		go func(m *mapper) {
+			m.run()
+			mapperWg.Done()
+		}(m)
+	}
+
+	// Send the graphql triples
+	if len(ld.opt.DataFiles) > 0 {
+		ld.blockingFileReader()
+	} else if len(ld.opt.DataIPC) > 0 {
+		ld.blockingIPCReader()
+	} else {
+		fmt.Printf("No input provided. Must be one of files or socket")
+		os.Exit(1)
+	}
+
+	// Wait for mappers to be done processing the input.
+	mapperWg.Wait()
+
+	// Allow memory to GC before the reduce phase.
+	for i := range ld.mappers {
+		ld.mappers[i] = nil
+	}
+	x.Check(ld.xids.Flush())
+	if db != nil {
+		x.Check(db.Close())
+	}
+	// ld.xids = nil
+}
+
+func parseGqlSchema(s string) map[uint64]*x.ExportedGQLSchema {
+	schemaMap := make(map[uint64]*x.ExportedGQLSchema)
+
+	var schemas []*x.ExportedGQLSchema
+	if err := json.Unmarshal([]byte(s), &schemas); err != nil {
+		fmt.Println("Error while decoding the graphql schema. Assuming it to be in format < 21.03.")
+		schemaMap[x.GalaxyNamespace] = &x.ExportedGQLSchema{
+			Namespace: x.GalaxyNamespace,
+			Schema:    s,
+		}
+		return schemaMap
+	}
+
+	for _, schema := range schemas {
+		if _, ok := schemaMap[schema.Namespace]; ok {
+			fmt.Printf("Found multiple GraphQL schema for namespace %d.", schema.Namespace)
+			continue
+		}
+		schemaMap[schema.Namespace] = schema
+	}
+	return schemaMap
+}
+
+func (ld *loader) reduceStage() {
+	ld.prog.setPhase(reducePhase)
+
+	r := reducer{
+		state:     ld.state,
+		streamIds: make(map[string]uint32),
+	}
+	x.Check(r.run())
+}
+
+func (ld *loader) writeSchema() {
+	numDBs := uint32(len(ld.dbs))
+	preds := make([][]string, numDBs)
+
+	// Get all predicates that have data in some DB.
+	m := make(map[string]struct{})
+	for i, db := range ld.dbs {
+		preds[i] = ld.dqlSchema.getPredicates(db)
+		for _, p := range preds[i] {
+			m[p] = struct{}{}
+		}
+	}
+
+	// Find any predicates that don't have data in any DB
+	// and distribute them among all the DBs.
+	for p := range ld.dqlSchema.schemaMap {
+		if _, ok := m[p]; !ok {
+			i := adler32.Checksum([]byte(p)) % numDBs
+			preds[i] = append(preds[i], p)
+		}
+	}
+
+	// Write out each DB's final predicate list.
+	for i, db := range ld.dbs {
+		ld.dqlSchema.write(db, preds[i])
+	}
+}
+
+func (ld *loader) cleanup() {
+	for _, db := range ld.dbs {
+		x.Check(db.Close())
+	}
+	for _, db := range ld.tmpDbs {
+		opts := db.Opts()
+		x.Check(db.Close())
+		x.Check(os.RemoveAll(opts.Dir))
+	}
+	ld.prog.endSummary()
 }

@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	encjson "encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -133,7 +134,17 @@ func (jc *jsonChunker) Chunk(r *bufio.Reader) (*bytes.Buffer, error) {
 
 			// validate that there are no more non-space chars after the ]
 			if slurpSpace(r) != io.EOF {
-				return nil, errors.New("Not all of JSON file consumed")
+				// This is a situation where we had [{...},{...}] [{...},{...}]
+				// within the same file. In that case, we can absorb the leading
+				// `[` and continue with the map.
+				ch, err = jc.nextRune(r)
+				if err != nil {
+					return nil, fmt.Errorf("Got err after ]: %v", err)
+				}
+				if ch == '[' {
+					continue // Now expecting a {..}
+				}
+				return nil, fmt.Errorf("Unexpected rune after ]: %q", ch)
 			}
 
 			if _, err := out.WriteRune(']'); err != nil {

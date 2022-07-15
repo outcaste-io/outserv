@@ -3,6 +3,7 @@ type Txn {
   hash: String! @id
   value: Int64 @search
   fee: Int64 @search
+  timestamp: DateTime @search(by: [day])
   blockNumber: Int64 @search
   block: Block @hasInverse(field: transactions)
   to: Account @hasInverse(field: incoming)
@@ -23,6 +24,7 @@ type AccountBal @remote {
 
 type Block {
   number: Int64 @id
+  timestamp: Int64 @search
   transactions: [Txn]
 }
 

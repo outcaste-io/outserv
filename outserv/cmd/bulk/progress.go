@@ -91,15 +91,15 @@ func (p *progress) reportOnce() {
 		rdfCount := atomic.LoadInt64(&p.nquadCount)
 		errCount := atomic.LoadInt64(&p.errCount)
 		elapsed := time.Since(p.start)
-		fmt.Printf("[%s] MAP %s nquad_count:%s err_count:%s nquad_speed:%s/sec "+
-			"edge_count:%s edge_speed:%s/sec jemalloc: %s \n",
+		fmt.Printf("[%s] MAP %s IN count:%s speed:%s/sec | "+
+			"OUT count:%s speed:%s/sec | Errors: %s | Jemalloc: %s \n",
 			timestamp,
 			x.FixedDuration(elapsed),
 			niceFloat(float64(rdfCount)),
-			niceFloat(float64(errCount)),
 			niceFloat(float64(rdfCount)/elapsed.Seconds()),
 			niceFloat(float64(mapEdgeCount)),
 			niceFloat(float64(mapEdgeCount)/elapsed.Seconds()),
+			niceFloat(float64(errCount)),
 			humanize.IBytes(uint64(z.NumAllocBytes())),
 		)
 	case reducePhase:
@@ -115,8 +115,8 @@ func (p *progress) reportOnce() {
 		if mapEdgeCount != 0 {
 			pct = fmt.Sprintf("%.2f%% ", 100*float64(reduceEdgeCount)/float64(mapEdgeCount))
 		}
-		fmt.Printf("[%s] REDUCE %s %sedge_count:%s edge_speed:%s/sec "+
-			"plist_count:%s plist_speed:%s/sec. Num Encoding MBs: %d. jemalloc: %s \n",
+		fmt.Printf("[%s] REDUCE %s %s| IN count: %s speed: %s/sec "+
+			"| OUT count: %s speed: %s/sec | Encoding MBs: %4d | Jemalloc: %s \n",
 			timestamp,
 			x.FixedDuration(now.Sub(p.start)),
 			pct,

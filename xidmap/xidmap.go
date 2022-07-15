@@ -4,18 +4,12 @@
 package xidmap
 
 import (
-	"context"
 	"encoding/binary"
-	"math/rand"
 	"regexp"
-	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 
 	"github.com/dgryski/go-farm"
 	"github.com/golang/glog"
@@ -40,10 +34,9 @@ type XidMapOptions struct {
 // manner. It's memory friendly because the mapping is stored on disk, but fast
 // because it uses an LRU cache.
 type XidMap struct {
-	dg         *dgo.Dgraph
-	shards     []*shard
-	newRanges  chan *pb.AssignedIds
-	maxUidSeen uint64
+	shards    []*shard
+	newRanges chan *pb.AssignedIds
+	nextUid   uint64
 
 	// Optionally, these can be set to persist the mappings.
 	writer *badger.WriteBatch
@@ -55,29 +48,12 @@ type XidMap struct {
 
 type shard struct {
 	sync.RWMutex
-	block
 
 	tree *z.Tree
 }
 
-type block struct {
-	start, end uint64
-}
-
 type kv struct {
 	key, value []byte
-}
-
-// assign assumes the write lock is already acquired.
-func (b *block) assign(ch <-chan *pb.AssignedIds) uint64 {
-	if b.end == 0 || b.start > b.end {
-		newRange := <-ch
-		b.start, b.end = newRange.StartId, newRange.EndId
-	}
-	x.AssertTrue(b.start <= b.end)
-	uid := b.start
-	b.start++
-	return uid
 }
 
 // New creates an XidMap. zero conn must be valid for UID allocations to happen. Optionally, a
@@ -90,7 +66,6 @@ func New(opts XidMapOptions) *XidMap {
 		newRanges: make(chan *pb.AssignedIds, numShards),
 		shards:    make([]*shard, numShards),
 		kvChan:    make(chan []kv, 64),
-		dg:        opts.DgClient,
 	}
 	for i := range xm.shards {
 		xm.shards[i] = &shard{
@@ -133,69 +108,7 @@ func New(opts XidMapOptions) *XidMap {
 		})
 		x.Check(err)
 	}
-
-	go func() {
-		const initBackoff = 10 * time.Millisecond
-		const maxBackoff = 5 * time.Second
-		backoff := initBackoff
-		for {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-			ctx = xm.attachNamespace(ctx)
-			cancel()
-
-			panic("TODO: Assign UIDs here locally. Then send to Zero.")
-			// TODO: Assign UIDs here &pb.Num{Val: 1e5, Type: pb.Num_UID}
-			// assigned, err := xm.zc.AssignIds(ctx, &pb.Num{Val: 1e5, Type: pb.Num_UID})
-			// glog.V(2).Infof("Assigned Uids: %+v. Err: %v", assigned, err)
-			// cancel()
-			var assigned *pb.AssignedIds
-			var err error
-			if err == nil {
-				backoff = initBackoff
-				xm.updateMaxSeen(assigned.EndId)
-				xm.newRanges <- assigned
-				continue
-			}
-			glog.Errorf("Error while getting lease: %v\n", err)
-			backoff *= 2
-			if backoff > maxBackoff {
-				backoff = maxBackoff
-			}
-
-			if x.IsJwtExpired(err) {
-				if err := xm.relogin(); err != nil {
-					glog.Errorf("While trying to relogin: %v", err)
-				}
-			}
-			time.Sleep(backoff)
-		}
-	}()
 	return xm
-}
-
-func (m *XidMap) attachNamespace(ctx context.Context) context.Context {
-	if m.dg == nil {
-		return ctx
-	}
-
-	// Need to attach JWT because slash uses alpha as zero proxy.
-	md, ok := metadata.FromOutgoingContext(ctx)
-	if !ok {
-		md = metadata.New(nil)
-	}
-	md.Set("accessJwt", m.dg.GetJwt().AccessJwt)
-	ctx = metadata.NewOutgoingContext(ctx, md)
-	return ctx
-}
-
-func (m *XidMap) relogin() error {
-	if m.dg == nil {
-		return nil
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	return m.dg.Relogin(ctx)
 }
 
 func (m *XidMap) shardFor(xid string) *shard {
@@ -234,7 +147,8 @@ func (m *XidMap) AssignUid(xid string) (uint64, bool) {
 	sh := m.shardFor(xid)
 	sh.RLock()
 
-	uid := sh.tree.Get(farm.Fingerprint64([]byte(xid)))
+	fp := farm.Fingerprint64([]byte(xid))
+	uid := sh.tree.Get(fp)
 	sh.RUnlock()
 	if uid > 0 {
 		return uid, false
@@ -243,13 +157,13 @@ func (m *XidMap) AssignUid(xid string) (uint64, bool) {
 	sh.Lock()
 	defer sh.Unlock()
 
-	uid = sh.tree.Get(farm.Fingerprint64([]byte(xid)))
+	uid = sh.tree.Get(fp)
 	if uid > 0 {
 		return uid, false
 	}
 
-	newUid := sh.assign(m.newRanges)
-	sh.tree.Set(farm.Fingerprint64([]byte(xid)), newUid)
+	newUid := atomic.AddUint64(&m.nextUid, 1)
+	sh.tree.Set(fp, newUid)
 
 	if m.writer != nil {
 		var uidBuf [8]byte
@@ -265,81 +179,21 @@ func (m *XidMap) AssignUid(xid string) (uint64, bool) {
 	return newUid, true
 }
 
-func (sh *shard) Current() uint64 {
-	sh.RLock()
-	defer sh.RUnlock()
-	return sh.start
-}
-
-func (m *XidMap) updateMaxSeen(max uint64) {
+func (m *XidMap) BumpPast(max uint64) {
 	for {
-		prev := atomic.LoadUint64(&m.maxUidSeen)
+		prev := atomic.LoadUint64(&m.nextUid)
 		if prev >= max {
 			return
 		}
-		if atomic.CompareAndSwapUint64(&m.maxUidSeen, prev, max) {
+		if atomic.CompareAndSwapUint64(&m.nextUid, prev, max+1) {
 			return
-		}
-	}
-}
-
-// BumpTo can be used to make Zero allocate UIDs up to this given number. Attempts are made to
-// ensure all future allocations of UIDs be higher than this one, but results are not guaranteed.
-func (m *XidMap) BumpTo(uid uint64) {
-	// If we have a cluster that cannot lease out new UIDs because it has already leased upto its
-	// max limit. Now, we try to live load the data with the given UIDs and the AssignIds complains
-	// that the limit has reached. Hence, update the xidmap's maxSeenUid and make progress.
-	updateLease := func(msg string) {
-		if !strings.Contains(msg, "limit has reached. currMax:") {
-			return
-		}
-		matches := maxLeaseRegex.FindAllStringSubmatch(msg, 1)
-		if len(matches) == 0 {
-			return
-		}
-		maxUidLeased, err := strconv.ParseUint(matches[0][1], 10, 64)
-		if err != nil {
-			glog.Errorf("While parsing currMax %+v", err)
-			return
-		}
-		m.updateMaxSeen(maxUidLeased)
-	}
-
-	for {
-		curMax := atomic.LoadUint64(&m.maxUidSeen)
-		if uid <= curMax {
-			return
-		}
-		glog.V(1).Infof("Bumping up to %v", uid)
-		num := x.Max(uid-curMax, 1e4)
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		ctx = m.attachNamespace(ctx)
-		cancel()
-
-		// TODO: Figure out a way to assign ids.
-		var assigned *pb.AssignedIds
-		var err error
-		if err == nil {
-			glog.V(1).Infof("Requested bump: %d. Got assigned: %v", uid, assigned)
-			m.updateMaxSeen(assigned.EndId)
-			return
-		}
-		updateLease(err.Error())
-		glog.Errorf("While requesting AssignUids(%d): %v", num, err)
-		if x.IsJwtExpired(err) {
-			if err := m.relogin(); err != nil {
-				glog.Errorf("While trying to relogin: %v", err)
-			}
 		}
 	}
 }
 
 // AllocateUid gives a single uid without creating an xid to uid mapping.
 func (m *XidMap) AllocateUid() uint64 {
-	sh := m.shards[rand.Intn(len(m.shards))]
-	sh.Lock()
-	defer sh.Unlock()
-	return sh.assign(m.newRanges)
+	return atomic.AddUint64(&m.nextUid, 1)
 }
 
 // Flush must be called if DB is provided to XidMap.

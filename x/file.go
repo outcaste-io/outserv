@@ -17,6 +17,7 @@
 package x
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -160,21 +161,7 @@ func WriteGroupIdFile(pdir string, group_id uint32) error {
 	}
 
 	groupFile := filepath.Join(pdir, GroupIdFileName)
-	f, err := os.OpenFile(groupFile, os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
-		return nil
-	}
-	if _, err := f.WriteString(strconv.Itoa(int(group_id))); err != nil {
-		return err
-	}
-	if _, err := f.WriteString("\n"); err != nil {
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-
-	return nil
+	return os.WriteFile(groupFile, []byte(fmt.Sprintf("%d\n", group_id)), 0600)
 }
 
 // ReadGroupIdFile reads the file at the given path and attempts to retrieve the
