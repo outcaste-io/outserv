@@ -17,19 +17,18 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
 
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 )
 
-var path = flag.String("geth", "", "Geth IPC path or GraphQL Address")
+var path = flag.String("geth", "", "Geth IPC path or GraphQL Address."+
+	" Recommendation is to use the GraphQL address for performance.")
 var graphql = flag.String("gql", "http://localhost:8080", "Outserv GraphQL endpoint")
 var outDir = flag.String("dir", "", "Output to dir as JSON.GZ files instead of sending to Outserv.")
 var outIPC = flag.String("ipc", "", "Output IPC dir for loader to read directly from.")
@@ -44,27 +43,6 @@ mutation($Txns: [AddTxnInput!]!) {
 	}
 }
 `
-
-type Account struct {
-	Uid     string `json:"uid,omitempty"`
-	Address string `json:"address"`
-}
-type Txn struct {
-	Uid         string  `json:"uid,omitempty"`
-	Hash        string  `json:"hash"`
-	Value       int64   `json:"value"`
-	Fee         int64   `json:"fee"`
-	BlockNumber int64   `json:"blockNumber"`
-	Timestamp   int64   `json:"timestamp"`
-	Block       Block   `json:"block"`
-	To          Account `json:"to"`
-	From        Account `json:"from"`
-
-	// The following fields are used by ETH. But, not part of Outserv's GraphQL Schema.
-	ValueStr string `json:"value_str,omitempty"`
-	GasUsed  int64  `json:"gasUsed,omitempty"`
-	GasPrice string `json:"gasPrice,omitempty"`
-}
 
 type Batch struct {
 	Txns []Txn `json:"Txns"`
@@ -86,148 +64,15 @@ type WResp struct {
 	Data   DataResp    `json:"data"`
 	Errors []ErrorResp `json:"errors"`
 }
-type Block struct {
-	wg           sync.WaitGroup
-	Uid          string `json:"uid,omitempty"`
-	Number       int64  `json:"number"`
-	Timestamp    string `json:"timestamp,omitempty"`
-	Transactions []Txn  `json:"transactions,omitempty"`
-}
 
 var gwei = big.NewInt(1e9)
-
-func (b *Block) fillViaClient() {
-	blockNumber := big.NewInt(b.Number)
-	block, err := client.BlockByNumber(context.Background(), blockNumber)
-	check(err)
-	for _, tx := range block.Transactions() {
-		receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
-		check(err)
-		gasUsed := new(big.Int).SetUint64(receipt.GasUsed)
-		if receipt.Status != 1 {
-			// Skip failed transactions.
-			continue
-		}
-
-		var to, from Account
-		if msg, err := tx.AsMessage(types.NewEIP155Signer(chainID), nil); err == nil {
-			from.Address = msg.From().Hex()
-		}
-
-		if tx.To() != nil {
-			to.Address = tx.To().Hex()
-		}
-
-		valGwei := new(big.Int).Div(tx.Value(), gwei)
-		fee := new(big.Int).Mul(tx.GasPrice(), gasUsed)
-		feeGwei := new(big.Int).Div(fee, gwei)
-		txn := Txn{
-			Hash:        tx.Hash().Hex(),
-			Value:       valGwei.Int64(),
-			Fee:         feeGwei.Int64(),
-			BlockNumber: b.Number,
-			Block:       Block{Number: b.Number},
-			To:          to,
-			From:        from,
-		}
-		if len(txn.To.Address) == 0 || len(txn.From.Address) == 0 {
-			continue
-		}
-		b.Transactions = append(b.Transactions, txn)
-	}
-}
-
-func (b *Block) fillViaGraphQL() {
-	q := fmt.Sprintf(`
-{
-	block(number: %d) {
-		number
-		timestamp
-		transactions {
-			hash
-			from { address }
-			to { address }
-			value_str: value
-			gasPrice
-			gasUsed
-		}
-	}
-}`, b.Number)
-
-	type httpReq struct {
-		Query string
-	}
-	req := httpReq{Query: q}
-	reqData, err := json.Marshal(req)
-	check(err)
-
-	buf := bytes.NewBuffer(reqData)
-	resp, err := http.Post(*path, "application/graphql", buf)
-	check(err)
-
-	data, err := ioutil.ReadAll(resp.Body)
-	check(err)
-	check(resp.Body.Close())
-
-	type eResp struct {
-		Data struct {
-			Block Block
-		} `json:"data"`
-	}
-	var eresp eResp
-	check(json.Unmarshal(data, &eresp))
-
-	blk := eresp.Data.Block
-	if blk.Number != b.Number {
-		fmt.Printf("Invalid response from ETH. Expected: %d Got: %d\n", b.Number, blk.Number)
-		os.Exit(1)
-	}
-	ts, err := strconv.ParseInt(blk.Timestamp, 0, 64)
-	if err != nil {
-		fmt.Printf("Unable to parse timestamp: %s\n", blk.Timestamp)
-		ts = 0
-	}
-	for _, txn := range blk.Transactions {
-		val, ok := new(big.Int).SetString(txn.ValueStr, 0)
-		if !ok {
-			val = new(big.Int).SetInt64(0)
-		}
-		txn.Value = new(big.Int).Div(val, gwei).Int64()
-
-		if len(txn.To.Address) == 0 || len(txn.From.Address) == 0 {
-			continue
-		}
-		txn.To.Uid = fmt.Sprintf("_:Account.%s", txn.To.Address)
-		txn.From.Uid = fmt.Sprintf("_:Account.%s", txn.From.Address)
-
-		price, ok := new(big.Int).SetString(txn.GasPrice, 0)
-		if !ok {
-			price = new(big.Int).SetInt64(0)
-		}
-		fee := new(big.Int).Mul(price, new(big.Int).SetInt64(txn.GasUsed))
-		feeGwei := new(big.Int).Div(fee, gwei)
-		txn.Fee = feeGwei.Int64()
-		txn.BlockNumber = b.Number
-
-		txn.Timestamp = ts
-		txn.Block = Block{Number: b.Number, Uid: fmt.Sprintf("_:Block.%08d", b.Number)}
-		txn.Uid = fmt.Sprintf("_:Txn.%s", txn.Hash)
-
-		// Zero out the following fields, so they don't get marshalled when
-		// sending to Outserv.
-		txn.ValueStr = ""
-		txn.GasUsed = 0
-		txn.GasPrice = ""
-		b.Transactions = append(b.Transactions, txn)
-	}
-}
 
 func (b *Block) Fill() {
 	defer b.wg.Done()
 	if isGraphQL {
-		b.fillViaGraphQL()
+		b.fastFillViaGraphQL()
 	} else {
-		b.fillViaClient()
+		b.slowFillViaClient()
 	}
 }
 
@@ -438,55 +283,4 @@ func main() {
 	chain.BlockingFill()
 	wg.Wait()
 	fmt.Println("DONE")
-}
-
-type RateMonitor struct {
-	start       time.Time
-	lastSent    uint64
-	lastCapture time.Time
-	rates       []float64
-	idx         int
-}
-
-func NewRateMonitor(numSamples int) *RateMonitor {
-	return &RateMonitor{
-		start: time.Now(),
-		rates: make([]float64, numSamples),
-	}
-}
-
-const minRate = 0.0001
-
-// Capture captures the current number of sent bytes. This number should be monotonically
-// increasing.
-func (rm *RateMonitor) Capture(sent uint64) {
-	diff := sent - rm.lastSent
-	dur := time.Since(rm.lastCapture)
-	rm.lastCapture, rm.lastSent = time.Now(), sent
-
-	rate := float64(diff) / dur.Seconds()
-	if rate < minRate {
-		rate = minRate
-	}
-	rm.rates[rm.idx] = rate
-	rm.idx = (rm.idx + 1) % len(rm.rates)
-}
-
-// Rate returns the average rate of transmission smoothed out by the number of samples.
-func (rm *RateMonitor) Rate() uint64 {
-	var total float64
-	var den float64
-	for _, r := range rm.rates {
-		if r < minRate {
-			// Ignore this. We always set minRate, so this is a zero.
-			// Typically at the start of the rate monitor, we'd have zeros.
-			continue
-		}
-		total += r
-		den += 1.0
-	}
-	if den < minRate {
-		return 0
-	}
-	return uint64(total / den)
 }

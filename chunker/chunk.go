@@ -145,7 +145,6 @@ func (jc *jsonChunker) Chunk(r *bufio.Reader) (*bytes.Buffer, error) {
 					continue // Now expecting a {..}
 				}
 				return nil, fmt.Errorf("Unexpected rune after ]: %q", ch)
-				// return nil, errors.New("Not all of JSON file consumed")
 			}
 
 			if _, err := out.WriteRune(']'); err != nil {
