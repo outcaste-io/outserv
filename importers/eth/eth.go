@@ -3,15 +3,18 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/big"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -30,6 +33,7 @@ import (
 var path = flag.String("geth", "", "Geth IPC path or GraphQL Address")
 var graphql = flag.String("gql", "http://localhost:8080", "Outserv GraphQL endpoint")
 var outDir = flag.String("dir", "", "Output to dir as JSON.GZ files instead of sending to Outserv.")
+var outPipe = flag.String("socket", "", "Output socket dir for bulk loader to read from.")
 var dryRun = flag.Bool("dry", false, "If true, don't send txns to GraphQL endpoint")
 var numGo = flag.Int("gor", 4, "Number of goroutines to use")
 var startBlock = flag.Int64("start", 14900000, "Start at block")
@@ -259,17 +263,39 @@ func (c *Chain) BlockingFill() {
 func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	var writer *gzip.Writer
+	var bytesWritten int64
+	defer func() {
+		fmt.Printf("Process %d wrote %d MBs of data\n", gid, bytesWritten/1<<20)
+	}()
+
+	var writer io.Writer
 	if len(*outDir) > 0 {
 		f, err := os.Create(filepath.Join(*outDir, fmt.Sprintf("%02d.json.gz", gid)))
 		check(err)
 
-		writer = gzip.NewWriter(f)
+		gw := gzip.NewWriter(f)
+		writer = gw
 		defer func() {
-			writer.Flush()
-			writer.Close()
+			gw.Flush()
+			gw.Close()
 			f.Sync()
 			f.Close()
+		}()
+	} else if len(*outPipe) > 0 {
+		path := filepath.Join(*outPipe, fmt.Sprintf("%02d.ipc", gid))
+		fmt.Printf("Listening on path: %s\n", path)
+		l, err := net.Listen("unix", path)
+		check(err)
+		fmt.Printf("Waiting for connection on path: %s\n", path)
+		conn, err := l.Accept()
+		check(err)
+		fmt.Printf("Got connection for path: %s. Writing...\n", path)
+		bw := bufio.NewWriterSize(conn, 1<<20)
+		writer = bw
+		defer func() {
+			bw.Flush()
+			conn.Close()
+			l.Close()
 		}()
 	}
 
@@ -281,7 +307,8 @@ func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 		if writer != nil {
 			data, err := json.Marshal(txns)
 			check(err)
-			_, err = writer.Write(data)
+			n, err := writer.Write(data)
+			bytesWritten += int64(n)
 			return err
 		}
 

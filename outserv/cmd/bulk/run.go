@@ -4,6 +4,7 @@
 package bulk
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
+	"net"
 	"net/http"
 	_ "net/http/pprof" // http profiler
 	"os"
@@ -59,6 +61,7 @@ func init() {
 	Bulk.EnvPrefix = "OUTSERV_BULK"
 
 	flag := Bulk.Cmd.Flags()
+	flag.StringP("socket", "t", "", "Open a Unix Socket to read data")
 	flag.StringP("files", "f", "",
 		"Location of *.json(.gz) file(s) to load.")
 	flag.StringP("schema", "s", "", "Location of the GraphQL schema file.")
@@ -86,8 +89,7 @@ func init() {
 	flag.Bool("version", false, "Prints the version of Dgraph Bulk Loader.")
 	flag.String("xidmap", "", "Directory to store xid to uid mapping")
 	// TODO: Potentially move http server to main.
-	flag.String("http", "localhost:8080",
-		"Address to serve http (pprof).")
+	flag.String("http", "localhost:8080", "Address to serve http (pprof).")
 	flag.Bool("ignore_errors", false, "ignore line parsing errors in rdf files")
 	flag.Int("map_shards", 1,
 		"Number of map output shards. Must be greater than or equal to the number of reduce "+
@@ -129,6 +131,7 @@ func run() {
 
 	opt := options{
 		DataFiles:        Bulk.Conf.GetString("files"),
+		DataSocket:       Bulk.Conf.GetString("socket"),
 		EncryptionKey:    keys.EncKey,
 		GqlSchemaFile:    Bulk.Conf.GetString("schema"),
 		OutDir:           Bulk.Conf.GetString("out"),
@@ -166,10 +169,7 @@ func run() {
 		os.Exit(1)
 	}
 
-	if opt.DataFiles == "" {
-		fmt.Fprint(os.Stderr, "JSON file(s) location must be specified.\n")
-		os.Exit(1)
-	} else {
+	if len(opt.DataFiles) > 0 {
 		fileList := strings.Split(opt.DataFiles, ",")
 		for _, file := range fileList {
 			if !filestore.Exists(file) {
@@ -331,6 +331,7 @@ func maxOpenFilesWarning() {
 
 type options struct {
 	DataFiles        string
+	DataSocket       string
 	GqlSchemaFile    string
 	OutDir           string
 	ReplaceOutDir    bool
@@ -437,36 +438,13 @@ func readSchema(opt *options) *schema.ParsedSchema {
 	return result
 }
 
-func (ld *loader) mapStage() {
-	ld.prog.setPhase(mapPhase)
-	var db *badger.DB
-	if len(ld.opt.ClientDir) > 0 {
-		x.Check(os.MkdirAll(ld.opt.ClientDir, 0700))
-
-		var err error
-		db, err = badger.Open(badger.DefaultOptions(ld.opt.ClientDir))
-		x.Checkf(err, "Error while creating badger KV posting store")
-	}
-	ld.xids = xidmap.New(xidmap.XidMapOptions{
-		DB:  db,
-		Dir: filepath.Join(ld.opt.TmpDir, bufferDir),
-	})
-
+func (ld *loader) blockingFileReader() {
 	fs := filestore.NewFileStore(ld.opt.DataFiles)
 
 	files := fs.FindDataFiles(ld.opt.DataFiles, []string{".json", ".json.gz"})
 	if len(files) == 0 {
 		fmt.Printf("No data files found in %s.\n", ld.opt.DataFiles)
 		os.Exit(1)
-	}
-
-	var mapperWg sync.WaitGroup
-	mapperWg.Add(len(ld.mappers))
-	for _, m := range ld.mappers {
-		go func(m *mapper) {
-			m.run()
-			mapperWg.Done()
-		}(m)
 	}
 
 	// This is the main map loop.
@@ -496,11 +474,79 @@ func (ld *loader) mapStage() {
 		}(file)
 	}
 	x.Check(thr.Finish())
+	close(ld.readerChunkCh)
+}
+
+func (ld *loader) blockingSocketReader() {
+	fmt.Printf("Reading from socket: %s\n", ld.opt.DataSocket)
+	files := x.FindDataFiles(ld.opt.DataSocket, []string{".ipc"})
+	fmt.Printf("Found files: %v\n", files)
+
+	var wg sync.WaitGroup
+	for _, file := range files {
+		wg.Add(1)
+		go func(file string) {
+			defer wg.Done()
+			conn, err := net.Dial("unix", file)
+			x.Check(err)
+			defer conn.Close()
+
+			r := bufio.NewReaderSize(conn, 32<<20)
+			chunk := chunker.NewChunker(chunker.JsonFormat, 1000)
+			for {
+				chunkBuf, err := chunk.Chunk(r)
+				if chunkBuf != nil && chunkBuf.Len() > 0 {
+					ld.readerChunkCh <- chunkBuf
+				}
+				if err == io.EOF {
+					fmt.Printf("io.EOF for socket: %s\n", file)
+					return
+				} else if err != nil {
+					x.Check(err)
+				}
+			}
+		}(file)
+	}
+	wg.Wait()
+	close(ld.readerChunkCh)
+}
+
+func (ld *loader) mapStage() {
+	ld.prog.setPhase(mapPhase)
+	var db *badger.DB
+	if len(ld.opt.ClientDir) > 0 {
+		x.Check(os.MkdirAll(ld.opt.ClientDir, 0700))
+
+		var err error
+		db, err = badger.Open(badger.DefaultOptions(ld.opt.ClientDir))
+		x.Checkf(err, "Error while creating badger KV posting store")
+	}
+	ld.xids = xidmap.New(xidmap.XidMapOptions{
+		DB:  db,
+		Dir: filepath.Join(ld.opt.TmpDir, bufferDir),
+	})
+
+	var mapperWg sync.WaitGroup
+	mapperWg.Add(len(ld.mappers))
+	for _, m := range ld.mappers {
+		go func(m *mapper) {
+			m.run()
+			mapperWg.Done()
+		}(m)
+	}
 
 	// Send the graphql triples
 	// ld.processGqlSchema()
+	if len(ld.opt.DataFiles) > 0 {
+		ld.blockingFileReader()
+	} else if len(ld.opt.DataSocket) > 0 {
+		ld.blockingSocketReader()
+	} else {
+		fmt.Printf("No input provided. Must be one of files or socket")
+		os.Exit(1)
+	}
 
-	close(ld.readerChunkCh)
+	// Wait for mappers to be done processing the input.
 	mapperWg.Wait()
 
 	// Allow memory to GC before the reduce phase.
