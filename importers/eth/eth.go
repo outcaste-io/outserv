@@ -3,7 +3,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -288,22 +287,11 @@ func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 
 		fd, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, os.ModeNamedPipe)
 		check(err)
+		defer fd.Close()
 
-		// fmt.Printf("Listening on path: %s\n", path)
-		// l, err := net.Listen("unix", path)
-		// check(err)
-		// fmt.Printf("Waiting for connection on path: %s\n", path)
-		// conn, err := l.Accept()
-		// check(err)
-		// fmt.Printf("Got connection for path: %s. Writing...\n", path)
-		bw := bufio.NewWriterSize(fd, 1<<20)
-		writer = bw
-		defer func() {
-			bw.Flush()
-			fd.Close()
-			// conn.Close()
-			// l.Close()
-		}()
+		// No need to do any buffering. It would just cause an
+		// additional copy for no good reason.
+		writer = fd
 	}
 
 	var txns []Txn
@@ -323,7 +311,6 @@ func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 			Query:     txnMu,
 			Variables: Batch{Txns: txns},
 		}
-		// fmt.Printf("----------> Txns %d. Sending...\n", len(txns))
 		data, err := json.Marshal(q)
 		if err != nil {
 			return err
@@ -417,6 +404,10 @@ func main() {
 	if len(*outDir) > 0 {
 		fmt.Printf("Outputting JSON files to %q\n", *outDir)
 		*graphql = ""
+	} else if len(*outIPC) > 0 {
+		fmt.Printf("Outputting to IPC files at %q\n", *outIPC)
+		os.RemoveAll(*outIPC)
+		os.MkdirAll(*outIPC, 0755)
 	}
 
 	if !isGraphQL {
@@ -437,6 +428,7 @@ func main() {
 	chain := Chain{
 		blockCh: make(chan *Block, 16),
 	}
+
 	var wg sync.WaitGroup
 	for i := 0; i < *numGo; i++ {
 		wg.Add(1)
