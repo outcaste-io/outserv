@@ -14,7 +14,6 @@ import (
 	"io/ioutil"
 	"log"
 	"math/big"
-	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -23,6 +22,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
@@ -33,7 +33,7 @@ import (
 var path = flag.String("geth", "", "Geth IPC path or GraphQL Address")
 var graphql = flag.String("gql", "http://localhost:8080", "Outserv GraphQL endpoint")
 var outDir = flag.String("dir", "", "Output to dir as JSON.GZ files instead of sending to Outserv.")
-var outPipe = flag.String("socket", "", "Output socket dir for bulk loader to read from.")
+var outIPC = flag.String("ipc", "", "Output IPC dir for loader to read directly from.")
 var dryRun = flag.Bool("dry", false, "If true, don't send txns to GraphQL endpoint")
 var numGo = flag.Int("gor", 4, "Number of goroutines to use")
 var startBlock = flag.Int64("start", 14900000, "Start at block")
@@ -281,21 +281,28 @@ func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 			f.Sync()
 			f.Close()
 		}()
-	} else if len(*outPipe) > 0 {
-		path := filepath.Join(*outPipe, fmt.Sprintf("%02d.ipc", gid))
-		fmt.Printf("Listening on path: %s\n", path)
-		l, err := net.Listen("unix", path)
+	} else if len(*outIPC) > 0 {
+		path := filepath.Join(*outIPC, fmt.Sprintf("%02d.ipc", gid))
+		fmt.Printf("Creating IPC: %s\n", path)
+		check(syscall.Mkfifo(path, 0666))
+
+		fd, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, os.ModeNamedPipe)
 		check(err)
-		fmt.Printf("Waiting for connection on path: %s\n", path)
-		conn, err := l.Accept()
-		check(err)
-		fmt.Printf("Got connection for path: %s. Writing...\n", path)
-		bw := bufio.NewWriterSize(conn, 1<<20)
+
+		// fmt.Printf("Listening on path: %s\n", path)
+		// l, err := net.Listen("unix", path)
+		// check(err)
+		// fmt.Printf("Waiting for connection on path: %s\n", path)
+		// conn, err := l.Accept()
+		// check(err)
+		// fmt.Printf("Got connection for path: %s. Writing...\n", path)
+		bw := bufio.NewWriterSize(fd, 1<<20)
 		writer = bw
 		defer func() {
 			bw.Flush()
-			conn.Close()
-			l.Close()
+			fd.Close()
+			// conn.Close()
+			// l.Close()
 		}()
 	}
 

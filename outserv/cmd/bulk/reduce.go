@@ -127,7 +127,8 @@ func (r *reducer) run() error {
 func (r *reducer) createBadgerInternal(dir string, compression bool) *badger.DB {
 	opt := r.state.opt.Badger.
 		WithDir(dir).
-		WithExternalMagic(x.MagicVersion)
+		WithExternalMagic(x.MagicVersion).
+		WithLogger(nil)
 
 	opt.Compression = bo.None
 	opt.ZSTDCompressionLevel = 0

@@ -13,7 +13,6 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
-	"net"
 	"net/http"
 	_ "net/http/pprof" // http profiler
 	"os"
@@ -61,7 +60,7 @@ func init() {
 	Bulk.EnvPrefix = "OUTSERV_BULK"
 
 	flag := Bulk.Cmd.Flags()
-	flag.StringP("socket", "t", "", "Open a Unix Socket to read data")
+	flag.StringP("ipc", "i", "", "Directory or path of IPC files.")
 	flag.StringP("files", "f", "",
 		"Location of *.json(.gz) file(s) to load.")
 	flag.StringP("schema", "s", "", "Location of the GraphQL schema file.")
@@ -131,7 +130,7 @@ func run() {
 
 	opt := options{
 		DataFiles:        Bulk.Conf.GetString("files"),
-		DataSocket:       Bulk.Conf.GetString("socket"),
+		DataIPC:          Bulk.Conf.GetString("ipc"),
 		EncryptionKey:    keys.EncKey,
 		GqlSchemaFile:    Bulk.Conf.GetString("schema"),
 		OutDir:           Bulk.Conf.GetString("out"),
@@ -289,12 +288,11 @@ func run() {
 			fmt.Fprintln(os.Stderr, "Error writing to bulk meta file")
 			os.Exit(1)
 		}
-	}
-
-	maxUid := loader.xids.AllocateUid()
-	for i := 0; i < opt.ReduceShards; i++ {
-		dir := filepath.Join(opt.OutDir, strconv.Itoa(i), "p")
-		x.Check(writeUIDFile(dir, maxUid))
+		maxUid := loader.xids.AllocateUid()
+		for i := 0; i < opt.ReduceShards; i++ {
+			dir := filepath.Join(opt.OutDir, strconv.Itoa(i), "p")
+			x.Check(writeUIDFile(dir, maxUid))
+		}
 	}
 
 	loader.reduceStage()
@@ -331,7 +329,7 @@ func maxOpenFilesWarning() {
 
 type options struct {
 	DataFiles        string
-	DataSocket       string
+	DataIPC          string
 	GqlSchemaFile    string
 	OutDir           string
 	ReplaceOutDir    bool
@@ -478,8 +476,8 @@ func (ld *loader) blockingFileReader() {
 }
 
 func (ld *loader) blockingSocketReader() {
-	fmt.Printf("Reading from socket: %s\n", ld.opt.DataSocket)
-	files := x.FindDataFiles(ld.opt.DataSocket, []string{".ipc"})
+	fmt.Printf("Reading from socket: %s\n", ld.opt.DataIPC)
+	files := x.FindDataFiles(ld.opt.DataIPC, []string{".ipc"})
 	fmt.Printf("Found files: %v\n", files)
 
 	var wg sync.WaitGroup
@@ -487,11 +485,14 @@ func (ld *loader) blockingSocketReader() {
 		wg.Add(1)
 		go func(file string) {
 			defer wg.Done()
-			conn, err := net.Dial("unix", file)
+			// conn, err := net.Dial("unix", file)
+			// x.Check(err)
+			// defer conn.Close()
+			fd, err := os.OpenFile(file, os.O_RDONLY, os.ModeNamedPipe)
 			x.Check(err)
-			defer conn.Close()
+			defer fd.Close()
 
-			r := bufio.NewReaderSize(conn, 32<<20)
+			r := bufio.NewReaderSize(fd, 32<<20)
 			chunk := chunker.NewChunker(chunker.JsonFormat, 1000)
 			for {
 				chunkBuf, err := chunk.Chunk(r)
@@ -499,7 +500,7 @@ func (ld *loader) blockingSocketReader() {
 					ld.readerChunkCh <- chunkBuf
 				}
 				if err == io.EOF {
-					fmt.Printf("io.EOF for socket: %s\n", file)
+					fmt.Printf("io.EOF for IPC: %s\n", file)
 					return
 				} else if err != nil {
 					x.Check(err)
@@ -539,7 +540,7 @@ func (ld *loader) mapStage() {
 	// ld.processGqlSchema()
 	if len(ld.opt.DataFiles) > 0 {
 		ld.blockingFileReader()
-	} else if len(ld.opt.DataSocket) > 0 {
+	} else if len(ld.opt.DataIPC) > 0 {
 		ld.blockingSocketReader()
 	} else {
 		fmt.Printf("No input provided. Must be one of files or socket")
