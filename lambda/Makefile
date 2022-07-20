@@ -1,5 +1,5 @@
 .PHONY: build
 build:
-	npm install --force
+	npm install
 	npm run-script build
 	cp -r dist ../outserv/cmd/alpha/
