@@ -245,16 +245,18 @@ build_artifacts() {
   [[ $OUTSERV_BUILD_MAC =~ 1|true ]] && createSum darwin
 
   # Build Docker images
-  build_docker_image
+  # TODO(mrjn): Fix up later.
+  # build_docker_image
 
   # Build Archives
   createTar linux
   [[ $OUTSERV_BUILD_MAC =~ 1|true ]] && createTar darwin
 
-  if [[ "$GOARCH" == "amd64" ]]; then
-    echo "Release $TAG is ready."
-    docker run outserv/outserv:$DOCKER_TAG outserv
-  fi
+  # TODO(mrjn): Fix up later.
+  # if [[ "$GOARCH" == "amd64" ]]; then
+  #   echo "Release $TAG is ready."
+  #   docker run outserv/outserv:$DOCKER_TAG outserv
+  # fi
   ls -alh $TMP
 }
 
