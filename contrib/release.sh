@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to do Dgraph release. This script would output the built binaries in
+# Script to do outserv release. This script would output the built binaries in
 # $TMP.  This script should NOT be responsible for doing any testing, or
 # uploading to any server.  The sole task of this script is to build the
 # binaries and prepare them such that any human or script can then pick these up
@@ -17,11 +17,9 @@ RESET='\033[0m'
 
 ## Toggle Builds
 ## TODO: update to use command line flags
-DGRAPH_BUILD_WINDOWS=${DGRAPH_BUILD_WINDOWS:-0}
-DGRAPH_BUILD_MAC=${DGRAPH_BUILD_MAC:-0}
-DGRAPH_BUILD_RATEL=${DGRAPH_BUILD_RATEL:-1}
-DGRAPH_BUILD_AMD64=${DGRAPH_BUILD_AMD64:-1}
-DGRAPH_BUILD_ARM64=${DGRAPH_BUILD_ARM64:-0}
+OUTSERV_BUILD_MAC=${OUTSERV_BUILD_MAC:-0}
+OUTSERV_BUILD_AMD64=${OUTSERV_BUILD_AMD64:-1}
+OUTSERV_BUILD_ARM64=${OUTSERV_BUILD_ARM64:-0}
 
 print_error() {
     printf "$RED$1$RESET\n"
@@ -68,7 +66,7 @@ check_command_exists shasum
 check_command_exists tar
 check_command_exists zip
 
-nvm install --lts=Fermium # Fermium is Node v14 LTS
+nvm install --lts=Gallium # Gallium is Node v16 LTS
 
 # Don't use standard GOPATH. Create a new one.
 unset GOBIN
@@ -101,15 +99,14 @@ if [ -z "$TAG" ]; then
   echo "Must specify which tag to build for."
   exit 1
 fi
-echo "Building Dgraph for tag: $TAG"
+echo "Building Outserv for tag: $TAG"
 
 # Stop on first failure.
 set -e
 set -o xtrace
 
-ratel_release="github.com/dgraph-io/ratel/server.ratelVersion"
-release="github.com/outcaste-io/outserv/x.dgraphVersion"
-codenameKey="github.com/outcaste-io/outserv/x.dgraphCodename"
+release="github.com/outcaste-io/outserv/x.outservVersion"
+codenameKey="github.com/outcaste-io/outserv/x.outservCodename"
 branch="github.com/outcaste-io/outserv/x.gitBranch"
 commitSHA1="github.com/outcaste-io/outserv/x.lastCommitSHA"
 commitTime="github.com/outcaste-io/outserv/x.lastCommitTime"
@@ -118,46 +115,45 @@ jemallocXgoFlags=
 # Get xgo and docker image
 if [[ $GOVERSION =~ ^1\.16.* ]] || [[ $GOVERSION =~ ^1\.17.* ]]; then
   # Build xgo docker image with 'go env -w GO111MODULE=auto' to support 1.16.x
-  docker build -f release/xgo.Dockerfile -t dgraph/xgo:go-${GOVERSION} --build-arg GOVERSION=${GOVERSION} .
+  docker build -f release/xgo.Dockerfile -t outserv/xgo:go-${GOVERSION} --build-arg GOVERSION=${GOVERSION} .
   # Instruct xgo to use alternative image
-  export DGRAPH_BUILD_XGO_IMAGE="-image dgraph/xgo:go-${GOVERSION}"
+  export OUTSERV_BUILD_XGO_IMAGE="-image outserv/xgo:go-${GOVERSION}"
 fi
 go install src.techknowlogick.com/xgo
 mkdir -p ~/.xgo-cache
 
-
-basedir=$GOPATH/src/github.com/dgraph-io
+basedir=$GOPATH/src/github.com/outserv-io
 mkdir -p "$basedir"
 
-# Clone Dgraph repo.
+# Clone outserv repo.
 pushd $basedir
   git clone "$repodir"
 popd
 
-pushd $basedir/dgraph
+pushd $basedir/outserv
   git checkout $TAG
   # HEAD here points to whatever is checked out.
   lastCommitSHA1=$(git rev-parse --short HEAD)
-  codename="$(awk '/^BUILD_CODENAME/ { print $NF }' ./dgraph/Makefile)"
+  codename="$(awk '/^BUILD_CODENAME/ { print $NF }' ./outserv/Makefile)"
   gitBranch=$(git rev-parse --abbrev-ref HEAD)
   lastCommitTime=$(git log -1 --format=%ci)
   release_version=$(git describe --always --tags)
 popd
 
 # The Docker tag should not contain a slash e.g. feature/issue1234
-# The initial slash is taken from the repository name dgraph/dgraph:tag
+# The initial slash is taken from the repository name outserv/outserv:tag
 DOCKER_TAG=${2:-$release_version}
 
 # Build the JS lambda server.
-pushd $basedir/dgraph/lambda
+pushd $basedir/outserv/lambda
   make build
 popd
 
 # Regenerate protos. Should not be different from what's checked in.
-pushd $basedir/dgraph/protos
+pushd $basedir/outserv/protos
   # We need to fetch the modules to get the correct proto files. e.g., for
   # badger and dgo
-  go get -d -v ../dgraph
+  go get -d -v ../outserv
 
   make regenerate
   if [[ "$(git status --porcelain .)" ]]; then
@@ -166,137 +162,55 @@ pushd $basedir/dgraph/protos
   fi
 popd
 
-# Clone Badger repo.
-pushd $basedir
-  git clone https://github.com/dgraph-io/badger.git
-  # Check out badger version specific to the Dgraph release.
-  cd ./badger
-  ref="$(grep github.com/dgraph-io/badger/v3 $basedir/dgraph/go.mod | grep -v replace |  awk '{ print $2 }')"
-  commitish="$(echo "$ref" | awk -F- '{ print $NF }')"
-  git checkout "$commitish"
-popd
-
-if [[ $DGRAPH_BUILD_RATEL =~ 1|true ]]; then
-  # Clone ratel repo.
-  pushd $basedir
-    git clone https://github.com/dgraph-io/ratel.git
-  popd
-
-  # build ratel client
-  pushd $basedir/ratel
-    (export GO111MODULE=off; ./scripts/build.prod.sh)
-    ./scripts/test.sh
-  popd
-fi
-
-build_windows() {
-  # Build Windows.
-  pushd $basedir/dgraph/dgraph
-    xgo -x -go="go-$GOVERSION" --targets=windows/$GOARCH $DGRAPH_BUILD_XGO_IMAGE -buildmode=exe -ldflags \
-        "-X $release=$release_version -X $codenameKey=$codename -X $branch=$gitBranch -X $commitSHA1=$lastCommitSHA1 -X '$commitTime=$lastCommitTime'" .
-    mkdir -p $TMP/$GOARCH/windows
-    mv dgraph-windows-4.0-$GOARCH.exe $TMP/windows/$GOARCH/dgraph.exe
-  popd
-
-  pushd $basedir/badger/badger
-    xgo -x -go="go-$GOVERSION" --targets=windows/$GOARCH $DGRAPH_BUILD_XGO_IMAGE -buildmode=exe .
-    mv badger-windows-4.0-$GOARCH.exe $TMP/windows/$GOARCH/badger.exe
-  popd
-
-  if [[ $DGRAPH_BUILD_RATEL =~ 1|true ]]; then
-    pushd $basedir/ratel
-      xgo -x -go="go-$GOVERSION" --targets=windows/$GOARCH $DGRAPH_BUILD_XGO_IMAGE -ldflags "-X $ratel_release=$release_version"  -buildmode=exe .
-      mv ratel-windows-4.0-$GOARCH.exe $TMP/windows/$GOARCH/dgraph-ratel.exe
-    popd
-  fi
-}
-
 build_darwin() {
   # Build Darwin.
-  pushd $basedir/dgraph/dgraph
-    xgo -x -go="go-$GOVERSION" --targets=darwin-10.9/$GOARCH $DGRAPH_BUILD_XGO_IMAGE -ldflags \
+  pushd $basedir/outserv/outserv
+    xgo -x -go="go-$GOVERSION" --targets=darwin-10.9/$GOARCH $OUTSERV_BUILD_XGO_IMAGE -ldflags \
     "-X $release=$release_version -X $codenameKey=$codename -X $branch=$gitBranch -X $commitSHA1=$lastCommitSHA1 -X '$commitTime=$lastCommitTime'" .
     mkdir -p $TMP/darwin/$GOARCH
-    mv dgraph-darwin-10.9-$GOARCH $TMP/darwin/$GOARCH/dgraph
+    mv outserv-darwin-10.9-$GOARCH $TMP/darwin/$GOARCH/outserv
   popd
-
-  pushd $basedir/badger/badger
-    xgo -x -go="go-$GOVERSION" --targets=darwin-10.9/$GOARCH $DGRAPH_BUILD_XGO_IMAGE .
-    mv badger-darwin-10.9-$GOARCH $TMP/darwin/$GOARCH/badger
-  popd
-
-  if [[ $DGRAPH_BUILD_RATEL =~ 1|true ]]; then
-    pushd $basedir/ratel
-      xgo -x -go="go-$GOVERSION" --targets=darwin-10.9/$GOARCH $DGRAPH_BUILD_XGO_IMAGE -ldflags "-X $ratel_release=$release_version" .
-      mv ratel-darwin-10.9-$GOARCH $TMP/darwin/$GOARCH/dgraph-ratel
-    popd
-  fi
 }
 
 build_linux() {
   # Build Linux.
-  pushd $basedir/dgraph/dgraph
-    xgo -x -v -go="go-$GOVERSION" --targets=linux/$GOARCH $DGRAPH_BUILD_XGO_IMAGE -ldflags \
+  pushd $basedir/outserv/outserv
+    xgo -x -v -go="go-$GOVERSION" --targets=linux/$GOARCH $OUTSERV_BUILD_XGO_IMAGE -ldflags \
        "-X $release=$release_version -X $codenameKey=$codename -X $branch=$gitBranch -X $commitSHA1=$lastCommitSHA1 -X '$commitTime=$lastCommitTime'" --tags=jemalloc -deps=https://github.com/jemalloc/jemalloc/releases/download/5.2.1/jemalloc-5.2.1.tar.bz2  --depsargs='--with-jemalloc-prefix=je_ --with-malloc-conf=background_thread:true,metadata_thp:auto --enable-prof' .
-    strip -x dgraph-linux-$GOARCH
+    strip -x outserv-linux-$GOARCH
     mkdir -p $TMP/linux/$GOARCH
-    mv dgraph-linux-$GOARCH $TMP/linux/$GOARCH/dgraph
+    mv outserv-linux-$GOARCH $TMP/linux/$GOARCH/outserv
   popd
-
-  pushd $basedir/badger/badger
-    xgo -x -v -go="go-$GOVERSION" --targets=linux/$GOARCH $DGRAPH_BUILD_XGO_IMAGE --tags=jemalloc -deps=https://github.com/jemalloc/jemalloc/releases/download/5.2.1/jemalloc-5.2.1.tar.bz2  --depsargs='--with-jemalloc-prefix=je_ --with-malloc-conf=background_thread:true,metadata_thp:auto --enable-prof' .
-    strip -x badger-linux-$GOARCH
-    mv badger-linux-$GOARCH $TMP/linux/$GOARCH/badger
-  popd
-
-  if [[ $DGRAPH_BUILD_RATEL =~ 1|true ]]; then
-    pushd $basedir/ratel
-      xgo -x -v -go="go-$GOVERSION" --targets=linux/$GOARCH $DGRAPH_BUILD_XGO_IMAGE -ldflags "-X $ratel_release=$release_version"  .
-      strip -x ratel-linux-$GOARCH
-      mv ratel-linux-$GOARCH $TMP/linux/dgraph-ratel
-    popd
-  fi
 }
 
 createSum () {
   os=$1
   echo "Creating checksum for $os"
-  if [[ "$os" != "windows" ]]; then
-    pushd $TMP/$os/$GOARCH
-      csum=$(shasum -a 256 dgraph | awk '{print $1}')
-      echo $csum /usr/local/bin/dgraph >> ../dgraph-checksum-$os-$GOARCH.sha256
-      csum=$(shasum -a 256 dgraph-ratel | awk '{print $1}')
-      echo $csum /usr/local/bin/dgraph-ratel >> ../dgraph-checksum-$os-$GOARCH.sha256
-    popd
-  else
-    pushd $TMP/$os/$GOARCH
-      csum=$(shasum -a 256 dgraph.exe | awk '{print $1}')
-      echo $csum dgraph.exe >> ../dgraph-checksum-$os-$GOARCH.sha256
-      csum=$(shasum -a 256 dgraph-ratel.exe | awk '{print $1}')
-      echo $csum dgraph-ratel.exe >> ../dgraph-checksum-$os-$GOARCH.sha256
-    popd
-  fi
+  pushd $TMP/$os/$GOARCH
+    csum=$(shasum -a 256 outserv | awk '{print $1}')
+    echo $csum /usr/local/bin/outserv >> ../outserv-checksum-$os-$GOARCH.sha256
+  popd
 }
 
 ## TODO: Add arm64 buildkit support once xgo works for arm64
 build_docker_image() {
   if [[ "$GOARCH" == "amd64" ]]; then
-    # Create Dgraph Docker image.
-    # edit Dockerfile to point to binaries 
-    sed "s/^ADD linux/ADD linux\/$GOARCH/" $basedir/dgraph/contrib/Dockerfile > $TMP/Dockerfile
+    # Create outserv Docker image.
+    # edit Dockerfile to point to binaries
+    sed "s/^ADD linux/ADD linux\/$GOARCH/" $basedir/outserv/contrib/Dockerfile > $TMP/Dockerfile
     pushd $TMP
       # Get a fresh ubuntu:latest image each time
       # Don't rely on whatever "latest" version
       # happens to be on the machine.
       docker pull ubuntu:latest
 
-      docker build -t dgraph/dgraph:$DOCKER_TAG .
+      docker build -t outserv/outserv:$DOCKER_TAG .
     popd
     rm $TMP/Dockerfile
 
-    # Create Dgraph standalone Docker image.
-    pushd $basedir/dgraph/contrib/standalone
-      make DGRAPH_VERSION=$DOCKER_TAG
+    # Create outserv standalone Docker image.
+    pushd $basedir/outserv/contrib/standalone
+      make OUTSERV_VERSION=$DOCKER_TAG
     popd
   fi
 }
@@ -306,7 +220,7 @@ createTar () {
   os=$1
   echo "Creating tar for $os"
   pushd $TMP/$os/$GOARCH
-    tar -zcvf ../dgraph-$os-$GOARCH.tar.gz *
+    tar -zcvf ../outserv-$os-$GOARCH.tar.gz *
   popd
   rm -Rf $TMP/$os/$GOARCH
 }
@@ -316,45 +230,42 @@ createZip () {
   os=$1
   echo "Creating zip for $os"
   pushd $TMP/$os/$GOARCH
-    zip -r ../dgraph-$os-$GOARCH.zip *
+    zip -r ../outserv-$os-$GOARCH.zip *
   popd
   rm -Rf $TMP/$os/$GOARCH
 }
 
 build_artifacts() {
   # Build Binaries
-  [[ $DGRAPH_BUILD_WINDOWS =~ 1|true ]] && build_windows
-  [[ $DGRAPH_BUILD_MAC =~ 1|true ]] && build_darwin
+  [[ $OUTSERV_BUILD_MAC =~ 1|true ]] && build_darwin
   build_linux
 
   # Build Checksums
   createSum linux
-  [[ $DGRAPH_BUILD_MAC =~ 1|true ]] && createSum darwin
-  [[ $DGRAPH_BUILD_WINDOWS =~ 1|true ]] && createSum windows
+  [[ $OUTSERV_BUILD_MAC =~ 1|true ]] && createSum darwin
 
   # Build Docker images
   build_docker_image
 
   # Build Archives
   createTar linux
-  [[ $DGRAPH_BUILD_WINDOWS =~ 1|true ]] && createZip windows
-  [[ $DGRAPH_BUILD_MAC =~ 1|true ]] && createTar darwin
+  [[ $OUTSERV_BUILD_MAC =~ 1|true ]] && createTar darwin
 
   if [[ "$GOARCH" == "amd64" ]]; then
     echo "Release $TAG is ready."
-    docker run dgraph/dgraph:$DOCKER_TAG dgraph
+    docker run outserv/outserv:$DOCKER_TAG outserv
   fi
   ls -alh $TMP
 }
 
-if [[ $DGRAPH_BUILD_AMD64 =~ 1|true ]]; then
+if [[ $OUTSERV_BUILD_AMD64 =~ 1|true ]]; then
   export GOARCH=amd64
   build_artifacts
 fi
 
-## Currently arm64 xgo fails for dgraph and badger
+## Currently arm64 xgo fails for outserv and badger
 ## * https://github.com/techknowlogick/xgo/issues/105
-if [[ $DGRAPH_BUILD_ARM64 =~ 1|true ]]; then
+if [[ $OUTSERV_BUILD_ARM64 =~ 1|true ]]; then
   export GOARCH=arm64
   build_artifacts
 fi
@@ -368,12 +279,12 @@ if git show-ref -q --verify "refs/tags/$TAG"; then
 fi
 echo
 echo "Push the Docker tag:"
-echo "  docker push dgraph/dgraph:$DOCKER_TAG"
-echo "  docker push dgraph/standalone:$DOCKER_TAG"
+echo "  docker push outserv/outserv:$DOCKER_TAG"
+echo "  docker push outserv/standalone:$DOCKER_TAG"
 echo
 echo "If this should be the latest release, then tag"
 echo "the image as latest too."
-echo "  docker tag dgraph/dgraph:$DOCKER_TAG dgraph/dgraph:latest"
-echo "  docker tag dgraph/standalone:$DOCKER_TAG dgraph/standalone:latest"
-echo "  docker push dgraph/dgraph:latest"
-echo "  docker push dgraph/standalone:latest"
+echo "  docker tag outserv/outserv:$DOCKER_TAG outserv/outserv:latest"
+echo "  docker tag outserv/standalone:$DOCKER_TAG outserv/standalone:latest"
+echo "  docker push outserv/outserv:latest"
+echo "  docker push outserv/standalone:latest"
