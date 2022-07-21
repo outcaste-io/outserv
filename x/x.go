@@ -1149,8 +1149,7 @@ func ToHexString(i uint64) string {
 
 // TODO: Fix this all up.
 // RootTemplate defines the help template for dgraph command.
-var RootTemplate string = `**Blockchain Search: Powered by Outserv**
-` + BuildDetails() +
+var RootTemplate string = BuildDetails() +
 	`Usage:{{if .Runnable}}
   {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
   {{.CommandPath}} [command]{{end}} {{if .HasAvailableSubCommands}}

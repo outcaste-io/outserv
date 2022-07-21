@@ -17,7 +17,7 @@ import (
 	"unicode"
 
 	"github.com/outcaste-io/outserv/outserv/cmd/alpha"
-	"github.com/outcaste-io/outserv/outserv/cmd/bulk"
+	"github.com/outcaste-io/outserv/outserv/cmd/boot"
 	"github.com/outcaste-io/outserv/outserv/cmd/cert"
 	"github.com/outcaste-io/outserv/outserv/cmd/debug"
 	"github.com/outcaste-io/outserv/outserv/cmd/debuginfo"
@@ -33,16 +33,9 @@ import (
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
-	Use:   "outserv",
-	Short: "Outserv: Distributed Graph Database",
-	Long: `
-Outserv is a horizontally scalable and distributed graph database,
-providing ACID transactions, consistent replication and linearizable reads.
-It's built from the ground up to perform for a rich set of queries. Being a native
-graph database, it tightly controls how the data is arranged on disk to optimize
-for query performance and throughput, reducing disk seeks and network calls in a
-cluster.
-` + x.BuildDetails(),
+	Use:               "outserv",
+	Short:             "Outserv: Blockchain Search",
+	Long:              x.BuildDetails(),
 	PersistentPreRunE: cobra.NoArgs,
 }
 
@@ -65,10 +58,8 @@ var rootConf = viper.New()
 
 // subcommands initially contains all default sub-commands.
 var subcommands = []*x.SubCommand{
-	// TODO: Consider if we need bulk loader.
-	// TODO: Consider if we need live loader.
 	&cert.Cert,
-	&alpha.Alpha, &version.Version, &debug.Debug, &bulk.Bulk,
+	&alpha.Alpha, &version.Version, &debug.Debug, &boot.Boot,
 	&debuginfo.Profile, &decrypt.Decrypt, &wallet.Wallet,
 }
 

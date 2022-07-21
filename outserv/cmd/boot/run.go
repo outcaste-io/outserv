@@ -1,7 +1,7 @@
 // Portions Copyright 2017-2021 Dgraph Labs, Inc. are available under the Apache License v2.0.
 // Portions Copyright 2022 Outcaste LLC are available under the Sustainable License v1.0.
 
-package bulk
+package boot
 
 import (
 	"bufio"
@@ -39,27 +39,27 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Bulk is the sub-command invoked when running "dgraph bulk".
-var Bulk x.SubCommand
+// Boot is the sub-command invoked when running "dgraph boot".
+var Boot x.SubCommand
 
 var defaultOutDir = "./out"
 
-const BulkBadgerDefaults = "compression=snappy; numgoroutines=8;"
+const BadgerDefaults = "compression=snappy; numgoroutines=8;"
 
 func init() {
-	Bulk.Cmd = &cobra.Command{
-		Use:   "bulk",
-		Short: "Run Outserv Bulk Loader",
+	Boot.Cmd = &cobra.Command{
+		Use:   "boot",
+		Short: "Run Outserv Boot Loader",
 		Run: func(cmd *cobra.Command, args []string) {
-			defer x.StartProfile(Bulk.Conf).Stop()
+			defer x.StartProfile(Boot.Conf).Stop()
 			run()
 		},
 		Annotations: map[string]string{"group": "data-load"},
 	}
-	Bulk.Cmd.SetHelpTemplate(x.NonRootTemplate)
-	Bulk.EnvPrefix = "OUTSERV_BULK"
+	Boot.Cmd.SetHelpTemplate(x.NonRootTemplate)
+	Boot.EnvPrefix = "OUTSERV_BOOT"
 
-	flag := Bulk.Cmd.Flags()
+	flag := Boot.Cmd.Flags()
 	flag.StringP("ipc", "i", "", "Directory or path of IPC files.")
 	flag.StringP("files", "f", "",
 		"Location of *.json(.gz) file(s) to load.")
@@ -81,11 +81,11 @@ func init() {
 		"Skip the map phase (assumes that map output files already exist).")
 	flag.Bool("cleanup_tmp", true,
 		"Clean up the tmp directory after the loader finishes. Setting this to false allows the"+
-			" bulk loader can be re-run while skipping the map phase.")
+			" boot loader can be re-run while skipping the map phase.")
 	flag.Int("reducers", 1,
 		"Number of reducers to run concurrently. Increasing this can improve performance, and "+
 			"must be less than or equal to the number of reduce shards.")
-	flag.Bool("version", false, "Prints the version of Dgraph Bulk Loader.")
+	flag.Bool("version", false, "Prints the version of Dgraph Boot Loader.")
 	flag.String("xidmap", "", "Directory to store xid to uid mapping")
 	// TODO: Potentially move http server to main.
 	flag.String("http", "localhost:8080", "Address to serve http (pprof).")
@@ -107,7 +107,7 @@ func init() {
 	flag.Int64("max-splits", 1000,
 		"How many splits can a single key have, before it is forbidden. Also known as Jupiter key.")
 
-	flag.String("badger", BulkBadgerDefaults, z.NewSuperFlagHelp(BulkBadgerDefaults).
+	flag.String("badger", BadgerDefaults, z.NewSuperFlagHelp(BadgerDefaults).
 		Head("Badger options (Refer to badger documentation for all possible options)").
 		Flag("compression",
 			"Specifies the compression algorithm and compression level (if applicable) for the "+
@@ -123,40 +123,40 @@ func run() {
 	cacheDefaults := fmt.Sprintf("indexcachesize=%d; blockcachesize=%d; ",
 		(70*cacheSize)/100, (30*cacheSize)/100)
 
-	bopts := badger.DefaultOptions("").FromSuperFlag(BulkBadgerDefaults + cacheDefaults).
-		FromSuperFlag(Bulk.Conf.GetString("badger"))
-	keys, err := ee.GetKeys(Bulk.Conf)
+	bopts := badger.DefaultOptions("").FromSuperFlag(BadgerDefaults + cacheDefaults).
+		FromSuperFlag(Boot.Conf.GetString("badger"))
+	keys, err := ee.GetKeys(Boot.Conf)
 	x.Check(err)
 
 	opt := options{
-		DataFiles:        Bulk.Conf.GetString("files"),
-		DataIPC:          Bulk.Conf.GetString("ipc"),
+		DataFiles:        Boot.Conf.GetString("files"),
+		DataIPC:          Boot.Conf.GetString("ipc"),
 		EncryptionKey:    keys.EncKey,
-		GqlSchemaFile:    Bulk.Conf.GetString("schema"),
-		OutDir:           Bulk.Conf.GetString("out"),
-		ReplaceOutDir:    Bulk.Conf.GetBool("replace_out"),
-		TmpDir:           Bulk.Conf.GetString("tmp"),
-		NumGoroutines:    Bulk.Conf.GetInt("num_go_routines"),
-		MapBufSize:       uint64(Bulk.Conf.GetInt("mapoutput_mb")),
-		PartitionBufSize: int64(Bulk.Conf.GetInt("partition_mb")),
-		SkipMapPhase:     Bulk.Conf.GetBool("skip_map_phase"),
-		CleanupTmp:       Bulk.Conf.GetBool("cleanup_tmp"),
-		NumReducers:      Bulk.Conf.GetInt("reducers"),
-		Version:          Bulk.Conf.GetBool("version"),
-		ZeroAddr:         Bulk.Conf.GetString("zero"),
-		HttpAddr:         Bulk.Conf.GetString("http"),
-		IgnoreErrors:     Bulk.Conf.GetBool("ignore_errors"),
-		MapShards:        Bulk.Conf.GetInt("map_shards"),
-		ReduceShards:     Bulk.Conf.GetInt("reduce_shards"),
-		CustomTokenizers: Bulk.Conf.GetString("custom_tokenizers"),
-		ClientDir:        Bulk.Conf.GetString("xidmap"),
-		Namespace:        Bulk.Conf.GetUint64("force-namespace"),
+		GqlSchemaFile:    Boot.Conf.GetString("schema"),
+		OutDir:           Boot.Conf.GetString("out"),
+		ReplaceOutDir:    Boot.Conf.GetBool("replace_out"),
+		TmpDir:           Boot.Conf.GetString("tmp"),
+		NumGoroutines:    Boot.Conf.GetInt("num_go_routines"),
+		MapBufSize:       uint64(Boot.Conf.GetInt("mapoutput_mb")),
+		PartitionBufSize: int64(Boot.Conf.GetInt("partition_mb")),
+		SkipMapPhase:     Boot.Conf.GetBool("skip_map_phase"),
+		CleanupTmp:       Boot.Conf.GetBool("cleanup_tmp"),
+		NumReducers:      Boot.Conf.GetInt("reducers"),
+		Version:          Boot.Conf.GetBool("version"),
+		ZeroAddr:         Boot.Conf.GetString("zero"),
+		HttpAddr:         Boot.Conf.GetString("http"),
+		IgnoreErrors:     Boot.Conf.GetBool("ignore_errors"),
+		MapShards:        Boot.Conf.GetInt("map_shards"),
+		ReduceShards:     Boot.Conf.GetInt("reduce_shards"),
+		CustomTokenizers: Boot.Conf.GetString("custom_tokenizers"),
+		ClientDir:        Boot.Conf.GetString("xidmap"),
+		Namespace:        Boot.Conf.GetUint64("force-namespace"),
 		Badger:           bopts,
 	}
 
-	// set MaxSplits because while bulk-loading alpha won't be running and rollup would not be
+	// set MaxSplits because while boot-loading alpha won't be running and rollup would not be
 	// able to pick value for max-splits from x.Config.Limit.
-	posting.MaxSplits = Bulk.Conf.GetInt("max-splits")
+	posting.MaxSplits = Boot.Conf.GetInt("max-splits")
 
 	x.PrintVersion()
 	if opt.Version {
@@ -236,7 +236,7 @@ func run() {
 		x.Check(x.WriteGroupIdFile(dir, uint32(i+1)))
 	}
 
-	// Create a directory just for bulk loader's usage.
+	// Create a directory just for boot loader's usage.
 	if !opt.SkipMapPhase {
 		x.Check(os.RemoveAll(opt.TmpDir))
 		x.Check(os.MkdirAll(opt.TmpDir, 0700))
@@ -253,38 +253,38 @@ func run() {
 
 	loader := newLoader(&opt)
 
-	const bulkMetaFilename = "bulk.meta"
-	bulkMetaPath := filepath.Join(opt.TmpDir, bulkMetaFilename)
+	const bootMetaFilename = "boot.meta"
+	bootMetaPath := filepath.Join(opt.TmpDir, bootMetaFilename)
 
 	if opt.SkipMapPhase {
-		bulkMetaData, err := ioutil.ReadFile(bulkMetaPath)
+		bootMetaData, err := ioutil.ReadFile(bootMetaPath)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Error reading from bulk meta file")
 			os.Exit(1)
 		}
 
-		var bulkMeta pb.BulkMeta
-		if err = bulkMeta.Unmarshal(bulkMetaData); err != nil {
+		var bootMeta pb.BulkMeta
+		if err = bootMeta.Unmarshal(bootMetaData); err != nil {
 			fmt.Fprintln(os.Stderr, "Error deserializing bulk meta file")
 			os.Exit(1)
 		}
 
-		loader.prog.mapEdgeCount = bulkMeta.EdgeCount
-		loader.dqlSchema.schemaMap = bulkMeta.SchemaMap
+		loader.prog.mapEdgeCount = bootMeta.EdgeCount
+		loader.dqlSchema.schemaMap = bootMeta.SchemaMap
 	} else {
 		loader.mapStage()
 		mergeMapShardsIntoReduceShards(&opt)
 
-		bulkMeta := pb.BulkMeta{
+		bootMeta := pb.BulkMeta{
 			EdgeCount: loader.prog.mapEdgeCount,
 			SchemaMap: loader.dqlSchema.schemaMap,
 		}
-		bulkMetaData, err := bulkMeta.Marshal()
+		bootMetaData, err := bootMeta.Marshal()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Error serializing bulk meta file")
 			os.Exit(1)
 		}
-		if err = ioutil.WriteFile(bulkMetaPath, bulkMetaData, 0644); err != nil {
+		if err = ioutil.WriteFile(bootMetaPath, bootMetaData, 0644); err != nil {
 			fmt.Fprintln(os.Stderr, "Error writing to bulk meta file")
 			os.Exit(1)
 		}
@@ -314,7 +314,7 @@ func maxOpenFilesWarning() {
 	)
 	maxOpenFiles, err := x.QueryMaxOpenFiles()
 	if err != nil || maxOpenFiles < 1e6 {
-		fmt.Println(green + "\nThe bulk loader needs to open many files at once. This number depends" +
+		fmt.Println(green + "\nThe boot loader needs to open many files at once. This number depends" +
 			" on the size of the data set loaded, the map file output size, and the level" +
 			" of indexing. 100,000 is adequate for most data set sizes. See `man ulimit` for" +
 			" details of how to change the limit.")
