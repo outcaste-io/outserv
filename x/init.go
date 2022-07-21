@@ -64,9 +64,9 @@ func BuildDetails() string {
 	z.Free(buf)
 
 	return fmt.Sprintf(`
-# Outserv: Blockchain Search with GraphQL
-# Licensed under Sustainable License v1.0
-# Copyright 2022 Outcaste LLC
+==> Outserv: Blockchain Search with GraphQL <==
+==> Licensed under Sustainable License v1.0 <==
+==> Copyright 2022 Outcaste LLC <==
 
 Outserv version   : %v
 Outserv codename  : %v
