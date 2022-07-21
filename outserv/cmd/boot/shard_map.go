@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package bulk
+package boot
 
 import (
 	"sync"

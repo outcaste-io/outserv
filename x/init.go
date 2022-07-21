@@ -64,6 +64,10 @@ func BuildDetails() string {
 	z.Free(buf)
 
 	return fmt.Sprintf(`
+# Outserv: Blockchain Search with GraphQL
+# Licensed under Sustainable License v1.0
+# Copyright 2022 Outcaste LLC
+
 Outserv version   : %v
 Outserv codename  : %v
 Outserv SHA-256   : %x
@@ -72,8 +76,6 @@ Commit timestamp  : %v
 Branch            : %v
 Go version        : %v
 jemalloc enabled  : %v
-
-Licensed under Sustainable License v1.0. Copyright 2022 Outcaste LLC.
 
 `,
 		outservVersion, outservCodename, ExecutableChecksum(), lastCommitSHA, lastCommitTime, gitBranch,
