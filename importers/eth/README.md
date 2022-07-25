@@ -1,9 +1,16 @@
 # How to use this importer
 
+The way to use this importer is [documented
+here](https://docs.outcaste.io/docs/importer/bootstrap).
+
+## Modifying the code
+
+The functions and structs that you want to modify are located in fill.go. Start
+with your modifications there and then extend outwards to eth.go, if needed.
+
 ## Notes from Field Test
 
-
-Bulk loader could take 48 GBs of memory just to store the Hash -> Outserv UIDs
+Boot loader could take 48 GBs of memory just to store the Hash -> Outserv UIDs
 mapping. It is recommended to use a 64 GB RAM machine.
 
 Assuming a fast connection to Geth, this import process is CPU bound. So,
@@ -44,3 +51,6 @@ This resulted in 400 GBs (compressed) of map phase output on disk.
 $ du -sh tmp
 427G	tmp
 ```
+
+The final reduce output from this is around 750GB. Ensure you have enough disk
+space.

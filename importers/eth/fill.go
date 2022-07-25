@@ -49,6 +49,9 @@ type Block struct {
 // fastFillViaGraphQL connects with the GraphQL endpoint exposed via Geth. And
 // fetches blocks and transaction information. This is the fastest way to get
 // data out of Geth -- at least 10x faster than the JSON-RPC interface.
+//
+// To adapt this importer to your needs, please start with modifying here, and
+// the Txn struct.
 func (b *Block) fastFillViaGraphQL() {
 	q := fmt.Sprintf(`
 {
@@ -137,6 +140,9 @@ func (b *Block) fastFillViaGraphQL() {
 // slowFillViaClient doesn't yet have UIDs set. Needs to be modified to match
 // with fastFillViaGraphQL. Recommendation is to use fastFillViaGraphQL instead
 // because it is indeed 10x faster than this function.
+//
+// If you're not using fastFillViaGraphQL and you want to adapt this importer to
+// your needs, start with modifying this function and the Txn struct.
 func (b *Block) slowFillViaClient() {
 	blockNumber := big.NewInt(b.Number)
 	block, err := client.BlockByNumber(context.Background(), blockNumber)
