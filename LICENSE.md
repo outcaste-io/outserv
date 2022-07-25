@@ -79,3 +79,8 @@ Control can be direct or indirect.
 terms.
 - use means anything you do with the software requiring one of your licenses.
 - trademark means trademarks, service marks, and similar rights.
+
+---
+
+Please see the reasoning behind Sustainable License and the FAQs
+[here](https://manishrjain.com/tagged/license).
