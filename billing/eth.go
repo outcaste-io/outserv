@@ -67,6 +67,8 @@ func NewWallet(keyStorePath, password string) *EthWallet {
 
 func getEthEndpoint() string {
 	records, err := net.LookupTXT("_eth.outcaste.io")
+	// It's OK for us to check fail here, considering we're creating a new
+	// wallet, which happens at the beginning of the program.
 	x.Checkf(err, "Unable to lookup _eth.outcaste.io")
 	x.AssertTruef(len(records) > 0, "Unable to get ETH endpoint")
 	return records[0]
@@ -213,12 +215,8 @@ func (w *EthWallet) Pay(ctx context.Context, usd float64) error {
 	estGasWei := new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(estGas))
 	glog.Infof("Estimated cost of txn in ETH: %.6f", weiToEth(estGasWei))
 
-	updatedWei := new(big.Int).Sub(wei, estGasWei)
-	glog.Infof("Reducing charge from %.6f ETH to %.6f ETH to account for gas fee",
-		weiToEth(wei), weiToEth(updatedWei))
-
 	var data []byte
-	tx := types.NewTransaction(nonce, addr, updatedWei, gasLimit, gasPrice, data)
+	tx := types.NewTransaction(nonce, addr, wei, gasLimit, gasPrice, data)
 
 	chainID, err := client.NetworkID(ctx)
 	if err != nil {
