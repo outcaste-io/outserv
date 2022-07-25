@@ -274,7 +274,7 @@ func init() {
 
 	flag.String("wallet", billing.WalletDefaults, z.NewSuperFlagHelp(billing.WalletDefaults).
 		Head("Wallet options").
-		Flag("keystore", "Path of the ethereum wallet keystore.").
+		Flag("dir", "Directory path of the ethereum wallet keystore.").
 		Flag("password", "Password used to encrypt the keystore.").
 		String())
 }

@@ -75,11 +75,11 @@ func run(conf *viper.Viper) error {
 }
 
 func testWallet(keyStoreDir, password string) error {
-	wallet := billing.NewWallet(keyStoreDir, password, billing.TestEndpoint)
+	wallet := billing.NewWallet(keyStoreDir, password)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	err := wallet.Pay(ctx, 10.0) // Send $10.
+	err := wallet.Pay(ctx, 1.00) // Send $1.
 	glog.Infof("ETH payment done with error: %v\n", err)
 	return err
 }
@@ -102,7 +102,7 @@ func createWallet(keyStoreDir, passphrase string) error {
 	fmt.Printf("	Wallet JSON file stored in directory: %s\n", keyStoreDir)
 	fmt.Println(`
 WARNING:
-	Please keep the generated JSON file and the passphrase safe and secure.
+	Please keep the generated JSON file and the password safe and secure.
 	If you lose either of those, the funds in this account would be lost forever.
 `)
 	return nil
