@@ -27,10 +27,9 @@ import (
 
 type EthWallet struct {
 	endpoint string
-	// client   *ethclient.Client
-	account accounts.Account
-	secret  string
-	ks      *keystore.KeyStore
+	account  accounts.Account
+	secret   string
+	ks       *keystore.KeyStore
 }
 
 var (
@@ -43,7 +42,6 @@ var (
 )
 
 const (
-	// TODO: Update the endpoints to use outcaste.io domain.
 	WalletDefaults = `dir=; password=;`
 )
 
