@@ -595,8 +595,7 @@ func setupServer() {
 
 	baseMux.HandleFunc("/query", queryHandler)
 	baseMux.HandleFunc("/query/", queryHandler)
-	baseMux.HandleFunc("/mutate", mutationHandler)
-	baseMux.HandleFunc("/mutate/", mutationHandler)
+	// TODO: Remove alter endpoint later.
 	baseMux.HandleFunc("/alter", alterHandler)
 	baseMux.HandleFunc("/health", healthCheck)
 	baseMux.HandleFunc("/state", stateHandler)
