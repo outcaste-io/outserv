@@ -8,6 +8,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"net"
@@ -17,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -932,6 +934,22 @@ func run() {
 	// StartRaftNodes loads up DQL schema from disk. This is important step
 	// that's needed before GraphQL schema can be loaded in setupServer.
 	worker.StartRaftNodes(worker.State.WALstore, bindall)
+
+	// writeUIDFile in boot loader.
+	data, err := ioutil.ReadFile(path.Join(x.WorkerConfig.Dir.Posting, "max_uid"))
+	if err == nil {
+		str := strings.TrimSpace(string(data))
+		maxUid, err := strconv.ParseUint(str, 0, 64)
+		if err == nil {
+			glog.Infof("Found Max UID in p directory: %#x\n", maxUid)
+			x.Check(zero.BumpMaxUid(context.Background(), maxUid))
+		} else {
+			glog.Infof("Unable to parse max_uid. Got error: %v", err)
+		}
+	} else {
+		glog.Infof("No max_uid file found. Got error: %v\n", err)
+	}
+
 	atomic.AddUint32(&initDone, 1)
 
 	// initialization of the admin account can only be done after raft nodes are running

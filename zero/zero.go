@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"math"
 	"os"
 	"time"
 
@@ -296,6 +297,29 @@ func AssignUids(ctx context.Context, num uint32) (*pb.AssignedIds, error) {
 	end := st.MaxUID
 	// Both the StartId and EndId are inclusive.
 	return &pb.AssignedIds{StartId: end - uint64(num), EndId: end - 1}, nil
+}
+
+func BumpMaxUid(ctx context.Context, maxUid uint64) error {
+	for {
+		ms, err := LatestMembershipState(ctx)
+		if err != nil {
+			return errors.Wrapf(err, "while retrieving latest membership state")
+		}
+		if ms.MaxUID > maxUid {
+			glog.Infof("ms.MaxUID: %#x > maxUid: %#x. Returning from BumpMaxUid",
+				ms.MaxUID, maxUid)
+			return nil
+		}
+		ask := uint32(maxUid + 1 - ms.MaxUID)
+		if maxUid-ms.MaxUID >= math.MaxUint32 {
+			ask = uint32(math.MaxUint32)
+		}
+		glog.Infof("ms.MaxUID: %#x maxUid: %#x Assigning %#x UIDs\n",
+			ms.MaxUID, maxUid, ask)
+		if _, err := AssignUids(ctx, ask); err != nil {
+			return errors.Wrapf(err, "while assigning UIDS")
+		}
+	}
 }
 
 func AssignNsids(ctx context.Context, num uint32) (*pb.AssignedIds, error) {
