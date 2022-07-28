@@ -1,65 +1,22 @@
 # Outserv: Blockchain Search
 
-Outserv indexes Blockchain data to enable search and provides customizable GraphQL APIs to serve Blockchain data.
+Outserv enables you to run production grade GraphQL Search APIs over any
+blockchain data 10x faster than existing mechanisms.
 
-// TODO: Why Outserv.
+Outserv is the only system which combines the power of a saerch engine, a cache
+engine and a GraphQL layer, thus replacing three different systems in
+production.
 
-## What is the motivation behind Outserv?
-
-A typical GraphQL production tech stack today contains:
-
-1. A source of truth database (like Blockchain or Postgres)
-1. A search system (like Elastic Search)
-1. A cache system (like Redis)
-1. A GraphQL layer (like Hasura / Apollo)
-1. Business Logic
-
-Outserv cuts down this stack significantly. A tech stack with Outserv looks like
-this:
-
-1. A source of truth database (like Blockchain or Postgres)
-1. Outserv providing search, caching and GraphQL APIs
-1. Business Logic
-
-Outserv aims to make it trivial for anyone to bring up a production grade
+Outserv makes it trivial for anyone to bring up a production grade
 GraphQL tech stack -- which we consider to be an important step to web3
 decentralization.
 
-## Install from Source
+![Outserv Comparison Image](/static/outserv.jpeg)
 
-If you want to install from source, install Go 1.13+ or later and the following dependencies:
+## Documentation: Installation and Usage
 
-### Ubuntu
-
-```bash
-sudo apt-get update
-sudo apt-get install gcc make
-```
-
-### Build and Install
-
-Then clone the Outserv repository and use `make install` to install the Dgraph binary to `$GOPATH/bin`.
-
-```bash
-git clone https://github.com/outcaste-io/outserv.git
-cd ./outserv
-make install # or `make image` to build a Docker image
-```
-
-### Run
-
-```bash
-$ outserv graphql # To run the server
-$ outserv graphql --help # To see the various customization options.
-```
-
-## Get Started
-**To get started with Outserv, follow the Dgraph tutorials (for now):**
-
-- Installation to queries in 3 steps via [dgraph.io/docs/](https://dgraph.io/docs/get-started/).
-- A longer interactive tutorial via [dgraph.io/tour/](https://dgraph.io/tour/).
-- Tutorial and
-presentation videos on [YouTube channel](https://www.youtube.com/channel/UCghE41LR8nkKFlR3IFTRO4w/featured).
+Please follow the documentation in
+[https://docs.outcaste.io](https://docs.outcaste.io/docs/intro).
 
 ## Bugs / Feature Requests
 
