@@ -15,6 +15,7 @@ step towards web3 decentralization.
 
 ## Important Links
 
+- Latest release is in `release/v22.07` branch.
 - Read the announcement [blog post
 here](https://manishrjain.com/outserv-graphql-blockchain-search).
 - Follow the documentation at [https://docs.outcaste.io](https://docs.outcaste.io/docs/intro).
