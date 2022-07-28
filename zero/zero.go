@@ -305,12 +305,12 @@ func BumpMaxUid(ctx context.Context, maxUid uint64) error {
 		if err != nil {
 			return errors.Wrapf(err, "while retrieving latest membership state")
 		}
-		if maxUid <= ms.MaxUID {
-			glog.Infof("ms.MaxUID: %#x >= maxUid: %#x. Returning from BumpMaxUid",
+		if ms.MaxUID > maxUid {
+			glog.Infof("ms.MaxUID: %#x > maxUid: %#x. Returning from BumpMaxUid",
 				ms.MaxUID, maxUid)
 			return nil
 		}
-		ask := uint32(maxUid - ms.MaxUID)
+		ask := uint32(maxUid + 1 - ms.MaxUID)
 		if maxUid-ms.MaxUID >= math.MaxUint32 {
 			ask = uint32(math.MaxUint32)
 		}

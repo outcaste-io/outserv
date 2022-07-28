@@ -8,7 +8,7 @@ engine and a GraphQL layer, thus replacing three different systems in
 production.
 
 With a single executable binary, Outserv makes it trivial for anyone to bring up
-a production grade GraphQL tech stack -- which we consider to be an important
+a production grade GraphQL tech stack -- which I consider to be an important
 step towards web3 decentralization.
 
 ![Outserv Comparison Image](/static/outserv.jpeg)
@@ -16,10 +16,10 @@ step towards web3 decentralization.
 ## Important Links
 
 - Read the announcement [blog post
-here](https://manishrjain.com/outserv-graphql-blockchain-search)
-- Follow the documentation at [https://docs.outcaste.io](https://docs.outcaste.io/docs/intro)
-- See the [product roadmap here](https://github.com/outcaste-io/outserv/issues/61)
-- Join the Outserv [Discord community](https://discord.gg/rmJnNd4XaV)
+here](https://manishrjain.com/outserv-graphql-blockchain-search).
+- Follow the documentation at [https://docs.outcaste.io](https://docs.outcaste.io/docs/intro).
+- See the [product roadmap here](https://github.com/outcaste-io/outserv/issues/61).
+- Join the Outserv [Discord community](https://discord.gg/rmJnNd4XaV).
 - Consult with me to figure if Outserv would be a good solution
 for you via this [Calendly
 link](https://calendly.com/manishrjain/consulting-on-outserv).
@@ -46,12 +46,4 @@ The monetization model mentioned in the Sustainable License is explained
 
 Certain portions of this project are licensed by contributors or others
 under the terms of open source licenses such as the Apache License v2.0.
-
-## Join the Community
-
-If you'd like to consult with me to figure if Outserv would be a good solution
-for you, please use this [Calendly
-link](https://calendly.com/manishrjain/consulting-on-outserv).
-
-here.
 
