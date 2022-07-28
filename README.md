@@ -13,12 +13,17 @@ step towards web3 decentralization.
 
 ![Outserv Comparison Image](/static/outserv.jpeg)
 
+## Latest Release
+
+- The latest release of Outserv is `v22.07`, codenamed
+    [webb](https://webb.nasa.gov/).
+- Latest release is in `release/v22.07` branch.
+
 ## Important Links
 
-- Latest release is in `release/v22.07` branch.
+- Follow the documentation at [https://docs.outcaste.io](https://docs.outcaste.io/docs/intro).
 - Read the announcement [blog post
 here](https://manishrjain.com/outserv-graphql-blockchain-search).
-- Follow the documentation at [https://docs.outcaste.io](https://docs.outcaste.io/docs/intro).
 - See the [product roadmap here](https://github.com/outcaste-io/outserv/issues/61).
 - Join the Outserv [Discord community](https://discord.gg/rmJnNd4XaV).
 - Consult with me to figure if Outserv would be a good solution
