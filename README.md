@@ -27,7 +27,7 @@ following questions:
 
 1. What is the problem you are trying to solve for?
 2. What did you do?
-3. What did you expect?
+3. What did you expect to see?
 4. What did you see instead?
 
 ## License
