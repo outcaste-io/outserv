@@ -2,7 +2,7 @@
 # Portions Copyright 2022 Outcaste LLC are available under the Sustainable License v1.0.
 
 BUILD          ?= $(shell git rev-parse --short HEAD)
-BUILD_CODENAME  = zion
+BUILD_CODENAME  = webb
 BUILD_DATE     ?= $(shell git log -1 --format=%ci)
 BUILD_BRANCH   ?= $(shell git rev-parse --abbrev-ref HEAD)
 BUILD_VERSION  ?= $(shell git describe --always --tags)
@@ -53,8 +53,6 @@ help:
 	@echo
 	@echo Build commands:
 	@echo "  make [all]     - Build all targets [EE]"
-	@echo "  make oss       - Build all targets [OSS]"
-	@echo "  make dgraph    - Build dgraph binary"
 	@echo "  make install   - Install all targets"
 	@echo "  make uninstall - Uninstall known targets"
 	@echo "  make version   - Show current build info"
