@@ -1,21 +1,23 @@
-# Outserv: Blockchain Search
+# Outserv: Blockchain Search with GraphQL APIs
 
 Outserv enables you to run production grade GraphQL Search APIs over any
 blockchain data 10x faster than existing mechanisms.
 
-Outserv is the only system which combines the power of a saerch engine, a cache
+Outserv is the only system which combines the power of a search engine, a cache
 engine and a GraphQL layer, thus replacing three different systems in
 production.
 
-Outserv makes it trivial for anyone to bring up a production grade
-GraphQL tech stack -- which we consider to be an important step to web3
-decentralization.
+With a single executable binary, Outserv makes it trivial for anyone to bring up
+a production grade GraphQL tech stack -- which we consider to be an important
+step towards web3 decentralization.
 
 ![Outserv Comparison Image](/static/outserv.jpeg)
 
 ## Documentation: Installation and Usage
 
-Please follow the documentation in
+Please read the announcement [blog post
+here](https://manishrjain.com/outserv-graphql-blockchain-search). And follow the
+documentation at
 [https://docs.outcaste.io](https://docs.outcaste.io/docs/intro).
 
 ## Bugs / Feature Requests
