@@ -19,7 +19,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/edgraph"
 	"github.com/outcaste-io/outserv/ee/audit"
-	"github.com/outcaste-io/outserv/graphql/api"
 	"github.com/outcaste-io/outserv/graphql/resolve"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/graphql/subscription"
@@ -426,7 +425,7 @@ func commonHeaders(next http.Handler) http.Handler {
 func recoveryHandler(next http.Handler) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer api.PanicHandler(
+		defer x.PanicHandler(
 			func(err error) {
 				rr := schema.ErrorResponse(err)
 				write(w, rr, strings.Contains(r.Header.Get("Accept-Encoding"), "gzip"))

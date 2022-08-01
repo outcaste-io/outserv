@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/outcaste-io/outserv/edgraph"
-	"github.com/outcaste-io/outserv/graphql/api"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
@@ -417,7 +416,7 @@ func (r *RequestResolver) Resolve(ctx context.Context, gqlReq *schema.Request) (
 	// Panic Handler for mutation. This ensures that the mutation which causes panic
 	// gets logged in Alpha logs. This panic handler overrides the default Panic Handler
 	// used in recoveryHandler in admin/http.go
-	defer api.PanicHandler(
+	defer x.PanicHandler(
 		func(err error) {
 			resp.Errors = schema.AsGQLErrors(schema.AppendGQLErrs(resp.Errors, err))
 		}, gqlReq.Query)
@@ -465,7 +464,7 @@ func (r *RequestResolver) Resolve(ctx context.Context, gqlReq *schema.Request) (
 
 			go func(q *schema.Field, storeAt int) {
 				defer wg.Done()
-				defer api.PanicHandler(
+				defer x.PanicHandler(
 					func(err error) {
 						allResolved[storeAt] = &Resolved{
 							Data:  nil,
