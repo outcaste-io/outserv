@@ -268,8 +268,6 @@ func (gh *GqlHandler) isValid(namespace uint64) error {
 		return errors.New("resolver not found")
 	case gh.resolver[namespace].Schema() == nil:
 		return errors.New("schema is nil")
-	case gh.resolver[namespace].Schema().Meta() == nil:
-		return errors.New("schema meta is nil")
 	}
 	return nil
 }
@@ -440,20 +438,6 @@ func recoveryHandler(next http.Handler) http.Handler {
 //  * Access-Control-Allow-Headers
 //  * Access-Control-Allow-Origin
 func addDynamicHeaders(reqResolver *resolve.RequestResolver, origin string, w http.ResponseWriter) {
-	schemaMeta := reqResolver.Schema().Meta()
-
-	// Set allowed headers after also including headers which are part of forwardHeaders.
-	w.Header().Set("Access-Control-Allow-Headers", schemaMeta.AllowedCorsHeaders())
-
-	allowedOrigins := schemaMeta.AllowedCorsOrigins()
-	if len(allowedOrigins) == 0 {
-		// Since there is no allow-list to restrict, we'll allow everyone to access.
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-	} else if allowedOrigins[origin] {
-		// Let's set the respective origin address in the allow origin.
-		w.Header().Set("Access-Control-Allow-Origin", origin)
-	} else {
-		// otherwise, Given origin is not in the allow list, so let's remove any allowed origin.
-		w.Header().Del("Access-Control-Allow-Origin")
-	}
+	// Since there is no allow-list to restrict, we'll allow everyone to access.
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 }

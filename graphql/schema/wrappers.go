@@ -17,7 +17,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/outcaste-io/gqlparser/v2/parser"
-	"github.com/outcaste-io/outserv/graphql/authorization"
 
 	"github.com/outcaste-io/gqlparser/v2/ast"
 	"github.com/outcaste-io/outserv/x"
@@ -137,8 +136,6 @@ type Schema struct {
 	// remoteResponse stores the mapping of typeName->fieldName->responseName which will be used in result
 	// completion step.
 	remoteResponse map[string]map[string]string
-	// meta is the meta information extracted from input schema
-	meta *metaInfo
 }
 
 // An Operation is a single valid GraphQL operation.  It contains either
@@ -215,14 +212,6 @@ func (s *Schema) Mutations(t MutationType) []string {
 		}
 	}
 	return result
-}
-
-func (s *Schema) SetMeta(meta *metaInfo) {
-	s.meta = meta
-}
-
-func (s *Schema) Meta() *metaInfo {
-	return s.meta
 }
 
 func (s *Schema) Type(typeName string) *Type {
@@ -807,7 +796,6 @@ func AsSchema(s *ast.Schema, ns uint64) (*Schema, error) {
 		lambdaOnMutate:     lambdaOnMutateMappings(s),
 		requiresDirectives: requiresMappings(s),
 		remoteResponse:     remoteResponseMapping(s),
-		meta:               &metaInfo{}, // initialize with an empty metaInfo
 	}
 	sch.mutatedType = mutatedTypeMapping(sch, dgraphPredicate)
 	return sch, nil
@@ -949,10 +937,6 @@ func (f *Field) CompleteAlias(buf *bytes.Buffer) {
 	x.Check2(buf.WriteRune('"'))
 	x.Check2(buf.WriteString(f.ResponseName()))
 	x.Check2(buf.WriteString(`":`))
-}
-
-func (f *Field) GetAuthMeta() *authorization.AuthMeta {
-	return f.op.inSchema.meta.authMeta
 }
 
 func (f *Field) Arguments() map[string]interface{} {
@@ -1320,17 +1304,6 @@ func getCustomHTTPConfig(f *Field, isQueryOrMutation bool, ns uint64) (*FieldHTT
 	fconf.ForwardHeaders = http.Header{}
 	// set application/json as the default Content-Type
 	fconf.ForwardHeaders.Set("Content-Type", "application/json")
-	secretHeaders := httpArg.Value.Children.ForName("secretHeaders")
-	if secretHeaders != nil {
-		for _, h := range secretHeaders.Children {
-			key := strings.Split(h.Value.Raw, ":")
-			if len(key) == 1 {
-				key = []string{h.Value.Raw, h.Value.Raw}
-			}
-			val := string(f.op.inSchema.meta.secrets[key[1]])
-			fconf.ForwardHeaders.Set(key[0], val)
-		}
-	}
 
 	forwardHeaders := httpArg.Value.Children.ForName("forwardHeaders")
 	if forwardHeaders != nil {
@@ -1977,10 +1950,6 @@ func (fd *FieldDefinition) ForwardEdge() *FieldDefinition {
 		dgraphPredicate: fd.dgraphPredicate,
 		parentType:      typeWrapper,
 	}
-}
-
-func (fd *FieldDefinition) GetAuthMeta() *authorization.AuthMeta {
-	return fd.inSchema.meta.authMeta
 }
 
 func (t *Type) Name() string {

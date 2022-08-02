@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/outcaste-io/outserv/graphql/authorization"
 	"github.com/outcaste-io/outserv/worker"
 
 	"github.com/outcaste-io/outserv/x"
@@ -157,10 +156,6 @@ func GetBodyForLambda(ctx context.Context, field *Field, parents,
 		"namespace":            ns,
 		"resolver":             field.GetObjectName() + "." + field.Name(),
 		"X-Dgraph-AccessToken": accessJWT,
-		"authHeader": map[string]interface{}{
-			"key":   field.GetAuthMeta().GetHeader(),
-			"value": authorization.GetJwtToken(ctx),
-		},
 	}
 	if parents != nil {
 		body["parents"] = parents

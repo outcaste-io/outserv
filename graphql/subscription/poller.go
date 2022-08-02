@@ -25,8 +25,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dgrijalva/jwt-go/v4"
-
 	"github.com/dgryski/go-farm"
 	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/graphql/resolve"
@@ -76,37 +74,9 @@ func (p *Poller) AddSubscriber(req *schema.Request) (*SubscriberResponse, error)
 		return nil, err
 	}
 
-	// find out the custom claims for auth, if any. As,
-	// We also need to use authVariables in generating the hashed bucketID
-	authMeta := resolver.Schema().Meta().AuthMeta()
-	ctx, err := authMeta.AttachAuthorizationJwt(context.Background(), req.Header)
-	if err != nil {
-		return nil, err
-	}
-	customClaims, err := authMeta.ExtractCustomClaims(ctx)
-	if err != nil {
-		return nil, err
-	}
-	// for the cases when no expiry is given in jwt or subscription doesn't have any authorization,
-	// we set their expiry to zero time
-	if customClaims.StandardClaims.ExpiresAt == nil {
-		customClaims.StandardClaims.ExpiresAt = jwt.At(time.Time{})
-	}
-
 	buf, err := json.Marshal(req)
 	x.Check(err)
-	var bucketID uint64
-	if customClaims.AuthVariables != nil {
-
-		// TODO - Add custom marshal function that marshal's the json in sorted order.
-		authvariables, err := json.Marshal(customClaims.AuthVariables)
-		if err != nil {
-			return nil, err
-		}
-		bucketID = farm.Fingerprint64(append(buf, authvariables...))
-	} else {
-		bucketID = farm.Fingerprint64(buf)
-	}
+	bucketID := farm.Fingerprint64(buf)
 	p.Lock()
 	defer p.Unlock()
 
@@ -130,8 +100,7 @@ func (p *Poller) AddSubscriber(req *schema.Request) (*SubscriberResponse, error)
 	}
 	glog.Infof("Subscription polling is started for the ID %d", subscriptionID)
 
-	subscriptions[subscriptionID] = subscriber{
-		expiry: customClaims.StandardClaims.ExpiresAt.Time, updateCh: updateCh}
+	subscriptions[subscriptionID] = subscriber{updateCh: updateCh}
 	p.pollRegistry[bucketID] = subscriptions
 
 	if ok {
@@ -147,11 +116,10 @@ func (p *Poller) AddSubscriber(req *schema.Request) (*SubscriberResponse, error)
 	// There is no goroutine running to check updates for this query. So, run one to publish
 	// the updates.
 	pollR := &pollRequest{
-		bucketID:      bucketID,
-		prevHash:      prevHash,
-		graphqlReq:    req,
-		authVariables: customClaims.AuthVariables,
-		localEpoch:    localEpoch,
+		bucketID:   bucketID,
+		prevHash:   prevHash,
+		graphqlReq: req,
+		localEpoch: localEpoch,
 	}
 	go p.poll(pollR)
 
