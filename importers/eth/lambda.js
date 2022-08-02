@@ -33,14 +33,15 @@ async function test({args, graphql, dql}) {
 }
 
 async function latestBlock({args, graphql}) {
+  console.log("args", args);
   const results = await graphql(`
   { queryBlock(order: {desc: number}, first: 1) {
     number
   }} `)
   if (results.data.queryBlock.length == 0) {
-    return 0
+    return {"number": 0}
   }
-  return results.data.queryBlock[0].number;
+  return {"number": results.data.queryBlock[0].number}
 }
 
 self.addGraphQLResolvers({

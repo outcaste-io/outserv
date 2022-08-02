@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"math"
 	"math/big"
+	"runtime/debug"
 	"strconv"
 	"time"
 
@@ -96,6 +97,8 @@ func CompleteObject(
 	path []interface{},
 	fields []*Field,
 	res map[string]interface{}) ([]byte, x.GqlErrorList) {
+	glog.Infof("CompleteObject: 1: %+v 2: %+v 3: %+v\n", path, fields, res)
+	debug.PrintStack()
 
 	var errs x.GqlErrorList
 	var buf bytes.Buffer
@@ -120,7 +123,8 @@ func CompleteObject(
 		}
 	}
 
-	for _, f := range fields {
+	for i, f := range fields {
+		glog.Infof("CompleteObject field: %d -> %+v | %+v\n", i, f, f.field)
 		if f.SkipField(dgraphTypes, seenField) {
 			continue
 		}
@@ -174,6 +178,7 @@ func CompleteValue(
 	path []interface{},
 	field *Field,
 	val interface{}) ([]byte, x.GqlErrorList) {
+	glog.Infof("CompleteValue: 1: %+v 2: %+v 3: %+v\n", path, field, val)
 
 	switch val := val.(type) {
 	case map[string]interface{}:

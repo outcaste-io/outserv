@@ -1333,7 +1333,9 @@ func getCustomHTTPConfig(f *Field, isQueryOrMutation bool, ns uint64) (*FieldHTT
 		remoteQuery := graphqlArg.Raw
 		remoteQuery = remoteQuery[:strings.LastIndex(remoteQuery, "}")]
 		remoteQuery = fmt.Sprintf("%s%s}", remoteQuery, buf.String())
+		glog.Infof("remoteQuery DEBUG: %s\n", remoteQuery)
 		fconf.RemoteGqlQuery = remoteQuery
+		glog.Infof("remoteQuery fconf DEBUG: %+v\n", fconf)
 	}
 
 	// if it is a query or mutation, substitute the vars in URL and Body here itself
