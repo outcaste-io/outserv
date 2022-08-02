@@ -317,8 +317,6 @@ func generateGQLSchema(sch *worker.GqlSchema, ns uint64) (*schema.Schema, error)
 	if err != nil {
 		return nil, err
 	}
-	generatedSchema.SetMeta(schHandler.MetaInfo())
-
 	return generatedSchema, nil
 }
 

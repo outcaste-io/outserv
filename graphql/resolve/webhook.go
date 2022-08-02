@@ -11,7 +11,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 
-	"github.com/outcaste-io/outserv/graphql/authorization"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/worker"
 	"github.com/outcaste-io/outserv/x"
@@ -61,20 +60,13 @@ type deleteEvent struct {
 func sendWebhookEvent(ctx context.Context, m *schema.Field, commitTs uint64, rootUIDs []string) {
 	accessJWT, _ := x.ExtractJwt(ctx)
 	ns, _ := x.ExtractNamespace(ctx)
-	var authHeader *authHeaderPayload
-	if m.GetAuthMeta() != nil {
-		authHeader = &authHeaderPayload{
-			Key:   m.GetAuthMeta().GetHeader(),
-			Value: authorization.GetJwtToken(ctx),
-		}
-	}
 
 	payload := webhookPayload{
 		Source:     worker.GetLambdaScript(ns),
 		Namespace:  ns,
 		Resolver:   "$webhook",
 		AccessJWT:  accessJWT,
-		AuthHeader: authHeader,
+		AuthHeader: nil,
 		Event: eventPayload{
 			Typename:  m.MutatedType().Name(),
 			Operation: m.MutationType(),

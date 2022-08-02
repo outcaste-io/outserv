@@ -4,8 +4,6 @@
 package schema
 
 import (
-	"bufio"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -14,7 +12,6 @@ import (
 	"github.com/outcaste-io/gqlparser/v2/gqlerror"
 	"github.com/outcaste-io/gqlparser/v2/parser"
 	"github.com/outcaste-io/gqlparser/v2/validator"
-	"github.com/outcaste-io/outserv/graphql/authorization"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 )
@@ -26,7 +23,6 @@ type Handler struct {
 	originalDefs   []string
 	completeSchema *ast.Schema
 	dgraphSchema   string
-	schemaMeta     *metaInfo
 }
 
 // FromString builds a GraphQL Schema from input string, or returns any parsing
@@ -45,10 +41,6 @@ func FromString(schema string, ns uint64) (*Schema, error) {
 	}
 
 	return AsSchema(gqlSchema, ns)
-}
-
-func (s *Handler) MetaInfo() *metaInfo {
-	return s.schemaMeta
 }
 
 func (s *Handler) GQLSchema() string {
@@ -156,122 +148,11 @@ func (s *Handler) GQLSchemaWithoutApolloExtras() string {
 	return Stringify(astSchemaCopy, s.originalDefs, true)
 }
 
-// metaInfo stores all the meta data extracted from a schema
-type metaInfo struct {
-	// secrets are key value pairs stored in the GraphQL schema which can be added as headers
-	// to requests which resolve custom queries/mutations. These are extracted from # Dgraph.Secret.
-	secrets map[string]x.Sensitive
-	// extraCorsHeaders are the allowed CORS Headers in addition to x.AccessControlAllowedHeaders.
-	// These are parsed from the forwardHeaders specified in the @custom directive.
-	// The header for Dgraph.Authorization is also part of this.
-	// They are returned to the client as part of Access-Control-Allow-Headers.
-	extraCorsHeaders []string
-	// allowedCorsOrigins stores allowed CORS origins extracted from # Dgraph.Allow-Origin.
-	// They are returned to the client as part of Access-Control-Allow-Origin.
-	allowedCorsOrigins map[string]bool
-	// authMeta stores the authorization meta info extracted from `# Dgraph.Authorization` if any,
-	// otherwise it is nil.
-	authMeta *authorization.AuthMeta
-}
-
-func (m *metaInfo) AllowedCorsHeaders() string {
-	return strings.Join(append([]string{x.AccessControlAllowedHeaders}, m.extraCorsHeaders...), ",")
-}
-
-func (m *metaInfo) AllowedCorsOrigins() map[string]bool {
-	return m.allowedCorsOrigins
-}
-
-func (m *metaInfo) AuthMeta() *authorization.AuthMeta {
-	return m.authMeta
-}
-
-func parseMetaInfo(sch string) (*metaInfo, error) {
-	scanner := bufio.NewScanner(strings.NewReader(sch))
-	authSecret := ""
-	schMetaInfo := &metaInfo{
-		secrets:            make(map[string]x.Sensitive),
-		allowedCorsOrigins: make(map[string]bool),
-	}
-	var err error
-	for scanner.Scan() {
-		text := strings.TrimSpace(scanner.Text())
-
-		if strings.HasPrefix(text, "#") {
-			header := strings.TrimSpace(text[1:])
-			if strings.HasPrefix(header, "Dgraph.Authorization") {
-				if authSecret != "" {
-					return nil, errors.Errorf("Dgraph.Authorization should be only be specified once in "+
-						"a schema, found second mention: %v", text)
-				}
-				authSecret = text
-				continue
-			}
-
-			if strings.HasPrefix(header, "Dgraph.Allow-Origin") {
-				parts := strings.Fields(text)
-				if len(parts) != 3 {
-					return nil, errors.Errorf("incorrect format for specifying Dgraph.Allow-Origin"+
-						" found for comment: `%s`, it should be `# Dgraph."+
-						"Allow-Origin \"http://example.com\"`", text)
-				}
-				var allowedOrigin string
-				if err = json.Unmarshal([]byte(parts[2]), &allowedOrigin); err != nil {
-					return nil, errors.Errorf("incorrect format for specifying Dgraph.Allow-Origin"+
-						" found for comment: `%s`, it should be `# Dgraph."+
-						"Allow-Origin \"http://example.com\"`", text)
-				}
-				schMetaInfo.allowedCorsOrigins[allowedOrigin] = true
-				continue
-			}
-
-			if !strings.HasPrefix(header, "Dgraph.Secret") {
-				continue
-			}
-			parts := strings.Fields(text)
-			const doubleQuotesCode = 34
-
-			if len(parts) < 4 {
-				return nil, errors.Errorf("incorrect format for specifying Dgraph secret found for "+
-					"comment: `%s`, it should be `# Dgraph.Secret key value`", text)
-			}
-			val := strings.Join(parts[3:], " ")
-			if strings.Count(val, `"`) != 2 || val[0] != doubleQuotesCode || val[len(val)-1] != doubleQuotesCode {
-				return nil, errors.Errorf("incorrect format for specifying Dgraph secret found for "+
-					"comment: `%s`, it should be `# Dgraph.Secret key value`", text)
-			}
-
-			val = strings.Trim(val, `"`)
-			key := strings.Trim(parts[2], `"`)
-			// lets obfuscate the value of the secrets from here on.
-			schMetaInfo.secrets[key] = x.Sensitive(val)
-		}
-	}
-
-	if err = scanner.Err(); err != nil {
-		return nil, errors.Wrapf(err, "while trying to parse secrets from schema file")
-	}
-
-	if authSecret != "" {
-		schMetaInfo.authMeta, err = authorization.ParseAuthMeta(authSecret)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return schMetaInfo, nil
-}
-
 // NewHandler processes the input schema. If there are no errors, it returns
 // a valid Handler, otherwise it returns nil and an error.
 func NewHandler(input string) (*Handler, error) {
 	if input == "" {
 		return nil, gqlerror.Errorf("No schema specified")
-	}
-
-	metaInfo, err := parseMetaInfo(input)
-	if err != nil {
-		return nil, err
 	}
 
 	// The input schema contains just what's required to describe the types,
@@ -369,17 +250,11 @@ func NewHandler(input string) (*Handler, error) {
 		return nil, gqlerror.List{gqlErr}
 	}
 
-	gqlErrList = postGQLValidation(sch, defns, metaInfo.secrets)
+	gqlErrList = postGQLValidation(sch, defns, nil)
 	if gqlErrList != nil {
 		return nil, gqlErrList
 	}
 
-	var authHeader string
-	if metaInfo.authMeta != nil {
-		authHeader = metaInfo.authMeta.Header
-	}
-
-	metaInfo.extraCorsHeaders = getAllowedHeaders(sch, defns, authHeader)
 	dgSchema := genDgSchema(sch, typesToComplete, providesFieldsMap)
 	completeSchema(sch, typesToComplete, providesFieldsMap)
 	cleanSchema(sch)
@@ -388,22 +263,11 @@ func NewHandler(input string) (*Handler, error) {
 		return nil, gqlerror.Errorf("No query or mutation found in the generated schema")
 	}
 
-	// If Dgraph.Authorization header is parsed successfully and JWKUrls is present
-	// then initialise the http client and Fetch the JWKs from the JWKUrls.
-	if metaInfo.authMeta != nil && len(metaInfo.authMeta.JWKUrls) != 0 {
-		metaInfo.authMeta.InitHttpClient()
-		fetchErr := metaInfo.authMeta.FetchJWKs()
-		if fetchErr != nil {
-			return nil, fetchErr
-		}
-	}
-
 	return &Handler{
 		input:          input,
 		dgraphSchema:   dgSchema,
 		completeSchema: sch,
 		originalDefs:   defns,
-		schemaMeta:     metaInfo,
 	}, nil
 }
 
