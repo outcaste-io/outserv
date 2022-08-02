@@ -229,6 +229,7 @@ func check(err error) {
 var isGraphQL bool
 var client *ethclient.Client
 var chainID *big.Int
+var writeUids bool
 
 func main() {
 	flag.Parse()
@@ -249,10 +250,12 @@ func main() {
 	if len(*outDir) > 0 {
 		fmt.Printf("Outputting JSON files to %q\n", *outDir)
 		*graphql = ""
+		writeUids = true
 	} else if len(*outIPC) > 0 {
 		fmt.Printf("Outputting to IPC files at %q\n", *outIPC)
 		os.RemoveAll(*outIPC)
 		os.MkdirAll(*outIPC, 0755)
+		writeUids = true
 	}
 
 	if !isGraphQL {
