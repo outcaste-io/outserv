@@ -215,6 +215,8 @@ func (e *ExecutionTrace) Merge(other *ExecutionTrace) {
 // recorded.  So for a mutation you can see total duration, mutation duration,
 // query duration and also amount of time spent by the API orchestrating the
 // mutation/query.
+//
+// TODO: Maybe remove. It looks like it's for Apollo.
 type ResolverTrace struct {
 	// (comments from Apollo Tracing spec)
 

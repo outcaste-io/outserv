@@ -26,6 +26,7 @@ type Block {
   number: Int64 @id
   timestamp: Int64 @search
   transactions: [Txn]
+  name: String @lambda
 }
 
 type Query {

@@ -93,6 +93,9 @@ func Unmarshal(data []byte, v interface{}) error {
 //
 // if "dob" were non-nullable (maybe it's type is DateTime!), then the result is
 // nil and the error propagates to the enclosing level.
+//
+// This function just adds nils where it needs those, based on what the user
+// asked for.
 func CompleteObject(
 	path []interface{},
 	fields []*Field,

@@ -184,22 +184,9 @@ func (rf *ResolverFactory) WithConventionResolvers(
 		})
 	}
 
-	for _, q := range s.Queries(schema.EntitiesQuery) {
-		rf.WithQueryResolver(q, func(q *schema.Field) QueryResolver {
-			return NewEntitiesQueryResolver(fns.Qrw, fns.Ex)
-		})
-	}
-
 	for _, q := range s.Queries(schema.HTTPQuery) {
 		rf.WithQueryResolver(q, func(q *schema.Field) QueryResolver {
 			return NewHTTPQueryResolver(nil)
-		})
-	}
-
-	for _, q := range s.Queries(schema.DQLQuery) {
-		rf.WithQueryResolver(q, func(q *schema.Field) QueryResolver {
-			// DQL queries don't need any QueryRewriter
-			return NewCustomDQLQueryResolver(fns.Qrw, fns.Ex)
 		})
 	}
 
@@ -330,7 +317,7 @@ func entitiesQueryCompletion(ctx context.Context, resolved *Resolved) {
 	})
 
 	var data map[string][]interface{}
-	err := schema.Unmarshal(resolved.Data, &data)
+	err = schema.Unmarshal(resolved.Data, &data)
 	if err != nil {
 		resolved.Err = schema.AppendGQLErrs(resolved.Err, err)
 		return
@@ -619,9 +606,31 @@ func (hr *httpResolver) Resolve(ctx context.Context, field *schema.Field) *Resol
 	defer stop()
 
 	resolved := hr.rewriteAndExecute(ctx, field)
+
+	glog.Infoln("----------")
+	glog.Infof("Field before: %+v\n", field)
+	field.SetNameAndArguments("getBlock", map[string]interface{}{"number": "14999999"})
+	// field.Name = "getBlock"
+	// field.Arguments["number"] = 14999998
+	glog.Infof("Field after: %+v\n", field)
+	glog.Infof("Field after name, alias, args: %s %s %+v\n", field.Name(), field.Alias(), field.Arguments())
+	res := NewQueryResolver(NewQueryRewriter(), NewDgraphExecutor())
+	resolved = res.Resolve(ctx, field)
+	glog.Infof("After calling query resolver: %s\n", resolved.Data)
+	return resolved
+
+	// Fill up the object internally.
+	//
 	// Perhaps, we can now call resultCompleter:
 	// CompletionFunc(entitiesQueryCompletion)
-	glog.Infof("calling entitiesQueryCompletion for resolved: %+v\n", resolved)
+	glog.Infof("calling entitiesQueryCompletion for resolved: %s\n", resolved.Data)
+	// Refactor Apollo Fed code to fill up the object as needed.
+	//
+	// Or, make a query to the normal route -- queryResolver
+	// Get a list of objects, and then create a query which can be passed over
+	// to queryResolver (it would do all the nils and such).
+	// Create a query for queryResolver somehow and then it would do the filling
+	// up and validation etc.
 	entitiesQueryCompletion(ctx, resolved)
 	glog.Infof("after calling entitiesQueryCompletion for resolved: %+v\n", resolved)
 
@@ -657,6 +666,9 @@ func (hr *httpResolver) rewriteAndExecute(ctx context.Context, field *schema.Fie
 		glog.Infof("rewriteAndExecute SS %d -> %+v\n", i, f.DgraphAlias())
 	}
 
+	// I can inject here the code to fill out all the asked for fields.
+
+	//
 	return DataResult(field, map[string]interface{}{field.Name(): fieldData}, errs)
 }
 
@@ -725,12 +737,6 @@ func NewQueryResolver(qr *QueryRewriter, ex DgraphExecutor) QueryResolver {
 	return &queryResolver{queryRewriter: qr, executor: ex, resultCompleter: CompletionFunc(noopCompletion)}
 }
 
-// NewEntitiesQueryResolver creates a new query resolver for `_entities` query.
-// It is introduced because result completion works little different for `_entities` query.
-func NewEntitiesQueryResolver(qr *QueryRewriter, ex DgraphExecutor) QueryResolver {
-	return &queryResolver{queryRewriter: qr, executor: ex, resultCompleter: CompletionFunc(entitiesQueryCompletion)}
-}
-
 // a queryResolver can resolve a single GraphQL query field.
 type queryResolver struct {
 	queryRewriter   *QueryRewriter
@@ -753,6 +759,7 @@ func (qr *queryResolver) Resolve(ctx context.Context, query *schema.Field) *Reso
 	timer.Start()
 	defer timer.Stop()
 
+	glog.Infof("query name, alias, args: %s %s %+v\n", query.Name(), query.Alias(), query.Arguments())
 	resolved := qr.rewriteAndExecute(ctx, query)
 	qr.resultCompleter.Complete(ctx, resolved)
 	return resolved
@@ -806,81 +813,6 @@ func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query *schema.Fi
 		Extensions: ext,
 	}
 
-	return resolved
-}
-
-func NewCustomDQLQueryResolver(qr *QueryRewriter, ex DgraphExecutor) QueryResolver {
-	return &customDQLQueryResolver{queryRewriter: qr, executor: ex}
-}
-
-type customDQLQueryResolver struct {
-	queryRewriter *QueryRewriter
-	executor      DgraphExecutor
-}
-
-func (qr *customDQLQueryResolver) Resolve(ctx context.Context, query *schema.Field) *Resolved {
-	span := otrace.FromContext(ctx)
-	stop := x.SpanTimer(span, "resolveCustomDQLQuery")
-	defer stop()
-
-	resolverTrace := &schema.ResolverTrace{
-		Path:       []interface{}{query.ResponseName()},
-		ParentType: "Query",
-		FieldName:  query.ResponseName(),
-		ReturnType: query.Type().String(),
-	}
-	timer := newtimer(ctx, &resolverTrace.OffsetDuration)
-	timer.Start()
-	defer timer.Stop()
-
-	resolved := qr.rewriteAndExecute(ctx, query)
-	return resolved
-}
-
-func (qr *customDQLQueryResolver) rewriteAndExecute(ctx context.Context,
-	query *schema.Field) *Resolved {
-	dgraphQueryDuration := &schema.LabeledOffsetDuration{Label: "query"}
-	ext := &schema.Extensions{}
-
-	emptyResult := func(err error) *Resolved {
-		resolved := EmptyResult(query, err)
-		resolved.Extensions = ext
-		return resolved
-	}
-
-	vars, err := dqlVars(query.Arguments())
-	if err != nil {
-		return emptyResult(err)
-	}
-
-	dgQuery, err := qr.queryRewriter.Rewrite(ctx, query)
-	if err != nil {
-		return emptyResult(schema.GQLWrapf(err, "got error while rewriting DQL query"))
-	}
-
-	qry := dgraph.AsString(dgQuery)
-
-	queryTimer := newtimer(ctx, &dgraphQueryDuration.OffsetDuration)
-	queryTimer.Start()
-
-	req := &edgraph.Request{
-		Req: &pb.Request{Query: qry, Vars: vars, ReadOnly: true},
-	}
-	resp, err := qr.executor.Execute(ctx, req)
-	queryTimer.Stop()
-
-	if err != nil {
-		return emptyResult(schema.GQLWrapf(err, "Dgraph query failed"))
-	}
-	ext.TouchedUids = resp.GetMetrics().GetNumUids()[touchedUidsKey]
-
-	var respJson map[string]interface{}
-	if err = schema.Unmarshal(resp.Json, &respJson); err != nil {
-		return emptyResult(schema.GQLWrapf(err, "couldn't unmarshal Dgraph result"))
-	}
-
-	resolved := DataResult(query, respJson, nil)
-	resolved.Extensions = ext
 	return resolved
 }
 
