@@ -11,7 +11,7 @@ With a single executable binary, Outserv makes it trivial for anyone to bring up
 a production grade GraphQL tech stack -- which I consider to be an important
 step towards web3 decentralization.
 
-![Outserv Comparison Image](/static/outserv.jpeg)
+<img src="/static/outserv.jpeg" width="500" />
 
 ## Latest Release
 
@@ -30,13 +30,13 @@ here](https://manishrjain.com/outserv-graphql-blockchain-search).
 for you via this [Calendly
 link](https://calendly.com/manishrjain/consulting-on-outserv).
 
-## Why Outserv over Cloud API Systems?
+## Why Choose Outserv over Cloud API Services?
 
 - Having control over your own API server and blockchain node is the holy grail of decentralization -- the big leap that web3 has over web2.
 - Never run into rate limits, ever again.
 - Not only is Outserv high-performant, having a dedicated system running
-    closer to edge just for your usage would always outperform far-away cloud
-    API server where your queries have to compete for resources against all
+    closer to edge, just for your usage, would always outperform far-away cloud
+    API servers where your queries have to compete for resources against all
     others.
 - Data is no one-size-fits-all. Enrich the blockchain data by adding more
     context, combining data from multiple sources to allow for better searches.
