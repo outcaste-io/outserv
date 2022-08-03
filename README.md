@@ -38,7 +38,7 @@ link](https://calendly.com/manishrjain/consulting-on-outserv).
     closer to edge just for your usage would always outperform far-away cloud
     API server where your queries have to compete for resources against all
     others.
-- Data is not one-size-fits-all. Enrich the blockchain data by adding more
+- Data is no one-size-fits-all. Enrich the blockchain data by adding more
     context, combining data from multiple sources to allow for better searches.
 - For medium to heavy workloads, Outserv would be way cheaper than paying for
     various Cloud API access.
