@@ -32,7 +32,7 @@ link](https://calendly.com/manishrjain/consulting-on-outserv).
 
 ## Why Outserv over Cloud API Systems?
 
-- Running your own API server and blockchain node is the holy grail of decentralization. That is the big leap that web3 has over web2.
+- Having control over your own API server and blockchain node is the holy grail of decentralization -- the big leap that web3 has over web2.
 - Never run into rate limits, ever again.
 - Not only is Outserv high-performant, having a dedicated system running
     closer to edge just for your usage would always outperform far-away cloud
