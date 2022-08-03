@@ -32,8 +32,6 @@ link](https://calendly.com/manishrjain/consulting-on-outserv).
 
 ## Why Outserv over Cloud API Systems?
 
-![Decentralization Comic](/static/decentralization.jpg)
-
 - Running your own API server and blockchain node is the holy grail of decentralization, *wouldn't you agree?*
 - Never run into rate limits, ever again.
 - Not only is Outserv high-performant, having a dedicated system running
@@ -44,6 +42,8 @@ link](https://calendly.com/manishrjain/consulting-on-outserv).
     context, combining data from multiple sources to allow for better searches.
 - For medium to heavy workloads, Outserv would be cheaper than paying for
     various Cloud API access.
+
+<img src="/static/decentralization.jpeg" width="500" />
 
 ## Bugs / Feature Requests
 
