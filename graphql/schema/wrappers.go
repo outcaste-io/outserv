@@ -576,31 +576,6 @@ func customAndLambdaMappings(s *ast.Schema, ns uint64) (map[string]map[string]*a
 
 func requiresMappings(s *ast.Schema) map[string]map[string][]string {
 	requiresDirectives := make(map[string]map[string][]string)
-
-	for _, typ := range s.Types {
-		for _, f := range typ.Fields {
-			for i, dir := range f.Directives {
-				if dir.Name != apolloRequiresDirective {
-					continue
-				}
-				lastIndex := len(f.Directives) - 1
-				f.Directives[i] = f.Directives[lastIndex]
-				f.Directives = f.Directives[:lastIndex]
-
-				var fieldMap map[string][]string
-				if existingFieldMap, ok := requiresDirectives[typ.Name]; ok {
-					fieldMap = existingFieldMap
-				} else {
-					fieldMap = make(map[string][]string)
-				}
-
-				fieldMap[f.Name] = strings.Fields(dir.Arguments[0].Value.Raw)
-				requiresDirectives[typ.Name] = fieldMap
-
-				break
-			}
-		}
-	}
 	return requiresDirectives
 }
 
@@ -634,11 +609,11 @@ func remoteResponseMapping(s *ast.Schema) map[string]map[string]string {
 }
 
 func hasExtends(def *ast.Definition) bool {
-	return def.Directives.ForName(apolloExtendsDirective) != nil
+	return false
 }
 
 func hasExternal(f *ast.FieldDefinition) bool {
-	return f.Directives.ForName(apolloExternalDirective) != nil
+	return false
 }
 
 func (f *Field) IsExternal() bool {
@@ -659,11 +634,7 @@ func hasCustomOrLambda(f *ast.FieldDefinition) bool {
 }
 
 func isKeyField(f *ast.FieldDefinition, typ *ast.Definition) bool {
-	keyDirective := typ.Directives.ForName(apolloKeyDirective)
-	if keyDirective == nil {
-		return false
-	}
-	return f.Name == keyDirective.Arguments[0].Value.Raw
+	return false
 }
 
 // Filter out those fields which have @external directive and are not @key fields
@@ -1475,74 +1446,6 @@ func (f *Field) IncludeAbstractField(dgraphTypes []string) bool {
 
 	}
 	return false
-}
-
-func (q *Field) RepresentationsArg() (*EntityRepresentations, error) {
-	representations, ok := q.ArgValue("representations").([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("error parsing `representations` argument")
-	}
-	if len(representations) == 0 {
-		return nil, fmt.Errorf("expecting at least one item in `representations` argument")
-	}
-	representation, ok := representations[0].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("error parsing %dth item in the `_representations` argument", 0)
-	}
-	typename, ok := representation[Typename].(string)
-	if !ok {
-		return nil, fmt.Errorf("unable to extract __typename from %dth item in the"+
-			" `_representations` argument", 0)
-	}
-	typ := q.op.inSchema.schema.Types[typename]
-	if typ == nil {
-		return nil, fmt.Errorf("type %s not found in the schema", typename)
-	}
-	keyDir := typ.Directives.ForName(apolloKeyDirective)
-	if keyDir == nil {
-		return nil, fmt.Errorf("type %s doesn't have a key Directive", typename)
-	}
-	keyFldName := keyDir.Arguments[0].Value.Raw
-
-	// initialize the struct to return
-	entityReprs := &EntityRepresentations{
-		TypeDefn: &Type{
-			typ:             &ast.Type{NamedType: typename},
-			inSchema:        q.op.inSchema,
-			dgraphPredicate: q.op.inSchema.dgraphPredicate,
-		},
-		KeyVals:                make([]interface{}, 0, len(representations)),
-		KeyValToRepresentation: make(map[string]map[string]interface{}),
-	}
-	entityReprs.KeyField = entityReprs.TypeDefn.Field(keyFldName)
-
-	// iterate over all the representations and parse
-	for i, rep := range representations {
-		representation, ok = rep.(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("error parsing %dth item in the `_representations` argument", i)
-		}
-
-		typename, ok = representation[Typename].(string)
-		if !ok {
-			return nil, fmt.Errorf("unable to extract __typename from %dth item in the"+
-				" `_representations` argument", i)
-		}
-		if typename != entityReprs.TypeDefn.Name() {
-			return nil, fmt.Errorf("expected only one unique typename in `_representations`"+
-				" argument, got: [%s, %s]", entityReprs.TypeDefn.Name(), typename)
-		}
-
-		keyVal, ok := representation[keyFldName]
-		if !ok {
-			return nil, fmt.Errorf("unable to extract value for key field `%s` from %dth item in"+
-				" the `_representations` argument", keyFldName, i)
-		}
-		entityReprs.KeyVals = append(entityReprs.KeyVals, keyVal)
-		entityReprs.KeyValToRepresentation[fmt.Sprint(keyVal)] = representation
-	}
-
-	return entityReprs, nil
 }
 
 func (q *Field) Rename(newName string) {

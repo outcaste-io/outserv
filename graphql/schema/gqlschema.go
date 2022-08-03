@@ -68,13 +68,13 @@ const (
 	cacheControlDirective = "cacheControl"
 	CacheControlHeader    = "Cache-Control"
 
-	// Directives to support Apollo Federation
-	apolloKeyDirective      = "key"
-	apolloKeyArg            = "fields"
-	apolloExternalDirective = "external"
-	apolloExtendsDirective  = "extends"
-	apolloRequiresDirective = "requires"
-	apolloProvidesDirective = "provides"
+	// // Directives to support Apollo Federation
+	// apolloKeyDirective      = "key"
+	// apolloKeyArg            = "fields"
+	// apolloExternalDirective = "external"
+	// apolloExtendsDirective  = "extends"
+	// apolloRequiresDirective = "requires"
+	// apolloProvidesDirective = "provides"
 
 	// custom directive args and fields
 	dqlArg      = "dql"
@@ -458,8 +458,7 @@ type directiveValidator func(
 	sch *ast.Schema,
 	typ *ast.Definition,
 	field *ast.FieldDefinition,
-	dir *ast.Directive,
-	secrets map[string]x.Sensitive) gqlerror.List
+	dir *ast.Directive) gqlerror.List
 
 type searchTypeIndex struct {
 	gqlType string
@@ -593,8 +592,7 @@ func ValidatorNoOp(
 	sch *ast.Schema,
 	typ *ast.Definition,
 	field *ast.FieldDefinition,
-	dir *ast.Directive,
-	secrets map[string]x.Sensitive) gqlerror.List {
+	dir *ast.Directive) gqlerror.List {
 	return nil
 }
 
@@ -613,11 +611,6 @@ var directiveValidators = map[string]directiveValidator{
 	defaultDirective:        defaultDirectiveValidation,
 	lambdaOnMutateDirective: ValidatorNoOp,
 	generateDirective:       ValidatorNoOp,
-	apolloKeyDirective:      ValidatorNoOp,
-	apolloExtendsDirective:  ValidatorNoOp,
-	apolloExternalDirective: apolloExternalValidation,
-	apolloRequiresDirective: apolloRequiresValidation,
-	apolloProvidesDirective: apolloProvidesValidation,
 	remoteResponseDirective: remoteResponseValidation,
 }
 
@@ -637,11 +630,6 @@ var directiveLocationMap = map[string]map[ast.DefinitionKind]bool{
 	lambdaDirective:         nil,
 	lambdaOnMutateDirective: {ast.Object: true, ast.Interface: true},
 	generateDirective:       {ast.Object: true, ast.Interface: true},
-	apolloKeyDirective:      {ast.Object: true, ast.Interface: true},
-	apolloExtendsDirective:  {ast.Object: true, ast.Interface: true},
-	apolloExternalDirective: nil,
-	apolloRequiresDirective: nil,
-	apolloProvidesDirective: nil,
 	remoteResponseDirective: nil,
 	cascadeDirective:        nil,
 }
@@ -823,49 +811,7 @@ func expandSchema(doc *ast.SchemaDocument) *gqlerror.Error {
 
 	doc.Definitions = append(doc.Definitions, docExtras.Definitions...)
 	doc.Directives = append(doc.Directives, docExtras.Directives...)
-	expandSchemaWithApolloExtras(doc)
 	return nil
-}
-
-func expandSchemaWithApolloExtras(doc *ast.SchemaDocument) {
-	var apolloKeyTypes []string
-	for _, defn := range doc.Definitions {
-		if defn.Directives.ForName(apolloKeyDirective) != nil {
-			apolloKeyTypes = append(apolloKeyTypes, defn.Name)
-		}
-	}
-
-	// No need to Expand with Apollo federation Extras
-	if len(apolloKeyTypes) == 0 {
-		return
-	}
-
-	// Form _Entity union with all the entities
-	// for e.g : union _Entity = A | B
-	// where A and B are object with @key directives
-	entityUnionDefinition := &ast.Definition{Kind: ast.Union, Name: "_Entity", Types: apolloKeyTypes}
-	doc.Definitions = append(doc.Definitions, entityUnionDefinition)
-
-	// Parse Apollo Queries and append to the Parsed Schema
-	docApolloQueries, gqlErr := parser.ParseSchema(&ast.Source{Input: apolloSchemaQueries})
-	if gqlErr != nil {
-		x.Panic(gqlErr)
-	}
-
-	queryDefinition := doc.Definitions.ForName("Query")
-	if queryDefinition == nil {
-		doc.Definitions = append(doc.Definitions, docApolloQueries.Definitions[0])
-	} else {
-		queryDefinition.Fields = append(queryDefinition.Fields, docApolloQueries.Definitions[0].Fields...)
-	}
-
-	docExtras, gqlErr := parser.ParseSchema(&ast.Source{Input: apolloSchemaExtras})
-	if gqlErr != nil {
-		x.Panic(gqlErr)
-	}
-	doc.Definitions = append(doc.Definitions, docExtras.Definitions...)
-	doc.Directives = append(doc.Directives, docExtras.Directives...)
-
 }
 
 // preGQLValidation validates schema before GraphQL validation.  Validation
@@ -893,8 +839,7 @@ func preGQLValidation(schema *ast.SchemaDocument) gqlerror.List {
 // are easier to run once we know that the schema is GraphQL valid and that validation
 // has fleshed out the schema structure; we just need to check if it also satisfies
 // the extra rules.
-func postGQLValidation(schema *ast.Schema, definitions []string,
-	secrets map[string]x.Sensitive) gqlerror.List {
+func postGQLValidation(schema *ast.Schema, definitions []string) gqlerror.List {
 	var errs []*gqlerror.Error
 
 	for _, defn := range definitions {
@@ -909,7 +854,7 @@ func postGQLValidation(schema *ast.Schema, definitions []string,
 				if directiveValidators[dir.Name] == nil {
 					continue
 				}
-				errs = append(errs, directiveValidators[dir.Name](schema, typ, field, dir, secrets)...)
+				errs = append(errs, directiveValidators[dir.Name](schema, typ, field, dir)...)
 			}
 		}
 	}

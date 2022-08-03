@@ -218,25 +218,6 @@ func NewHandler(input string) (*Handler, error) {
 			if remoteDir != nil {
 				continue
 			}
-
-			for _, fld := range defn.Fields {
-				providesDir := fld.Directives.ForName(apolloProvidesDirective)
-				if providesDir == nil {
-					continue
-				}
-				arg := providesDir.Arguments.ForName(apolloKeyArg)
-				providesFieldArgs := strings.Fields(arg.Value.Raw)
-				var typeMap map[string]bool
-				if existingTypeMap, ok := providesFieldsMap[fld.Type.Name()]; ok {
-					typeMap = existingTypeMap
-				} else {
-					typeMap = make(map[string]bool)
-				}
-				for _, fldName := range providesFieldArgs {
-					typeMap[fldName] = true
-				}
-				providesFieldsMap[fld.Type.Name()] = typeMap
-			}
 		}
 		typesToComplete = append(typesToComplete, defn.Name)
 	}
@@ -250,7 +231,7 @@ func NewHandler(input string) (*Handler, error) {
 		return nil, gqlerror.List{gqlErr}
 	}
 
-	gqlErrList = postGQLValidation(sch, defns, nil)
+	gqlErrList = postGQLValidation(sch, defns)
 	if gqlErrList != nil {
 		return nil, gqlErrList
 	}

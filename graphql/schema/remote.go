@@ -229,7 +229,7 @@ type remoteArgMetadata struct {
 
 // validates the graphql given in @custom->http->graphql by introspecting remote schema.
 // It assumes that the graphql syntax is correct, only remote validation is needed.
-func validateRemoteGraphql(metadata *remoteGraphqlMetadata) error {
+func validateRemoteGraphqlXX(metadata *remoteGraphqlMetadata) error {
 	remoteIntrospection, err := introspectRemoteSchema(metadata.url, metadata.headers)
 	if err != nil {
 		return err
