@@ -1033,10 +1033,9 @@ func (f *Field) CustomRequiredFields() map[string]*FieldDefinition {
 
 	var rf map[string]bool
 	bodyArg := httpArg.Value.Children.ForName(httpBody)
-	graphqlArg := httpArg.Value.Children.ForName(httpGraphql)
 	if bodyArg != nil {
 		bodyTemplate := bodyArg.Raw
-		_, rf, _ = parseBodyTemplate(bodyTemplate, graphqlArg == nil)
+		_, rf, _ = parseBodyTemplate(bodyTemplate, true)
 	}
 
 	if rf == nil {
@@ -1060,25 +1059,6 @@ func (f *Field) CustomRequiredFields() map[string]*FieldDefinition {
 		}
 	}
 
-	if graphqlArg == nil {
-		return toRequiredFieldDefs(rf, f)
-	}
-	modeVal := SINGLE
-	modeArg := httpArg.Value.Children.ForName(mode)
-	if modeArg != nil {
-		modeVal = modeArg.Raw
-	}
-
-	if modeVal == SINGLE {
-		// For BATCH mode, required args would have been parsed from the body above.
-		var err error
-		rf, err = parseRequiredArgsFromGQLRequest(graphqlArg.Raw)
-		// This should not be returning an error since we should have validated this during schema
-		// update.
-		if err != nil {
-			return nil
-		}
-	}
 	return toRequiredFieldDefs(rf, f)
 }
 
@@ -1260,12 +1240,9 @@ func getCustomHTTPConfig(f *Field, isQueryOrMutation bool, ns uint64) (*FieldHTT
 
 	// both body and graphql can't be present together
 	bodyArg := httpArg.Value.Children.ForName(httpBody)
-	graphqlArg := httpArg.Value.Children.ForName(httpGraphql)
 	var bodyTemplate string
 	if bodyArg != nil {
 		bodyTemplate = bodyArg.Raw
-	} else if graphqlArg != nil {
-		bodyTemplate = `{ query: $query, variables: $variables }`
 	}
 	// bodyTemplate will be empty if there was no body or graphql, like the case of a simple GET req
 	if bodyTemplate != "" {
@@ -1292,44 +1269,17 @@ func getCustomHTTPConfig(f *Field, isQueryOrMutation bool, ns uint64) (*FieldHTT
 		}
 	}
 
-	if graphqlArg != nil {
-		queryDoc, gqlErr := parser.ParseQuery(&ast.Source{Input: graphqlArg.Raw})
-		if gqlErr != nil {
-			return nil, gqlErr
-		}
-		// queryDoc will always have only one operation with only one field
-		qfield := queryDoc.Operations[0].SelectionSet[0].(*ast.Field)
-		if fconf.Mode == BATCH {
-			fconf.GraphqlBatchModeArgument = queryDoc.Operations[0].VariableDefinitions[0].Variable
-		}
-		fconf.RemoteGqlQueryName = qfield.Name
-		buf := &bytes.Buffer{}
-		buildGraphqlRequestFields(buf, f.field)
-		remoteQuery := graphqlArg.Raw
-		remoteQuery = remoteQuery[:strings.LastIndex(remoteQuery, "}")]
-		remoteQuery = fmt.Sprintf("%s%s}", remoteQuery, buf.String())
-		glog.Infof("remoteQuery DEBUG: %s\n", remoteQuery)
-		fconf.RemoteGqlQuery = remoteQuery
-		glog.Infof("remoteQuery fconf DEBUG: %+v\n", fconf)
-	}
-
 	// if it is a query or mutation, substitute the vars in URL and Body here itself
 	if isQueryOrMutation {
 		var err error
 		argMap := f.field.ArgumentMap(f.op.vars)
 		var bodyVars map[string]interface{}
 		// url params can exist only with body, and not with graphql
-		if graphqlArg == nil {
-			fconf.URL, err = SubstituteVarsInURL(fconf.URL, argMap)
-			if err != nil {
-				return nil, errors.Wrapf(err, "while substituting vars in URL")
-			}
-			bodyVars = argMap
-		} else {
-			bodyVars = make(map[string]interface{})
-			bodyVars["query"] = fconf.RemoteGqlQuery
-			bodyVars["variables"] = argMap
+		fconf.URL, err = SubstituteVarsInURL(fconf.URL, argMap)
+		if err != nil {
+			return nil, errors.Wrapf(err, "while substituting vars in URL")
 		}
+		bodyVars = argMap
 		fconf.Template = SubstituteVarsInBody(fconf.Template, bodyVars)
 	}
 

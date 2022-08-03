@@ -747,18 +747,3 @@ func convertScalarToString(val interface{}) (string, error) {
 	}
 	return str, nil
 }
-
-func dqlVars(args map[string]interface{}) (map[string]string, error) {
-	vars := make(map[string]string)
-	for k, v := range args {
-		// pb.Request{}.Vars accepts only string values for variables,
-		// so need to convert all variable values to string
-		vStr, err := convertScalarToString(v)
-		if err != nil {
-			return vars, schema.GQLWrapf(err, "couldn't convert argument %s to string", k)
-		}
-		// the keys in pb.Request{}.Vars are assumed to be prefixed with $
-		vars["$"+k] = vStr
-	}
-	return vars, nil
-}

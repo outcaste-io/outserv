@@ -69,15 +69,14 @@ const (
 	CacheControlHeader    = "Cache-Control"
 
 	// custom directive args and fields
-	dqlArg      = "dql"
-	httpArg     = "http"
-	httpUrl     = "url"
-	httpMethod  = "method"
-	httpBody    = "body"
-	httpGraphql = "graphql" // TODO: Think this should be removed.
-	mode        = "mode"
-	BATCH       = "BATCH"
-	SINGLE      = "SINGLE"
+	dqlArg     = "dql"
+	httpArg    = "http"
+	httpUrl    = "url"
+	httpMethod = "method"
+	httpBody   = "body"
+	mode       = "mode"
+	BATCH      = "BATCH"
+	SINGLE     = "SINGLE"
 
 	// geo type names and fields
 	Point        = "Point"
