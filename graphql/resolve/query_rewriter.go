@@ -168,7 +168,6 @@ func entitiesQuery(field *schema.Field) ([]*gql.GraphQuery, error) {
 
 	dgQueries := []*gql.GraphQuery{dgQuery}
 	return append(dgQueries, selectionAuth...), nil
-
 }
 
 func aggregateQuery(query *schema.Field) []*gql.GraphQuery {

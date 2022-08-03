@@ -178,7 +178,7 @@ func CompleteValue(
 	path []interface{},
 	field *Field,
 	val interface{}) ([]byte, x.GqlErrorList) {
-	glog.Infof("CompleteValue: 1: %+v 2: %+v 3: %+v\n", path, field, val)
+	glog.Infof("CompleteValue: 1: %+v 2: %+v | %+v 3: %+v\n", path, field, field.field, val)
 
 	switch val := val.(type) {
 	case map[string]interface{}:
