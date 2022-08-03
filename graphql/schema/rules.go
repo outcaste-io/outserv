@@ -1698,6 +1698,7 @@ func customDirectiveValidation(sch *ast.Schema,
 
 	// 7. Validating graphql combination with url params, method and body
 	body := httpArg.Value.Children.ForName(httpBody)
+	// TODO: Maybe remove this graphql thing here.
 	graphql := httpArg.Value.Children.ForName(httpGraphql)
 	if graphql != nil {
 		if urlHasParams {

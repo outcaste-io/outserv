@@ -1448,10 +1448,6 @@ func (f *Field) IncludeAbstractField(dgraphTypes []string) bool {
 	return false
 }
 
-func (q *Field) Rename(newName string) {
-	q.field.Name = newName
-}
-
 func (q *Field) Schema() *Schema {
 	return q.op.inSchema
 }
@@ -1532,18 +1528,6 @@ func (q *Field) QueryType() QueryType {
 	return queryType(q.Name(), q.op.inSchema.customDirectives["Query"][q.Name()])
 }
 
-func (q *Field) DQLQuery() string {
-	if q.Kind == MutationKind {
-		panic("DQLQuery probably shouldn't have been called")
-	}
-	if customDir := q.op.inSchema.customDirectives["Query"][q.Name()]; customDir != nil {
-		if dqlArgument := customDir.Arguments.ForName(dqlArg); dqlArgument != nil {
-			return dqlArgument.Value.Raw
-		}
-	}
-	return ""
-}
-
 func queryType(name string, custom *ast.Directive) QueryType {
 	switch {
 	case custom != nil:
@@ -1577,19 +1561,6 @@ func (m *Field) QueryField() *Field {
 		return f
 	}
 	return nil
-}
-
-func (m *Field) NumUidsField() *Field {
-	for _, f := range m.SelectionSet() {
-		if f.Name() == NumUid {
-			return f
-		}
-	}
-	return nil
-}
-
-func (m *Field) HasLambdaOnMutate() bool {
-	return m.op.inSchema.lambdaOnMutate[m.Name()]
 }
 
 // MutatedType returns the underlying type that gets mutated by m.
@@ -1780,73 +1751,6 @@ func (fd *FieldDefinition) Inverse() *FieldDefinition {
 
 	// fld must exist if the schema passed our validation
 	fld := typ.Fields.ForName(invFieldArg.Value.Raw)
-
-	return &FieldDefinition{
-		fieldDef:        fld,
-		inSchema:        fd.inSchema,
-		dgraphPredicate: fd.dgraphPredicate,
-		parentType:      typeWrapper,
-	}
-}
-
-func (fd *FieldDefinition) WithMemberType(memberType string) *FieldDefinition {
-	// just need to return a copy of this fieldDefinition with type set to memberType
-	return &FieldDefinition{
-		fieldDef: &ast.FieldDefinition{
-			Name:         fd.fieldDef.Name,
-			Arguments:    fd.fieldDef.Arguments,
-			DefaultValue: fd.fieldDef.DefaultValue,
-			Type:         &ast.Type{NamedType: memberType},
-			Directives:   fd.fieldDef.Directives,
-			Position:     fd.fieldDef.Position,
-		},
-		inSchema:        fd.inSchema,
-		dgraphPredicate: fd.dgraphPredicate,
-		parentType:      fd.parentType,
-	}
-}
-
-// ForwardEdge gets the field definition for a forward edge if this field is a reverse edge
-// i.e. if it has a dgraph directive like
-// @dgraph(name: "~movies")
-func (fd *FieldDefinition) ForwardEdge() *FieldDefinition {
-	dd := fd.fieldDef.Directives.ForName(dgraphDirective)
-	if dd == nil {
-		return nil
-	}
-
-	arg := dd.Arguments.ForName(dgraphPredArg)
-	if arg == nil {
-		return nil // really not possible
-	}
-	name := arg.Value.Raw
-
-	if !strings.HasPrefix(name, "~") && !strings.HasPrefix(name, "<~") {
-		return nil
-	}
-
-	fedge := strings.Trim(name, "<~>")
-	typeWrapper := fd.Type()
-	// typ must exist if the schema passed GQL validation
-	typ := fd.inSchema.schema.Types[typeWrapper.Name()]
-
-	var fld *ast.FieldDefinition
-	// Have to range through all the fields and find the correct forward edge. This would be
-	// expensive and should ideally be cached on schema update.
-	for _, field := range typ.Fields {
-		dir := field.Directives.ForName(dgraphDirective)
-		if dir == nil {
-			continue
-		}
-		predArg := dir.Arguments.ForName(dgraphPredArg)
-		if predArg == nil || predArg.Value.Raw == "" {
-			continue
-		}
-		if predArg.Value.Raw == fedge {
-			fld = field
-			break
-		}
-	}
 
 	return &FieldDefinition{
 		fieldDef:        fld,

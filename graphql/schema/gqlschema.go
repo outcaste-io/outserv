@@ -68,21 +68,13 @@ const (
 	cacheControlDirective = "cacheControl"
 	CacheControlHeader    = "Cache-Control"
 
-	// // Directives to support Apollo Federation
-	// apolloKeyDirective      = "key"
-	// apolloKeyArg            = "fields"
-	// apolloExternalDirective = "external"
-	// apolloExtendsDirective  = "extends"
-	// apolloRequiresDirective = "requires"
-	// apolloProvidesDirective = "provides"
-
 	// custom directive args and fields
 	dqlArg      = "dql"
 	httpArg     = "http"
 	httpUrl     = "url"
 	httpMethod  = "method"
 	httpBody    = "body"
-	httpGraphql = "graphql"
+	httpGraphql = "graphql" // TODO: Think this should be removed.
 	mode        = "mode"
 	BATCH       = "BATCH"
 	SINGLE      = "SINGLE"
