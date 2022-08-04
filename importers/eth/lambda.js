@@ -33,7 +33,6 @@ async function test({args, graphql, dql}) {
 }
 
 async function latestBlock({args, graphql}) {
-  console.log("args", args);
   const results = await graphql(`
   { queryBlock(order: {desc: number}, first: 1) {
     number
