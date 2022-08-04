@@ -1,18 +1,5 @@
-/*
- * Copyright 2019 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2019 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Sustainable License v1.0.
 
 package schema
 
@@ -42,7 +29,6 @@ const (
 	idDirectiveInterfaceArg = "interface"
 	subscriptionDirective   = "withSubscription"
 	secretDirective         = "secret"
-	authDirective           = "auth"
 	customDirective         = "custom"
 	remoteDirective         = "remote" // types with this directive are not stored in Dgraph.
 	remoteResponseDirective = "remoteResponse"
@@ -288,18 +274,10 @@ input GenerateMutationParams {
 	directiveDefs = `
 directive @hasInverse(field: String!) on FIELD_DEFINITION
 directive @search(by: [DgraphIndex!]) on FIELD_DEFINITION
-directive @dgraph(type: String, pred: String) on OBJECT | INTERFACE | FIELD_DEFINITION
 directive @id(interface: Boolean) on FIELD_DEFINITION
 directive @default(add: DgraphDefault, update: DgraphDefault) on FIELD_DEFINITION
 directive @withSubscription on OBJECT | INTERFACE | FIELD_DEFINITION
 directive @secret(field: String!, pred: String) on OBJECT | INTERFACE
-directive @auth(
-	password: AuthRule
-	query: AuthRule,
-	add: AuthRule,
-	update: AuthRule,
-	delete: AuthRule) on OBJECT | INTERFACE
-directive @custom(http: CustomHTTP, dql: String) on FIELD_DEFINITION
 directive @remote on OBJECT | INTERFACE | UNION | INPUT_OBJECT | ENUM
 directive @remoteResponse(name: String) on FIELD_DEFINITION
 directive @cascade(fields: [String]) on FIELD
@@ -310,25 +288,6 @@ directive @generate(
 	query: GenerateQueryParams,
 	mutation: GenerateMutationParams,
 	subscription: Boolean) on OBJECT | INTERFACE
-`
-	// see: https://www.apollographql.com/docs/federation/gateway/#custom-directive-support
-	// So, we should only add type system directives here.
-	// Even with type system directives, there is a bug in Apollo Federation due to which the
-	// directives having non-scalar args cause issues in schema stitching in gateway.
-	// See: https://github.com/apollographql/apollo-server/issues/3655
-	// So, such directives have to be missed too.
-	apolloSupportedDirectiveDefs = `
-directive @hasInverse(field: String!) on FIELD_DEFINITION
-directive @search(by: [DgraphIndex!]) on FIELD_DEFINITION
-directive @dgraph(type: String, pred: String) on OBJECT | INTERFACE | FIELD_DEFINITION
-directive @id(interface: Boolean) on FIELD_DEFINITION
-directive @default(add: DgraphDefault, update: DgraphDefault) on FIELD_DEFINITION
-directive @withSubscription on OBJECT | INTERFACE | FIELD_DEFINITION
-directive @secret(field: String!, pred: String) on OBJECT | INTERFACE
-directive @remote on OBJECT | INTERFACE | UNION | INPUT_OBJECT | ENUM
-directive @remoteResponse(name: String) on FIELD_DEFINITION
-directive @lambda on FIELD_DEFINITION
-directive @lambdaOnMutate(add: Boolean, update: Boolean, delete: Boolean) on OBJECT | INTERFACE
 `
 	filterInputs = `
 input IntFilter {
@@ -594,7 +553,6 @@ var directiveValidators = map[string]directiveValidator{
 	idDirective:             idValidation,
 	subscriptionDirective:   ValidatorNoOp,
 	secretDirective:         passwordValidation,
-	authDirective:           ValidatorNoOp, // Just to get it printed into generated schema
 	customDirective:         customDirectiveValidation,
 	remoteDirective:         ValidatorNoOp,
 	deprecatedDirective:     ValidatorNoOp,
@@ -614,7 +572,6 @@ var directiveLocationMap = map[string]map[ast.DefinitionKind]bool{
 	idDirective:           nil,
 	subscriptionDirective: {ast.Object: true, ast.Interface: true},
 	secretDirective:       {ast.Object: true, ast.Interface: true},
-	authDirective:         {ast.Object: true, ast.Interface: true},
 	customDirective:       nil,
 	remoteDirective: {ast.Object: true, ast.Interface: true, ast.Union: true,
 		ast.InputObject: true, ast.Enum: true},
@@ -2506,10 +2463,7 @@ func hasStringifiableFields(typ *ast.Definition) bool {
 // Any types in originalTypes are printed first, followed by the schemaExtras,
 // and then all generated types, scalars, enums, directives, query and
 // mutations all in alphabetical order.
-// var "apolloServiceQuery" is used to distinguish Schema String from what should be
-// returned as a result of apollo service query. In case of Apollo service query, Schema
-// removes some of the directive definitions which are currently not supported at the gateway.
-func Stringify(schema *ast.Schema, originalTypes []string, apolloServiceQuery bool) string {
+func Stringify(schema *ast.Schema, originalTypes []string) string {
 	var sch, original, object, input, enum strings.Builder
 
 	if schema.Types == nil {
@@ -2549,9 +2503,6 @@ func Stringify(schema *ast.Schema, originalTypes []string, apolloServiceQuery bo
 	// In case of ApolloServiceQuery, schemaExtras is little different.
 	// It excludes some of the directive definitions.
 	schemaExtras := schemaInputs + directiveDefs + filterInputs
-	if apolloServiceQuery {
-		schemaExtras = schemaInputs + apolloSupportedDirectiveDefs + filterInputs
-	}
 	docExtras, gqlErr := parser.ParseSchema(&ast.Source{Input: schemaExtras})
 	if gqlErr != nil {
 		x.Panic(gqlErr)

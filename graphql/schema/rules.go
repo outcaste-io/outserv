@@ -1,18 +1,5 @@
-/*
- * Copyright 2019 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2019 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Sustainable License v1.0.
 
 package schema
 
@@ -39,7 +26,7 @@ func init() {
 		passwordDirectiveValidation, conflictingDirectiveValidation, nonIdFieldsCheck,
 		remoteTypeValidation, generateDirectiveValidation, lambdaOnMutateValidation)
 	fieldValidations = append(fieldValidations, listValidityCheck, fieldArgumentCheck,
-		fieldNameCheck, isValidFieldForList, hasAuthDirective, fieldDirectiveCheck)
+		fieldNameCheck, isValidFieldForList, fieldDirectiveCheck)
 
 	validator.AddRule("Check variable type is correct", variableTypeCheck)
 	validator.AddRule("Check arguments of cascade directive", directiveArgumentsCheck)
@@ -509,21 +496,14 @@ func collectFieldNames(idFields []*ast.FieldDefinition) (string, []gqlerror.Loca
 }
 
 func conflictingDirectiveValidation(schema *ast.Schema, typ *ast.Definition) gqlerror.List {
-	var hasAuth, hasRemote, hasSubscription bool
+	var hasRemote, hasSubscription bool
 	for _, dir := range typ.Directives {
-		if dir.Name == authDirective {
-			hasAuth = true
-		}
 		if dir.Name == remoteDirective {
 			hasRemote = true
 		}
 		if dir.Name == subscriptionDirective {
 			hasSubscription = true
 		}
-	}
-	if hasAuth && hasRemote {
-		return []*gqlerror.Error{gqlerror.ErrorPosf(typ.Position, `Type %s; cannot have both @%s and @%s directive`,
-			typ.Name, authDirective, remoteDirective)}
 	}
 	if hasSubscription && hasRemote {
 		return []*gqlerror.Error{gqlerror.ErrorPosf(typ.Position, `Type %s; cannot have both @%s and @%s directive`,
@@ -715,18 +695,6 @@ func idCountCheck(schema *ast.Schema, typ *ast.Definition) gqlerror.List {
 	}
 
 	return errs
-}
-
-func hasAuthDirective(typ *ast.Definition, field *ast.FieldDefinition) gqlerror.List {
-	for _, directive := range field.Directives {
-		if directive.Name != authDirective {
-			continue
-		}
-		return []*gqlerror.Error{gqlerror.ErrorPosf(field.Position,
-			"Type %s; Field %s: @%s directive is not allowed on fields",
-			typ.Name, field.Name, authDirective)}
-	}
-	return nil
 }
 
 func isValidFieldForList(typ *ast.Definition, field *ast.FieldDefinition) gqlerror.List {
