@@ -781,11 +781,6 @@ func responseName(f *ast.Field) string {
 func (f *Field) Name() string {
 	return f.field.Name
 }
-func (f *Field) SetNameAndArguments(name string, args map[string]interface{}) {
-	f.field.Name = name
-	f.field.Alias = name
-	f.arguments = args
-}
 
 func (f *Field) Alias() string {
 	return f.field.Alias
