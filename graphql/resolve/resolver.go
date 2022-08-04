@@ -565,12 +565,6 @@ func DataResult(f *schema.Field, data map[string]interface{}, err error) *Resolv
 	}
 }
 
-func newtimer(ctx context.Context, Duration *schema.OffsetDuration) *schema.OffsetTimer {
-	resolveStartTime, _ := ctx.Value(resolveStartTime).(time.Time)
-	tf := schema.NewOffsetTimerFactory(resolveStartTime)
-	return tf.NewOffsetTimer(Duration)
-}
-
 var errNotScalar = errors.New("provided value is not a scalar, can't convert it to string")
 
 // A QueryResolver can resolve a single query.
@@ -614,23 +608,12 @@ func (qr *queryResolver) Resolve(ctx context.Context, query *schema.Field) *Reso
 	stop := x.SpanTimer(span, "resolveQuery")
 	defer stop()
 
-	resolverTrace := &schema.ResolverTrace{
-		Path:       []interface{}{query.ResponseName()},
-		ParentType: "Query",
-		FieldName:  query.ResponseName(),
-		ReturnType: query.Type().String(),
-	}
-	timer := newtimer(ctx, &resolverTrace.OffsetDuration)
-	timer.Start()
-	defer timer.Stop()
-
 	resolved := qr.rewriteAndExecute(ctx, query)
 	qr.resultCompleter.Complete(ctx, resolved)
 	return resolved
 }
 
 func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query *schema.Field) *Resolved {
-	dgraphQueryDuration := &schema.LabeledOffsetDuration{Label: "query"}
 	ext := &schema.Extensions{}
 
 	emptyResult := func(err error) *Resolved {
@@ -654,15 +637,11 @@ func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query *schema.Fi
 	qry := dgraph.AsString(dgQuery)
 	glog.Infof("DQL Query: %s\n", qry)
 
-	queryTimer := newtimer(ctx, &dgraphQueryDuration.OffsetDuration)
-	queryTimer.Start()
-
 	req := &edgraph.Request{
 		Req:      &pb.Request{Query: qry, ReadOnly: true},
 		GqlField: query,
 	}
 	resp, err := qr.executor.Execute(ctx, req)
-	queryTimer.Stop()
 
 	if err != nil && !x.IsGqlErrorList(err) {
 		err = schema.GQLWrapf(err, "Dgraph query failed")
