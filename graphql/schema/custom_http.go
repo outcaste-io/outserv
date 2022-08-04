@@ -13,8 +13,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang/glog"
-	"github.com/outcaste-io/gqlparser/v2/ast"
 	"github.com/outcaste-io/outserv/worker"
 
 	"github.com/outcaste-io/outserv/x"
@@ -159,25 +157,11 @@ func GetBodyForLambda(ctx context.Context, field *Field, parents,
 		"resolver":             field.GetObjectName() + "." + field.Name(),
 		"X-Dgraph-AccessToken": accessJWT,
 	}
-	glog.Infof("GetBodyForLambda. Directives: %d\n", len(field.field.Directives))
-	for i, dir := range field.field.Directives {
-		glog.Infof("GetBodyForLambda. dir %d -> %+v\n", i, dir)
-	}
-	glog.Infof("GetBodyForLambda. SelectionSet: %d\n", len(field.field.SelectionSet))
-	for i, sel := range field.field.SelectionSet {
-		f, ok := sel.(*ast.Field)
-		if !ok {
-			continue
-		}
-		glog.Infof("GetBodyForLambda. selfield %d -> %+v\n", i, f)
-	}
-
 	if parents != nil {
 		body["parents"] = parents
 	}
 	if args != nil {
 		body["args"] = args
 	}
-	glog.Infof("GetBodyForLambda: %+v\n", body)
 	return body
 }

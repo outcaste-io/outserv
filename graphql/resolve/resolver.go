@@ -506,34 +506,6 @@ func (hr *httpResolver) Resolve(ctx context.Context, field *schema.Field) *Resol
 	defer stop()
 
 	resolved := hr.rewriteAndExecute(ctx, field)
-
-	glog.Infoln("----------")
-	glog.Infof("Field before: %+v\n", field)
-	field.SetNameAndArguments("getBlock", map[string]interface{}{"number": "14999999"})
-	// field.Name = "getBlock"
-	// field.Arguments["number"] = 14999998
-	glog.Infof("Field after: %+v\n", field)
-	glog.Infof("Field after name, alias, args: %s %s %+v\n", field.Name(), field.Alias(), field.Arguments())
-	res := NewQueryResolver(NewQueryRewriter(), NewDgraphExecutor())
-	resolved = res.Resolve(ctx, field)
-	glog.Infof("After calling query resolver: %s\n", resolved.Data)
-	return resolved
-
-	// Fill up the object internally.
-	//
-	// Perhaps, we can now call resultCompleter:
-	// CompletionFunc(entitiesQueryCompletion)
-	glog.Infof("calling entitiesQueryCompletion for resolved: %s\n", resolved.Data)
-	// Refactor Apollo Fed code to fill up the object as needed.
-	//
-	// Or, make a query to the normal route -- queryResolver
-	// Get a list of objects, and then create a query which can be passed over
-	// to queryResolver (it would do all the nils and such).
-	// Create a query for queryResolver somehow and then it would do the filling
-	// up and validation etc.
-	// entitiesQueryCompletion(ctx, resolved)
-	glog.Infof("after calling entitiesQueryCompletion for resolved: %+v\n", resolved)
-
 	return resolved
 }
 
@@ -561,14 +533,7 @@ func (hr *httpResolver) rewriteAndExecute(ctx context.Context, field *schema.Fie
 			Err:   hardErrs,
 		}
 	}
-	glog.Infof("rewriteAndExecute: Got field data: %+v\n", fieldData)
-	for i, f := range field.SelectionSet() {
-		glog.Infof("rewriteAndExecute SS %d -> %+v\n", i, f.DgraphAlias())
-	}
 
-	// I can inject here the code to fill out all the asked for fields.
-
-	//
 	return DataResult(field, map[string]interface{}{field.Name(): fieldData}, errs)
 }
 
@@ -659,7 +624,6 @@ func (qr *queryResolver) Resolve(ctx context.Context, query *schema.Field) *Reso
 	timer.Start()
 	defer timer.Stop()
 
-	glog.Infof("query name, alias, args: %s %s %+v\n", query.Name(), query.Alias(), query.Arguments())
 	resolved := qr.rewriteAndExecute(ctx, query)
 	qr.resultCompleter.Complete(ctx, resolved)
 	return resolved
