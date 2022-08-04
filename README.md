@@ -30,6 +30,21 @@ here](https://manishrjain.com/outserv-graphql-blockchain-search).
 for you via this [Calendly
 link](https://calendly.com/manishrjain/consulting-on-outserv).
 
+## Why Outserv over Cloud API Systems?
+
+- Having control over your own API server and blockchain node is the holy grail of decentralization -- the big leap that web3 has over web2.
+- Never run into rate limits, ever again.
+- Not only is Outserv high-performant, having a dedicated system running
+    closer to edge just for your usage would always outperform far-away cloud
+    API server where your queries have to compete for resources against all
+    others.
+- Data is no one-size-fits-all. Enrich the blockchain data by adding more
+    context, combining data from multiple sources to allow for better searches.
+- For medium to heavy workloads, Outserv would be way cheaper than paying for
+    various Cloud API access.
+
+<img src="/static/decentralization.jpeg" width="500" />
+
 ## Bugs / Feature Requests
 
 To report bugs or request features, please use GitHub issues. Please do answer these
