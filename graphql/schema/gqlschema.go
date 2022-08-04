@@ -1,18 +1,5 @@
-/*
- * Copyright 2019 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Portions Copyright 2019 Dgraph Labs, Inc. are available under the Apache License v2.0.
+// Portions Copyright 2022 Outcaste LLC are available under the Sustainable License v1.0.
 
 package schema
 
@@ -42,7 +29,6 @@ const (
 	idDirectiveInterfaceArg = "interface"
 	subscriptionDirective   = "withSubscription"
 	secretDirective         = "secret"
-	authDirective           = "auth"
 	customDirective         = "custom"
 	remoteDirective         = "remote" // types with this directive are not stored in Dgraph.
 	remoteResponseDirective = "remoteResponse"
@@ -68,24 +54,15 @@ const (
 	cacheControlDirective = "cacheControl"
 	CacheControlHeader    = "Cache-Control"
 
-	// Directives to support Apollo Federation
-	apolloKeyDirective      = "key"
-	apolloKeyArg            = "fields"
-	apolloExternalDirective = "external"
-	apolloExtendsDirective  = "extends"
-	apolloRequiresDirective = "requires"
-	apolloProvidesDirective = "provides"
-
 	// custom directive args and fields
-	dqlArg      = "dql"
-	httpArg     = "http"
-	httpUrl     = "url"
-	httpMethod  = "method"
-	httpBody    = "body"
-	httpGraphql = "graphql"
-	mode        = "mode"
-	BATCH       = "BATCH"
-	SINGLE      = "SINGLE"
+	dqlArg     = "dql"
+	httpArg    = "http"
+	httpUrl    = "url"
+	httpMethod = "method"
+	httpBody   = "body"
+	mode       = "mode"
+	BATCH      = "BATCH"
+	SINGLE     = "SINGLE"
 
 	// geo type names and fields
 	Point        = "Point"
@@ -297,18 +274,10 @@ input GenerateMutationParams {
 	directiveDefs = `
 directive @hasInverse(field: String!) on FIELD_DEFINITION
 directive @search(by: [DgraphIndex!]) on FIELD_DEFINITION
-directive @dgraph(type: String, pred: String) on OBJECT | INTERFACE | FIELD_DEFINITION
 directive @id(interface: Boolean) on FIELD_DEFINITION
 directive @default(add: DgraphDefault, update: DgraphDefault) on FIELD_DEFINITION
 directive @withSubscription on OBJECT | INTERFACE | FIELD_DEFINITION
 directive @secret(field: String!, pred: String) on OBJECT | INTERFACE
-directive @auth(
-	password: AuthRule
-	query: AuthRule,
-	add: AuthRule,
-	update: AuthRule,
-	delete: AuthRule) on OBJECT | INTERFACE
-directive @custom(http: CustomHTTP, dql: String) on FIELD_DEFINITION
 directive @remote on OBJECT | INTERFACE | UNION | INPUT_OBJECT | ENUM
 directive @remoteResponse(name: String) on FIELD_DEFINITION
 directive @cascade(fields: [String]) on FIELD
@@ -319,25 +288,6 @@ directive @generate(
 	query: GenerateQueryParams,
 	mutation: GenerateMutationParams,
 	subscription: Boolean) on OBJECT | INTERFACE
-`
-	// see: https://www.apollographql.com/docs/federation/gateway/#custom-directive-support
-	// So, we should only add type system directives here.
-	// Even with type system directives, there is a bug in Apollo Federation due to which the
-	// directives having non-scalar args cause issues in schema stitching in gateway.
-	// See: https://github.com/apollographql/apollo-server/issues/3655
-	// So, such directives have to be missed too.
-	apolloSupportedDirectiveDefs = `
-directive @hasInverse(field: String!) on FIELD_DEFINITION
-directive @search(by: [DgraphIndex!]) on FIELD_DEFINITION
-directive @dgraph(type: String, pred: String) on OBJECT | INTERFACE | FIELD_DEFINITION
-directive @id(interface: Boolean) on FIELD_DEFINITION
-directive @default(add: DgraphDefault, update: DgraphDefault) on FIELD_DEFINITION
-directive @withSubscription on OBJECT | INTERFACE | FIELD_DEFINITION
-directive @secret(field: String!, pred: String) on OBJECT | INTERFACE
-directive @remote on OBJECT | INTERFACE | UNION | INPUT_OBJECT | ENUM
-directive @remoteResponse(name: String) on FIELD_DEFINITION
-directive @lambda on FIELD_DEFINITION
-directive @lambdaOnMutate(add: Boolean, update: Boolean, delete: Boolean) on OBJECT | INTERFACE
 `
 	filterInputs = `
 input IntFilter {
@@ -458,8 +408,7 @@ type directiveValidator func(
 	sch *ast.Schema,
 	typ *ast.Definition,
 	field *ast.FieldDefinition,
-	dir *ast.Directive,
-	secrets map[string]x.Sensitive) gqlerror.List
+	dir *ast.Directive) gqlerror.List
 
 type searchTypeIndex struct {
 	gqlType string
@@ -593,8 +542,7 @@ func ValidatorNoOp(
 	sch *ast.Schema,
 	typ *ast.Definition,
 	field *ast.FieldDefinition,
-	dir *ast.Directive,
-	secrets map[string]x.Sensitive) gqlerror.List {
+	dir *ast.Directive) gqlerror.List {
 	return nil
 }
 
@@ -605,7 +553,6 @@ var directiveValidators = map[string]directiveValidator{
 	idDirective:             idValidation,
 	subscriptionDirective:   ValidatorNoOp,
 	secretDirective:         passwordValidation,
-	authDirective:           ValidatorNoOp, // Just to get it printed into generated schema
 	customDirective:         customDirectiveValidation,
 	remoteDirective:         ValidatorNoOp,
 	deprecatedDirective:     ValidatorNoOp,
@@ -613,11 +560,6 @@ var directiveValidators = map[string]directiveValidator{
 	defaultDirective:        defaultDirectiveValidation,
 	lambdaOnMutateDirective: ValidatorNoOp,
 	generateDirective:       ValidatorNoOp,
-	apolloKeyDirective:      ValidatorNoOp,
-	apolloExtendsDirective:  ValidatorNoOp,
-	apolloExternalDirective: apolloExternalValidation,
-	apolloRequiresDirective: apolloRequiresValidation,
-	apolloProvidesDirective: apolloProvidesValidation,
 	remoteResponseDirective: remoteResponseValidation,
 }
 
@@ -630,18 +572,12 @@ var directiveLocationMap = map[string]map[ast.DefinitionKind]bool{
 	idDirective:           nil,
 	subscriptionDirective: {ast.Object: true, ast.Interface: true},
 	secretDirective:       {ast.Object: true, ast.Interface: true},
-	authDirective:         {ast.Object: true, ast.Interface: true},
 	customDirective:       nil,
 	remoteDirective: {ast.Object: true, ast.Interface: true, ast.Union: true,
 		ast.InputObject: true, ast.Enum: true},
 	lambdaDirective:         nil,
 	lambdaOnMutateDirective: {ast.Object: true, ast.Interface: true},
 	generateDirective:       {ast.Object: true, ast.Interface: true},
-	apolloKeyDirective:      {ast.Object: true, ast.Interface: true},
-	apolloExtendsDirective:  {ast.Object: true, ast.Interface: true},
-	apolloExternalDirective: nil,
-	apolloRequiresDirective: nil,
-	apolloProvidesDirective: nil,
 	remoteResponseDirective: nil,
 	cascadeDirective:        nil,
 }
@@ -823,49 +759,7 @@ func expandSchema(doc *ast.SchemaDocument) *gqlerror.Error {
 
 	doc.Definitions = append(doc.Definitions, docExtras.Definitions...)
 	doc.Directives = append(doc.Directives, docExtras.Directives...)
-	expandSchemaWithApolloExtras(doc)
 	return nil
-}
-
-func expandSchemaWithApolloExtras(doc *ast.SchemaDocument) {
-	var apolloKeyTypes []string
-	for _, defn := range doc.Definitions {
-		if defn.Directives.ForName(apolloKeyDirective) != nil {
-			apolloKeyTypes = append(apolloKeyTypes, defn.Name)
-		}
-	}
-
-	// No need to Expand with Apollo federation Extras
-	if len(apolloKeyTypes) == 0 {
-		return
-	}
-
-	// Form _Entity union with all the entities
-	// for e.g : union _Entity = A | B
-	// where A and B are object with @key directives
-	entityUnionDefinition := &ast.Definition{Kind: ast.Union, Name: "_Entity", Types: apolloKeyTypes}
-	doc.Definitions = append(doc.Definitions, entityUnionDefinition)
-
-	// Parse Apollo Queries and append to the Parsed Schema
-	docApolloQueries, gqlErr := parser.ParseSchema(&ast.Source{Input: apolloSchemaQueries})
-	if gqlErr != nil {
-		x.Panic(gqlErr)
-	}
-
-	queryDefinition := doc.Definitions.ForName("Query")
-	if queryDefinition == nil {
-		doc.Definitions = append(doc.Definitions, docApolloQueries.Definitions[0])
-	} else {
-		queryDefinition.Fields = append(queryDefinition.Fields, docApolloQueries.Definitions[0].Fields...)
-	}
-
-	docExtras, gqlErr := parser.ParseSchema(&ast.Source{Input: apolloSchemaExtras})
-	if gqlErr != nil {
-		x.Panic(gqlErr)
-	}
-	doc.Definitions = append(doc.Definitions, docExtras.Definitions...)
-	doc.Directives = append(doc.Directives, docExtras.Directives...)
-
 }
 
 // preGQLValidation validates schema before GraphQL validation.  Validation
@@ -893,8 +787,7 @@ func preGQLValidation(schema *ast.SchemaDocument) gqlerror.List {
 // are easier to run once we know that the schema is GraphQL valid and that validation
 // has fleshed out the schema structure; we just need to check if it also satisfies
 // the extra rules.
-func postGQLValidation(schema *ast.Schema, definitions []string,
-	secrets map[string]x.Sensitive) gqlerror.List {
+func postGQLValidation(schema *ast.Schema, definitions []string) gqlerror.List {
 	var errs []*gqlerror.Error
 
 	for _, defn := range definitions {
@@ -909,7 +802,7 @@ func postGQLValidation(schema *ast.Schema, definitions []string,
 				if directiveValidators[dir.Name] == nil {
 					continue
 				}
-				errs = append(errs, directiveValidators[dir.Name](schema, typ, field, dir, secrets)...)
+				errs = append(errs, directiveValidators[dir.Name](schema, typ, field, dir)...)
 			}
 		}
 	}
@@ -2570,10 +2463,7 @@ func hasStringifiableFields(typ *ast.Definition) bool {
 // Any types in originalTypes are printed first, followed by the schemaExtras,
 // and then all generated types, scalars, enums, directives, query and
 // mutations all in alphabetical order.
-// var "apolloServiceQuery" is used to distinguish Schema String from what should be
-// returned as a result of apollo service query. In case of Apollo service query, Schema
-// removes some of the directive definitions which are currently not supported at the gateway.
-func Stringify(schema *ast.Schema, originalTypes []string, apolloServiceQuery bool) string {
+func Stringify(schema *ast.Schema, originalTypes []string) string {
 	var sch, original, object, input, enum strings.Builder
 
 	if schema.Types == nil {
@@ -2613,9 +2503,6 @@ func Stringify(schema *ast.Schema, originalTypes []string, apolloServiceQuery bo
 	// In case of ApolloServiceQuery, schemaExtras is little different.
 	// It excludes some of the directive definitions.
 	schemaExtras := schemaInputs + directiveDefs + filterInputs
-	if apolloServiceQuery {
-		schemaExtras = schemaInputs + apolloSupportedDirectiveDefs + filterInputs
-	}
 	docExtras, gqlErr := parser.ParseSchema(&ast.Source{Input: schemaExtras})
 	if gqlErr != nil {
 		x.Panic(gqlErr)

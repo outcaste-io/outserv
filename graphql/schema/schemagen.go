@@ -44,108 +44,11 @@ func FromString(schema string, ns uint64) (*Schema, error) {
 }
 
 func (s *Handler) GQLSchema() string {
-	return Stringify(s.completeSchema, s.originalDefs, false)
+	return Stringify(s.completeSchema, s.originalDefs)
 }
 
 func (s *Handler) DGSchema() string {
 	return s.dgraphSchema
-}
-
-// TODO(mrjn): Understand this better and remove Apollo Federation stuff.
-//
-// GQLSchemaWithoutApolloExtras return GraphQL schema string
-// excluding Apollo extras definitions and Apollo Queries and
-// some directives which are not exposed to the Apollo Gateway
-// as they are failing in the schema validation which is a bug
-// in their library. See here:
-// https://github.com/apollographql/apollo-server/issues/3655
-func (s *Handler) GQLSchemaWithoutApolloExtras() string {
-	typeMapCopy := make(map[string]*ast.Definition)
-	for typ, defn := range s.completeSchema.Types {
-		// Exclude "union _Entity = ..." definition from types
-		if typ == "_Entity" {
-			continue
-		}
-		fldListCopy := make(ast.FieldList, 0)
-		for _, fld := range defn.Fields {
-			fldDirectiveListCopy := make(ast.DirectiveList, 0)
-			for _, dir := range fld.Directives {
-				// Drop "@custom" directive from the field's definition.
-				if dir.Name == "custom" {
-					continue
-				}
-				fldDirectiveListCopy = append(fldDirectiveListCopy, dir)
-			}
-			newFld := &ast.FieldDefinition{
-				Name:         fld.Name,
-				Arguments:    fld.Arguments,
-				DefaultValue: fld.DefaultValue,
-				Type:         fld.Type,
-				Directives:   fldDirectiveListCopy,
-				Position:     fld.Position,
-			}
-			fldListCopy = append(fldListCopy, newFld)
-		}
-
-		directiveListCopy := make(ast.DirectiveList, 0)
-		for _, dir := range defn.Directives {
-			// Drop @generate and @auth directive from the Type Definition.
-			if dir.Name == "generate" || dir.Name == "auth" {
-				continue
-			}
-			directiveListCopy = append(directiveListCopy, dir)
-		}
-		typeMapCopy[typ] = &ast.Definition{
-			Kind:       defn.Kind,
-			Name:       defn.Name,
-			Directives: directiveListCopy,
-			Fields:     fldListCopy,
-			BuiltIn:    defn.BuiltIn,
-			EnumValues: defn.EnumValues,
-		}
-	}
-	queryList := make(ast.FieldList, 0)
-	for _, qry := range s.completeSchema.Query.Fields {
-		// Drop Apollo Queries from the List of Queries.
-		if qry.Name == "_entities" || qry.Name == "_service" {
-			continue
-		}
-		qryDirectiveListCopy := make(ast.DirectiveList, 0)
-		for _, dir := range qry.Directives {
-			// Drop @custom directive from the Queries.
-			if dir.Name == "custom" {
-				continue
-			}
-			qryDirectiveListCopy = append(qryDirectiveListCopy, dir)
-		}
-		queryList = append(queryList, &ast.FieldDefinition{
-			Name:       qry.Name,
-			Arguments:  qry.Arguments,
-			Type:       qry.Type,
-			Directives: qryDirectiveListCopy,
-			Position:   qry.Position,
-		})
-	}
-
-	if typeMapCopy["Query"] != nil {
-		typeMapCopy["Query"].Fields = queryList
-	}
-
-	queryDefn := &ast.Definition{
-		Kind:   ast.Object,
-		Name:   "Query",
-		Fields: queryList,
-	}
-	astSchemaCopy := &ast.Schema{
-		Query:         queryDefn,
-		Mutation:      s.completeSchema.Mutation,
-		Subscription:  s.completeSchema.Subscription,
-		Types:         typeMapCopy,
-		Directives:    s.completeSchema.Directives,
-		PossibleTypes: s.completeSchema.PossibleTypes,
-		Implements:    s.completeSchema.Implements,
-	}
-	return Stringify(astSchemaCopy, s.originalDefs, true)
 }
 
 // NewHandler processes the input schema. If there are no errors, it returns
@@ -218,25 +121,6 @@ func NewHandler(input string) (*Handler, error) {
 			if remoteDir != nil {
 				continue
 			}
-
-			for _, fld := range defn.Fields {
-				providesDir := fld.Directives.ForName(apolloProvidesDirective)
-				if providesDir == nil {
-					continue
-				}
-				arg := providesDir.Arguments.ForName(apolloKeyArg)
-				providesFieldArgs := strings.Fields(arg.Value.Raw)
-				var typeMap map[string]bool
-				if existingTypeMap, ok := providesFieldsMap[fld.Type.Name()]; ok {
-					typeMap = existingTypeMap
-				} else {
-					typeMap = make(map[string]bool)
-				}
-				for _, fldName := range providesFieldArgs {
-					typeMap[fldName] = true
-				}
-				providesFieldsMap[fld.Type.Name()] = typeMap
-			}
 		}
 		typesToComplete = append(typesToComplete, defn.Name)
 	}
@@ -250,7 +134,7 @@ func NewHandler(input string) (*Handler, error) {
 		return nil, gqlerror.List{gqlErr}
 	}
 
-	gqlErrList = postGQLValidation(sch, defns, nil)
+	gqlErrList = postGQLValidation(sch, defns)
 	if gqlErrList != nil {
 		return nil, gqlErrList
 	}
@@ -269,51 +153,6 @@ func NewHandler(input string) (*Handler, error) {
 		completeSchema: sch,
 		originalDefs:   defns,
 	}, nil
-}
-
-func getAllowedHeaders(sch *ast.Schema, definitions []string, authHeader string) []string {
-	headers := make(map[string]struct{})
-
-	setHeaders := func(dir *ast.Directive) {
-		if dir == nil {
-			return
-		}
-
-		httpArg := dir.Arguments.ForName("http")
-		if httpArg == nil {
-			return
-		}
-		forwardHeaders := httpArg.Value.Children.ForName("forwardHeaders")
-		if forwardHeaders == nil {
-			return
-		}
-		for _, h := range forwardHeaders.Children {
-			key := strings.Split(h.Value.Raw, ":")
-			if len(key) == 1 {
-				key = []string{h.Value.Raw, h.Value.Raw}
-			}
-			headers[key[1]] = struct{}{}
-		}
-	}
-
-	for _, defn := range definitions {
-		for _, field := range sch.Types[defn].Fields {
-			custom := field.Directives.ForName(customDirective)
-			setHeaders(custom)
-		}
-	}
-
-	finalHeaders := make([]string, 0, len(headers)+1)
-	for h := range headers {
-		finalHeaders = append(finalHeaders, h)
-	}
-
-	// Add Auth Header to finalHeaders list
-	if authHeader != "" {
-		finalHeaders = append(finalHeaders, authHeader)
-	}
-
-	return finalHeaders
 }
 
 func getAllSearchIndexes(val *ast.Value) []string {

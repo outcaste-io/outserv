@@ -38,9 +38,9 @@ async function latestBlock({args, graphql}) {
     number
   }} `)
   if (results.data.queryBlock.length == 0) {
-    return 0
+    return {"number": 0}
   }
-  return results.data.queryBlock[0].number;
+  return {"number": results.data.queryBlock[0].number}
 }
 
 self.addGraphQLResolvers({

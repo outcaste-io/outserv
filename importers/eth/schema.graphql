@@ -31,5 +31,5 @@ type Block {
 type Query {
   accountBalance(address: String!, blockNumber: Int64): AccountBal @lambda
   test: String @lambda
-  latestBlock: Int64 @lambda
+  latestBlock: Block @lambda
 }

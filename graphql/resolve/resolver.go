@@ -7,7 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"github.com/outcaste-io/outserv/graphql/dgraph"
 	"github.com/outcaste-io/outserv/graphql/schema"
 )
 
@@ -182,22 +183,9 @@ func (rf *ResolverFactory) WithConventionResolvers(
 		})
 	}
 
-	for _, q := range s.Queries(schema.EntitiesQuery) {
-		rf.WithQueryResolver(q, func(q *schema.Field) QueryResolver {
-			return NewEntitiesQueryResolver(fns.Qrw, fns.Ex)
-		})
-	}
-
 	for _, q := range s.Queries(schema.HTTPQuery) {
 		rf.WithQueryResolver(q, func(q *schema.Field) QueryResolver {
 			return NewHTTPQueryResolver(nil)
-		})
-	}
-
-	for _, q := range s.Queries(schema.DQLQuery) {
-		rf.WithQueryResolver(q, func(q *schema.Field) QueryResolver {
-			// DQL queries don't need any QueryRewriter
-			return NewCustomDQLQueryResolver(fns.Qrw, fns.Ex)
 		})
 	}
 
@@ -261,102 +249,6 @@ func NewResolverFactory(
 		queryError:    queryError,
 		mutationError: mutationError,
 	}
-}
-
-// entitiesCompletion transform the result of the `_entities` query.
-// It changes the order of the result to the order of keyField in the
-// `_representations` argument.
-func entitiesQueryCompletion(ctx context.Context, resolved *Resolved) {
-	// return if Data is not present
-	if len(resolved.Data) == 0 {
-		return
-	}
-	if resolved.Field.Kind != schema.QueryKind {
-		// This function shouldn't be called for anything other than a query.
-		return
-	}
-	query := resolved.Field
-
-	var data map[string][]interface{}
-	err := schema.Unmarshal(resolved.Data, &data)
-	if err != nil {
-		resolved.Err = schema.AppendGQLErrs(resolved.Err, err)
-		return
-	}
-
-	// fetch the keyFieldValueList from the query arguments.
-	repr, err := query.RepresentationsArg()
-	if err != nil {
-		resolved.Err = schema.AppendGQLErrs(resolved.Err, err)
-		return
-	}
-	keyFieldType := repr.KeyField.Type().Name()
-
-	// store the index of the keyField Values present in the argument in a map.
-	// key in the map is of type interface because there are multiple types like String,
-	// Int, Int64 allowed as @id. There could be duplicate keys in the representations
-	// so the value of map is a list of integers containing all the indices for a key.
-	indexMap := make(map[interface{}][]int)
-	uniqueKeyList := make([]interface{}, 0)
-	for i, key := range repr.KeyVals {
-		indexMap[key] = append(indexMap[key], i)
-	}
-
-	// Create a list containing unique keys and then sort in ascending order because this
-	// will be the order in which the data is received.
-	// for eg: for keys: {1, 2, 4, 1, 3} is converted into {1, 2, 4, 3} and then {1, 2, 3, 4}
-	// this will be the order of received data from the dgraph.
-	for k := range indexMap {
-		uniqueKeyList = append(uniqueKeyList, k)
-	}
-	sort.Slice(uniqueKeyList, func(i, j int) bool {
-		switch val := uniqueKeyList[i].(type) {
-		case string:
-			return val < uniqueKeyList[j].(string)
-		case json.Number:
-			switch keyFieldType {
-			case "Int", "Int64":
-				val1, _ := val.Int64()
-				val2, _ := uniqueKeyList[j].(json.Number).Int64()
-				return val1 < val2
-			case "Float":
-				val1, _ := val.Float64()
-				val2, _ := uniqueKeyList[j].(json.Number).Float64()
-				return val1 < val2
-			}
-		case int64:
-			return val < uniqueKeyList[j].(int64)
-		case float64:
-			return val < uniqueKeyList[j].(float64)
-		}
-		return false
-	})
-
-	// create the new output according to the index of the keyFields present in the argument.
-	entitiesQryResp := data["_entities"]
-
-	// if `entitiesQueryResp` contains less number of elements than the number of unique keys
-	// which is because the object related to certain key is not present in the dgraph.
-	// This will end into an error at the Gateway, so no need to order the result here.
-	if len(entitiesQryResp) < len(uniqueKeyList) {
-		return
-	}
-
-	// Reorder the output response according to the order of the keys in the representations argument.
-	output := make([]interface{}, len(repr.KeyVals))
-	for i, key := range uniqueKeyList {
-		for _, idx := range indexMap[key] {
-			output[idx] = entitiesQryResp[i]
-		}
-	}
-
-	// replace the result obtained from the dgraph and marshal back.
-	data["_entities"] = output
-	resolved.Data, err = json.Marshal(data)
-	if err != nil {
-		resolved.Err = schema.AppendGQLErrs(resolved.Err, err)
-	}
-
 }
 
 // noopCompletion just passes back it's result and err arguments
@@ -673,8 +565,128 @@ func DataResult(f *schema.Field, data map[string]interface{}, err error) *Resolv
 	}
 }
 
-func newtimer(ctx context.Context, Duration *schema.OffsetDuration) *schema.OffsetTimer {
-	resolveStartTime, _ := ctx.Value(resolveStartTime).(time.Time)
-	tf := schema.NewOffsetTimerFactory(resolveStartTime)
-	return tf.NewOffsetTimer(Duration)
+var errNotScalar = errors.New("provided value is not a scalar, can't convert it to string")
+
+// A QueryResolver can resolve a single query.
+// Implemented by:
+// - httpResolver
+// - httpQueryResolver
+// - QueryResolverFunc
+// - queryResolver
+// - customDQLQueryResolver
+// - getSchemaResolver in admin/schema.go
+type QueryResolver interface {
+	Resolve(ctx context.Context, query *schema.Field) *Resolved
+}
+
+// QueryResolverFunc is an adapter that allows to build a QueryResolver from
+// a function.  Based on the http.HandlerFunc pattern.
+type QueryResolverFunc func(ctx context.Context, query *schema.Field) *Resolved
+
+// Resolve calls qr(ctx, query)
+func (qr QueryResolverFunc) Resolve(ctx context.Context, query *schema.Field) *Resolved {
+	return qr(ctx, query)
+}
+
+// NewQueryResolver creates a new query resolver.  The resolver runs the pipeline:
+// 1) rewrite the query using qr (return error if failed)
+// 2) execute the rewritten query with ex (return error if failed)
+// 3) process the result with rc
+func NewQueryResolver(qr *QueryRewriter, ex DgraphExecutor) QueryResolver {
+	return &queryResolver{queryRewriter: qr, executor: ex, resultCompleter: CompletionFunc(noopCompletion)}
+}
+
+// a queryResolver can resolve a single GraphQL query field.
+type queryResolver struct {
+	queryRewriter   *QueryRewriter
+	executor        DgraphExecutor
+	resultCompleter CompletionFunc
+}
+
+func (qr *queryResolver) Resolve(ctx context.Context, query *schema.Field) *Resolved {
+	span := otrace.FromContext(ctx)
+	stop := x.SpanTimer(span, "resolveQuery")
+	defer stop()
+
+	resolved := qr.rewriteAndExecute(ctx, query)
+	qr.resultCompleter.Complete(ctx, resolved)
+	return resolved
+}
+
+func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query *schema.Field) *Resolved {
+	ext := &schema.Extensions{}
+
+	emptyResult := func(err error) *Resolved {
+		return &Resolved{
+			// all the auto-generated queries are nullable, but users may define queries with
+			// @custom(dql: ...) which may be non-nullable. So, we need to set the Data field
+			// only if the query was nullable and keep it nil if it was non-nullable.
+			// query.NullResponse() method handles that.
+			Data:       query.NullResponse(),
+			Field:      query,
+			Err:        schema.SetPathIfEmpty(err, query.ResponseName()),
+			Extensions: ext,
+		}
+	}
+
+	dgQuery, err := qr.queryRewriter.Rewrite(ctx, query)
+	if err != nil {
+		return emptyResult(schema.GQLWrapf(err, "couldn't rewrite query %s",
+			query.ResponseName()))
+	}
+	qry := dgraph.AsString(dgQuery)
+	glog.Infof("DQL Query: %s\n", qry)
+
+	req := &edgraph.Request{
+		Req:      &pb.Request{Query: qry, ReadOnly: true},
+		GqlField: query,
+	}
+	resp, err := qr.executor.Execute(ctx, req)
+
+	if err != nil && !x.IsGqlErrorList(err) {
+		err = schema.GQLWrapf(err, "Dgraph query failed")
+		glog.Infof("Dgraph query execution failed : %s", err)
+	}
+
+	ext.TouchedUids = resp.GetMetrics().GetNumUids()[touchedUidsKey]
+	resolved := &Resolved{
+		Data:       resp.GetJson(),
+		Field:      query,
+		Err:        schema.SetPathIfEmpty(err, query.ResponseName()),
+		Extensions: ext,
+	}
+
+	return resolved
+}
+
+func resolveIntrospection(ctx context.Context, q *schema.Field) *Resolved {
+	data, err := schema.Introspect(q)
+	return &Resolved{
+		Data:  data,
+		Field: q,
+		Err:   err,
+	}
+}
+
+// converts scalar values received from GraphQL arguments to go string
+// If it is a scalar only possible cases are: string, bool, int64, float64 and nil.
+func convertScalarToString(val interface{}) (string, error) {
+	var str string
+	switch v := val.(type) {
+	case string:
+		str = v
+	case bool:
+		str = strconv.FormatBool(v)
+	case int64:
+		str = strconv.FormatInt(v, 10)
+	case float64:
+		str = strconv.FormatFloat(v, 'f', -1, 64)
+	case json.Number:
+		str = v.String()
+	case nil:
+		str = ""
+	default:
+		return "", errNotScalar
+	}
+	return str, nil
 }

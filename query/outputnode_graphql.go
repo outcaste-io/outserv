@@ -658,11 +658,6 @@ func (genc *graphQLEncoder) processCustomFields(field *gqlSchema.Field, n fastJs
 			}
 			wg.Done()
 		}()
-		// extract the representations for Apollo _entities query and store them in GraphQL encoder
-		if field.QueryType() == gqlSchema.EntitiesQuery {
-			// ignore the error here, as that should have been taken care of during query rewriting
-			genc.entityRepresentations, _ = field.RepresentationsArg()
-		}
 		// start resolving the custom fields
 		genc.resolveCustomFields(field.SelectionSet(), []fastJsonNode{genc.children(n)})
 		// close the error and result channels, to terminate the goroutines started above
