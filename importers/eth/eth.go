@@ -36,16 +36,16 @@ var dryRun = flag.Bool("dry", false, "If true, don't send txns to GraphQL endpoi
 var numGo = flag.Int("gor", 4, "Number of goroutines to use")
 var startBlock = flag.Int64("start", 14900000, "Start at block")
 
-var txnMu = `
-mutation($Txns: [AddTxnInput!]!) {
-	addTxn(input: $Txns, upsert: true) {
+var blockMu = `
+mutation($Blks: [AddBlockInput!]!) {
+	addBlock(input: $Blks, upsert: true) {
 		numUids
 	}
 }
 `
 
 type Batch struct {
-	Txns []Txn `json:"Txns"`
+	Blks []Block `json:"Blks,omitempty"`
 }
 type GQL struct {
 	Query     string `json:"query"`
@@ -76,9 +76,8 @@ func (b *Block) Fill() {
 	}
 }
 
-func (b *Block) Txns() []Txn {
+func (b *Block) Wait() {
 	b.wg.Wait()
-	return b.Transactions
 }
 
 type Chain struct {
@@ -139,13 +138,12 @@ func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 		writer = fd
 	}
 
-	var txns []Txn
-	sendTxns := func(txns []Txn) error {
-		if len(txns) == 0 {
+	sendBlks := func(blks []Block) error {
+		if len(blks) == 0 {
 			return nil
 		}
 		if writer != nil {
-			data, err := json.Marshal(txns)
+			data, err := json.Marshal(blks)
 			check(err)
 			n, err := writer.Write(data)
 			writtenMB += float64(n) / (1 << 20)
@@ -153,8 +151,8 @@ func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 		}
 
 		q := GQL{
-			Query:     txnMu,
-			Variables: Batch{Txns: txns},
+			Query:     blockMu,
+			Variables: Batch{Blks: blks},
 		}
 		data, err := json.Marshal(q)
 		if err != nil {
@@ -164,15 +162,11 @@ func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 	}
 
 	for block := range c.blockCh {
-		txns = append(txns, block.Txns()...)
-		if len(txns) >= 100 {
-			check(sendTxns(txns))
-			atomic.AddUint64(&c.numTxns, uint64(len(txns)))
-			txns = txns[:0]
-		}
+		block.Wait()
+		check(sendBlks([]Block{*block}))
+		atomic.AddUint64(&c.numTxns, uint64(len(block.Transactions)))
 		atomic.AddUint64(&c.numBlocks, 1)
 	}
-	check(sendTxns(txns))
 }
 
 func (c *Chain) printMetrics() {

@@ -15,6 +15,7 @@ type Account {
   address: String! @id
   incoming: [Txn]
   outgoing: [Txn]
+  mined: [Block]
 }
 
 type AccountBal @remote {
@@ -23,9 +24,13 @@ type AccountBal @remote {
 }
 
 type Block {
-  number: Int64 @id
-  timestamp: Int64 @search
+  hash: String! @id
+  number: Int64 @search
+  timestamp: DateTime @search(by: [day])
+  ommerCount: Int @search
+  ommers: [Block]
   transactions: [Txn]
+  miner: Account @hasInverse(field: mined)
 }
 
 type Query {
