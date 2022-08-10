@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/outcaste-io/outserv/importers/ix"
 	"github.com/pkg/errors"
 )
 
@@ -173,7 +174,7 @@ func (c *Chain) printMetrics() {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
-	rm := NewRateMonitor(300)
+	rm := ix.NewRateMonitor(300)
 	start := time.Now()
 	for range ticker.C {
 		maxBlockId := atomic.LoadInt64(&c.blockId)
@@ -263,7 +264,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("Latest: %08d\n", header.Number)
+		fmt.Printf("ChainID: %d Latest: %08d\n", chainID.Uint64(), header.Number)
 	}
 	fmt.Printf("Using %d goroutines.\n", *numGo)
 
