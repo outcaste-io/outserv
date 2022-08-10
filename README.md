@@ -21,7 +21,7 @@ step towards web3 decentralization.
 
 ## Important Links
 
-- Follow the documentation at [https://docs.outcaste.io](https://docs.outcaste.io/docs/intro).
+- Follow the documentation at [https://docs.outserv.io](https://docs.outserv.io/docs/intro).
 - Read the announcement [blog post
 here](https://manishrjain.com/outserv-graphql-blockchain-search).
 - See the [product roadmap here](https://github.com/outcaste-io/outserv/issues/61).
