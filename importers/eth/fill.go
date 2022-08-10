@@ -19,7 +19,7 @@ import (
 
 type Account struct {
 	Uid     string `json:"uid,omitempty"`
-	Address string `json:"address"`
+	Address string `json:"address,omitempty"`
 }
 type Txn struct {
 	Uid         string  `json:"uid,omitempty"`
@@ -40,10 +40,17 @@ type Txn struct {
 
 type Block struct {
 	wg           sync.WaitGroup
-	Uid          string `json:"uid,omitempty"`
-	Number       int64  `json:"number"`
-	Timestamp    string `json:"timestamp,omitempty"`
-	Transactions []Txn  `json:"transactions,omitempty"`
+	Uid          string   `json:"uid,omitempty"`
+	Hash         string   `json:"hash,omitempty"`
+	Number       int64    `json:"number,omitempty"`
+	Timestamp    int64    `json:"timestamp,omitempty"`
+	Transactions []Txn    `json:"transactions,omitempty"`
+	OmmerCount   int      `json:"ommerCount,omitempty"`
+	Ommers       []Block  `json:"ommers,omitempty"`
+	Miner        *Account `json:"miner,omitempty"`
+
+	// The following fields are used by ETH. But, not part of Outserv's GraphQL Schema.
+	TimestampStr string `json:"ts,omitempty"`
 }
 
 // fastFillViaGraphQL connects with the GraphQL endpoint exposed via Geth. And
@@ -56,8 +63,16 @@ func (b *Block) fastFillViaGraphQL() {
 	q := fmt.Sprintf(`
 {
 	block(number: %d) {
+		hash
 		number
-		timestamp
+		ts: timestamp
+		ommerCount
+		ommers {
+			hash
+			number
+			miner { address }
+		}
+		miner { address }
 		transactions {
 			hash
 			from { address }
@@ -97,10 +112,20 @@ func (b *Block) fastFillViaGraphQL() {
 		fmt.Printf("Invalid response from ETH. Expected: %d Got: %d\n", b.Number, blk.Number)
 		os.Exit(1)
 	}
-	ts, err := strconv.ParseInt(blk.Timestamp, 0, 64)
+	ts, err := strconv.ParseInt(blk.TimestampStr, 0, 64)
 	if err != nil {
 		fmt.Printf("Unable to parse timestamp: %s\n", blk.Timestamp)
 		ts = 0
+	}
+	b.Hash = blk.Hash
+	b.Timestamp = ts
+	b.Miner = blk.Miner
+	if writeUids {
+		b.Uid = fmt.Sprintf("_:Block.%s", b.Hash)
+	}
+	if blk.OmmerCount > 0 {
+		b.OmmerCount = blk.OmmerCount
+		b.Ommers = blk.Ommers
 	}
 	for _, txn := range blk.Transactions {
 		val, ok := new(big.Int).SetString(txn.ValueStr, 0)
@@ -127,11 +152,11 @@ func (b *Block) fastFillViaGraphQL() {
 		txn.BlockNumber = b.Number
 
 		txn.Timestamp = ts
-		txn.Block = Block{Number: b.Number}
+		txn.Block = Block{Hash: b.Hash}
 
 		if writeUids {
 			txn.Uid = fmt.Sprintf("_:Txn.%s", txn.Hash)
-			txn.Block.Uid = fmt.Sprintf("_:Block.%08d", b.Number)
+			txn.Block.Uid = fmt.Sprintf("_:Block.%s", b.Hash)
 		}
 
 		// Zero out the following fields, so they don't get marshalled when
