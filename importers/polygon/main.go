@@ -31,12 +31,6 @@ var chainID *big.Int
 var writeUids bool
 var gwei = big.NewInt(1e9)
 
-func check(err error) {
-	if err != nil {
-		log.Fatalf("Got error: %v", err)
-	}
-}
-
 func sendRequest(data []byte) error {
 	if *dryRun {
 		return nil
@@ -167,7 +161,7 @@ func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 
 	for block := range c.blockCh {
 		block.Wait()
-		check(sendBlks([]Block{*block}))
+		ix.Check(sendBlks([]Block{*block}))
 		atomic.AddUint64(&c.numTxns, uint64(len(block.Transactions)))
 		atomic.AddUint64(&c.numBlocks, 1)
 	}

@@ -115,7 +115,7 @@ func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 	var writer io.Writer
 	if len(*outDir) > 0 {
 		f, err := os.Create(filepath.Join(*outDir, fmt.Sprintf("%02d.json.gz", gid)))
-		check(err)
+		ix.Check(err)
 
 		gw := gzip.NewWriter(f)
 		writer = gw
@@ -128,10 +128,10 @@ func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 	} else if len(*outIPC) > 0 {
 		path := filepath.Join(*outIPC, fmt.Sprintf("%02d.ipc", gid))
 		fmt.Printf("Creating IPC: %s\n", path)
-		check(syscall.Mkfifo(path, 0666))
+		ix.Check(syscall.Mkfifo(path, 0666))
 
 		fd, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, os.ModeNamedPipe)
-		check(err)
+		ix.Check(err)
 		defer fd.Close()
 
 		// No need to do any buffering. It would just cause an
@@ -145,7 +145,7 @@ func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 		}
 		if writer != nil {
 			data, err := json.Marshal(blks)
-			check(err)
+			ix.Check(err)
 			n, err := writer.Write(data)
 			writtenMB += float64(n) / (1 << 20)
 			return err
@@ -164,7 +164,7 @@ func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 
 	for block := range c.blockCh {
 		block.Wait()
-		check(sendBlks([]Block{*block}))
+		ix.Check(sendBlks([]Block{*block}))
 		atomic.AddUint64(&c.numTxns, uint64(len(block.Transactions)))
 		atomic.AddUint64(&c.numBlocks, 1)
 	}
@@ -213,12 +213,6 @@ func sendRequest(data []byte) error {
 	}
 
 	return nil
-}
-
-func check(err error) {
-	if err != nil {
-		log.Fatalf("Got error: %v", err)
-	}
 }
 
 var isGraphQL bool

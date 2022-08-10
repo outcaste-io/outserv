@@ -1,6 +1,15 @@
 package ix
 
-import "time"
+import (
+	"log"
+	"time"
+)
+
+func Check(err error) {
+	if err != nil {
+		log.Fatalf("Got error: %v", err)
+	}
+}
 
 type RateMonitor struct {
 	start       time.Time

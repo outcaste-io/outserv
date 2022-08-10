@@ -15,6 +15,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/outcaste-io/outserv/importers/ix"
 )
 
 type Account struct {
@@ -89,15 +90,15 @@ func (b *Block) fastFillViaGraphQL() {
 	}
 	req := httpReq{Query: q}
 	reqData, err := json.Marshal(req)
-	check(err)
+	ix.Check(err)
 
 	buf := bytes.NewBuffer(reqData)
 	resp, err := http.Post(*path, "application/graphql", buf)
-	check(err)
+	ix.Check(err)
 
 	data, err := ioutil.ReadAll(resp.Body)
-	check(err)
-	check(resp.Body.Close())
+	ix.Check(err)
+	ix.Check(resp.Body.Close())
 
 	type eResp struct {
 		Data struct {
@@ -105,7 +106,7 @@ func (b *Block) fastFillViaGraphQL() {
 		} `json:"data"`
 	}
 	var eresp eResp
-	check(json.Unmarshal(data, &eresp))
+	ix.Check(json.Unmarshal(data, &eresp))
 
 	blk := eresp.Data.Block
 	if blk.Number != b.Number {
@@ -177,10 +178,10 @@ func (b *Block) fastFillViaGraphQL() {
 func (b *Block) slowFillViaClient() {
 	blockNumber := big.NewInt(b.Number)
 	block, err := client.BlockByNumber(context.Background(), blockNumber)
-	check(err)
+	ix.Check(err)
 	for _, tx := range block.Transactions() {
 		receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
-		check(err)
+		ix.Check(err)
 		gasUsed := new(big.Int).SetUint64(receipt.GasUsed)
 		if receipt.Status != 1 {
 			// Skip failed transactions.
