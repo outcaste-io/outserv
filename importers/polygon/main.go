@@ -112,6 +112,14 @@ func (c *Chain) printMetrics() {
 	}
 }
 
+func getLatest() int64 {
+	header, err := client.HeaderByNumber(context.Background(), nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return header.Number.Int64()
+}
+
 func (c *Chain) BlockingFill() {
 	defer close(c.blockCh)
 
@@ -123,11 +131,25 @@ func (c *Chain) BlockingFill() {
 		return
 	}
 
+	latest := getLatest()
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			num := getLatest()
+			atomic.StoreInt64(&latest, num)
+		}
+	}()
+
 	c.blockId = *startBlock - 1
 	for {
 		blockId := atomic.AddInt64(&c.blockId, 1)
-		if blockId >= 15e6 {
-			return
+		for {
+			end := atomic.LoadInt64(&latest)
+			if blockId <= end {
+				break
+			}
+			time.Sleep(time.Second)
 		}
 		b := &Block{Number: blockId}
 		b.wg.Add(1)
@@ -156,11 +178,15 @@ func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 		if err != nil {
 			return err
 		}
+		fmt.Printf("data:\n%s\n", data)
 		return sendRequest(data)
 	}
 
 	for block := range c.blockCh {
 		block.Wait()
+		if len(block.Transactions) == 0 {
+			continue
+		}
 		Check(sendBlks([]Block{*block}))
 		atomic.AddUint64(&c.numTxns, uint64(len(block.Transactions)))
 		atomic.AddUint64(&c.numBlocks, 1)
