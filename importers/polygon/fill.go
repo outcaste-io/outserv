@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"sync"
@@ -18,18 +19,19 @@ type Txn struct {
 	Uid         string  `json:"uid,omitempty"`
 	Hash        string  `json:"hash"`
 	Value       int64   `json:"value"`
-	Fee         int64   `json:"fee"`
+	Gas         int64   `json:"gas"`
+	GasPrice    int64   `json:"gasPrice"`
 	BlockNumber int64   `json:"blockNumber"`
 	Timestamp   int64   `json:"timestamp"`
 	Block       Block   `json:"block"`
 	To          Account `json:"to"`
 	From        Account `json:"from"`
-	Method      string  `json:"method"`
+	Method      string  `json:"method,omitempty"`
+	Input       string  `json:"input,omitempty"`
 
 	// The following fields are used by ETH. But, not part of Outserv's GraphQL Schema.
 	ValueStr string `json:"value_str,omitempty"`
 	GasUsed  int64  `json:"gasUsed,omitempty"`
-	GasPrice string `json:"gasPrice,omitempty"`
 }
 
 type Block struct {
@@ -74,35 +76,27 @@ func (b *Block) fillViaClient() {
 	b.Hash = block.Hash().Hex()
 	b.Timestamp = int64(block.Time())
 
-	signer := types.LatestSignerForChainID(chainID)
-
 	for _, tx := range block.Transactions() {
-		if tx.To() == nil || tx.To().String() != contractAddr {
-			continue
-		}
 		input := tx.Data()
-		if len(input) < 4 {
-			continue
-		}
-		method := input[:4]
-		m, err := contractAbi.MethodById(method)
-		if err != nil {
-			fmt.Printf("Unable to parse method with id: %x\n", method)
-			// Reject the txn.
-			continue
-		}
-
 		in := make(map[string]interface{})
-		err = m.Inputs.UnpackIntoMap(in, input[4:])
-		Check(err)
-
-		receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
-		Check(err)
-		gasUsed := new(big.Int).SetUint64(receipt.GasUsed)
-		if receipt.Status != 1 {
-			// Skip failed transactions.
-			continue
+		methodName := ""
+		if len(input) >= 4 {
+			method := input[:4]
+			m, err := contractAbi.MethodById(method)
+			if err == nil {
+				methodName = m.Name
+				err = m.Inputs.UnpackIntoMap(in, input[4:])
+				Check(err)
+			}
 		}
+
+		// receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
+		// Check(err)
+		// gasUsed := new(big.Int).SetUint64(receipt.GasUsed)
+		// if receipt.Status != 1 {
+		// 	// Skip failed transactions.
+		// 	continue
+		// }
 
 		var to, from Account
 		if msg, err := tx.AsMessage(signer, nil); err == nil {
@@ -111,12 +105,11 @@ func (b *Block) fillViaClient() {
 			fmt.Printf("Unable to parse from: %v\n", err)
 		}
 
-		if tx.To() != nil {
-			to.Address = tx.To().Hex()
-		}
 		if addr, has := in["to"]; has {
 			addra := addr.(common.Address)
 			to.Address = addra.Hex()
+		} else if tx.To() != nil {
+			to.Address = tx.To().Hex()
 		}
 
 		value := tx.Value()
@@ -125,19 +118,23 @@ func (b *Block) fillViaClient() {
 		}
 
 		valGwei := new(big.Int).Div(value, gwei)
-		fee := new(big.Int).Mul(tx.GasPrice(), gasUsed)
-		feeGwei := new(big.Int).Div(fee, gwei)
+		gasGwei := new(big.Int).Div(tx.GasPrice(), gwei)
 		txn := Txn{
 			Hash:        tx.Hash().Hex(),
 			Value:       valGwei.Int64(),
-			Fee:         feeGwei.Int64(),
+			Gas:         int64(tx.Gas()),
+			GasPrice:    gasGwei.Int64(),
 			BlockNumber: b.Number,
 			Block:       Block{Hash: b.Hash},
 			To:          to,
 			From:        from,
 			Timestamp:   b.Timestamp,
-			Method:      m.Name,
+			Method:      methodName,
 		}
+		if len(tx.Data()) > 0 {
+			txn.Input = "0x" + hex.EncodeToString(tx.Data())
+		}
+
 		// data, err := json.MarshalIndent(txn, " ", " ")
 		// Check(err)
 		// fmt.Printf("Got txn\n%s\n", data)

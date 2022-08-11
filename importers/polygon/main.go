@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 )
@@ -194,6 +195,7 @@ func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 }
 
 var contractAbi abi.ABI
+var signer types.Signer
 
 func main() {
 	flag.Parse()
@@ -216,6 +218,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	signer = types.LatestSignerForChainID(chainID)
 
 	header, err := client.HeaderByNumber(context.Background(), nil)
 	if err != nil {

@@ -1,0 +1,30 @@
+type Txn {
+  oid: ID!
+  hash: String! @id
+  value: Int64 @search
+  fee: Int64 @search
+  timestamp: DateTime @search(by: [day])
+  blockNumber: Int64 @search
+  block: Block @hasInverse(field: transactions)
+  to: Account @hasInverse(field: incoming)
+  from: Account @hasInverse(field: outgoing)
+}
+
+type Account {
+  oid: ID!
+  address: String! @id
+  incoming: [Txn]
+  outgoing: [Txn]
+  mined: [Block]
+}
+
+type Block {
+  hash: String! @id
+  number: Int64 @search
+  timestamp: DateTime @search(by: [day])
+  ommerCount: Int @search
+  ommers: [Block]
+  transactions: [Txn]
+  miner: Account @hasInverse(field: mined)
+}
+
