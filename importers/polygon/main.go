@@ -14,15 +14,15 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/outcaste-io/outserv/importers/ix"
 	"github.com/pkg/errors"
 )
 
 var path = flag.String("rpc", "", "Polygon Bor JSON RPC path")
 var graphql = flag.String("gql", "http://localhost:8080", "Outserv GraphQL endpoint")
 var dryRun = flag.Bool("dry", false, "If true, don't send txns to GraphQL endpoint")
-var numGo = flag.Int("gor", 4, "Number of goroutines to use")
+var numGo = flag.Int("gor", 1, "Number of goroutines to use")
 var startBlock = flag.Int64("start", 1, "Start at block, including this one")
 var blockId = flag.Int64("block", 0, "If set, only fetch this block")
 
@@ -98,7 +98,7 @@ func (c *Chain) printMetrics() {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
-	rm := ix.NewRateMonitor(300)
+	rm := NewRateMonitor(300)
 	start := time.Now()
 	for range ticker.C {
 		maxBlockId := atomic.LoadInt64(&c.blockId)
@@ -161,20 +161,26 @@ func (c *Chain) processTxns(gid int, wg *sync.WaitGroup) {
 
 	for block := range c.blockCh {
 		block.Wait()
-		ix.Check(sendBlks([]Block{*block}))
+		Check(sendBlks([]Block{*block}))
 		atomic.AddUint64(&c.numTxns, uint64(len(block.Transactions)))
 		atomic.AddUint64(&c.numBlocks, 1)
 	}
 }
 
+var contractAbi abi.ABI
+
 func main() {
 	flag.Parse()
-
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
-	var err error
+	fdata, err := ioutil.ReadFile("mrc20.abi")
+	Check(err)
+
+	contractAbi, err = abi.JSON(bytes.NewReader(fdata))
+	Check(err)
+
 	client, err = ethclient.Dial(*path)
 	if err != nil {
 		log.Fatal(err)

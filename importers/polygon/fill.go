@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"math/big"
+	"os"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/outcaste-io/outserv/importers/ix"
 )
 
 type Account struct {
@@ -54,10 +55,32 @@ func (b *Block) Fill() {
 func (b *Block) fillViaClient() {
 	blockNumber := big.NewInt(b.Number)
 	block, err := client.BlockByNumber(context.Background(), blockNumber)
-	ix.Check(err)
+	Check(err)
+	// addr := common.HexToAddress("0x0000000000000000000000000000000000001010")
+	// tok, err := NewToken(addr, client)
+
 	for _, tx := range block.Transactions() {
+		if tx.To() == nil || tx.To().String() != contractAddr {
+			continue
+		}
+		input := tx.Data()
+		if len(input) < 4 {
+			continue
+		}
+		method := input[:4]
+		m, err := contractAbi.MethodById(method)
+		Check(err)
+		fmt.Printf("Method name: %s\n", m.Name)
+
+		in := make(map[string]interface{})
+		err = m.Inputs.UnpackIntoMap(in, input[4:])
+		Check(err)
+
+		fmt.Printf("Parsed in: %+v\n", in)
+		os.Exit(0)
+
 		receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
-		ix.Check(err)
+		Check(err)
 		gasUsed := new(big.Int).SetUint64(receipt.GasUsed)
 		if receipt.Status != 1 {
 			// Skip failed transactions.
