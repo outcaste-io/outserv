@@ -1,0 +1,55 @@
+type Block {
+  hash: String! @id
+
+  number: Int64 @search
+  baseFeePerGas: BigInt
+  difficulty: BigInt
+  extraData: String
+  gasLimit: Int64
+  gasUsed: Int64
+  logsBloom: String
+  miner: Account
+  mixHash: String
+  nonce: Int64
+  parentHash: String
+  receiptsRoot: String
+  sha3Uncles: String
+  size: Int64
+  stateRoot: String
+  timestamp: DateTime @search(by: [day])
+  totalDifficulty: BigInt
+  transactions: [Transaction]
+  transactionsRoot: String
+  uncles: [Block]
+}
+
+type Account {
+  address: String! @id
+
+  incoming: [Txn] @hasInverse(field: to)
+  outgoing: [Txn] @hasInverse(field: from)
+  mined: [Block] @hasInverse(field: miner)
+}
+
+type Transaction {
+  hash: String @id
+
+  block: Block @hasInverse(field: transactions)
+  blockNumber: Int64 @search
+  from: Account
+  gas: Int64
+  gasPrice: BigInt
+  maxFeePerGas: BigInt
+  maxPriorityFeePerGas: BigInt
+  input: String
+  nonce: Int64
+  to: Account
+  transactionIndex: Int
+  value: BigInt @search
+  type: Int
+  # accessList
+  chainId: Int
+  v: String
+  r: String
+  s: String
+}
