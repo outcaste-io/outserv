@@ -384,12 +384,6 @@ directive @provides(fields: _FieldSet!) on FIELD_DEFINITION
 directive @key(fields: _FieldSet!) on OBJECT | INTERFACE
 directive @extends on OBJECT | INTERFACE
 `
-	apolloSchemaQueries = `
-type Query {
-	_entities(representations: [_Any!]!): [_Entity]!
-	_service: _Service!
-}
-`
 )
 
 // Filters for Boolean and enum aren't needed in here schemaExtras because they are
@@ -2552,14 +2546,6 @@ func Stringify(schema *ast.Schema, originalTypes []string) string {
 		"#######################\n# Extended Definitions\n#######################\n"))
 	x.Check2(sch.WriteString(schemaExtras))
 	x.Check2(sch.WriteString("\n"))
-	// Add Apollo Extras to the schema only when "_Entity" union is generated.
-	if schema.Types["_Entity"] != nil {
-		x.Check2(sch.WriteString(
-			"#######################\n# Extended Apollo Definitions\n#######################\n"))
-		x.Check2(sch.WriteString(generateUnionString(schema.Types["_Entity"])))
-		x.Check2(sch.WriteString(apolloSchemaExtras))
-		x.Check2(sch.WriteString("\n"))
-	}
 	if object.Len() > 0 {
 		x.Check2(sch.WriteString(
 			"#######################\n# Generated Types\n#######################\n\n"))

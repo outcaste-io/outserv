@@ -26,8 +26,8 @@ type Block {
 type Account {
   address: String! @id
 
-  incoming: [Txn] @hasInverse(field: to)
-  outgoing: [Txn] @hasInverse(field: from)
+  incoming: [Transaction] @hasInverse(field: to)
+  outgoing: [Transaction] @hasInverse(field: from)
   mined: [Block] @hasInverse(field: miner)
 }
 
@@ -44,11 +44,11 @@ type Transaction {
   input: String
   nonce: Int64
   to: Account
-  transactionIndex: Int
+  transactionIndex: Int64
   value: BigInt @search
-  type: Int
+  type: Int64
   # accessList
-  chainId: Int
+  chainId: Int64
   v: String
   r: String
   s: String

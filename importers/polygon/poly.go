@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"flag"
@@ -11,11 +12,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/outcaste-io/outserv/lex"
 	"github.com/pkg/errors"
 )
 
@@ -24,12 +27,40 @@ var dst = flag.String("dst", "", "Outserv GraphQL endpoint, or a directory")
 var start = flag.Int64("start", 1, "Starting Block Number")
 var end = flag.Int64("end", 0, "If set, stop at this Block Number, including it")
 var gor = flag.Int("j", 4, "Num Goroutines to use")
+var dryRun = flag.Bool("dry", false, "If true, don't send txns to GraphQL endpoint")
 
 func uid(writer io.Writer, typ, id string) string {
 	if writer == nil {
 		return ""
 	}
 	return fmt.Sprintf("_:%s.%s", typ, id)
+}
+
+func sendRequest(data []byte) error {
+	if *dryRun {
+		return nil
+	}
+	// TODO: Check that the schema is correctly set.
+	var wr WResp
+	resp, err := http.Post(fmt.Sprintf("%s/graphql", *dst),
+		"application/graphql", bytes.NewBuffer(data))
+	if err != nil {
+		return errors.Wrapf(err, "while posting request")
+	}
+	out, err := ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	if err := json.Unmarshal(out, &wr); err != nil {
+		return errors.Wrapf(err, "response: %s\n", out)
+	}
+	for _, werr := range wr.Errors {
+		if len(werr.Message) > 0 {
+			fmt.Printf("REQUEST was:\n%s\n", data)
+			return fmt.Errorf("Got error from GraphQL: %s\n", werr.Message)
+		}
+	}
+
+	return nil
 }
 
 func fetchBlock(writer io.Writer, blockNumber int64) (*BlockParsed, error) {
@@ -82,6 +113,85 @@ func fetchBlock(writer io.Writer, blockNumber int64) (*BlockParsed, error) {
 	return &out, nil
 }
 
+var blockMu = `
+mutation {
+	addBlock(upsert: true, input: %s) {
+		numUids
+	}
+}
+`
+
+type Resp struct {
+	NumUids int `json:"numUids"`
+}
+type DataResp struct {
+	Resp Resp `json:"addTxn"`
+}
+type ErrorResp struct {
+	Message string `json:"message"`
+}
+type WResp struct {
+	Data   DataResp    `json:"data"`
+	Errors []ErrorResp `json:"errors"`
+}
+type Batch struct {
+	Blks []BlockParsed `json:"Blks,omitempty"`
+}
+type GQL struct {
+	Query     string `json:"query"`
+	Variables Batch  `json:"variables"`
+}
+
+func isQuote(r rune) bool {
+	return r == '"'
+}
+func isColon(r rune) bool {
+	return r == ':'
+}
+func lexTopLevel(l *lex.Lexer) lex.StateFn {
+	r := l.Next()
+	if r == '{' {
+		l.Depth++
+		l.ArgDepth = 0
+	} else if r == '}' {
+		l.Depth--
+		if l.Depth == 0 {
+			return nil
+		}
+	} else if l.Depth > 0 && l.ArgDepth == 0 && r == '"' {
+		// This is the key. Do not emit.
+		l.Ignore()
+		l.Next()
+		l.AcceptUntil(isQuote)
+		l.Emit(lex.ItemType(2))
+		l.Next()
+		l.Ignore()
+		l.AcceptUntil(isColon)
+		l.Next()
+		l.Emit(lex.ItemType(2))
+		l.ArgDepth++
+		return lexTopLevel
+	} else if l.ArgDepth > 0 && r == '"' {
+		Check(l.LexQuotedString())
+		l.Emit(lex.ItemType(2))
+		l.ArgDepth--
+		return lexTopLevel
+	}
+	l.Emit(lex.ItemType(2))
+	return lexTopLevel
+}
+
+func toGraphQLInput(data []byte) {
+	fmt.Printf("data of len: %d\n", len(data))
+	lex := lex.Lexer{Input: string(data)}
+	lex.Run(lexTopLevel)
+	itr := lex.NewIterator()
+	for itr.Next() {
+		item := itr.Item()
+		fmt.Printf("Got val: %s\n", item.Val)
+	}
+}
+
 func processBlock(gid int, wg *sync.WaitGroup) {
 	defer wg.Done()
 
@@ -115,6 +225,18 @@ func processBlock(gid int, wg *sync.WaitGroup) {
 			Check(err)
 		} else {
 			// Send to Outserv directly
+			data, err := json.Marshal([]BlockParsed{*block})
+			Check(err)
+			// fmt.Printf("Before:\n%s\n", data)
+			gqdata := toGraphQLInputX(data)
+
+			q := fmt.Sprintf(blockMu, gqdata)
+			// q := GQL{
+			// 	Query:     blockMu,
+			// 	Variables: Batch{Blks: []BlockParsed{*block}},
+			// }
+			fmt.Printf("Query:\n%s\n", q)
+			Check(sendRequest([]byte(q)))
 		}
 	}
 }
@@ -147,9 +269,14 @@ func latestBlock() (int64, error) {
 }
 
 var blockCh = make(chan int64, 16)
+var graphqlRe *regexp.Regexp
 
 func main() {
 	flag.Parse()
+
+	var err error
+	graphqlRe, err = regexp.Compile(`\"([a-zA-Z0-9_]+)\":`)
+	Check(err)
 
 	bend, err := latestBlock()
 	Check(err)

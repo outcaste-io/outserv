@@ -51,7 +51,7 @@ func TypeForValue(v []byte) (TypeID, interface{}) {
 
 	// Possible int.
 	case checkInt(s):
-		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+		if i, err := strconv.ParseInt(s, 0, 64); err == nil {
 			return TypeInt64, i
 		}
 

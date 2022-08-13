@@ -5,8 +5,11 @@ package types
 
 import (
 	"math/big"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	geom "github.com/twpayne/go-geom"
 )
 
@@ -190,6 +193,13 @@ func ValueForType(id TypeID) Val {
 // ParseTime parses the time from string trying various datetime formats.
 // By default, Go parses time in UTC unless specified in the data itself.
 func ParseTime(val string) (time.Time, error) {
+	if strings.HasPrefix(val, "0x") { // JSON-RPC format
+		epoch, err := strconv.ParseInt(val, 0, 64)
+		if err != nil {
+			return time.Time{}, errors.Wrapf(err, "Unable to parse hex for time: %s", val)
+		}
+		return time.Unix(epoch, 0), nil
+	}
 	if len(val) == len(dateFormatY) {
 		return time.Parse(dateFormatY, val)
 	}

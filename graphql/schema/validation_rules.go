@@ -151,7 +151,7 @@ func intRangeCheck(observers *validator.Events, addError validator.AddErrFunc) {
 			if value.Kind == ast.NullValue {
 				return
 			}
-			_, err := strconv.ParseInt(value.Raw, 10, 32)
+			_, err := strconv.ParseInt(value.Raw, 0, 32)
 			if err != nil {
 				if errors.Is(err, strconv.ErrRange) {
 					addError(validator.Message("Out of range value '%s', for type `%s`",
@@ -162,7 +162,7 @@ func intRangeCheck(observers *validator.Events, addError validator.AddErrFunc) {
 			}
 		case "Int64":
 			if value.Kind == ast.IntValue || value.Kind == ast.StringValue {
-				_, err := strconv.ParseInt(value.Raw, 10, 64)
+				_, err := strconv.ParseInt(value.Raw, 0, 64)
 				if err != nil {
 					if errors.Is(err, strconv.ErrRange) {
 						addError(validator.Message("Out of range value '%s', for type `%s`",
@@ -193,7 +193,7 @@ func intRangeCheck(observers *validator.Events, addError validator.AddErrFunc) {
 		case "UInt64":
 			// UInt64 exists only in admin schema
 			if value.Kind == ast.IntValue || value.Kind == ast.StringValue {
-				_, err := strconv.ParseUint(value.Raw, 10, 64)
+				_, err := strconv.ParseUint(value.Raw, 0, 64)
 				if err != nil {
 					addError(validator.Message(err.Error()), validator.At(value.Position))
 				}

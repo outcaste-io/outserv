@@ -2122,7 +2122,7 @@ func parseAsJSONTemplate(value *ast.Value, vars map[string]bool, strictJSON bool
 		vars[value.Raw] = true
 		return value.String(), nil
 	case ast.IntValue:
-		return strconv.ParseInt(value.Raw, 10, 64)
+		return strconv.ParseInt(value.Raw, 0, 64)
 	case ast.FloatValue:
 		return strconv.ParseFloat(value.Raw, 64)
 	case ast.BooleanValue:
