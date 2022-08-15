@@ -65,7 +65,7 @@ func sendRequest(data []byte) error {
 	return nil
 }
 
-func fillReceipt(dst *TransactionOut, writer io.Writer) error {
+func fetchReceipt(dst *TransactionOut, writer io.Writer) error {
 	q := fmt.Sprintf(`{
 	"jsonrpc": "2.0",
 	"method": "eth_getTransactionReceipt",
@@ -81,19 +81,23 @@ func fillReceipt(dst *TransactionOut, writer io.Writer) error {
 	if err != nil {
 		return errors.Wrapf(err, "Unable to read response")
 	}
+	if len(data) == 0 {
+		return fmt.Errorf("Zero length response for receipt: %s", dst.Hash)
+	}
 
 	type T struct {
 		Result TransactionRPC `json:"result"`
 	}
 	var t T
-	Check(json.Unmarshal(data, &t))
+	if err := json.Unmarshal(data, &t); err != nil {
+		return errors.Wrapf(err, "unmarshal failed for receipt %s with data %s", dst.Hash, data)
+	}
 
 	src := t.Result
 	if len(src.TransactionHash) == 0 {
 		// I see this happening in txn
 		// 0xf6c3feac09aa84558510f74af0c9bf7fd51ff15f902f68d51592e09cad8896b2
-		fmt.Printf("Got NO receipt for HASH: %s\n", dst.Hash)
-		return nil
+		return fmt.Errorf("Got NO receipt for HASH: %s\n", dst.Hash)
 	}
 	if src.TransactionHash != dst.Hash {
 		log.Fatalf("Receipt hash: %s . Wanted hash: %s\n", src.TransactionHash, dst.Hash)
@@ -144,6 +148,9 @@ func fetchBlock(writer io.Writer, blockNumber int64) (*BlockOut, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "Unable to read response")
 	}
+	if len(data) == 0 {
+		return nil, fmt.Errorf("Zero length response for block: %#x", blockNumber)
+	}
 
 	type T struct {
 		Result BlockRPC `json:"result"`
@@ -175,7 +182,14 @@ func fetchBlock(writer io.Writer, blockNumber int64) (*BlockOut, error) {
 			Address: t.To,
 		}
 		outTxn.Uid = uid(writer, "Transaction", outTxn.Hash)
-		Check(fillReceipt(&outTxn, writer))
+		for i := 0; i < 60; i++ {
+			err = fetchReceipt(&outTxn, writer)
+			if err == nil {
+				break
+			}
+			time.Sleep(time.Second)
+		}
+		Check(err)
 		out.Transactions = append(out.Transactions, outTxn)
 	}
 	return &out, nil
@@ -239,9 +253,16 @@ func processBlock(gid int, wg *sync.WaitGroup) {
 	}
 
 	for num := range blockCh {
-		block, err := fetchBlock(writer, num)
+		var block *BlockOut
+		for i := 0; i < 60; i++ {
+			block, err = fetchBlock(writer, num)
+			if err == nil {
+				break
+			}
+			time.Sleep(time.Second)
+		}
 		if err != nil {
-			fmt.Printf("Unable to parse block: %d\n", num)
+			fmt.Printf("Unable to fetch block: %#x . Got error: %v", num, err)
 			Check(err)
 		}
 		if writer != nil {
@@ -323,7 +344,7 @@ func printMetrics() {
 		rm.Capture(num)
 
 		dur := time.Since(start)
-		fmt.Printf("BlockId: %8d Processed: %5d blocks %5d txns [ %6s @ %5d blocks/min ]\n",
+		fmt.Printf("BlockId: %8d Processed: %5d blocks | %5d txns [ %6s @ %5d blocks/min ]\n",
 			maxBlockId, num, atomic.LoadUint64(&numTxns),
 			dur.Round(time.Second), rm.Rate()*60.0)
 	}
