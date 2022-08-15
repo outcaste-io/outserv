@@ -103,16 +103,16 @@ type LogRPC struct {
 }
 type LogOut struct {
 	Log
-	Uid         string         `json:"uid,omitempty"`
-	Transaction TransactionOut `json:"transaction,omitempty"`
-	Block       BlockOut       `json:"block,omitempty"`
+	Uid         string          `json:"uid,omitempty"`
+	Transaction *TransactionOut `json:"transaction,omitempty"`
+	Block       *BlockOut       `json:"block,omitempty"`
 }
 
 const quote = '"'
 
-// toGraphQLInputX does NOT handle a {"key": 1.0} yet. But, we don't expect
+// toGraphQLInput does NOT handle a {"key": 1.0} yet. But, we don't expect
 // those from JSON-RPC anyway.
-func toGraphQLInputX(data []byte) []byte {
+func toGraphQLInput(data []byte) []byte {
 	var depth, key int
 	out := &bytes.Buffer{}
 	out.Grow(len(data))

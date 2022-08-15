@@ -81,7 +81,6 @@ func fillReceipt(dst *TransactionOut, writer io.Writer) error {
 	if err != nil {
 		return errors.Wrapf(err, "Unable to read response")
 	}
-	fmt.Printf("Got receipt data: %s\n", data)
 
 	type T struct {
 		Result TransactionRPC `json:"result"`
@@ -95,15 +94,16 @@ func fillReceipt(dst *TransactionOut, writer io.Writer) error {
 		log.Fatalf("Receipt hash: %s . Wanted hash: %s\n", src.TransactionHash, dst.Hash)
 		return nil
 	}
-	fmt.Printf("---------Got result: %+v\n", src)
 
 	Assert(len(dst.Logs) == 0) // Should only fill once.
 	for _, l := range src.Logs {
 		var lo LogOut
 		lo.Log = l.Log
 		lo.Uid = uid(writer, "Log", fmt.Sprintf("%s-%s", dst.Hash, l.LogIndex))
-		lo.Transaction = TransactionOut{Uid: dst.Uid}
-		lo.Block = BlockOut{Uid: uid(writer, "Block", src.BlockHash)}
+		if writer != nil {
+			lo.Transaction = &TransactionOut{Uid: dst.Uid}
+			lo.Block = &BlockOut{Uid: uid(writer, "Block", src.BlockHash)}
+		}
 		dst.Logs = append(dst.Logs, lo)
 	}
 	dst.ContractAddress = src.ContractAddress
@@ -181,6 +181,14 @@ mutation {
 }
 `
 
+var blockMuWithVar = `
+mutation($Blks: [AddBlockInput!]!) {
+	addBlock(upsert: true, input: $Blks) {
+		numUids
+	}
+}
+`
+
 type Resp struct {
 	NumUids int `json:"numUids"`
 }
@@ -241,17 +249,6 @@ func lexTopLevel(l *lex.Lexer) lex.StateFn {
 	return lexTopLevel
 }
 
-func toGraphQLInput(data []byte) {
-	fmt.Printf("data of len: %d\n", len(data))
-	lex := lex.Lexer{Input: string(data)}
-	lex.Run(lexTopLevel)
-	itr := lex.NewIterator()
-	for itr.Next() {
-		item := itr.Item()
-		fmt.Printf("Got val: %s\n", item.Val)
-	}
-}
-
 func processBlock(gid int, wg *sync.WaitGroup) {
 	defer wg.Done()
 
@@ -279,7 +276,7 @@ func processBlock(gid int, wg *sync.WaitGroup) {
 			Check(err)
 		}
 		if writer != nil {
-			data, err := json.Marshal(block)
+			data, err := json.Marshal([]BlockOut{*block})
 			Check(err)
 			_, err = writer.Write(data)
 			Check(err)
@@ -287,16 +284,19 @@ func processBlock(gid int, wg *sync.WaitGroup) {
 			// Send to Outserv directly
 			data, err := json.Marshal([]BlockOut{*block})
 			Check(err)
-			// fmt.Printf("Before:\n%s\n", data)
-			gqdata := toGraphQLInputX(data)
+			fmt.Printf("Before:\n%s\n", data)
+			gqdata := toGraphQLInput(data)
 
 			q := fmt.Sprintf(blockMu, gqdata)
-			// q := GQL{
-			// 	Query:     blockMu,
-			// 	Variables: Batch{Blks: []BlockParsed{*block}},
-			// }
-			fmt.Printf("Query:\n%s\n", q)
 			Check(sendRequest([]byte(q)))
+
+			// q := GQL{
+			// 	Query:     blockMuWithVar,
+			// 	Variables: Batch{Blks: []BlockOut{*block}},
+			// }
+			// data, err := json.Marshal(q)
+			// Check(err)
+			// Check(sendRequest(data))
 		}
 	}
 }

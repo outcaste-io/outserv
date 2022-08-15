@@ -71,7 +71,7 @@ type Log {
   blockNumber: Int64 @search
   transactionIndex: Int64
   logIndex: Int64
-  removed: Bool
+  removed: Boolean
   transaction: Transaction @hasInverse(field: logs)
   block: Block @hasInverse(field: logs)
 }
