@@ -499,7 +499,9 @@ func Marshal(from Val, toID TypeID) (Val, error) {
 	return to, nil
 }
 
-func ToBinary(id TypeID, b interface{}) ([]byte, error) {
+// ToBinary converts the value `b` to its byte representation, followed by
+// conversion to Sval, which holds the first byte as the ID.
+func ToBinary(id TypeID, b interface{}) (Sval, error) {
 	to, err := Marshal(Val{id, b}, TypeBinary)
 	if err != nil {
 		return nil, err
