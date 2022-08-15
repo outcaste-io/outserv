@@ -9,10 +9,12 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -63,7 +65,64 @@ func sendRequest(data []byte) error {
 	return nil
 }
 
-func fetchBlock(writer io.Writer, blockNumber int64) (*BlockParsed, error) {
+func fillReceipt(dst *TransactionOut, writer io.Writer) error {
+	q := fmt.Sprintf(`{
+	"jsonrpc": "2.0",
+	"method": "eth_getTransactionReceipt",
+	"params": [%q],
+	"id": 1}`, dst.Hash)
+
+	resp, err := http.Post(*url, "application/json", strings.NewReader(q))
+	if err != nil {
+		return errors.Wrapf(err, "Unable to fetch receipt: %s", dst.Hash)
+	}
+	defer resp.Body.Close()
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return errors.Wrapf(err, "Unable to read response")
+	}
+	fmt.Printf("Got receipt data: %s\n", data)
+
+	type T struct {
+		Result TransactionRPC `json:"result"`
+	}
+	var t T
+	Check(json.Unmarshal(data, &t))
+
+	src := t.Result
+	Assert(len(src.TransactionHash) > 0)
+	if src.TransactionHash != dst.Hash {
+		log.Fatalf("Receipt hash: %s . Wanted hash: %s\n", src.TransactionHash, dst.Hash)
+		return nil
+	}
+	fmt.Printf("---------Got result: %+v\n", src)
+
+	Assert(len(dst.Logs) == 0) // Should only fill once.
+	for _, l := range src.Logs {
+		var lo LogOut
+		lo.Log = l.Log
+		lo.Uid = uid(writer, "Log", fmt.Sprintf("%s-%s", dst.Hash, l.LogIndex))
+		lo.Transaction = TransactionOut{Uid: dst.Uid}
+		lo.Block = BlockOut{Uid: uid(writer, "Block", src.BlockHash)}
+		dst.Logs = append(dst.Logs, lo)
+	}
+	dst.ContractAddress = src.ContractAddress
+	dst.CumulativeGasUsed = src.CumulativeGasUsed
+	// dst.EffectiveGasPrice = src.EffectiveGasPrice
+	dst.GasUsed = src.GasUsed
+	dst.Status = src.Status
+
+	// Calculate Fee
+	if price, ok := new(big.Int).SetString(dst.GasPrice, 0); ok {
+		if gasUsed, ok2 := new(big.Int).SetString(dst.GasUsed, 0); ok2 {
+			fee := new(big.Int).Mul(price, gasUsed)
+			dst.Fee = "0x" + fee.Text(16)
+		}
+	}
+	return nil
+}
+
+func fetchBlock(writer io.Writer, blockNumber int64) (*BlockOut, error) {
 	fmt.Printf("Processing block: %d\n", blockNumber)
 	q := fmt.Sprintf(`{
 	"jsonrpc": "2.0",
@@ -87,27 +146,28 @@ func fetchBlock(writer io.Writer, blockNumber int64) (*BlockParsed, error) {
 	var t T
 	Check(json.Unmarshal(data, &t))
 
-	var out BlockParsed
+	var out BlockOut
 	out.Block = t.Result.Block
 	out.Uid = uid(writer, "Block", out.Hash)
 	if len(t.Result.Miner) > 0 {
-		out.Miner = Account{
+		out.Miner = &AccountOut{
 			Uid:     uid(writer, "Account", t.Result.Miner),
 			Address: t.Result.Miner,
 		}
 	}
 	for _, t := range t.Result.Transactions {
-		var outTxn TransactionParsed
+		var outTxn TransactionOut
 		outTxn.Transaction = t.Transaction
-		outTxn.From = Account{
+		outTxn.From = &AccountOut{
 			Uid:     uid(writer, "Account", t.From),
 			Address: t.From,
 		}
-		outTxn.To = Account{
+		outTxn.To = &AccountOut{
 			Uid:     uid(writer, "Account", t.To),
 			Address: t.To,
 		}
 		outTxn.Uid = uid(writer, "Transaction", outTxn.Hash)
+		Check(fillReceipt(&outTxn, writer))
 		out.Transactions = append(out.Transactions, outTxn)
 	}
 	return &out, nil
@@ -135,7 +195,7 @@ type WResp struct {
 	Errors []ErrorResp `json:"errors"`
 }
 type Batch struct {
-	Blks []BlockParsed `json:"Blks,omitempty"`
+	Blks []BlockOut `json:"Blks,omitempty"`
 }
 type GQL struct {
 	Query     string `json:"query"`
@@ -225,7 +285,7 @@ func processBlock(gid int, wg *sync.WaitGroup) {
 			Check(err)
 		} else {
 			// Send to Outserv directly
-			data, err := json.Marshal([]BlockParsed{*block})
+			data, err := json.Marshal([]BlockOut{*block})
 			Check(err)
 			// fmt.Printf("Before:\n%s\n", data)
 			gqdata := toGraphQLInputX(data)
@@ -243,7 +303,14 @@ func processBlock(gid int, wg *sync.WaitGroup) {
 
 func Check(err error) {
 	if err != nil {
+		debug.PrintStack()
 		log.Fatalf("Got error: %v", err)
+	}
+}
+func Assert(thing bool) {
+	if !thing {
+		debug.PrintStack()
+		log.Fatal("Assertion failed")
 	}
 }
 

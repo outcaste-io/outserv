@@ -34,14 +34,14 @@ type BlockRPC struct {
 	Transactions []TransactionRPC
 }
 
-type BlockParsed struct {
-	Uid string `json:"uid,omitempty"`
+type BlockOut struct {
 	Block
-	Miner        Account             `json:"miner,omitempty"`
-	Transactions []TransactionParsed `json:"transactions,omitempty"`
+	Uid          string           `json:"uid,omitempty"`
+	Miner        *AccountOut      `json:"miner,omitempty"`
+	Transactions []TransactionOut `json:"transactions,omitempty"`
 }
 
-type Account struct {
+type AccountOut struct {
 	Uid     string `json:"uid,omitempty"`
 	Address string `json:"address,omitempty"`
 }
@@ -62,19 +62,50 @@ type Transaction struct {
 	V                    string `json:"v,omitempty"`
 	R                    string `json:"r,omitempty"`
 	S                    string `json:"s,omitempty"`
-}
 
+	// Fields picked from Receipt.
+	ContractAddress   string `json:"contractAddress,omitempty"`
+	CumulativeGasUsed string `json:"cumulativeGasUsed,omitempty"`
+	// EffectiveGasPrice string `json:"effectiveGasPrice,omitempty"` // = GasPrice
+	GasUsed string `json:"gasUsed,omitempty"` // != Gas
+	Status  string `json:"status,omitempty"`
+}
 type TransactionRPC struct {
 	Transaction
-	From string `json:"from,omitempty"`
-	To   string `json:"to,omitempty"`
+	TransactionHash string   `json:"transactionHash,omitempty"`
+	BlockHash       string   `json:"blockHash,omitempty"`
+	From            string   `json:"from,omitempty"`
+	To              string   `json:"to,omitempty"`
+	Logs            []LogRPC `json:"logs,omitempty"`
+}
+type TransactionOut struct {
+	Transaction
+	Uid  string      `json:"uid,omitempty"`
+	Fee  string      `json:"fee,omitempty"`
+	From *AccountOut `json:"from,omitempty"`
+	To   *AccountOut `json:"to,omitempty"`
+	Logs []LogOut    `json:"logs,omitempty"`
 }
 
-type TransactionParsed struct {
-	Uid string `json:"uid,omitempty"`
-	Transaction
-	From Account `json:"from,omitempty"`
-	To   Account `json:"to,omitempty"`
+type Log struct {
+	Address          string   `json:"address,omitempty"`
+	Topics           []string `json:"topics,omitempty"`
+	Data             string   `json:"data,omitempty"`
+	BlockNumber      string   `json:"blockNumber,omitempty"`
+	TransactionIndex string   `json:"transactionIndex,omitempty"`
+	LogIndex         string   `json:"logIndex,omitempty"`
+	Removed          bool     `json:"removed,omitempty"`
+}
+type LogRPC struct {
+	Log
+	TransactionHash string `json:"transactionHash,omitempty"`
+	BlockHash       string `json:"blockHash,omitempty"`
+}
+type LogOut struct {
+	Log
+	Uid         string         `json:"uid,omitempty"`
+	Transaction TransactionOut `json:"transaction,omitempty"`
+	Block       BlockOut       `json:"block,omitempty"`
 }
 
 const quote = '"'
