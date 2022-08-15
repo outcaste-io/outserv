@@ -149,7 +149,10 @@ func fetchBlock(writer io.Writer, blockNumber int64) (*BlockOut, error) {
 		Result BlockRPC `json:"result"`
 	}
 	var t T
-	Check(json.Unmarshal(data, &t))
+	if err := json.Unmarshal(data, &t); err != nil {
+		fmt.Printf("Unable to unmarshal data:\n%s\n", data)
+		Check(err)
+	}
 
 	var out BlockOut
 	out.Block = t.Result.Block
