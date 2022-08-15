@@ -89,7 +89,12 @@ func fillReceipt(dst *TransactionOut, writer io.Writer) error {
 	Check(json.Unmarshal(data, &t))
 
 	src := t.Result
-	Assert(len(src.TransactionHash) > 0)
+	if len(src.TransactionHash) == 0 {
+		// I see this happening in txn
+		// 0xf6c3feac09aa84558510f74af0c9bf7fd51ff15f902f68d51592e09cad8896b2
+		fmt.Printf("Got receipt %s for HASH: %s\n", data, dst.Hash)
+		return nil
+	}
 	if src.TransactionHash != dst.Hash {
 		log.Fatalf("Receipt hash: %s . Wanted hash: %s\n", src.TransactionHash, dst.Hash)
 		return nil
