@@ -18,9 +18,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/outcaste-io/outserv/lex"
 	"github.com/pkg/errors"
 )
 
@@ -92,7 +92,7 @@ func fillReceipt(dst *TransactionOut, writer io.Writer) error {
 	if len(src.TransactionHash) == 0 {
 		// I see this happening in txn
 		// 0xf6c3feac09aa84558510f74af0c9bf7fd51ff15f902f68d51592e09cad8896b2
-		fmt.Printf("Got receipt %s for HASH: %s\n", data, dst.Hash)
+		fmt.Printf("Got NO receipt for HASH: %s\n", dst.Hash)
 		return nil
 	}
 	if src.TransactionHash != dst.Hash {
@@ -128,7 +128,7 @@ func fillReceipt(dst *TransactionOut, writer io.Writer) error {
 }
 
 func fetchBlock(writer io.Writer, blockNumber int64) (*BlockOut, error) {
-	fmt.Printf("Processing block: %d\n", blockNumber)
+	// fmt.Printf("Processing block: %d\n", blockNumber)
 	q := fmt.Sprintf(`{
 	"jsonrpc": "2.0",
 	"method": "eth_getBlockByNumber",
@@ -215,45 +215,6 @@ type GQL struct {
 	Variables Batch  `json:"variables"`
 }
 
-func isQuote(r rune) bool {
-	return r == '"'
-}
-func isColon(r rune) bool {
-	return r == ':'
-}
-func lexTopLevel(l *lex.Lexer) lex.StateFn {
-	r := l.Next()
-	if r == '{' {
-		l.Depth++
-		l.ArgDepth = 0
-	} else if r == '}' {
-		l.Depth--
-		if l.Depth == 0 {
-			return nil
-		}
-	} else if l.Depth > 0 && l.ArgDepth == 0 && r == '"' {
-		// This is the key. Do not emit.
-		l.Ignore()
-		l.Next()
-		l.AcceptUntil(isQuote)
-		l.Emit(lex.ItemType(2))
-		l.Next()
-		l.Ignore()
-		l.AcceptUntil(isColon)
-		l.Next()
-		l.Emit(lex.ItemType(2))
-		l.ArgDepth++
-		return lexTopLevel
-	} else if l.ArgDepth > 0 && r == '"' {
-		Check(l.LexQuotedString())
-		l.Emit(lex.ItemType(2))
-		l.ArgDepth--
-		return lexTopLevel
-	}
-	l.Emit(lex.ItemType(2))
-	return lexTopLevel
-}
-
 func processBlock(gid int, wg *sync.WaitGroup) {
 	defer wg.Done()
 
@@ -303,6 +264,8 @@ func processBlock(gid int, wg *sync.WaitGroup) {
 			// Check(err)
 			// Check(sendRequest(data))
 		}
+		atomic.AddUint64(&numBlocks, 1)
+		atomic.AddUint64(&numTxns, uint64(len(block.Transactions)))
 	}
 }
 
@@ -342,10 +305,31 @@ func latestBlock() (int64, error) {
 
 var blockCh = make(chan int64, 16)
 var graphqlRe *regexp.Regexp
+var curBlock int64
+var numBlocks, numTxns uint64
+
+func printMetrics() {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	rm := NewRateMonitor(300)
+	start := time.Now()
+	for range ticker.C {
+		maxBlockId := atomic.LoadInt64(&curBlock)
+		num := atomic.LoadUint64(&numBlocks)
+		rm.Capture(num)
+
+		dur := time.Since(start)
+		fmt.Printf("BlockId: %8d Processed: %5d blocks %5d txns [ %6s @ %5d blocks/min ]\n",
+			maxBlockId, num, atomic.LoadUint64(&numTxns),
+			dur.Round(time.Second), rm.Rate()*60.0)
+	}
+}
 
 func main() {
 	flag.Parse()
 
+	// TODO: Use graphqlRe possibly.
 	var err error
 	graphqlRe, err = regexp.Compile(`\"([a-zA-Z0-9_]+)\":`)
 	Check(err)
@@ -360,17 +344,19 @@ func main() {
 		go processBlock(i, wg)
 	}
 
-	curBlock := *start
+	go printMetrics()
+	atomic.StoreInt64(&curBlock, *start)
 	for {
+		cur := atomic.LoadInt64(&curBlock)
 		if *end != 0 {
-			if curBlock > *end {
+			if cur > *end {
 				break
 			}
 		}
 
-		if curBlock <= bend {
-			blockCh <- curBlock
-			curBlock++
+		if cur <= bend {
+			blockCh <- cur
+			atomic.AddInt64(&curBlock, 1)
 		} else {
 			time.Sleep(time.Second)
 			bend, err = latestBlock()
