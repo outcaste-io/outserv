@@ -95,16 +95,16 @@ func Convert(from Sval, toID TypeID) (Val, error) {
 			case TypeBinary:
 				*res = []byte(vc)
 			case TypeInt64:
-				val, err := strconv.ParseInt(vc, 10, 64)
+				val, err := strconv.ParseInt(vc, 0, 64)
 				if err != nil {
 					return to, err
 				}
 				*res = val
 			case TypeBigInt:
 				val := &big.Int{}
-				val, ok := val.SetString(vc, 10)
+				val, ok := val.SetString(vc, 0)
 				if !ok {
-					return to, errors.New("Non-numeric string")
+					return to, errors.Errorf("Unable to parse %s to big.Int", vc)
 				}
 				*res = *val
 			case TypeFloat:
@@ -195,7 +195,8 @@ func Convert(from Sval, toID TypeID) (Val, error) {
 			case TypeBool:
 				*res = vc.Int64() != 0
 			case TypeString, TypeDefault:
-				*res = vc.String()
+				*res = fmt.Sprintf("%#x", vc)
+				// *res = vc.String()
 			case TypeDatetime:
 				*res = time.Unix(vc.Int64(), 0).UTC()
 			default:
@@ -497,7 +498,9 @@ func Marshal(from Val, toID TypeID) (Val, error) {
 	return to, nil
 }
 
-func ToBinary(id TypeID, b interface{}) ([]byte, error) {
+// ToBinary converts the value `b` to its byte representation, followed by
+// conversion to Sval, which holds the first byte as the ID.
+func ToBinary(id TypeID, b interface{}) (Sval, error) {
 	to, err := Marshal(Val{id, b}, TypeBinary)
 	if err != nil {
 		return nil, err
@@ -526,6 +529,7 @@ func cantConvert(from TypeID, to TypeID) error {
 }
 
 // MarshalJSON makes Val satisfy the json.Marshaler interface.
+// TODO: More things in outputnode should be calling this.
 func (v Val) MarshalJSON() ([]byte, error) {
 	switch v.Tid {
 	case TypeInt64:
@@ -544,7 +548,8 @@ func (v Val) MarshalJSON() ([]byte, error) {
 		return json.Marshal(v.Value.(string))
 	case TypeBigInt:
 		i := v.Value.(big.Int)
-		return i.MarshalJSON()
+		return []byte("\"0x" + i.Text(16) + "\""), nil
+		// return i.MarshalJSON()
 	}
 	return nil, errors.Errorf("Invalid type for MarshalJSON: %v", v.Tid)
 }

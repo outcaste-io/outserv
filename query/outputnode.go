@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"math/big"
 	"strconv"
 	"strings"
 	"sync"
@@ -659,12 +658,7 @@ func valToBytes(v types.Val) ([]byte, error) {
 	case types.TypePassword:
 		return []byte(fmt.Sprintf("%q", v.Value.(string))), nil
 	case types.TypeBigInt:
-		i := v.Value.(big.Int)
-		v, err := i.MarshalJSON()
-		if err != nil {
-			return nil, err
-		}
-		return []byte(fmt.Sprintf("\"%s\"", v)), nil
+		return v.MarshalJSON()
 	default:
 		return nil, errors.New("Unsupported types.Val.Tid")
 	}

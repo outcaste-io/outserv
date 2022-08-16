@@ -1,0 +1,77 @@
+type Block {
+  hash: String! @id
+
+  number: Int64 @search
+  baseFeePerGas: BigInt
+  difficulty: BigInt
+  extraData: String
+  gasLimit: Int64
+  gasUsed: Int64
+  logsBloom: String
+  miner: Account
+  mixHash: String
+  nonce: Int64
+  parentHash: String
+  receiptsRoot: String
+  sha3Uncles: String
+  size: Int64
+  stateRoot: String
+  timestamp: DateTime @search(by: [day])
+  totalDifficulty: BigInt
+  transactions: [Transaction]
+  transactionsRoot: String
+  uncles: [Block]
+  logs: [Log]
+}
+
+type Account {
+  address: String! @id
+
+  incoming: [Transaction] @hasInverse(field: to)
+  outgoing: [Transaction] @hasInverse(field: from)
+  mined: [Block] @hasInverse(field: miner)
+}
+
+type Transaction {
+  hash: String @id
+
+  block: Block @hasInverse(field: transactions)
+  blockNumber: Int64 @search
+  from: Account
+  gas: Int64
+  gasPrice: BigInt
+  maxFeePerGas: BigInt
+  maxPriorityFeePerGas: BigInt
+  input: String
+  nonce: Int64
+  to: Account
+  transactionIndex: Int64
+  value: BigInt @search
+  fee: BigInt @search
+  type: Int64
+  # accessList -- ignore for now
+  chainId: Int64
+  v: String
+  r: String
+  s: String
+
+  # Fields picked from receipt
+  contractAddress: String
+  cumulativeGasUsed: Int64
+  gasUsed: Int64
+  status: Int64
+  logs: [Log]
+}
+
+type Log {
+  oid: ID # Use Outserv ID
+  address: String
+  topics: [String]
+  data: String
+  blockNumber: Int64 @search
+  transactionIndex: Int64
+  logIndex: Int64
+  removed: Boolean
+  transaction: Transaction @hasInverse(field: logs)
+  block: Block @hasInverse(field: logs)
+}

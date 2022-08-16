@@ -1311,7 +1311,7 @@ func defaultDirectiveValidation(sch *ast.Schema,
 				typ.Name, field.Name, value, fieldType)}
 		}
 		if fieldType == "Int" {
-			if _, err := strconv.ParseInt(value, 10, 64); err != nil {
+			if _, err := strconv.ParseInt(value, 0, 64); err != nil {
 				return []*gqlerror.Error{gqlerror.ErrorPosf(
 					dir.Position,
 					"Type %s; Field %s: @default directive provides value \"%s\" which cannot be used with %s",

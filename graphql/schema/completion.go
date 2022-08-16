@@ -407,7 +407,7 @@ func coerceScalar(val interface{}, field *Field, path []interface{}) (interface{
 				val = 0
 			}
 		case string:
-			i, err := strconv.ParseInt(v, 10, 64)
+			i, err := strconv.ParseInt(v, 0, 64)
 			if err != nil {
 				return nil, valueCoercionError(v)
 			}
