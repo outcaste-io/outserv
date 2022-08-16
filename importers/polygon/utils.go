@@ -1,3 +1,4 @@
+// Copyright 2022 Outcaste LLC. Licensed under the Apache License v2.0.
 package main
 
 import "time"

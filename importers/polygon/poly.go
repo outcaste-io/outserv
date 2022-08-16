@@ -1,3 +1,4 @@
+// Copyright 2022 Outcaste LLC. Licensed under the Apache License v2.0.
 package main
 
 import (
@@ -13,7 +14,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -42,7 +42,6 @@ func sendRequest(data []byte) error {
 	if *dryRun {
 		return nil
 	}
-	// TODO: Check that the schema is correctly set.
 	var wr WResp
 	resp, err := http.Post(fmt.Sprintf("%s/graphql", *dst),
 		"application/graphql", bytes.NewBuffer(data))
@@ -95,8 +94,6 @@ func fetchReceipt(dst *TransactionOut, writer io.Writer) error {
 
 	src := t.Result
 	if len(src.TransactionHash) == 0 {
-		// I see this happening in txn
-		// 0xf6c3feac09aa84558510f74af0c9bf7fd51ff15f902f68d51592e09cad8896b2
 		return fmt.Errorf("Got NO receipt for HASH: %s\n", dst.Hash)
 	}
 	if src.TransactionHash != dst.Hash {
@@ -117,7 +114,7 @@ func fetchReceipt(dst *TransactionOut, writer io.Writer) error {
 	}
 	dst.ContractAddress = src.ContractAddress
 	dst.CumulativeGasUsed = src.CumulativeGasUsed
-	// dst.EffectiveGasPrice = src.EffectiveGasPrice
+	// dst.EffectiveGasPrice = src.EffectiveGasPrice // Same as GasPrice
 	dst.GasUsed = src.GasUsed
 	dst.Status = src.Status
 
@@ -272,6 +269,7 @@ func processBlock(gid int, wg *sync.WaitGroup) {
 			Check(err)
 		} else {
 			// Send to Outserv directly
+			// TODO: Fix this part.
 			data, err := json.Marshal([]BlockOut{*block})
 			Check(err)
 			fmt.Printf("Before:\n%s\n", data)
@@ -328,7 +326,6 @@ func latestBlock() (int64, error) {
 }
 
 var blockCh = make(chan int64, 16)
-var graphqlRe *regexp.Regexp
 var curBlock int64
 var numBlocks, numTxns uint64
 
@@ -352,11 +349,6 @@ func printMetrics() {
 
 func main() {
 	flag.Parse()
-
-	// TODO: Use graphqlRe possibly.
-	var err error
-	graphqlRe, err = regexp.Compile(`\"([a-zA-Z0-9_]+)\":`)
-	Check(err)
 
 	bend, err := latestBlock()
 	Check(err)

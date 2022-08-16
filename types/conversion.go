@@ -14,7 +14,6 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/pkg/errors"
 	geom "github.com/twpayne/go-geom"
@@ -549,7 +548,6 @@ func (v Val) MarshalJSON() ([]byte, error) {
 		return json.Marshal(v.Value.(string))
 	case TypeBigInt:
 		i := v.Value.(big.Int)
-		glog.Infof("inside marshal json")
 		return []byte("\"0x" + i.Text(16) + "\""), nil
 		// return i.MarshalJSON()
 	}
