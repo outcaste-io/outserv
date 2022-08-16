@@ -109,8 +109,9 @@ func fetchReceipt(dst *TransactionOut, writer io.Writer) error {
 		lo.Uid = uid(writer, "Log", fmt.Sprintf("%s-%s", dst.Hash, l.LogIndex))
 		if writer != nil {
 			lo.Transaction = &TransactionOut{Uid: dst.Uid}
-			lo.Block = &BlockOut{Uid: uid(writer, "Block", src.BlockHash)}
 		}
+		// Always include the block.
+		lo.Block = &BlockOut{Uid: fmt.Sprintf("_:Block.%s", src.BlockHash)}
 		dst.Logs = append(dst.Logs, lo)
 	}
 	dst.ContractAddress = src.ContractAddress
@@ -276,7 +277,7 @@ func processBlock(gid int, wg *sync.WaitGroup) {
 				Query:     blockMuWithVar,
 				Variables: Batch{Blks: []BlockOut{*block}},
 			}
-			data, err = json.Marshal(q)
+			data, err := json.Marshal(q)
 			Check(err)
 			Check(sendRequest(data))
 		}
