@@ -113,6 +113,8 @@ const quote = '"'
 
 // toGraphQLInput does NOT handle a {"key": 1.0} yet. But, we don't expect
 // those from JSON-RPC anyway.
+// TODO: Remove this function after making this importer work directly with
+// Outserv.
 func toGraphQLInput(data []byte) []byte {
 	var depth, key int
 	out := &bytes.Buffer{}

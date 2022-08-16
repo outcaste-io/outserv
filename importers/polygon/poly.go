@@ -24,8 +24,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-var url = flag.String("url", "", "Bor URL address")
-var dst = flag.String("dst", "", "Outserv GraphQL endpoint, or a directory")
+var url = flag.String("url", "", "Bor JSON-RPC URL")
+var dst = flag.String("dst", "", "Outserv GraphQL endpoint, or a directory."+
+	" If directory, it must exist already.")
 var start = flag.Int64("start", 1, "Starting Block Number")
 var end = flag.Int64("end", 0, "If set, stop at this Block Number, including it")
 var gor = flag.Int("j", 4, "Num Goroutines to use")
