@@ -64,7 +64,7 @@ type Transaction {
 }
 
 type Log {
-  oid: ID # Use Outserv ID
+  lid: String @id
   address: String
   topics: [String]
   data: String

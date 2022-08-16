@@ -269,23 +269,16 @@ func processBlock(gid int, wg *sync.WaitGroup) {
 			_, err = writer.Write(data)
 			Check(err)
 		} else {
-			// Send to Outserv directly
-			// TODO: Fix this part.
-			data, err := json.Marshal([]BlockOut{*block})
-			Check(err)
-			fmt.Printf("Before:\n%s\n", data)
-			gqdata := toGraphQLInput(data)
-
-			q := fmt.Sprintf(blockMu, gqdata)
-			Check(sendRequest([]byte(q)))
-
-			// q := GQL{
-			// 	Query:     blockMuWithVar,
-			// 	Variables: Batch{Blks: []BlockOut{*block}},
-			// }
-			// data, err := json.Marshal(q)
+			// data, err := json.Marshal([]BlockOut{*block})
 			// Check(err)
-			// Check(sendRequest(data))
+			// fmt.Printf("DATA:\n%s\n", data)
+			q := GQL{
+				Query:     blockMuWithVar,
+				Variables: Batch{Blks: []BlockOut{*block}},
+			}
+			data, err = json.Marshal(q)
+			Check(err)
+			Check(sendRequest(data))
 		}
 		atomic.AddUint64(&numBlocks, 1)
 		atomic.AddUint64(&numTxns, uint64(len(block.Transactions)))

@@ -308,6 +308,7 @@ func (n *node) mutationWorker(workerId int) {
 	}
 }
 
+// UidsForObject uses all the edges in obj to find a matching UID.
 func UidsForObject(ctx context.Context, obj *pb.Object, txn *posting.Txn) (*sroar.Bitmap, error) {
 	var res *sroar.Bitmap
 	for _, nq := range obj.Edges {
