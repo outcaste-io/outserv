@@ -55,11 +55,16 @@ func sendRequest(data []byte) error {
 	if err := json.Unmarshal(out, &wr); err != nil {
 		return errors.Wrapf(err, "response: %s\n", out)
 	}
+
+	var hasError bool
 	for _, werr := range wr.Errors {
 		if len(werr.Message) > 0 {
-			fmt.Printf("REQUEST was:\n%s\n", data)
-			return fmt.Errorf("Got error from GraphQL: %s\n", werr.Message)
+			hasError = true
 		}
+	}
+	// fmt.Printf("REQUEST was:\n%s\n", data)
+	if hasError {
+		return fmt.Errorf("Got error from GraphQL: %+v\n", wr.Errors)
 	}
 
 	return nil
@@ -106,13 +111,20 @@ func fetchReceipt(dst *TransactionOut, writer io.Writer) error {
 	for _, l := range src.Logs {
 		var lo LogOut
 		lo.Log = l.Log
-		lo.Uid = uid(writer, "Log", fmt.Sprintf("%s-%s", dst.Hash, l.LogIndex))
+		lo.Lid = fmt.Sprintf("%s|%s", dst.Hash, l.LogIndex) // Create a unique ID for Log
+		lo.Uid = uid(writer, "Log", lo.Lid)
 		if writer != nil {
 			lo.Transaction = &TransactionOut{Uid: dst.Uid}
+			lo.Block = &BlockOut{Uid: fmt.Sprintf("_:Block.%s", src.BlockHash)}
+		} else {
+			// We need to associate log to block, because there's no direct
+			// relation between the two that exists yet. When we add this,
+			// Outserv would automatically create the reverse edge too.
+			lo.Block = &BlockOut{}
+			lo.Block.Hash = src.BlockHash
 		}
-		// Always include the block.
-		lo.Block = &BlockOut{Uid: fmt.Sprintf("_:Block.%s", src.BlockHash)}
 		dst.Logs = append(dst.Logs, lo)
+
 	}
 	dst.ContractAddress = src.ContractAddress
 	dst.CumulativeGasUsed = src.CumulativeGasUsed
@@ -214,7 +226,7 @@ type Resp struct {
 	NumUids int `json:"numUids"`
 }
 type DataResp struct {
-	Resp Resp `json:"addTxn"`
+	Resp Resp `json:"addBlock"`
 }
 type ErrorResp struct {
 	Message string `json:"message"`
@@ -270,9 +282,19 @@ func processBlock(gid int, wg *sync.WaitGroup) {
 			_, err = writer.Write(data)
 			Check(err)
 		} else {
-			// data, err := json.Marshal([]BlockOut{*block})
+			// The following code snippet is used to create a simplified input.
+			// if len(block.Transactions) > 0 {
+			// 	block.Transactions = block.Transactions[:1]
+			// }
+			// t := &block.Transactions[0]
+			// if len(t.Logs) > 0 {
+			// 	t.Logs = t.Logs[:1]
+			// }
+			// b := Batch{Blks: []BlockOut{*block}}
+			// data, err := json.Marshal(b)
 			// Check(err)
 			// fmt.Printf("DATA:\n%s\n", data)
+
 			q := GQL{
 				Query:     blockMuWithVar,
 				Variables: Batch{Blks: []BlockOut{*block}},
