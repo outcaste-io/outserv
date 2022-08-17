@@ -6,6 +6,7 @@ package posting
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"log"
 	"math"
@@ -337,12 +338,13 @@ func fingerprintEdge(t *pb.Edge) uint64 {
 
 	// All edges with a value without LANGTAG, have the same UID. In other words,
 	// an (entity, attribute) can only have one untagged value.
-	var id uint64 = math.MaxUint64
+	return math.MaxUint64
+	// var id uint64 = math.MaxUint64
 
-	if schema.State().IsList(t.Predicate) {
-		id = farm.Fingerprint64(t.ObjectValue)
-	}
-	return id
+	// if schema.State().IsList(t.Predicate) {
+	// 	id = farm.Fingerprint64(t.ObjectValue)
+	// }
+	// return id
 }
 
 func (l *List) addMutation(ctx context.Context, txn *Txn, t *pb.Edge) error {
@@ -1283,26 +1285,37 @@ func (l *List) AllValues(readTs uint64) ([]types.Sval, error) {
 	defer l.RUnlock()
 
 	var vals []types.Sval
-	err := l.iterate(readTs, 0, func(p *pb.Posting) error {
-		vals = append(vals, types.Sval(p.Value))
-		return nil
-	})
-	return vals, errors.Wrapf(err, "cannot retrieve all values from list with key %s",
-		hex.EncodeToString(l.key))
-}
+	v, err := l.Value(readTs)
+	if err == ErrNoValue {
+		return vals, err
+	}
+	if err != nil {
+		return vals, errors.Wrapf(err, "cannot retrieve all values from list with key %s",
+			hex.EncodeToString(l.key))
+	}
+	if len(v) == 0 {
+		return vals, nil
+	}
+	if v[0] != byte(types.TypeList) {
+		// There's only one value. Return that.
+		vals = append(vals, v)
+		return vals, nil
+	}
 
-// TODO(Lang): Remove this.
-func (l *List) GetLangTags(readTs uint64) ([]string, error) {
-	l.RLock()
-	defer l.RUnlock()
-
-	var tags []string
-	err := l.iterate(readTs, 0, func(p *pb.Posting) error {
-		tags = append(tags, "")
-		return nil
-	})
-	return tags, errors.Wrapf(err, "cannot retrieve language tags from list with key %s",
-		hex.EncodeToString(l.key))
+	r := bytes.NewReader(v[1:])
+	for r.Len() > 0 {
+		var sz [4]byte
+		if _, err := r.Read(sz[:]); err != nil {
+			return vals, errors.Wrapf(err, "unable to read key %s", hex.EncodeToString(l.key))
+		}
+		usz := binary.BigEndian.Uint32(sz[:])
+		val := make([]byte, usz)
+		if _, err := r.Read(val); err != nil {
+			return vals, errors.Wrapf(err, "unable to read key %s", hex.EncodeToString(l.key))
+		}
+		vals = append(vals, types.Sval(val))
+	}
+	return vals, nil
 }
 
 // Value returns the default value from the posting list. The default value is
@@ -1310,7 +1323,7 @@ func (l *List) GetLangTags(readTs uint64) ([]string, error) {
 func (l *List) Value(readTs uint64) (rval types.Sval, rerr error) {
 	l.RLock()
 	defer l.RUnlock()
-	val, found, err := l.findValue(readTs, math.MaxUint64)
+	val, found, err := l.findValue(readTs)
 	if err != nil {
 		return val, errors.Wrapf(err,
 			"cannot retrieve default value from list with key %s", hex.EncodeToString(l.key))
@@ -1321,34 +1334,9 @@ func (l *List) Value(readTs uint64) (rval types.Sval, rerr error) {
 	return val, nil
 }
 
-// ValueFor returns a value from posting list.
-func (l *List) ValueFor(readTs uint64) (rval types.Sval, rerr error) {
-	l.RLock() // All public methods should acquire locks, while private ones should assert them.
-	defer l.RUnlock()
-	p, err := l.postingFor(readTs)
-	if err != nil {
-		return rval, err
-	}
-	return types.Sval(p.Value), nil
-}
-
-// PostingFor returns the posting according to the preferred language list.
-func (l *List) PostingFor(readTs uint64, langs []string) (p *pb.Posting, rerr error) {
-	l.RLock()
-	defer l.RUnlock()
-	return l.postingFor(readTs)
-}
-
-func (l *List) postingFor(readTs uint64) (p *pb.Posting, rerr error) {
-	l.AssertRLock() // Avoid recursive locking by asserting a lock here.
-
-	_, pos, err := l.findPosting(readTs, math.MaxUint64)
-	return pos, err
-}
-
-func (l *List) findValue(readTs, uid uint64) (rval types.Sval, found bool, err error) {
+func (l *List) findValue(readTs uint64) (rval types.Sval, found bool, err error) {
 	l.AssertRLock()
-	found, p, err := l.findPosting(readTs, uid)
+	found, p, err := l.findPosting(readTs, math.MaxUint64)
 	if !found {
 		return rval, found, err
 	}

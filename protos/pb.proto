@@ -262,6 +262,7 @@ message PostingList {
   repeated uint64 splits = 4;
 
   bytes bitmap = 5;  // Roaring Bitmap encoded uint64s.
+  bytes value = 6; // Scalar value. Could be a list too.
 }
 
 message Function {

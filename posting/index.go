@@ -244,6 +244,8 @@ func (txn *Txn) addMutationHelper(ctx context.Context, l *List, doUpdateIndex bo
 			return nil, false, emptyCountParams, ErrTsTooOld
 		}
 	case doUpdateIndex || delNonListPredicate:
+		// This is retrieving nonlist predicate. So, fingerprint won't matter
+		// anyway.
 		found, currPost, err = l.findPosting(txn.ReadTs, fingerprintEdge(t))
 		if err != nil {
 			return nil, found, emptyCountParams, err

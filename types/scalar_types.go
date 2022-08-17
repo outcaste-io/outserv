@@ -52,6 +52,7 @@ const (
 	TypeObject
 	TypeUndefined
 	TypeBigInt
+	TypeList
 )
 
 // Name returns the name of the type.
@@ -79,6 +80,8 @@ func (t TypeID) String() string {
 		return "password"
 	case TypeBigInt:
 		return "bigint"
+	case TypeList:
+		return "list"
 	}
 	return ""
 }

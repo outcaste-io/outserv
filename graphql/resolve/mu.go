@@ -103,6 +103,9 @@ var upsertFlag int = 0x1
 
 func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 	flags int) ([]Object, error) {
+	if len(src) == 0 {
+		return []Object{}, nil
+	}
 
 	var idVal uint64
 	if id := typ.IDField(); id != nil {
