@@ -64,9 +64,9 @@ type Transaction {
 }
 
 type Log {
-  oid: ID # Use Outserv ID
+  lid: String @id
   address: String
-  topics: [String]
+  topics: [String] @search(by: [exact])
   data: String
   blockNumber: Int64 @search
   transactionIndex: Int64

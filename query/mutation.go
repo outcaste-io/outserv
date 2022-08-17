@@ -133,6 +133,17 @@ func ToMutations(ctx context.Context, gmuList []*pb.Mutation,
 				xids[xid.DgraphAlias()] = true
 			}
 		}
+
+		// We only consider Objects which have an XID. This would not work if a
+		// type doesn't have any XID. If we want to include objects without any
+		// XID, this is where a fix needs to be made. Later in the process
+		// UidsForObject in worker/draft.go would check all the edges within
+		// pb.Object for a matching UID.
+		//
+		// If we intend to expand this logic to include non-XID objects, then we
+		// could just allocate a UID here and be done. Anyways, for now, only
+		// considering objects with an XID.
+
 		_, isXid := xids[attr]
 		if !isXid {
 			mu.Edges = append(mu.Edges, edge)
@@ -144,7 +155,7 @@ func ToMutations(ctx context.Context, gmuList []*pb.Mutation,
 			continue
 		}
 		if strings.HasPrefix(edge.Subject, "_:") {
-			// Create a new object.
+			// We're creating an object only with the XIDs.
 			obj = &pb.Object{Var: edge.Subject}
 			mu.NewObjects = append(mu.NewObjects, obj)
 			obj.Edges = append(obj.Edges, edge)

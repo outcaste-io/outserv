@@ -665,6 +665,7 @@ func doMutate(ctx context.Context, qc *queryContext, resp *pb.Response) error {
 
 // buildUpsertQuery modifies the query to evaluate the
 // @if condition defined in Conditional Upsert.
+// TODO(mrjn): Should this be removed?
 func buildUpsertQuery(qc *queryContext) string {
 	if qc.req.Query == "" || len(qc.gmuList) == 0 {
 		return qc.req.Query

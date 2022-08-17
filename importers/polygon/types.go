@@ -104,6 +104,7 @@ type LogRPC struct {
 }
 type LogOut struct {
 	Log
+	Lid         string          `json:"lid,omitempty"`
 	Uid         string          `json:"uid,omitempty"`
 	Transaction *TransactionOut `json:"transaction,omitempty"`
 	Block       *BlockOut       `json:"block,omitempty"`
