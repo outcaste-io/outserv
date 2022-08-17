@@ -455,7 +455,6 @@ message Edge {
     DEL = 1;
   }
   Op op = 6;
-  uint64 position = 7; // Useful for scalar lists.
 }
 
 message LoginRequest {
