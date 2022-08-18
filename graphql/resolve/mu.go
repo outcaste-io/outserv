@@ -632,6 +632,7 @@ func handleInverses(ctx context.Context, typ *schema.Type, objs []Object) ([]*pb
 				// If the parent can only have one child, we need to delete the edge
 				// from that previous child -> parent.
 				prevChildNq, err := deletePreviousEdge(ctx, parentUid, f)
+				glog.Infof("prevChildNq: %+v | nq: %+v\n", prevChildNq, nq)
 				if err != nil {
 					return nil, errors.Wrapf(err, "handleInverses.deletePreviousChild")
 				}
@@ -650,7 +651,10 @@ func handleInverses(ctx context.Context, typ *schema.Type, objs []Object) ([]*pb
 				if err != nil {
 					return nil, errors.Wrapf(err, "handleInverses.deletePreviousChild.parent")
 				}
-				if prevParentNq != nil {
+				glog.Infof("prevParentNq: %+v | nq: %+v\n", prevParentNq, nq)
+				if prevParentNq == nil || parentUid == prevParentNq.Subject {
+					// parentUid == prevParentNq, no need to do anything.
+				} else {
 					nquads = append(nquads, prevParentNq)
 				}
 			}
