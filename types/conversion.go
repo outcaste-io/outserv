@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"runtime/debug"
 	"strconv"
 	"time"
 	"unsafe"
@@ -525,6 +526,7 @@ func StringToBinary(src string) []byte {
 }
 
 func cantConvert(from TypeID, to TypeID) error {
+	debug.PrintStack()
 	return errors.Errorf("Cannot convert %s to type %s", from, to)
 }
 

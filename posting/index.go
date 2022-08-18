@@ -51,18 +51,25 @@ func indexTokens(ctx context.Context, info *indexMutationInfo) ([]string, error)
 	if !schema.State().IsIndexed(ctx, attr) {
 		return nil, errors.Errorf("Attribute %s is not indexed.", attr)
 	}
-	sv, err := types.Convert(info.val, schemaType)
+	vals, err := types.FromList(info.val)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "Unable to parse val in indexTokens")
 	}
 
 	var tokens []string
-	for _, it := range info.tokenizers {
-		toks, err := tok.BuildTokens(sv.Value, it)
+	for _, val := range vals {
+		sv, err := types.Convert(val, schemaType)
 		if err != nil {
-			return tokens, err
+			return nil, errors.Wrapf(err, "Unable to convert val to %s", schemaType)
 		}
-		tokens = append(tokens, toks...)
+
+		for _, it := range info.tokenizers {
+			toks, err := tok.BuildTokens(sv.Value, it)
+			if err != nil {
+				return tokens, errors.Wrapf(err, "unable to BuildTokens")
+			}
+			tokens = append(tokens, toks...)
+		}
 	}
 	return tokens, nil
 }

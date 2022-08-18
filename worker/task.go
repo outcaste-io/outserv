@@ -354,7 +354,10 @@ func (qs *queryState) handleValuePostings(ctx context.Context, args funcArgs) er
 	span.Annotatef(nil, "Width: %d. NumGo: %d", width, numGo)
 
 	outputs := make([]*pb.Result, numGo)
-	listType := schema.State().IsList(q.Attr)
+
+	// Not sure if we need to use this listType or not. If we do need it, we can
+	// just return only one value.
+	// listType := schema.State().IsList(q.Attr)
 
 	calculate := func(idx int, itr *sroar.Iterator) error {
 		out := &pb.Result{}
@@ -369,23 +372,23 @@ func (qs *queryState) handleValuePostings(ctx context.Context, args funcArgs) er
 				return err
 			}
 
-			// If count is being requested, there is no need to populate value and facets matrix.
+			// If count is being requested, there is no need to populate value matrix.
 			if q.DoCount {
-				count, err := countForValuePostings(args, pl, listType)
+				vals, err := pl.AllValues(args.q.ReadTs)
 				if err != nil && err != posting.ErrNoValue {
 					return err
 				}
-				out.Counts = append(out.Counts, uint32(count))
+				out.Counts = append(out.Counts, uint32(len(vals)))
 				// Add an empty UID list to make later processing consistent.
 				out.UidMatrix = append(out.UidMatrix, &pb.List{})
 				continue
 			}
 
-			vals, err := retrieveValuesAndFacets(args, pl, listType)
+			vals, err := pl.AllValues(args.q.ReadTs)
 			switch {
 			case err == posting.ErrNoValue || (err == nil && len(vals) == 0):
 				// This branch is taken when the value does not exist in the pl or
-				// the number of values retreived is zero (there could still be facets).
+				// the number of values retreived is zero.
 				// We add empty lists to the UidMatrix, FaceMatrix, ValueMatrix and
 				// LangMatrix so that all these data structure have predicatble layouts.
 				out.UidMatrix = append(out.UidMatrix, &pb.List{})
@@ -485,57 +488,6 @@ func (qs *queryState) handleValuePostings(ctx context.Context, args funcArgs) er
 		out.ValueMatrix = append(out.ValueMatrix, chunk.ValueMatrix...)
 	}
 	return nil
-}
-
-// TODO: Rename this function and see if we still need it.
-func facetsFilterValuePostingList(args funcArgs, pl *posting.List,
-	listType bool, fn func(p *pb.Posting)) error {
-	q := args.q
-
-	// We need to pick multiple postings only in two cases:
-	// 1. ExpandAll is true.
-	// 2. Attribute type is of list type and no lang tag is specified in query.
-	pickMultiplePostings := q.ExpandAll || listType
-
-	// TODO(Ashish): This function starts iteration from start(afterUID is always 0). This can be
-	// optimized in come cases. For example when we know lang tag to fetch, we can directly jump
-	// to posting starting with that UID(check list.ValueFor()).
-	return pl.Iterate(q.ReadTs, 0, func(p *pb.Posting) error {
-		fn(p)
-		if pickMultiplePostings {
-			return nil // Continue iteration.
-		}
-
-		// We have picked the right posting, we can stop iteration now.
-		return posting.ErrStopIteration
-	})
-}
-
-func countForValuePostings(args funcArgs, pl *posting.List,
-	listType bool) (int, error) {
-	var filteredCount int
-	err := facetsFilterValuePostingList(args, pl, listType, func(p *pb.Posting) {
-		filteredCount++
-	})
-	if err != nil {
-		return 0, err
-	}
-
-	return filteredCount, nil
-}
-
-func retrieveValuesAndFacets(args funcArgs, pl *posting.List,
-	listType bool) ([]types.Sval, error) {
-	var vals []types.Sval
-
-	err := facetsFilterValuePostingList(args, pl, listType, func(p *pb.Posting) {
-		vals = append(vals, types.Sval(p.Value))
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return vals, nil
 }
 
 func countForUidPostings(args funcArgs, pl *posting.List,
