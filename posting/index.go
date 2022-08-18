@@ -126,22 +126,25 @@ func (l *List) handleDeleteAll(ctx context.Context, edge *pb.Edge, txn *Txn) err
 	hasCount := schema.State().HasCount(ctx, edge.Predicate)
 	// To calculate length of posting list. Used for deletion of count index.
 	plen := l.Length(txn.ReadTs, 0)
-	err := l.IterateAll(txn.ReadTs, 0, func(p *pb.Posting) error {
-		switch {
-		case isIndexed:
-			// Delete index edge of each posting.
-			return txn.addIndexMutations(ctx, &indexMutationInfo{
+
+	if isIndexed {
+		// If this predicate is indexed, we need to retrieve its older values,
+		// and delete those indices.
+		vals, err := l.AllValues(txn.ReadTs)
+		if err != nil {
+			return errors.Wrapf(err, "AllValues handleDeleteAll")
+		}
+		for _, val := range vals {
+			err := txn.addIndexMutations(ctx, &indexMutationInfo{
 				tokenizers: schema.State().Tokenizer(ctx, edge.Predicate),
 				edge:       edge,
-				val:        edge.ObjectValue,
+				val:        val,
 				op:         pb.Edge_DEL,
 			})
-		default:
-			return nil
+			if err != nil {
+				return errors.Wrapf(err, "while handleDeleteAll")
+			}
 		}
-	})
-	if err != nil {
-		return err
 	}
 	if hasCount {
 		// Delete uid from count index. Deletion of reverses is taken care by addReverseMutation
@@ -877,6 +880,7 @@ func (rb *IndexRebuild) needsListTypeRebuild() (bool, error) {
 		return true, nil
 	}
 	if rb.OldSchema.List && !rb.CurrentSchema.List {
+		// TODO(mrjn): Allow this. It's OK to drop some data in the process.
 		return false, errors.Errorf("Type can't be changed from list to scalar for attr: [%s]"+
 			" without dropping it first.", x.ParseAttr(rb.CurrentSchema.Predicate))
 	}
@@ -894,38 +898,17 @@ func rebuildListType(ctx context.Context, rb *IndexRebuild) error {
 	pk := x.ParsedKey{Attr: rb.Attr}
 	builder := rebuilder{attr: rb.Attr, prefix: pk.DataPrefix(), startTs: rb.StartTs}
 	builder.fn = func(uid uint64, pl *List, txn *Txn) error {
-		var mpost *pb.Posting
-		err := pl.IterateAll(txn.ReadTs, 0, func(p *pb.Posting) error {
-			// We only want to modify the untagged value. There could be other values with a
-			// lang tag.
-			if p.Uid == math.MaxUint64 {
-				mpost = p
-			}
-			return nil
-		})
+		sval, err := pl.Value(txn.ReadTs)
 		if err != nil {
 			return err
 		}
-		if mpost == nil {
-			return nil
-		}
-		// Delete the old edge corresponding to ValueId math.MaxUint64
-		t := &pb.Edge{
-			ObjectId:  x.ToHexString(mpost.Uid),
-			Predicate: rb.Attr,
-			Op:        pb.Edge_DEL,
-		}
-
 		// Ensure that list is in the cache run by txn. Otherwise, nothing would
 		// get updated.
 		pl = txn.cache.SetIfAbsent(string(pl.key), pl)
-		if err := pl.addMutation(ctx, txn, t); err != nil {
-			return err
-		}
-		// Add the new edge with the fingerprinted value id.
+		// A list of scalars are stored at math.MaxUint64 as well.
 		newEdge := &pb.Edge{
 			Predicate:   rb.Attr,
-			ObjectValue: mpost.Value,
+			ObjectValue: types.ToList([]types.Sval{sval}),
 			Op:          pb.Edge_SET,
 		}
 		return pl.addMutation(ctx, txn, newEdge)

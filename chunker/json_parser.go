@@ -5,7 +5,6 @@ package chunker
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -431,15 +430,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 				}
 			}
 			if len(vals) > 0 {
-				var b bytes.Buffer
-				b.WriteByte(byte(types.TypeList))
-				var sz [4]byte
-				for _, val := range vals {
-					binary.BigEndian.PutUint32(sz[:], uint32(len(val)))
-					b.Write(sz[:])
-					b.Write(val)
-				}
-				nq.ObjectValue = b.Bytes()
+				nq.ObjectValue = types.ToList(vals)
 				glog.Infof("Pushing a typeList of length: %d . Buf: %d\n", len(vals), len(nq.ObjectValue))
 				buf.Push(&nq)
 			}

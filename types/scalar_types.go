@@ -4,6 +4,9 @@
 package types
 
 import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
@@ -222,4 +225,46 @@ func ParseTime(val string) (time.Time, error) {
 	}
 	// Try without timezone.
 	return time.Parse(dateTimeFormat, val)
+}
+
+func ToList(vals []Sval) []byte {
+	if len(vals) == 0 {
+		return []byte{}
+	}
+	var b bytes.Buffer
+	b.WriteByte(byte(TypeList))
+	var sz [4]byte
+	for _, val := range vals {
+		binary.BigEndian.PutUint32(sz[:], uint32(len(val)))
+		b.Write(sz[:])
+		b.Write(val)
+	}
+	return b.Bytes()
+}
+
+func FromList(v []byte) ([]Sval, error) {
+	var vals []Sval
+	if len(v) == 0 {
+		return vals, nil
+	}
+	if v[0] != byte(TypeList) {
+		// There's only one value. Return that.
+		vals = append(vals, v)
+		return vals, nil
+	}
+
+	r := bytes.NewReader(v[1:])
+	for r.Len() > 0 {
+		var sz [4]byte
+		if _, err := r.Read(sz[:]); err != nil {
+			return vals, fmt.Errorf("Unable to read size FromList")
+		}
+		usz := binary.BigEndian.Uint32(sz[:])
+		val := make([]byte, usz)
+		if _, err := r.Read(val); err != nil {
+			return vals, fmt.Errorf("Unable to read value FromList")
+		}
+		vals = append(vals, Sval(val))
+	}
+	return vals, nil
 }

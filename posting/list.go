@@ -6,7 +6,6 @@ package posting
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"encoding/hex"
 	"log"
 	"math"
@@ -282,23 +281,14 @@ func (l *List) updateMutationLayer(mpost *pb.Posting, singleUidUpdate bool) erro
 			}
 		}
 
-		err := l.iterateAll(mpost.StartTs, 0, func(obj *pb.Posting) error {
-			// Ignore values which have the same uid as they will get replaced
-			// by the current value.
-			if obj.Uid == mpost.Uid {
-				return nil
-			}
-
-			// Mark all other values as deleted. By the end of the iteration, the
-			// list of postings will contain deleted operations and only one set
-			// for the mutation stored in mpost.
-			objCopy := proto.Clone(obj).(*pb.Posting)
+		bm, err := l.bitmap(ListOptions{ReadTs: mpost.StartTs})
+		if err != nil {
+			return errors.Wrapf(err, "while generating bitmap")
+		}
+		for _, uid := range bm.ToArray() {
+			objCopy := &pb.Posting{Uid: uid}
 			objCopy.Op = Del
 			newPlist.Postings = append(newPlist.Postings, objCopy)
-			return nil
-		})
-		if err != nil {
-			return err
 		}
 
 		// Update the mutation map with the new plist. Return here since the code below
@@ -560,87 +550,16 @@ func (l *List) Iterate(readTs uint64, afterUid uint64, f func(obj *pb.Posting) e
 	return l.iterate(readTs, afterUid, f)
 }
 
-// IterateAll iterates over all the UIDs and Postings.
-// TODO: We should remove this function after merging roaring bitmaps and fixing up how we map
-// facetsMatrix to uidMatrix.
-func (l *List) iterateAll(readTs uint64, afterUid uint64, f func(obj *pb.Posting) error) error {
-
-	bm, err := l.bitmap(ListOptions{
-		ReadTs:   readTs,
-		AfterUid: afterUid,
-	})
-	if err != nil {
-		return err
-	}
-
-	p := &pb.Posting{}
-
-	uitr := bm.NewIterator()
-	var next uint64
-
-	advance := func() {
-		next = math.MaxUint64
-		if nx := uitr.Next(); nx > 0 {
-			next = nx
-		}
-	}
-	advance()
-
-	var maxUid uint64
-	fn := func(obj *pb.Posting) error {
-		maxUid = x.Max(maxUid, obj.Uid)
-		return f(obj)
-	}
-
-	fi := func(obj *pb.Posting) error {
-		for next < obj.Uid {
-			p.Uid = next
-			if err := fn(p); err != nil {
-				return err
-			}
-			advance()
-		}
-		if err := fn(obj); err != nil {
-			return err
-		}
-		if obj.Uid == next {
-			advance()
-		}
-		return nil
-	}
-	if err := l.iterate(readTs, afterUid, fi); err != nil {
-		return err
-	}
-
-	codec.RemoveRange(bm, 0, maxUid)
-	uitr = bm.NewIterator()
-	for u := uitr.Next(); u > 0; u = uitr.Next() {
-		p.Uid = u
-		f(p)
-	}
-	return nil
-}
-
-func (l *List) IterateAll(readTs uint64, afterUid uint64, f func(obj *pb.Posting) error) error {
-	l.RLock()
-	defer l.RUnlock()
-	return l.iterateAll(readTs, afterUid, f)
-}
-
 // pickPostings goes through the mutable layer and returns the appropriate postings,
 // along with the timestamp of the delete marker, if any. If this timestamp is greater
 // than zero, it indicates that the immutable layer should be ignored during traversals.
 // If greater than zero, this timestamp must thus be greater than l.minTs.
 func (l *List) pickPostings(readTs uint64) (uint64, []*pb.Posting) {
 	// This function would return zero ts for entries above readTs.
-	effective := func(start, commit uint64) uint64 {
-		if commit > 0 && commit <= readTs {
+	effective := func(commit uint64) uint64 {
+		if commit <= readTs && commit > 0 {
 			// Has been committed and below the readTs.
 			return commit
-		}
-		if start == readTs {
-			// This mutation is by ME. So, I must be able to read it.
-			return start
 		}
 		return 0
 	}
@@ -648,9 +567,9 @@ func (l *List) pickPostings(readTs uint64) (uint64, []*pb.Posting) {
 	// First pick up the postings.
 	var deleteBelowTs uint64
 	var posts []*pb.Posting
-	for startTs, plist := range l.mutationMap {
+	for _, plist := range l.mutationMap {
 		// Pick up the transactions which are either committed, or the one which is ME.
-		effectiveTs := effective(startTs, plist.CommitTs)
+		effectiveTs := effective(plist.CommitTs)
 		if effectiveTs > deleteBelowTs {
 			// We're above the deleteBelowTs marker. We wouldn't reach here if effectiveTs is zero.
 			for _, mpost := range plist.Postings {
@@ -667,7 +586,7 @@ func (l *List) pickPostings(readTs uint64) (uint64, []*pb.Posting) {
 		// There was a delete all marker. So, trim down the list of postings.
 		result := posts[:0]
 		for _, post := range posts {
-			effectiveTs := effective(post.StartTs, post.CommitTs)
+			effectiveTs := effective(post.CommitTs)
 			if effectiveTs < deleteBelowTs { // Do pick the posts at effectiveTs == deleteBelowTs.
 				continue
 			}
@@ -681,8 +600,8 @@ func (l *List) pickPostings(readTs uint64) (uint64, []*pb.Posting) {
 		pi := posts[i]
 		pj := posts[j]
 		if pi.Uid == pj.Uid {
-			ei := effective(pi.StartTs, pi.CommitTs)
-			ej := effective(pj.StartTs, pj.CommitTs)
+			ei := effective(pi.CommitTs)
+			ej := effective(pj.CommitTs)
 			return ei > ej // Pick the higher, so we can discard older commits for the same UID.
 		}
 		return pi.Uid < pj.Uid
@@ -690,6 +609,8 @@ func (l *List) pickPostings(readTs uint64) (uint64, []*pb.Posting) {
 	return deleteBelowTs, posts
 }
 
+// TODO(mrjn): iterate could be hugely simplified. We only expect one Posting
+// per PL.
 func (l *List) iterate(readTs uint64, afterUid uint64, f func(obj *pb.Posting) error) error {
 	l.AssertRLock()
 
@@ -1117,6 +1038,7 @@ func (ro *rollupOutput) split(startUid uint64) error {
 }
 
 func (l *List) encode(out *rollupOutput, readTs uint64, split bool) error {
+	// TODO(mrjn): If it has values, we don't need to create a bitmap.
 	bm, err := l.bitmap(ListOptions{ReadTs: readTs})
 	if err != nil {
 		return err
@@ -1293,29 +1215,7 @@ func (l *List) AllValues(readTs uint64) ([]types.Sval, error) {
 		return vals, errors.Wrapf(err, "cannot retrieve all values from list with key %s",
 			hex.EncodeToString(l.key))
 	}
-	if len(v) == 0 {
-		return vals, nil
-	}
-	if v[0] != byte(types.TypeList) {
-		// There's only one value. Return that.
-		vals = append(vals, v)
-		return vals, nil
-	}
-
-	r := bytes.NewReader(v[1:])
-	for r.Len() > 0 {
-		var sz [4]byte
-		if _, err := r.Read(sz[:]); err != nil {
-			return vals, errors.Wrapf(err, "unable to read key %s", hex.EncodeToString(l.key))
-		}
-		usz := binary.BigEndian.Uint32(sz[:])
-		val := make([]byte, usz)
-		if _, err := r.Read(val); err != nil {
-			return vals, errors.Wrapf(err, "unable to read key %s", hex.EncodeToString(l.key))
-		}
-		vals = append(vals, types.Sval(val))
-	}
-	return vals, nil
+	return types.FromList(v)
 }
 
 // Value returns the default value from the posting list. The default value is
