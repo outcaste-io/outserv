@@ -14,7 +14,6 @@ import (
 	"unicode"
 
 	simdjson "github.com/dgraph-io/simdjson-go"
-	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/types"
@@ -430,9 +429,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 				}
 			}
 			if len(vals) > 0 {
-				glog.Infof("Got vals: %+v\n", vals)
 				nq.ObjectValue = types.ToList(vals)
-				glog.Infof("Pushing a typeList of length: %d . Buf: %d\n", len(vals), len(nq.ObjectValue))
 				buf.Push(&nq)
 			}
 		default:
