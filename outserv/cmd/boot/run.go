@@ -457,7 +457,7 @@ func (ld *loader) blockingFileReader() {
 			r, cleanup := fs.ChunkReader(file, nil)
 			defer cleanup()
 
-			chunk := chunker.NewChunker(chunker.JsonFormat, 1000)
+			chunk := chunker.NewChunker(1000)
 			for {
 				chunkBuf, err := chunk.Chunk(r)
 				if chunkBuf != nil && chunkBuf.Len() > 0 {
@@ -493,7 +493,7 @@ func (ld *loader) blockingIPCReader() {
 			defer fd.Close()
 
 			r := bufio.NewReaderSize(fd, 32<<20)
-			chunk := chunker.NewChunker(chunker.JsonFormat, 1000)
+			chunk := chunker.NewChunker(1000)
 			for {
 				chunkBuf, err := chunk.Chunk(r)
 				if chunkBuf != nil && chunkBuf.Len() > 0 {

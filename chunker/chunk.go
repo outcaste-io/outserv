@@ -26,7 +26,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"unicode"
 
 	"github.com/outcaste-io/outserv/ee/enc"
@@ -35,48 +34,26 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Chunker describes the interface to parse and process the input to the live and bulk loaders.
-type Chunker interface {
-	Chunk(r *bufio.Reader) (*bytes.Buffer, error)
-	Parse(chunkBuf *bytes.Buffer) error
-	NQuads() *NQuadBuffer
-}
-
-type jsonChunker struct {
+// Chunker is JSON chunker
+type Chunker struct {
 	nqs    *NQuadBuffer
 	inList bool
 }
 
-func (jc *jsonChunker) NQuads() *NQuadBuffer {
+func (jc *Chunker) NQuads() *NQuadBuffer {
 	return jc.nqs
 }
 
-// InputFormat represents the multiple formats supported by Chunker.
-type InputFormat byte
-
-const (
-	// UnknownFormat is a constant to denote a format not supported by the bulk/live loaders.
-	UnknownFormat InputFormat = iota
-	// JsonFormat is a constant to denote the input to the live/bulk loader is in the JSON format.
-	JsonFormat
-)
-
 // NewChunker returns a new chunker for the specified format.
-func NewChunker(inputFormat InputFormat, batchSize int) Chunker {
-	switch inputFormat {
-	case JsonFormat:
-		return &jsonChunker{
-			nqs: NewNQuadBuffer(batchSize),
-		}
-	default:
-		x.Panic(errors.New("unknown input format"))
-		return nil
+func NewChunker(batchSize int) *Chunker {
+	return &Chunker{
+		nqs: NewNQuadBuffer(batchSize),
 	}
 }
 
 // Chunk tries to consume multiple top-level maps from the reader until a size threshold is
 // reached, or the end of file is reached.
-func (jc *jsonChunker) Chunk(r *bufio.Reader) (*bytes.Buffer, error) {
+func (jc *Chunker) Chunk(r *bufio.Reader) (*bytes.Buffer, error) {
 	ch, err := jc.nextRune(r)
 	if err != nil {
 		return nil, err
@@ -171,7 +148,7 @@ func (jc *jsonChunker) Chunk(r *bufio.Reader) (*bytes.Buffer, error) {
 // consumeMap consumes the next map from the reader, and stores the result into the buffer out.
 // After ignoring spaces, if the reader does not begin with {, no rune will be consumed
 // from the reader.
-func (jc *jsonChunker) consumeMap(r *bufio.Reader, out *bytes.Buffer) error {
+func (jc *Chunker) consumeMap(r *bufio.Reader, out *bytes.Buffer) error {
 	// Just find the matching closing brace. Let the JSON-to-nquad parser in the mapper worry
 	// about whether everything in between is valid JSON or not.
 	depth := 0
@@ -212,7 +189,7 @@ func (jc *jsonChunker) consumeMap(r *bufio.Reader, out *bytes.Buffer) error {
 }
 
 // nextRune ignores any number of spaces that may precede a rune
-func (*jsonChunker) nextRune(r *bufio.Reader) (rune, error) {
+func (*Chunker) nextRune(r *bufio.Reader) (rune, error) {
 	if err := slurpSpace(r); err != nil {
 		return ' ', err
 	}
@@ -223,7 +200,7 @@ func (*jsonChunker) nextRune(r *bufio.Reader) (rune, error) {
 	return ch, nil
 }
 
-func (jc *jsonChunker) Parse(chunkBuf *bytes.Buffer) error {
+func (jc *Chunker) Parse(chunkBuf *bytes.Buffer) error {
 	if chunkBuf == nil || chunkBuf.Len() == 0 {
 		return nil
 	}
@@ -329,17 +306,4 @@ func IsJSONData(r *bufio.Reader) (bool, error) {
 	_, err = de.Token()
 
 	return err == nil, nil
-}
-
-// DataFormat returns a file's data format (JSON, or unknown) based on the filename
-// or the user-provided format option. The file extension has precedence.
-func DataFormat(filename string, format string) InputFormat {
-	format = strings.ToLower(format)
-	filename = strings.TrimSuffix(strings.ToLower(filename), ".gz")
-	switch {
-	case strings.HasSuffix(filename, ".json") || format == "json":
-		return JsonFormat
-	default:
-		return UnknownFormat
-	}
 }
