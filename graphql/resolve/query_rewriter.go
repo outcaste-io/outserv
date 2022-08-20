@@ -523,7 +523,7 @@ func addCommonRules(
 	if len(ids) > 0 {
 		addUIDFunc(dgQuery, ids)
 	} else {
-		addTypeFunc(dgQuery, fieldType.DgraphName())
+		dgQuery.Func = buildHasFunc(fieldType)
 	}
 	return []*gql.GraphQuery{dgQuery}
 }
@@ -540,18 +540,19 @@ func rewriteAsQuery(field *schema.Field) []*gql.GraphQuery {
 	if len(selectionAuth) > 0 {
 		return append(dgQuery, selectionAuth...)
 	}
-	dgQuery = rootQueryOptimization(dgQuery)
+	dgQuery = rootQueryOptimization(field, dgQuery)
 	return dgQuery
 }
 
-func rootQueryOptimization(dgQuery []*gql.GraphQuery) []*gql.GraphQuery {
+func rootQueryOptimization(field *schema.Field, dgQuery []*gql.GraphQuery) []*gql.GraphQuery {
 	q := dgQuery[0]
+
 	if q.Filter == nil || q.Func == nil {
 		// If we don't have any filter or root func, then we have to use
 		// whatever we got.
 		return dgQuery
 	}
-	if q.Func.Name != "type" {
+	if q.Func.Name != "has" {
 		// No need to do anything.
 		return dgQuery
 	}
@@ -587,12 +588,13 @@ func rootQueryOptimization(dgQuery []*gql.GraphQuery) []*gql.GraphQuery {
 		}
 		return dgQuery
 	}
+
 	return dgQuery
 }
 
 func addTypeFilter(q *gql.GraphQuery, typ *schema.Type) {
 	thisFilter := &gql.FilterTree{
-		Func: buildTypeFunc(typ.DgraphName()),
+		Func: buildHasFunc(typ),
 	}
 	addToFilterTree(q, thisFilter)
 }
@@ -626,14 +628,16 @@ func addEqFunc(q *gql.GraphQuery, dgPred string, values []interface{}) {
 	}
 }
 
-func addTypeFunc(q *gql.GraphQuery, typ string) {
-	q.Func = buildTypeFunc(typ)
-}
-
-func buildTypeFunc(typ string) *gql.Function {
+func buildHasFunc(typ *schema.Type) *gql.Function {
+	xids := typ.XIDFields()
+	if len(xids) == 0 {
+		// TODO(mrjn): Deal with this using typ.Fields.
+		return &gql.Function{}
+	}
+	xid := xids[0].DgraphAlias()
 	return &gql.Function{
-		Name: "type",
-		Args: []gql.Arg{{Value: typ}},
+		Name: "has",
+		Attr: xid,
 	}
 }
 
@@ -1351,13 +1355,13 @@ func buildUnionFilter(typ *schema.Type, filter map[string]interface{}) (*gql.Fil
 			// if the filter for a member type wasn't specified, was null, or was specified as {};
 			// then we need to query all nodes of that member type for the field on which the filter
 			// was specified.
-			memberTypeFt = &gql.FilterTree{Func: buildTypeFunc(memberType.DgraphName())}
+			memberTypeFt = &gql.FilterTree{Func: buildHasFunc(memberType)}
 		} else {
 			// else we need to query only the nodes which match the filter for that member type
 			memberTypeFt = &gql.FilterTree{
 				Op: "and",
 				Child: []*gql.FilterTree{
-					{Func: buildTypeFunc(memberType.DgraphName())},
+					{Func: buildHasFunc(memberType)},
 					buildFilter(memberType, memberTypeFilter),
 				},
 			}

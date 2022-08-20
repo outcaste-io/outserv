@@ -16,7 +16,6 @@
           },
           "logs": [
             {
-              "lid": "0xd52f34dbbf76786cb1fb63cf0509b46ecf521863e2f1faea259f7b17e07df57b|0x0",
               "logIndex": "0x2",
               "address": "0x83000597e8420ad7e9edd410b2883df1b83823cf",
               "topics": [

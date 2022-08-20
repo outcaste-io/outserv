@@ -19,7 +19,6 @@ import (
 const (
 	uidFunc   = "uid"
 	valueFunc = "val"
-	typFunc   = "type"
 	lenFunc   = "len"
 	countFunc = "count"
 	uidInFunc = "uid_in"
@@ -1567,7 +1566,7 @@ func validFuncName(name string) bool {
 
 	switch name {
 	case "regexp", "anyofterms", "allofterms", "alloftext", "anyoftext",
-		"has", "uid", "uid_in", "anyof", "allof", "type", "match":
+		"has", "uid", "uid_in", "anyof", "allof", "match":
 		return true
 	}
 	return false
@@ -1793,8 +1792,7 @@ L:
 
 			// Unlike other functions, uid function has no attribute, everything is args.
 			switch {
-			case len(function.Attr) == 0 && function.Name != uidFunc &&
-				function.Name != typFunc:
+			case len(function.Attr) == 0 && function.Name != uidFunc:
 
 				if strings.ContainsRune(itemInFunc.Val, '"') {
 					return nil, itemInFunc.Errorf("Attribute in function"+
@@ -1857,14 +1855,9 @@ L:
 		}
 	}
 
-	if function.Name != uidFunc && function.Name != typFunc && len(function.Attr) == 0 {
+	if function.Name != uidFunc && len(function.Attr) == 0 {
 		return nil, it.Errorf("Got empty attr for function: [%s]", function.Name)
 	}
-
-	if function.Name == typFunc && len(function.Args) != 1 {
-		return nil, it.Errorf("type function only supports one argument. Got: %v", function.Args)
-	}
-
 	return function, nil
 }
 

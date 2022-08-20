@@ -343,11 +343,11 @@ func getUidsFromFilter(ctx0 context.Context, m *schema.Field) ([]uint64, error) 
 	if len(ids) > 0 {
 		addUIDFunc(dgQuery[0], ids)
 	} else {
-		addTypeFunc(dgQuery[0], m.MutatedType().DgraphName())
+		dgQuery[0].Func = buildHasFunc(m.MutatedType())
 	}
 
 	_ = addFilter(dgQuery[0], m.MutatedType(), filter)
-	dgQuery = rootQueryOptimization(dgQuery)
+	dgQuery = rootQueryOptimization(m, dgQuery)
 
 	q := dgraph.AsString(dgQuery)
 	resp, err := edgraph.Query(ctx, &pb.Request{Query: q})
