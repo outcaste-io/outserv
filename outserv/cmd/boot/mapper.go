@@ -390,6 +390,7 @@ func (m *mapper) addIndexMapEntries(nq *pb.Edge) {
 
 	sch := m.dqlSchema.getSchema(nq.Predicate)
 
+	// TODO(mrjn): Reuse logic in posting/index.go.
 	var tokens []string
 	vals, err := types.FromList(nq.ObjectValue)
 	x.Check(err)

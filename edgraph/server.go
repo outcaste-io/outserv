@@ -654,7 +654,6 @@ func doMutate(ctx context.Context, qc *queryContext, resp *pb.Response) error {
 	qc.span.Annotatef(nil, "Applying mutations: %+v", mu)
 	resp.Txn, err = query.ApplyMutations(ctx, mu)
 	qc.span.Annotatef(nil, "Txn Context: %+v. Err=%v", resp.Txn, err)
-	glog.Infof("After applymutations: %+v err: %+v\n", resp.Txn, err)
 
 	// calculateMutationMetrics calculate cost for the mutation.
 	newUids := resp.Txn.GetUids()

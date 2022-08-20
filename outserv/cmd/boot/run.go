@@ -81,7 +81,7 @@ func init() {
 		"Skip the map phase (assumes that map output files already exist).")
 	flag.Bool("cleanup_tmp", true,
 		"Clean up the tmp directory after the loader finishes. Setting this to false allows the"+
-			" boot loader can be re-run while skipping the map phase.")
+			" boot loader to be re-run while skipping the map phase.")
 	flag.Int("reducers", 1,
 		"Number of reducers to run concurrently. Increasing this can improve performance, and "+
 			"must be less than or equal to the number of reduce shards.")
@@ -89,7 +89,7 @@ func init() {
 	flag.String("xidmap", "", "Directory to store xid to uid mapping")
 	// TODO: Potentially move http server to main.
 	flag.String("http", "localhost:8080", "Address to serve http (pprof).")
-	flag.Bool("ignore_errors", false, "ignore line parsing errors in rdf files")
+	flag.Bool("ignore_errors", false, "ignore parsing errors in JSON files")
 	flag.Int("map_shards", 1,
 		"Number of map output shards. Must be greater than or equal to the number of reduce "+
 			"shards. Increasing allows more evenly sized reduce shards, at the expense of "+
