@@ -204,8 +204,7 @@ func (jc *Chunker) Parse(chunkBuf *bytes.Buffer) error {
 	if chunkBuf == nil || chunkBuf.Len() == 0 {
 		return nil
 	}
-
-	return jc.nqs.ParseJSON(chunkBuf.Bytes(), SetNquads)
+	return jc.nqs.FastParseJSON(chunkBuf.Bytes(), SetNquads)
 }
 
 func slurpSpace(r *bufio.Reader) error {
