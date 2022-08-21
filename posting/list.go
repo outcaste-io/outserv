@@ -11,7 +11,6 @@ import (
 	"math"
 	"sort"
 
-	"github.com/dgryski/go-farm"
 	"github.com/pkg/errors"
 
 	"github.com/golang/protobuf/proto"
@@ -322,77 +321,14 @@ func TypeID(edge *pb.Edge) types.TypeID {
 }
 
 func fingerprintEdge(t *pb.Edge) uint64 {
-	// There could be a collision if the user gives us a value with Lang = "en" and later gives
-	// us a value = "en" for the same predicate. We would end up overwriting his older lang
-	// value.
-
-	// All edges with a value without LANGTAG, have the same UID. In other words,
-	// an (entity, attribute) can only have one untagged value.
+	// We just return one UID for all value Postings.
 	return math.MaxUint64
-	// var id uint64 = math.MaxUint64
-
-	// if schema.State().IsList(t.Predicate) {
-	// 	id = farm.Fingerprint64(t.ObjectValue)
-	// }
-	// return id
 }
 
 func (l *List) addMutation(ctx context.Context, txn *Txn, t *pb.Edge) error {
 	l.Lock()
 	defer l.Unlock()
 	return l.addMutationInternal(ctx, txn, t)
-}
-
-func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.Edge) uint64 {
-	getKey := func(key []byte, uid uint64) uint64 {
-		// Instead of creating a string first and then doing a fingerprint, let's do a fingerprint
-		// here to save memory allocations.
-		// Not entirely sure about effect on collision chances due to this simple XOR with uid.
-		return farm.Fingerprint64(key) ^ uid
-	}
-
-	var conflictKey uint64
-	switch {
-	case schema.State().HasUpsert(t.Predicate):
-		// Consider checking to see if a email id is unique. A user adds:
-		// <uid> <email> "email@email.org", and there's a string equal tokenizer
-		// and upsert directive on the schema.
-		// Then keys are "<email> <uid>" and "<email> email@email.org"
-		// The first key won't conflict, because two different UIDs can try to
-		// get the same email id. But, the second key would. Thus, we ensure
-		// that two users don't set the same email id.
-		conflictKey = getKey(key, 0)
-
-	case pk.IsData() && schema.State().IsList(t.Predicate):
-		// Data keys, irrespective of whether they are UID or values, should be judged based on
-		// whether they are lists or not. For UID, t.ValueId = UID. For value, t.ValueId =
-		// fingerprint(value) or could be fingerprint(lang) or something else.
-		//
-		// For singular uid predicate, like partner: uid // no list.
-		// a -> b
-		// a -> c
-		// Run concurrently, only one of them should succeed.
-		// But for friend: [uid], both should succeed.
-		//
-		// Similarly, name: string
-		// a -> "x"
-		// a -> "y"
-		// This should definitely have a conflict.
-		// But, if name: [string], then they can both succeed.
-		conflictKey = getKey(key, x.FromHex(t.ObjectId))
-
-	case pk.IsData(): // NOT a list. This case must happen after the above case.
-		conflictKey = getKey(key, 0)
-
-	case pk.IsIndex() || pk.IsCount():
-		// Index keys are by default of type [uid].
-		conflictKey = getKey(key, x.FromHex(t.ObjectId))
-
-	default:
-		// Don't assign a conflictKey.
-	}
-
-	return conflictKey
 }
 
 func (l *List) addMutationInternal(ctx context.Context, txn *Txn, t *pb.Edge) error {

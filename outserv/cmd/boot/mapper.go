@@ -16,7 +16,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	farm "github.com/dgryski/go-farm"
 	"github.com/golang/snappy"
 	"github.com/outcaste-io/outserv/chunker"
 	"github.com/outcaste-io/outserv/posting"
@@ -370,13 +369,8 @@ func (m *mapper) createPostings(nq *pb.Edge) *pb.Posting {
 		x.AssertTrue(sch != nil)
 	}
 	if nq.GetObjectValue() != nil {
-		switch {
-		// TODO(mrjn): We should stop assigning Uids to values.
-		case sch.List:
-			p.Uid = farm.Fingerprint64(nq.ObjectValue)
-		default:
-			p.Uid = math.MaxUint64
-		}
+		// All values go at math.MaxUint64
+		p.Uid = math.MaxUint64
 	}
 
 	// Early exit for no reverse edge.

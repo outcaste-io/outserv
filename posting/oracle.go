@@ -124,6 +124,7 @@ func InitApplied(ts uint64) {
 
 func (o *oracle) init() {
 	o.closer = z.NewCloser(1)
+	o.applied.Name = "Outserv.Oracle"
 	o.applied.Init(o.closer)
 	o.waiters = make(map[uint64][]chan struct{})
 	o.pendingTxns = make(map[uint64]*Txn)
