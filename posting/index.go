@@ -39,6 +39,30 @@ type indexMutationInfo struct {
 	op         pb.Edge_Op
 }
 
+func TokensFromVal(tokenizers []tok.Tokenizer, toType types.TypeID, val types.Sval) ([]string, error) {
+	vals, err := types.FromList(val)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Unable to parse val in indexTokens")
+	}
+
+	var tokens []string
+	for _, val := range vals {
+		sv, err := types.Convert(val, toType)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Unable to convert val to %s", toType)
+		}
+
+		for _, it := range tokenizers {
+			toks, err := tok.BuildTokens(sv.Value, it)
+			if err != nil {
+				return tokens, errors.Wrapf(err, "unable to BuildTokens")
+			}
+			tokens = append(tokens, toks...)
+		}
+	}
+	return tokens, nil
+}
+
 // indexTokens return tokens, without the predicate prefix and
 // index rune, for specific tokenizers.
 func indexTokens(ctx context.Context, info *indexMutationInfo) ([]string, error) {
@@ -51,27 +75,7 @@ func indexTokens(ctx context.Context, info *indexMutationInfo) ([]string, error)
 	if !schema.State().IsIndexed(ctx, attr) {
 		return nil, errors.Errorf("Attribute %s is not indexed.", attr)
 	}
-	vals, err := types.FromList(info.val)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Unable to parse val in indexTokens")
-	}
-
-	var tokens []string
-	for _, val := range vals {
-		sv, err := types.Convert(val, schemaType)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Unable to convert val to %s", schemaType)
-		}
-
-		for _, it := range info.tokenizers {
-			toks, err := tok.BuildTokens(sv.Value, it)
-			if err != nil {
-				return tokens, errors.Wrapf(err, "unable to BuildTokens")
-			}
-			tokens = append(tokens, toks...)
-		}
-	}
-	return tokens, nil
+	return TokensFromVal(info.tokenizers, schemaType, info.val)
 }
 
 // addIndexMutations adds mutation(s) for a single term, to maintain the index,

@@ -383,31 +383,19 @@ func (m *mapper) addIndexMapEntries(nq *pb.Edge) {
 	}
 
 	sch := m.dqlSchema.getSchema(nq.Predicate)
-
-	// TODO(mrjn): Reuse logic in posting/index.go.
-	var tokens []string
-	vals, err := types.FromList(nq.ObjectValue)
-	x.Check(err)
-	for _, val := range vals {
-		for _, tokName := range sch.GetTokenizer() {
-			// Find tokeniser.
-			toker, ok := tok.GetTokenizer(tokName)
-			if !ok {
-				log.Fatalf("unknown tokenizer %q", tokName)
-			}
-
-			// Convert from storage type to schema type.
-			schemaVal, err := types.Convert(val, types.TypeID(sch.GetValueType()))
-			// Shouldn't error, since we've already checked for convertibility when
-			// doing edge postings. So okay to be fatal.
-			x.Check(err)
-
-			// Extract tokens.
-			toks, err := tok.BuildTokens(schemaVal.Value, toker)
-			x.Check(err)
-			tokens = append(tokens, toks...)
+	var tokenizers []tok.Tokenizer
+	for _, tokName := range sch.GetTokenizer() {
+		toker, ok := tok.GetTokenizer(tokName)
+		if !ok {
+			log.Fatalf("unknown tokenizer %q", tokName)
 		}
+		tokenizers = append(tokenizers, toker)
 	}
+
+	toType := types.TypeID(sch.GetValueType())
+	tokens, err := posting.TokensFromVal(tokenizers, toType, nq.ObjectValue)
+	x.Check(err)
+
 	// Store index posting.
 	uid := x.FromHex(nq.Subject)
 	shard := m.state.shards.shardFor(nq.Predicate)
