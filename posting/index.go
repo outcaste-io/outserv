@@ -39,7 +39,9 @@ type indexMutationInfo struct {
 	op         pb.Edge_Op
 }
 
-func TokensFromVal(tokenizers []tok.Tokenizer, toType types.TypeID, val types.Sval) ([]string, error) {
+func TokensFromVal(tokenizers []tok.Tokenizer, toType types.TypeID,
+	val types.Sval) ([]string, error) {
+
 	vals, err := types.FromList(val)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Unable to parse val in indexTokens")
