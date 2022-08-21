@@ -441,7 +441,6 @@ func ValidateAndConvert(edge *pb.Edge, su *pb.SchemaUpdate) error {
 	var dst []types.Sval
 	for _, val := range vals {
 		// check compatibility of schema type and storage type
-		glog.Infof("Converting from %s to %s\n", types.TypeID(val[0]), schemaType)
 		out, err := types.Convert(val, schemaType)
 		if err != nil {
 			return errors.Wrapf(err, "ValidateAndConvert")
