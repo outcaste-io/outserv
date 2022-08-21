@@ -10,11 +10,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -41,7 +43,7 @@ var (
 )
 
 type flagOptions struct {
-	vals          bool
+	testOpenFiles bool
 	keyLookup     string
 	rollupKey     string
 	keyHistory    bool
@@ -52,7 +54,6 @@ type flagOptions struct {
 	itemMeta      bool
 	readTs        uint64
 	sizeHistogram bool
-	noKeys        bool
 	namespace     uint64
 	key           x.Sensitive
 	onlySummary   bool
@@ -75,10 +76,8 @@ func init() {
 	Debug.Cmd.SetHelpTemplate(x.NonRootTemplate)
 
 	flag := Debug.Cmd.Flags()
+	flag.BoolVar(&opt.testOpenFiles, "ulimit", false, "Test how many open files can we have.")
 	flag.BoolVar(&opt.itemMeta, "item", true, "Output item meta as well. Set to false for diffs.")
-	flag.BoolVar(&opt.vals, "vals", false, "Output values along with keys.")
-	flag.BoolVar(&opt.noKeys, "nokeys", false,
-		"Ignore key_. Only consider amount when calculating total.")
 	flag.Uint64Var(&opt.readTs, "at", math.MaxUint64, "Set read timestamp for all txns.")
 	flag.BoolVarP(&opt.readOnly, "readonly", "o", false, "Open in read only mode.")
 	flag.StringVarP(&opt.predicate, "pred", "r", "", "Only output specified predicate.")
@@ -595,7 +594,41 @@ func printSummary(db *badger.DB) {
 	fmt.Println()
 }
 
+func testOpenFilesLimit() {
+	tmp, err := ioutil.TempDir("", "outserv")
+	x.Check(err)
+
+	N := 100000
+	var open []*os.File
+	for i := 0; i < N; i++ {
+		fd, err := os.Create(path.Join(tmp, fmt.Sprintf("%05d", i)))
+		if err != nil {
+			fmt.Printf("Got error when opening file: %v\n", err)
+			break
+		}
+		open = append(open, fd)
+		if len(open)%100 == 0 {
+			fmt.Printf("Opened %05d files\n", len(open))
+		}
+	}
+	for _, fd := range open {
+		fd.Close()
+	}
+	os.RemoveAll(tmp)
+	fmt.Printf("Num files a process can open: %d\n", len(open))
+	if len(open) == N {
+		fmt.Println("Open File Limit Test: PASS")
+	} else {
+		fmt.Println("Open File Limit Test: FAIL")
+	}
+}
+
 func run() {
+	if opt.testOpenFiles {
+		testOpenFilesLimit()
+		return
+	}
+
 	go func() {
 		for i := 8080; i < 9080; i++ {
 			fmt.Printf("Listening for /debug HTTP requests at port: %d\n", i)
