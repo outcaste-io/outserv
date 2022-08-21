@@ -11,7 +11,6 @@ import (
 	"math"
 	"sort"
 
-	"github.com/dgryski/go-farm"
 	"github.com/pkg/errors"
 
 	"github.com/golang/protobuf/proto"
@@ -281,23 +280,14 @@ func (l *List) updateMutationLayer(mpost *pb.Posting, singleUidUpdate bool) erro
 			}
 		}
 
-		err := l.iterateAll(mpost.StartTs, 0, func(obj *pb.Posting) error {
-			// Ignore values which have the same uid as they will get replaced
-			// by the current value.
-			if obj.Uid == mpost.Uid {
-				return nil
-			}
-
-			// Mark all other values as deleted. By the end of the iteration, the
-			// list of postings will contain deleted operations and only one set
-			// for the mutation stored in mpost.
-			objCopy := proto.Clone(obj).(*pb.Posting)
+		bm, err := l.bitmap(ListOptions{ReadTs: mpost.StartTs})
+		if err != nil {
+			return errors.Wrapf(err, "while generating bitmap")
+		}
+		for _, uid := range bm.ToArray() {
+			objCopy := &pb.Posting{Uid: uid}
 			objCopy.Op = Del
 			newPlist.Postings = append(newPlist.Postings, objCopy)
-			return nil
-		})
-		if err != nil {
-			return err
 		}
 
 		// Update the mutation map with the new plist. Return here since the code below
@@ -331,76 +321,14 @@ func TypeID(edge *pb.Edge) types.TypeID {
 }
 
 func fingerprintEdge(t *pb.Edge) uint64 {
-	// There could be a collision if the user gives us a value with Lang = "en" and later gives
-	// us a value = "en" for the same predicate. We would end up overwriting his older lang
-	// value.
-
-	// All edges with a value without LANGTAG, have the same UID. In other words,
-	// an (entity, attribute) can only have one untagged value.
-	var id uint64 = math.MaxUint64
-
-	if schema.State().IsList(t.Predicate) {
-		id = farm.Fingerprint64(t.ObjectValue)
-	}
-	return id
+	// We just return one UID for all value Postings.
+	return math.MaxUint64
 }
 
 func (l *List) addMutation(ctx context.Context, txn *Txn, t *pb.Edge) error {
 	l.Lock()
 	defer l.Unlock()
 	return l.addMutationInternal(ctx, txn, t)
-}
-
-func GetConflictKey(pk x.ParsedKey, key []byte, t *pb.Edge) uint64 {
-	getKey := func(key []byte, uid uint64) uint64 {
-		// Instead of creating a string first and then doing a fingerprint, let's do a fingerprint
-		// here to save memory allocations.
-		// Not entirely sure about effect on collision chances due to this simple XOR with uid.
-		return farm.Fingerprint64(key) ^ uid
-	}
-
-	var conflictKey uint64
-	switch {
-	case schema.State().HasUpsert(t.Predicate):
-		// Consider checking to see if a email id is unique. A user adds:
-		// <uid> <email> "email@email.org", and there's a string equal tokenizer
-		// and upsert directive on the schema.
-		// Then keys are "<email> <uid>" and "<email> email@email.org"
-		// The first key won't conflict, because two different UIDs can try to
-		// get the same email id. But, the second key would. Thus, we ensure
-		// that two users don't set the same email id.
-		conflictKey = getKey(key, 0)
-
-	case pk.IsData() && schema.State().IsList(t.Predicate):
-		// Data keys, irrespective of whether they are UID or values, should be judged based on
-		// whether they are lists or not. For UID, t.ValueId = UID. For value, t.ValueId =
-		// fingerprint(value) or could be fingerprint(lang) or something else.
-		//
-		// For singular uid predicate, like partner: uid // no list.
-		// a -> b
-		// a -> c
-		// Run concurrently, only one of them should succeed.
-		// But for friend: [uid], both should succeed.
-		//
-		// Similarly, name: string
-		// a -> "x"
-		// a -> "y"
-		// This should definitely have a conflict.
-		// But, if name: [string], then they can both succeed.
-		conflictKey = getKey(key, x.FromHex(t.ObjectId))
-
-	case pk.IsData(): // NOT a list. This case must happen after the above case.
-		conflictKey = getKey(key, 0)
-
-	case pk.IsIndex() || pk.IsCount():
-		// Index keys are by default of type [uid].
-		conflictKey = getKey(key, x.FromHex(t.ObjectId))
-
-	default:
-		// Don't assign a conflictKey.
-	}
-
-	return conflictKey
 }
 
 func (l *List) addMutationInternal(ctx context.Context, txn *Txn, t *pb.Edge) error {
@@ -558,87 +486,16 @@ func (l *List) Iterate(readTs uint64, afterUid uint64, f func(obj *pb.Posting) e
 	return l.iterate(readTs, afterUid, f)
 }
 
-// IterateAll iterates over all the UIDs and Postings.
-// TODO: We should remove this function after merging roaring bitmaps and fixing up how we map
-// facetsMatrix to uidMatrix.
-func (l *List) iterateAll(readTs uint64, afterUid uint64, f func(obj *pb.Posting) error) error {
-
-	bm, err := l.bitmap(ListOptions{
-		ReadTs:   readTs,
-		AfterUid: afterUid,
-	})
-	if err != nil {
-		return err
-	}
-
-	p := &pb.Posting{}
-
-	uitr := bm.NewIterator()
-	var next uint64
-
-	advance := func() {
-		next = math.MaxUint64
-		if nx := uitr.Next(); nx > 0 {
-			next = nx
-		}
-	}
-	advance()
-
-	var maxUid uint64
-	fn := func(obj *pb.Posting) error {
-		maxUid = x.Max(maxUid, obj.Uid)
-		return f(obj)
-	}
-
-	fi := func(obj *pb.Posting) error {
-		for next < obj.Uid {
-			p.Uid = next
-			if err := fn(p); err != nil {
-				return err
-			}
-			advance()
-		}
-		if err := fn(obj); err != nil {
-			return err
-		}
-		if obj.Uid == next {
-			advance()
-		}
-		return nil
-	}
-	if err := l.iterate(readTs, afterUid, fi); err != nil {
-		return err
-	}
-
-	codec.RemoveRange(bm, 0, maxUid)
-	uitr = bm.NewIterator()
-	for u := uitr.Next(); u > 0; u = uitr.Next() {
-		p.Uid = u
-		f(p)
-	}
-	return nil
-}
-
-func (l *List) IterateAll(readTs uint64, afterUid uint64, f func(obj *pb.Posting) error) error {
-	l.RLock()
-	defer l.RUnlock()
-	return l.iterateAll(readTs, afterUid, f)
-}
-
 // pickPostings goes through the mutable layer and returns the appropriate postings,
 // along with the timestamp of the delete marker, if any. If this timestamp is greater
 // than zero, it indicates that the immutable layer should be ignored during traversals.
 // If greater than zero, this timestamp must thus be greater than l.minTs.
 func (l *List) pickPostings(readTs uint64) (uint64, []*pb.Posting) {
 	// This function would return zero ts for entries above readTs.
-	effective := func(start, commit uint64) uint64 {
-		if commit > 0 && commit <= readTs {
+	effective := func(commit uint64) uint64 {
+		if commit <= readTs && commit > 0 {
 			// Has been committed and below the readTs.
 			return commit
-		}
-		if start == readTs {
-			// This mutation is by ME. So, I must be able to read it.
-			return start
 		}
 		return 0
 	}
@@ -646,9 +503,9 @@ func (l *List) pickPostings(readTs uint64) (uint64, []*pb.Posting) {
 	// First pick up the postings.
 	var deleteBelowTs uint64
 	var posts []*pb.Posting
-	for startTs, plist := range l.mutationMap {
+	for _, plist := range l.mutationMap {
 		// Pick up the transactions which are either committed, or the one which is ME.
-		effectiveTs := effective(startTs, plist.CommitTs)
+		effectiveTs := effective(plist.CommitTs)
 		if effectiveTs > deleteBelowTs {
 			// We're above the deleteBelowTs marker. We wouldn't reach here if effectiveTs is zero.
 			for _, mpost := range plist.Postings {
@@ -665,7 +522,7 @@ func (l *List) pickPostings(readTs uint64) (uint64, []*pb.Posting) {
 		// There was a delete all marker. So, trim down the list of postings.
 		result := posts[:0]
 		for _, post := range posts {
-			effectiveTs := effective(post.StartTs, post.CommitTs)
+			effectiveTs := effective(post.CommitTs)
 			if effectiveTs < deleteBelowTs { // Do pick the posts at effectiveTs == deleteBelowTs.
 				continue
 			}
@@ -679,8 +536,8 @@ func (l *List) pickPostings(readTs uint64) (uint64, []*pb.Posting) {
 		pi := posts[i]
 		pj := posts[j]
 		if pi.Uid == pj.Uid {
-			ei := effective(pi.StartTs, pi.CommitTs)
-			ej := effective(pj.StartTs, pj.CommitTs)
+			ei := effective(pi.CommitTs)
+			ej := effective(pj.CommitTs)
 			return ei > ej // Pick the higher, so we can discard older commits for the same UID.
 		}
 		return pi.Uid < pj.Uid
@@ -688,6 +545,8 @@ func (l *List) pickPostings(readTs uint64) (uint64, []*pb.Posting) {
 	return deleteBelowTs, posts
 }
 
+// TODO(mrjn): iterate could be hugely simplified. We only expect one Posting
+// per PL.
 func (l *List) iterate(readTs uint64, afterUid uint64, f func(obj *pb.Posting) error) error {
 	l.AssertRLock()
 
@@ -1115,6 +974,7 @@ func (ro *rollupOutput) split(startUid uint64) error {
 }
 
 func (l *List) encode(out *rollupOutput, readTs uint64, split bool) error {
+	// TODO(mrjn): If it has values, we don't need to create a bitmap.
 	bm, err := l.bitmap(ListOptions{ReadTs: readTs})
 	if err != nil {
 		return err
@@ -1283,26 +1143,15 @@ func (l *List) AllValues(readTs uint64) ([]types.Sval, error) {
 	defer l.RUnlock()
 
 	var vals []types.Sval
-	err := l.iterate(readTs, 0, func(p *pb.Posting) error {
-		vals = append(vals, types.Sval(p.Value))
-		return nil
-	})
-	return vals, errors.Wrapf(err, "cannot retrieve all values from list with key %s",
-		hex.EncodeToString(l.key))
-}
-
-// TODO(Lang): Remove this.
-func (l *List) GetLangTags(readTs uint64) ([]string, error) {
-	l.RLock()
-	defer l.RUnlock()
-
-	var tags []string
-	err := l.iterate(readTs, 0, func(p *pb.Posting) error {
-		tags = append(tags, "")
-		return nil
-	})
-	return tags, errors.Wrapf(err, "cannot retrieve language tags from list with key %s",
-		hex.EncodeToString(l.key))
+	v, err := l.Value(readTs)
+	if err == ErrNoValue {
+		return vals, err
+	}
+	if err != nil {
+		return vals, errors.Wrapf(err, "cannot retrieve all values from list with key %s",
+			hex.EncodeToString(l.key))
+	}
+	return types.FromList(v)
 }
 
 // Value returns the default value from the posting list. The default value is
@@ -1310,7 +1159,7 @@ func (l *List) GetLangTags(readTs uint64) ([]string, error) {
 func (l *List) Value(readTs uint64) (rval types.Sval, rerr error) {
 	l.RLock()
 	defer l.RUnlock()
-	val, found, err := l.findValue(readTs, math.MaxUint64)
+	val, found, err := l.findValue(readTs)
 	if err != nil {
 		return val, errors.Wrapf(err,
 			"cannot retrieve default value from list with key %s", hex.EncodeToString(l.key))
@@ -1321,34 +1170,9 @@ func (l *List) Value(readTs uint64) (rval types.Sval, rerr error) {
 	return val, nil
 }
 
-// ValueFor returns a value from posting list.
-func (l *List) ValueFor(readTs uint64) (rval types.Sval, rerr error) {
-	l.RLock() // All public methods should acquire locks, while private ones should assert them.
-	defer l.RUnlock()
-	p, err := l.postingFor(readTs)
-	if err != nil {
-		return rval, err
-	}
-	return types.Sval(p.Value), nil
-}
-
-// PostingFor returns the posting according to the preferred language list.
-func (l *List) PostingFor(readTs uint64, langs []string) (p *pb.Posting, rerr error) {
-	l.RLock()
-	defer l.RUnlock()
-	return l.postingFor(readTs)
-}
-
-func (l *List) postingFor(readTs uint64) (p *pb.Posting, rerr error) {
-	l.AssertRLock() // Avoid recursive locking by asserting a lock here.
-
-	_, pos, err := l.findPosting(readTs, math.MaxUint64)
-	return pos, err
-}
-
-func (l *List) findValue(readTs, uid uint64) (rval types.Sval, found bool, err error) {
+func (l *List) findValue(readTs uint64) (rval types.Sval, found bool, err error) {
 	l.AssertRLock()
-	found, p, err := l.findPosting(readTs, uid)
+	found, p, err := l.findPosting(readTs, math.MaxUint64)
 	if !found {
 		return rval, found, err
 	}

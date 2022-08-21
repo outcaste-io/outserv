@@ -232,11 +232,18 @@ func appendPosting(w io.Writer, o *pb.Posting) {
 
 	if len(o.Value) > 0 {
 		fmt.Fprintf(w, " Type: %s. ", types.TypeID(o.Value[0]))
-		out, err := types.Convert(types.Sval(o.Value), types.TypeString)
+		vals, err := types.FromList(o.Value)
 		if err != nil {
-			fmt.Fprintf(w, " Value: %q Error: %v", o.Value, err)
+			fmt.Fprintf(w, " Error: %v", err)
 		} else {
-			fmt.Fprintf(w, " String Value: %q", out.Value)
+			for _, val := range vals {
+				out, err := types.Convert(val, types.TypeString)
+				if err != nil {
+					fmt.Fprintf(w, " Value: %q Error: %v", o.Value, err)
+				} else {
+					fmt.Fprintf(w, " String Value: %q", out.Value)
+				}
+			}
 		}
 	}
 	fmt.Fprintln(w, "")

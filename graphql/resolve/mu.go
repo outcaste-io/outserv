@@ -103,6 +103,9 @@ var upsertFlag int = 0x1
 
 func gatherObjects(ctx context.Context, src Object, typ *schema.Type,
 	flags int) ([]Object, error) {
+	if len(src) == 0 {
+		return []Object{}, nil
+	}
 
 	var idVal uint64
 	if id := typ.IDField(); id != nil {
@@ -340,11 +343,11 @@ func getUidsFromFilter(ctx0 context.Context, m *schema.Field) ([]uint64, error) 
 	if len(ids) > 0 {
 		addUIDFunc(dgQuery[0], ids)
 	} else {
-		addTypeFunc(dgQuery[0], m.MutatedType().DgraphName())
+		dgQuery[0].Func = buildHasFunc(m.MutatedType())
 	}
 
 	_ = addFilter(dgQuery[0], m.MutatedType(), filter)
-	dgQuery = rootQueryOptimization(dgQuery)
+	dgQuery = rootQueryOptimization(m, dgQuery)
 
 	q := dgraph.AsString(dgQuery)
 	resp, err := edgraph.Query(ctx, &pb.Request{Query: q})
@@ -647,7 +650,9 @@ func handleInverses(ctx context.Context, typ *schema.Type, objs []Object) ([]*pb
 				if err != nil {
 					return nil, errors.Wrapf(err, "handleInverses.deletePreviousChild.parent")
 				}
-				if prevParentNq != nil {
+				if prevParentNq == nil || parentUid == prevParentNq.Subject {
+					// parentUid == prevParentNq, no need to do anything.
+				} else {
 					nquads = append(nquads, prevParentNq)
 				}
 			}

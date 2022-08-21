@@ -45,7 +45,7 @@ func sendRequest(data []byte) error {
 	}
 	var wr WResp
 	resp, err := http.Post(fmt.Sprintf("%s/graphql", *dst),
-		"application/graphql", bytes.NewBuffer(data))
+		"application/json", bytes.NewBuffer(data))
 	if err != nil {
 		return errors.Wrapf(err, "while posting request")
 	}

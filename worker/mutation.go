@@ -5,6 +5,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sync"
 	"sync/atomic"
@@ -426,33 +427,49 @@ func ValidateAndConvert(edge *pb.Edge, su *pb.SchemaUpdate) error {
 		schemaType = storageType
 	}
 
-	var (
-		dst types.Val
-		err error
-	)
-
 	src := types.Sval(edge.ObjectValue)
-	// check compatibility of schema type and storage type
-	if dst, err = types.Convert(src, schemaType); err != nil {
-		return err
+	if len(src) == 0 {
+		return fmt.Errorf("Data of length zero for %+v", edge)
 	}
-
-	edge.ObjectValue, err = dst.Marshal()
+	vals, err := types.FromList(src)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "Unable to parse value: %x", src)
 	}
 
-	if x.WorkerConfig.AclEnabled && x.ParseAttr(edge.GetPredicate()) == "dgraph.rule.permission" {
-		perm, ok := dst.Value.(int64)
-		if !ok {
-			return errors.Errorf("Value for predicate <dgraph.rule.permission>" +
-				" should be of type int")
+	// This is the place where all the complex conversions happen. For example,
+	// from String to BigInt.
+	var dst []types.Sval
+	for _, val := range vals {
+		// check compatibility of schema type and storage type
+		out, err := types.Convert(val, schemaType)
+		if err != nil {
+			return errors.Wrapf(err, "ValidateAndConvert")
 		}
-		if perm < 0 || perm > 7 {
-			return errors.Errorf("Can't set <dgraph.rule.permission> to %d, Value for this"+
-				" predicate should be between 0 and 7", perm)
+		oval, err := out.Marshal()
+		if err != nil {
+			return errors.Wrapf(err, "Unable to marshal in ValidateAndConvert")
 		}
+		dst = append(dst, oval)
 	}
+	if src[0] == byte(types.TypeList) {
+		// If src was list, store as list.
+		edge.ObjectValue = types.ToList(dst)
+	} else {
+		x.AssertTrue(len(dst) == 1)
+		edge.ObjectValue = dst[0]
+	}
+
+	// if x.WorkerConfig.AclEnabled && x.ParseAttr(edge.GetPredicate()) == "dgraph.rule.permission" {
+	// 	perm, ok := dst.Value.(int64)
+	// 	if !ok {
+	// 		return errors.Errorf("Value for predicate <dgraph.rule.permission>" +
+	// 			" should be of type int")
+	// 	}
+	// 	if perm < 0 || perm > 7 {
+	// 		return errors.Errorf("Can't set <dgraph.rule.permission> to %d, Value for this"+
+	// 			" predicate should be between 0 and 7", perm)
+	// 	}
+	// }
 	return nil
 }
 

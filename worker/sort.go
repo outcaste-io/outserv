@@ -762,7 +762,7 @@ func fetchValue(uid uint64, attr string, scalar types.TypeID,
 		return types.Val{}, err
 	}
 
-	src, err := pl.ValueFor(readTs)
+	src, err := pl.Value(readTs)
 
 	if err != nil {
 		return types.Val{}, err

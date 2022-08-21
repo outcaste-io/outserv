@@ -14,6 +14,7 @@ import (
 	"unicode"
 
 	simdjson "github.com/dgraph-io/simdjson-go"
+	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/x"
@@ -36,6 +37,14 @@ func stripSpaces(str string) string {
 type mapResponse struct {
 	uid       string // uid retrieved or allocated for the node.
 	namespace uint64 // namespace to which the node belongs.
+}
+
+var starVal types.Sval
+
+func init() {
+	var err error
+	starVal, err = types.ToBinary(types.TypeString, x.Star)
+	x.Check(err)
 }
 
 func handleBasicType(k string, v interface{}, op int, nq *pb.Edge) error {
@@ -63,22 +72,18 @@ func handleBasicType(k string, v interface{}, op int, nq *pb.Edge) error {
 
 	// this int64 case is needed for FastParseJSON, which doesn't use json.Number
 	case int64:
+		// TODO(mrjn): Do we need to do the same thing here as others, i.e. use
+		// starVal in case of deletion?
 		var err error
-		if v == 0 && op == DeleteNquads {
-			nq.ObjectValue, err = types.ToBinary(types.TypeInt64, v)
-			return err
-		}
 		nq.ObjectValue, err = types.ToBinary(types.TypeInt64, v)
-		if err != nil {
-			return err
-		}
+		return err
 
 	case string:
 		var err error
 		// Default value is considered as S P * deletion.
 		if v == "" && op == DeleteNquads {
-			nq.ObjectValue, err = types.ToBinary(types.TypeString, x.Star)
-			return err
+			nq.ObjectValue = y.Copy(starVal)
+			return nil
 		}
 
 		// Handle the uid function in upsert block
@@ -102,27 +107,23 @@ func handleBasicType(k string, v interface{}, op int, nq *pb.Edge) error {
 	case float64:
 		var err error
 		if v == 0 && op == DeleteNquads {
-			nq.ObjectValue, err = types.ToBinary(types.TypeString, x.Star)
-			return err
+			nq.ObjectValue = y.Copy(starVal)
+			return nil
 		}
 		nq.ObjectValue, err = types.ToBinary(types.TypeFloat, v)
-		if err != nil {
-			return err
-		}
+		return err
 
 	case bool:
 		var err error
 		if !v && op == DeleteNquads {
-			nq.ObjectValue, err = types.ToBinary(types.TypeString, x.Star)
-			return err
+			nq.ObjectValue = y.Copy(starVal)
+			return nil
 		}
 		nq.ObjectValue, err = types.ToBinary(types.TypeBool, v)
-		if err != nil {
-			return err
-		}
+		return err
 
 	default:
-		return errors.Errorf("Unexpected type for val for attr: %s while converting to nquad", k)
+		return errors.Errorf("Unexpected type for val for attr: %s while converting to Edge", k)
 	}
 	return nil
 
@@ -383,17 +384,8 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 			nq.ObjectId = cr.uid
 			buf.Push(&nq)
 		case []interface{}:
-			for idx, item := range v {
-				if idx == 0 {
-					// determine if this is a scalar list
-					switch item.(type) {
-					case string, float64, json.Number, int64:
-						// Used to parse facet here.
-					default:
-						// not a scalar list, continue
-					}
-				}
-
+			var vals []types.Sval
+			for _, item := range v {
 				nq := pb.Edge{
 					Subject:   mr.uid,
 					Predicate: pred,
@@ -405,7 +397,15 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 					if err := handleBasicType(pred, iv, op, &nq); err != nil {
 						return mr, err
 					}
-					buf.Push(&nq)
+					if bytes.Equal(nq.ObjectValue, starVal) {
+						buf.Push(&nq)
+						// We found a deletion. Only process that.
+						vals = vals[:0]
+						break
+					}
+					// Don't push anything yet. We'd push it all as one value at
+					// the end.
+					vals = append(vals, nq.ObjectValue)
 				case map[string]interface{}:
 					// map[string]interface{} can mean geojson or a connecting entity.
 					ok, err := handleGeoType(item.(map[string]interface{}), &nq)
@@ -427,6 +427,10 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 					return mr,
 						errors.Errorf("Got unsupported type for list: %s", pred)
 				}
+			}
+			if len(vals) > 0 {
+				nq.ObjectValue = types.ToList(vals)
+				buf.Push(&nq)
 			}
 		default:
 			return mr, errors.Errorf("Unexpected type for val for attr: %s while converting to nquad", pred)

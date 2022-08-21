@@ -91,47 +91,47 @@ func (e *exporter) toJSON() (*bpb.KVList, error) {
 	// We could output more compact JSON at the cost of code complexity.
 	// Leaving it simple for now.
 
-	continuing := false
-	mapStart := fmt.Sprintf("  {\"uid\":"+uidFmtStrJson+`,"namespace":"%#x"`, e.uid, e.namespace)
-	err := e.pl.IterateAll(e.readTs, 0, func(p *pb.Posting) error {
-		if continuing {
-			fmt.Fprint(bp, ",\n")
-		} else {
-			continuing = true
-		}
+	// continuing := false
+	// mapStart := fmt.Sprintf("  {\"uid\":"+uidFmtStrJson+`,"namespace":"%#x"`, e.uid, e.namespace)
+	// err := e.pl.IterateAll(e.readTs, 0, func(p *pb.Posting) error {
+	// 	if continuing {
+	// 		fmt.Fprint(bp, ",\n")
+	// 	} else {
+	// 		continuing = true
+	// 	}
 
-		fmt.Fprint(bp, mapStart)
-		if p.PostingType == pb.Posting_REF {
-			fmt.Fprintf(bp, `,"%s":[`, e.attr)
-			fmt.Fprintf(bp, "{\"uid\":"+uidFmtStrJson, p.Uid)
-			fmt.Fprint(bp, "}]")
-		} else {
-			fmt.Fprintf(bp, `,"%s":`, e.attr)
-			str, err := valToStr(types.Sval(p.Value))
-			if err != nil {
-				// Copying this behavior from RDF exporter.
-				// TODO Investigate why returning here before before completely
-				//      exporting this posting is not considered data loss.
-				glog.Errorf("Ignoring error: %+v\n", err)
-				return nil
-			}
+	// 	fmt.Fprint(bp, mapStart)
+	// 	if p.PostingType == pb.Posting_REF {
+	// 		fmt.Fprintf(bp, `,"%s":[`, e.attr)
+	// 		fmt.Fprintf(bp, "{\"uid\":"+uidFmtStrJson, p.Uid)
+	// 		fmt.Fprint(bp, "}]")
+	// 	} else {
+	// 		fmt.Fprintf(bp, `,"%s":`, e.attr)
+	// 		str, err := valToStr(types.Sval(p.Value))
+	// 		if err != nil {
+	// 			// Copying this behavior from RDF exporter.
+	// 			// TODO Investigate why returning here before before completely
+	// 			//      exporting this posting is not considered data loss.
+	// 			glog.Errorf("Ignoring error: %+v\n", err)
+	// 			return nil
+	// 		}
 
-			if !types.TypeID(p.Value[0]).IsNumber() {
-				str = escapedString(str)
-			}
+	// 		if !types.TypeID(p.Value[0]).IsNumber() {
+	// 			str = escapedString(str)
+	// 		}
 
-			fmt.Fprint(bp, str)
-		}
+	// 		fmt.Fprint(bp, str)
+	// 	}
 
-		fmt.Fprint(bp, "}")
-		return nil
-	})
+	// 	fmt.Fprint(bp, "}")
+	// 	return nil
+	// })
 
 	kv := &bpb.KV{
 		Value:   bp.Bytes(),
 		Version: 1,
 	}
-	return listWrap(kv), err
+	return listWrap(kv), errors.New("TODO(mrjn): Implement this")
 }
 
 func toSchema(attr string, update *pb.SchemaUpdate) *bpb.KV {

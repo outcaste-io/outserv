@@ -16,7 +16,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	farm "github.com/dgryski/go-farm"
 	"github.com/golang/snappy"
 	"github.com/outcaste-io/outserv/chunker"
 	"github.com/outcaste-io/outserv/posting"
@@ -202,7 +201,7 @@ func (m *mapper) writeMapEntriesToFile(cbuf *z.Buffer, shardIdx int) {
 var once sync.Once
 
 func (m *mapper) run() {
-	chunk := chunker.NewChunker(chunker.JsonFormat, 1000)
+	chunk := chunker.NewChunker(1000)
 	nquads := chunk.NQuads()
 	go func() {
 		for chunkBuf := range m.readerChunkCh {
@@ -370,13 +369,8 @@ func (m *mapper) createPostings(nq *pb.Edge) *pb.Posting {
 		x.AssertTrue(sch != nil)
 	}
 	if nq.GetObjectValue() != nil {
-		switch {
-		// TODO(mrjn): We should stop assigning Uids to values.
-		case sch.List:
-			p.Uid = farm.Fingerprint64(nq.ObjectValue)
-		default:
-			p.Uid = math.MaxUint64
-		}
+		// All values go at math.MaxUint64
+		p.Uid = math.MaxUint64
 	}
 
 	// Early exit for no reverse edge.
@@ -389,33 +383,26 @@ func (m *mapper) addIndexMapEntries(nq *pb.Edge) {
 	}
 
 	sch := m.dqlSchema.getSchema(nq.Predicate)
+	var tokenizers []tok.Tokenizer
 	for _, tokName := range sch.GetTokenizer() {
-		// Find tokeniser.
 		toker, ok := tok.GetTokenizer(tokName)
 		if !ok {
 			log.Fatalf("unknown tokenizer %q", tokName)
 		}
+		tokenizers = append(tokenizers, toker)
+	}
 
-		// Convert from storage type to schema type.
-		schemaVal, err := types.Convert(nq.ObjectValue, types.TypeID(sch.GetValueType()))
-		// Shouldn't error, since we've already checked for convertibility when
-		// doing edge postings. So okay to be fatal.
-		x.Check(err)
+	toType := types.TypeID(sch.GetValueType())
+	tokens, err := posting.TokensFromVal(tokenizers, toType, nq.ObjectValue)
+	x.Check(err)
 
-		// Extract tokens.
-		toks, err := tok.BuildTokens(schemaVal.Value, toker)
-		x.Check(err)
-
-		// Store index posting.
-		for _, t := range toks {
-			m.addMapEntry(
-				x.IndexKey(nq.Predicate, t),
-				&pb.Posting{
-					Uid:         x.FromHex(nq.Subject),
-					PostingType: pb.Posting_REF,
-				},
-				m.state.shards.shardFor(nq.Predicate),
-			)
-		}
+	// Store index posting.
+	uid := x.FromHex(nq.Subject)
+	shard := m.state.shards.shardFor(nq.Predicate)
+	for _, t := range tokens {
+		m.addMapEntry(
+			x.IndexKey(nq.Predicate, t),
+			&pb.Posting{Uid: uid, PostingType: pb.Posting_REF},
+			shard)
 	}
 }
