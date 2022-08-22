@@ -24,26 +24,23 @@ var dur = flag.Duration("dur", time.Minute, "How long to run the benchmark")
 
 var blockQuery = `
 {
-	queryBlock(filter: {number: {eq: "%#x"}}) {
-		number
-		hash
-		baseFeePerGas
-		difficulty
-		extraData
-		gasLimit
-		transactions {
-			hash
-			blockNumber
-			logs {
-				address
-				topics
-				data
-				logIndex
+	queryBlock(filter: {number: {eq: "%#x"}}) {` +
+	blockFields + `
+		transactions {` +
+	txnFields + `
+			logs {` +
+	logFields + `
 			}
 		}
 	}
 }
 `
+
+var blockFields = `difficulty, extraData, gasLimit, gasUsed, hash, logsBloom, mixHash, nonce, number, parentHash, receiptsRoot, sha3Uncles, size, stateRoot, timestamp, totalDifficulty, miner { address }`
+
+var txnFields = `gas, gasPrice, maxFeePerGas, maxPriorityFeePerGas, hash, input, nonce, transactionIndex, value, type, v, r, s, contractAddress, cumulativeGasUsed, gasUsed, status, from { address }, to { address }`
+
+var logFields = `address, topics, data, blockNumber, transactionIndex, logIndex, removed`
 
 func fetchBlockWithTxnAndLogs(blockNum int64) (int64, error) {
 	q := fmt.Sprintf(blockQuery, blockNum)
