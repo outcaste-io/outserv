@@ -646,6 +646,7 @@ func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query *schema.Fi
 	if err != nil && !x.IsGqlErrorList(err) {
 		err = schema.GQLWrapf(err, "Dgraph query failed")
 		glog.Infof("Dgraph query execution failed : %s", err)
+		return emptyResult(err)
 	}
 
 	ext.TouchedUids = resp.GetMetrics().GetNumUids()[touchedUidsKey]
