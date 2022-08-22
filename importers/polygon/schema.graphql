@@ -5,8 +5,8 @@ type Block {
   baseFeePerGas: BigInt
   difficulty: BigInt
   extraData: String
-  gasLimit: Int64
-  gasUsed: Int64
+  gasLimit: Int64 @search
+  gasUsed: Int64 @search
   logsBloom: String
   miner: Account
   mixHash: String
@@ -14,7 +14,7 @@ type Block {
   parentHash: String
   receiptsRoot: String
   sha3Uncles: String
-  size: Int64
+  size: Int64 @search
   stateRoot: String
   timestamp: DateTime @search(by: [day])
   totalDifficulty: BigInt
@@ -38,7 +38,7 @@ type Transaction {
   block: Block @hasInverse(field: transactions)
   blockNumber: Int64 @search
   from: Account
-  gas: Int64
+  gas: Int64 @search
   gasPrice: BigInt
   maxFeePerGas: BigInt
   maxPriorityFeePerGas: BigInt
@@ -56,16 +56,16 @@ type Transaction {
   s: String
 
   # Fields picked from receipt
-  contractAddress: String
-  cumulativeGasUsed: Int64
-  gasUsed: Int64
+  contractAddress: String @search
+  cumulativeGasUsed: Int64 @search
+  gasUsed: Int64 @search
   status: Int64
   logs: [Log]
 }
 
 type Log {
   lid: String @id
-  address: String
+  address: String @search(by: [exact])
   topics: [String] @search(by: [exact])
   data: String
   blockNumber: Int64 @search
