@@ -635,7 +635,7 @@ func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query *schema.Fi
 			query.ResponseName()))
 	}
 	qry := dgraph.AsString(dgQuery)
-	glog.Infof("DQL Query: %s\n", qry)
+	glog.V(2).Infof("DQL Query: %s\n", qry)
 
 	req := &edgraph.Request{
 		Req:      &pb.Request{Query: qry, ReadOnly: true},
@@ -646,6 +646,7 @@ func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query *schema.Fi
 	if err != nil && !x.IsGqlErrorList(err) {
 		err = schema.GQLWrapf(err, "Dgraph query failed")
 		glog.Infof("Dgraph query execution failed : %s", err)
+		return emptyResult(err)
 	}
 
 	ext.TouchedUids = resp.GetMetrics().GetNumUids()[touchedUidsKey]
