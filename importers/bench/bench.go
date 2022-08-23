@@ -23,17 +23,18 @@ var (
 	maxBlock = flag.Int64("max", 14500000, "Max block number")
 	dur      = flag.Duration("dur", time.Minute, "How long to run the benchmark")
 	all      = flag.Bool("all", false, "Retrieve all fields.")
+	sample   = flag.Int("sample", 1000, "Output query and response every N times")
 
 	blockFields     = `difficulty, extraData, gasLimit, gasUsed, hash, logsBloom, miner { address }, mixHash, nonce, number, parentHash, receiptsRoot, sha3Uncles, size, stateRoot, timestamp, totalDifficulty`
 	blockFieldsMini = `gasUsed, hash, number, size, timestamp`
 	txnFields       = `contractAddress, cumulativeGasUsed, from { address }, gas, gasPrice, gasUsed, hash, input, maxFeePerGas, maxPriorityFeePerGas, nonce, r, s, status, to { address }, transactionIndex, type, v, value`
 	txnFieldsMini   = `from { address }, gasUsed, hash, status, to { address }`
 	logFields       = `address, blockNumber, data, logIndex, removed, topics, transactionIndex`
-	logFieldsMini   = `address, data, topics`
+	logFieldsMini   = `address, logIndex`
 )
 
 func getBlockQuery(number int64) string {
-	const q string = `{ queryBlock(filter: {number: {eq: "%#x"}} { %s, transactions { %s , logs { %s }}}}`
+	const q string = `{ queryBlock(filter: {number: {eq: "%#x"}}) { %s, transactions { %s , logs { %s }}}}`
 	if *all {
 		return fmt.Sprintf(q, number, blockFields, txnFields, logFields)
 	} else {
@@ -58,7 +59,19 @@ func fetchBlockWithTxnAndLogs(client *http.Client, blockNum int64) (int64, error
 	if err != nil {
 		return 0, err
 	}
+	if rand.Intn(1000) == 999 {
+		fmt.Printf("Query:\n%s\n%s\n", q, data)
+	}
 	resp.Body.Close()
+
+	// If we capture errors like this, we get complains about non-nullable
+	// fields, for example, for this txn:
+	// 0xd8c56fa18db12dfb8c6c717825ed7c02ad4a9d79f9249b3fe60570aa3b223875
+	// which doesn't have a to address.
+	//
+	// if strings.Contains(string(data), `"errors":`) {
+	// 	return 0, fmt.Errorf("%s", data)
+	// }
 	return int64(len(data)), nil
 }
 
