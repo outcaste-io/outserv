@@ -56,8 +56,6 @@ func fetchBlockWithTxnAndLogs(blockNum int64) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	// fmt.Printf("Resp:\n%s\n Query:\n%s\n", data, q)
-	// os.Exit(1)
 	return int64(len(data)), nil
 }
 
