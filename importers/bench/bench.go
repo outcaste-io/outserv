@@ -23,7 +23,7 @@ var (
 	maxBlock = flag.Int64("max", 14500000, "Max block number")
 	dur      = flag.Duration("dur", time.Minute, "How long to run the benchmark")
 	all      = flag.Bool("all", false, "Retrieve all fields.")
-	sample   = flag.Int("sample", 1000, "Output query and response every N times")
+	sample   = flag.Int("sample", 10000, "Output query and response every N times")
 
 	blockFields     = `difficulty, extraData, gasLimit, gasUsed, hash, logsBloom, miner { address }, mixHash, nonce, number, parentHash, receiptsRoot, sha3Uncles, size, stateRoot, timestamp, totalDifficulty`
 	blockFieldsMini = `gasUsed, hash, number, size, timestamp`
@@ -59,7 +59,7 @@ func fetchBlockWithTxnAndLogs(client *http.Client, blockNum int64) (int64, error
 	if err != nil {
 		return 0, err
 	}
-	if rand.Intn(1000) == 999 {
+	if rand.Intn(*sample) == 0 {
 		fmt.Printf("Query:\n%s\n%s\n", q, data)
 	}
 	resp.Body.Close()
