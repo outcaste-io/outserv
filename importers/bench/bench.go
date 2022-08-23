@@ -16,46 +16,49 @@ import (
 	"github.com/outcaste-io/ristretto/z"
 )
 
-var url = flag.String("url", "", "Outserv GraphQL endpoint")
-var gor = flag.Int("j", 32, "Num Goroutines to use")
-var minBlock = flag.Int64("min", 6000000, "Min block number")
-var maxBlock = flag.Int64("max", 14500000, "Max block number")
-var dur = flag.Duration("dur", time.Minute, "How long to run the benchmark")
+var (
+	url      = flag.String("url", "", "Outserv GraphQL endpoint")
+	gor      = flag.Int("j", 128, "Num Goroutines to use")
+	minBlock = flag.Int64("min", 6000000, "Min block number")
+	maxBlock = flag.Int64("max", 14500000, "Max block number")
+	dur      = flag.Duration("dur", time.Minute, "How long to run the benchmark")
+	all      = flag.Bool("all", false, "Retrieve all fields.")
 
-var blockQuery = `
-{
-	queryBlock(filter: {number: {eq: "%#x"}}) {` +
-	blockFields + `
-		transactions {` +
-	txnFields + `
-			logs {` +
-	logFields + `
-			}
-		}
+	blockFields     = `difficulty, extraData, gasLimit, gasUsed, hash, logsBloom, miner { address }, mixHash, nonce, number, parentHash, receiptsRoot, sha3Uncles, size, stateRoot, timestamp, totalDifficulty`
+	blockFieldsMini = `gasUsed, hash, number, size, timestamp`
+	txnFields       = `contractAddress, cumulativeGasUsed, from { address }, gas, gasPrice, gasUsed, hash, input, maxFeePerGas, maxPriorityFeePerGas, nonce, r, s, status, to { address }, transactionIndex, type, v, value`
+	txnFieldsMini   = `from { address }, gasUsed, hash, status, to { address }`
+	logFields       = `address, blockNumber, data, logIndex, removed, topics, transactionIndex`
+	logFieldsMini   = `address, data, topics`
+)
+
+func getBlockQuery(number int64) string {
+	const q string = `{ queryBlock(filter: {number: {eq: "%#x"}} { %s, transactions { %s , logs { %s }}}}`
+	if *all {
+		return fmt.Sprintf(q, number, blockFields, txnFields, logFields)
+	} else {
+		return fmt.Sprintf(q, number, blockFieldsMini, txnFieldsMini, logFieldsMini)
 	}
 }
-`
 
-var blockFields = `difficulty, extraData, gasLimit, gasUsed, hash, logsBloom, mixHash, nonce, number, parentHash, receiptsRoot, sha3Uncles, size, stateRoot, timestamp, totalDifficulty, miner { address }`
-
-var txnFields = `gas, gasPrice, maxFeePerGas, maxPriorityFeePerGas, hash, input, nonce, transactionIndex, value, type, v, r, s, contractAddress, cumulativeGasUsed, gasUsed, status, from { address }, to { address }`
-
-var logFields = `address, topics, data, blockNumber, transactionIndex, logIndex, removed`
-
-func fetchBlockWithTxnAndLogs(blockNum int64) (int64, error) {
-	q := fmt.Sprintf(blockQuery, blockNum)
+func fetchBlockWithTxnAndLogs(client *http.Client, blockNum int64) (int64, error) {
+	q := getBlockQuery(blockNum)
 	// fmt.Printf("Query: %s\n", q)
 
 	buf := bytes.NewBufferString(q)
-	resp, err := http.Post(*url, "application/graphql", buf)
+	req, err := http.NewRequest("POST", *url, buf)
+	x.Check(err)
+	req.Header.Add("Content-Type", "application/graphql")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return 0, err
 	}
-	defer resp.Body.Close()
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return 0, err
 	}
+	resp.Body.Close()
 	return int64(len(data)), nil
 }
 
@@ -97,6 +100,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 
+			client := &http.Client{}
 			var times []int64
 			var sizes []int64
 			for i := int64(0); ; i++ {
@@ -105,7 +109,7 @@ func main() {
 					break
 				}
 				bno := rand.Int63n(N) + *minBlock
-				sz, err := fetchBlockWithTxnAndLogs(bno)
+				sz, err := fetchBlockWithTxnAndLogs(client, bno)
 				x.Check(err)
 
 				times = append(times, time.Since(ts).Milliseconds())
