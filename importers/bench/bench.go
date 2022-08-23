@@ -143,11 +143,11 @@ func main() {
 	wg.Wait()
 
 	fmt.Println("-----------------------")
-	fmt.Println("Latency in milliseconds")
+	fmt.Printf("Latency in milliseconds")
 	fmt.Println(histDur.String())
 
 	fmt.Println("-----------------------")
-	fmt.Println("Resp size in bytes")
+	fmt.Printf("Resp size in bytes")
 	fmt.Println(histSz.String())
 
 	fmt.Println("DONE")
