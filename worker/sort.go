@@ -169,6 +169,7 @@ func sortWithIndex(ctx context.Context, ts *pb.SortMessage) *sortresult {
 
 	span := otrace.FromContext(ctx)
 	span.Annotate(nil, "sortWithIndex")
+	// glog.V(2).Infof("Sort Message: %+v\n", ts)
 
 	n := len(ts.UidMatrix)
 	out := make([]intersectedList, n)
@@ -474,7 +475,7 @@ func processSort(ctx context.Context, ts *pb.SortMessage) (*pb.SortResult, error
 	resCh := make(chan *sortresult, 2)
 	go func() {
 		select {
-		case <-time.After(3 * time.Millisecond):
+		case <-time.After(time.Second):
 			// Wait between ctx chan and time chan.
 		case <-ctx.Done():
 			resCh <- &sortresult{err: ctx.Err()}

@@ -1808,6 +1808,7 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 			}
 		default:
 			taskQuery, err := createTaskQuery(ctx, sg)
+			// glog.Infof("TaskQuery: %+v\n Error:%v\n", taskQuery, err)
 			if err != nil {
 				rch <- err
 				return

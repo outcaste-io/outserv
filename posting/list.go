@@ -1082,7 +1082,6 @@ func abs(a int) int {
 
 // Uids returns the UIDs given some query params.
 // We have to apply the filtering before applying (offset, count).
-// WARNING: Calling this function just to get UIDs is expensive
 func (l *List) Uids(opt ListOptions) (*pb.List, error) {
 	bm, err := l.Bitmap(opt)
 
