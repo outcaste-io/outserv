@@ -1158,6 +1158,7 @@ func (sg *SubGraph) updateUidMatrix() {
 		if len(sg.Params.Order) > 0 {
 			// We can't do intersection directly as the list is not sorted by UIDs.
 			// So do filter.
+			glog.Infof("l has %d bitmap and %d uids\n", len(l.Bitmap), len(l.SortedUids))
 			algo.ApplyFilter(l, func(uid uint64, idx int) bool {
 				return sg.DestMap.Contains(uid)
 			})
@@ -2117,7 +2118,9 @@ func (sg *SubGraph) applyOrderAndPagination(ctx context.Context) error {
 		return nil
 	}
 
-	sg.updateUidMatrix()
+	if len(sg.Filters) > 0 {
+		sg.updateUidMatrix()
+	}
 
 	for _, it := range sg.Params.NeedsVar {
 		// TODO(pawan) - Return error if user uses var order with predicates.
