@@ -75,3 +75,14 @@ type Log {
   transaction: Transaction @hasInverse(field: logs)
   block: Block @hasInverse(field: logs)
 }
+
+type AccountBal @remote {
+  address: String
+  value: Int64
+}
+
+type Query {
+  accountBalance(address: String!, blockNumber: Int64): AccountBal @lambda
+  test: String @lambda
+  latestBlock: Block @lambda
+}

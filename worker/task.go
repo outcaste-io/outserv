@@ -1715,8 +1715,7 @@ func (qs *queryState) handleHasFunction(ctx context.Context, q *pb.Query, out *p
 	res := sroar.NewBitmap()
 loop:
 	// This function could be switched to the stream.Lists framework, but after the change to use
-	// BitCompletePosting, the speed here is already pretty fast. The slowdown for @lang predicates
-	// occurs in filterStringFunction (like has(name) queries).
+	// BitCompletePosting, the speed here is already pretty fast.
 	for it.Seek(startKey); it.Valid(); {
 		item := it.Item()
 		if bytes.Equal(item.Key(), prevKey) {
