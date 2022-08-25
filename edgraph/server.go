@@ -1301,10 +1301,10 @@ func doQuery(ctx context.Context, req *Request) (resp *pb.Response, rerr error) 
 	// TODO(martinmr): Include Transport as part of the latency. Need to do
 	// this separately since it involves modifying the API protos.
 	resp.Latency = &pb.Latency{
-		ParsingNs:    uint64(l.Parsing.Nanoseconds()),
-		ProcessingNs: uint64(l.Processing.Nanoseconds()),
-		EncodingNs:   uint64(l.Json.Nanoseconds()),
-		TotalNs:      uint64((time.Since(l.Start)).Nanoseconds()),
+		ParsingMs:    uint64(l.Parsing.Milliseconds()),
+		ProcessingMs: uint64(l.Processing.Milliseconds()),
+		EncodingMs:   uint64(l.Json.Milliseconds()),
+		TotalMs:      uint64((time.Since(l.Start)).Milliseconds()),
 	}
 	md := metadata.Pairs(x.DgraphCostHeader, fmt.Sprint(resp.Metrics.NumUids["_total"]))
 	grpc.SendHeader(ctx, md)
