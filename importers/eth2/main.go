@@ -117,7 +117,7 @@ func main() {
 
 	go printQps()
 
-	curBlock = *blockRange - 1
+	curBlock = (*blockRange * 1000000) - 1
 	blockEnd = curBlock + 1000000 // Included.
 	var wg sync.WaitGroup
 	for i := 0; i < *numGo; i++ {
