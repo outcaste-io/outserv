@@ -75,42 +75,54 @@ func main() {
 
 		count++
 		if count%1000 == 0 && time.Since(logged) > 8*time.Second {
-			fmt.Printf("Inspecting database | count: %d | elapsed: %s", count, common.PrettyDuration(time.Since(start)))
+			fmt.Printf("Inspecting database | count: %d | elapsed: %s\n", count, common.PrettyDuration(time.Since(start)))
 			logged = time.Now()
 		}
+		break // HACK
 	}
 
 	// Inspect append-only file store then.
 	// for _, category := range []string{freezerHeaderTable, freezerBodiesTable, freezerReceiptTable, freezerHashTable, freezerDifficultyTable} {
 	err = db.ReadAncients(func(op ethdb.AncientReaderOp) error {
 		count := 0
-		for i := *startBlock; i < *endBlock; i++ {
-			fmt.Printf("Block: %d\n", i)
+		for curBlock := *startBlock; curBlock < *endBlock; curBlock++ {
+			fmt.Printf("Block: %d\n", curBlock)
 
+			var h types.Header
+			var r types.Body
 			{
-				val, err := op.Ancient(freezerHeaderTable, i)
+				val, err := op.Ancient(freezerHeaderTable, curBlock)
 				Check(err)
-				var h types.Header
 				Check(rlp.DecodeBytes(val, &h))
 				data, err := json.Marshal(h)
 				Check(err)
 				fmt.Printf("Header:\n%s\n", data)
 			}
 			{
-				val, err := op.Ancient(freezerBodiesTable, i)
+				val, err := op.Ancient(freezerBodiesTable, curBlock)
 				Check(err)
-				var r types.Body
 				Check(rlp.DecodeBytes(val, &r))
 				data, err := json.Marshal(r)
 				Check(err)
 				fmt.Printf("Body:\n%s\n", data)
 			}
 			{
-				val, err := op.Ancient(freezerReceiptTable, i)
+				val, err := op.Ancient(freezerReceiptTable, curBlock)
 				Check(err)
-				var r []*types.ReceiptForStorage
-				Check(rlp.DecodeBytes(val, &r))
-				data, err := json.Marshal(r)
+				var rs []*types.ReceiptForStorage
+				Check(rlp.DecodeBytes(val, &rs))
+				logIndex := uint(0)
+				for i := 0; i < len(rs); i++ {
+					for j := 0; j < len(rs[i].Logs); j++ {
+						rs[i].Logs[j].BlockNumber = curBlock
+						rs[i].Logs[j].BlockHash = h.Hash()
+						rs[i].Logs[j].TxHash = r.Transactions[i].Hash()
+						rs[i].Logs[j].TxIndex = uint(i)
+						rs[i].Logs[j].Index = logIndex
+						logIndex++
+					}
+				}
+				data, err := json.Marshal(rs)
 				Check(err)
 				fmt.Printf("Receipts:\n%s\n", data)
 			}
