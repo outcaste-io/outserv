@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"runtime/debug"
 	"time"
@@ -20,6 +23,7 @@ import (
 var root = flag.String("datadir", "", "Root ETH dir")
 var startBlock = flag.Uint64("start", 0, "Start block")
 var endBlock = flag.Uint64("end", 15000000, "End block")
+var out = flag.String("out", "", "Output Directory")
 
 func Check(err error) {
 	if err != nil {
@@ -81,6 +85,18 @@ func main() {
 		break // HACK
 	}
 
+	f, err := os.Create(filepath.Join(*out, "receipts.json.gz"))
+	Check(err)
+	_ = f
+	writer := bufio.NewWriterSize(f, 16<<20)
+	gzWriter := gzip.NewWriter(writer)
+
+	defer func() {
+		Check(gzWriter.Flush())
+		Check(writer.Flush())
+		Check(f.Sync())
+		Check(f.Close())
+	}()
 	// Inspect append-only file store then.
 	// for _, category := range []string{freezerHeaderTable, freezerBodiesTable, freezerReceiptTable, freezerHashTable, freezerDifficultyTable} {
 	err = db.ReadAncients(func(op ethdb.AncientReaderOp) error {
@@ -90,26 +106,28 @@ func main() {
 
 			var h types.Header
 			var r types.Body
-			{
+			var rs []*types.ReceiptForStorage
+			if false {
 				val, err := op.Ancient(freezerHeaderTable, curBlock)
 				Check(err)
 				Check(rlp.DecodeBytes(val, &h))
 				data, err := json.Marshal(h)
 				Check(err)
-				fmt.Printf("Header:\n%s\n", data)
+				_ = data
+				// fmt.Printf("Header:\n%s\n", data)
 			}
-			{
+			if false {
 				val, err := op.Ancient(freezerBodiesTable, curBlock)
 				Check(err)
 				Check(rlp.DecodeBytes(val, &r))
 				data, err := json.Marshal(r)
 				Check(err)
-				fmt.Printf("Body:\n%s\n", data)
+				_ = data
+				// fmt.Printf("Body:\n%s\n", data)
 			}
-			{
+			if true {
 				val, err := op.Ancient(freezerReceiptTable, curBlock)
 				Check(err)
-				var rs []*types.ReceiptForStorage
 				Check(rlp.DecodeBytes(val, &rs))
 				logIndex := uint(0)
 				for i := 0; i < len(rs); i++ {
@@ -124,7 +142,9 @@ func main() {
 				}
 				data, err := json.Marshal(rs)
 				Check(err)
-				fmt.Printf("Receipts:\n%s\n", data)
+				_, err = gzWriter.Write(data)
+				Check(err)
+				// fmt.Printf("Receipts:\n%s\n", data)
 			}
 
 			count++
