@@ -25,6 +25,8 @@ type Transaction struct {
 	V                    string `json:"v,omitempty"`
 	R                    string `json:"r,omitempty"`
 	S                    string `json:"s,omitempty"`
+	LogsBloom            string `json:"logsBloom,omitempty"`
+	Logs                 []Log  `json:"logs,omitempty"`
 
 	// Fields picked from Receipt.
 	ContractAddress   string `json:"contractAddress,omitempty"`
@@ -57,7 +59,7 @@ type Log struct {
 	BlockNumber      string   `json:"blockNumber,omitempty"`
 	TransactionIndex string   `json:"transactionIndex,omitempty"`
 	LogIndex         string   `json:"logIndex,omitempty"`
-	Removed          bool     `json:"removed,omitempty"`
+	Removed          bool     `json:"removed"`
 
 	Lid         string       `json:"lid,omitempty"`
 	Transaction *Transaction `json:"transaction,omitempty"`

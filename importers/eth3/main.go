@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -22,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/outcaste-io/outserv/x"
 )
 
@@ -29,6 +31,7 @@ var root = flag.String("datadir", "", "Root ETH dir")
 var startBlock = flag.Uint64("start", 0, "Start block")
 var endBlock = flag.Uint64("end", 15000000, "End block")
 var out = flag.String("out", "", "Output Directory")
+var numGo = flag.Int("gor", 8, "Number of goroutines")
 
 func Check(err error) {
 	if err != nil {
@@ -111,20 +114,126 @@ func parseBody(writer *Writer, b *types.Body, bHash string, bNum *big.Int) {
 	writer.Write(data)
 }
 
-func main() {
-	flag.Parse()
+var nilAddr = make([]byte, common.AddressLength)
 
-	ldb := filepath.Join(*root, "geth/chaindata")
-	ancient := filepath.Join(*root, "geth/chaindata/ancient")
-	db, err := rawdb.NewLevelDBDatabaseWithFreezer(ldb, 2048, 524288, ancient, "eth/db/chaindata/", true)
+func parseReceipts(writer *Writer, rs []*types.ReceiptForStorage, h *types.Header, b *types.Body) {
+	out := Block{Hash: h.Hash().Hex()}
+	if len(b.Transactions) != len(rs) {
+		panic(fmt.Sprintf("len txns: %d len(rs): %d. Mismatch\n", len(b.Transactions), len(rs)))
+	}
+	var cumGas uint64
+	var logIndex uint
+	for i := 0; i < len(rs); i++ {
+		var txn TransactionOut
+		dst := rs[i]
+		if !bytes.Equal(dst.ContractAddress.Bytes(), nilAddr) {
+			txn.ContractAddress = dst.ContractAddress.Hex()
+		} // else nil
+		txn.CumulativeGasUsed = hexutil.Uint64(dst.CumulativeGasUsed).String()
+		txn.GasUsed = hexutil.Uint64(dst.CumulativeGasUsed - cumGas).String()
+		cumGas = dst.CumulativeGasUsed
+		txn.Status = hexutil.Uint64(dst.Status).String()
+		txn.Hash = b.Transactions[i].Hash().Hex()
+		txn.LogsBloom = hexutil.Bytes(dst.Bloom.Bytes()).String()
+
+		for j := 0; j < len(rs[i].Logs); j++ {
+			lj := dst.Logs[j]
+			data, err := json.Marshal(lj)
+			Check(err)
+
+			var log Log
+			Check(json.Unmarshal(data, &log))
+
+			log.Lid = fmt.Sprintf("%s|%d", out.Hash, logIndex)
+			log.BlockNumber = (*hexutil.Big)(h.Number).String()
+			log.TransactionIndex = hexutil.Uint(i).String()
+			log.LogIndex = hexutil.Uint(logIndex).String()
+			logIndex++
+			out.Logs = append(out.Logs, log)
+			txn.Logs = append(txn.Logs, Log{Lid: log.Lid}) // Just a ref is sufficient.
+		}
+		out.Transactions = append(out.Transactions, txn)
+	}
+	data, err := json.Marshal(out)
 	Check(err)
+	writer.Write(data)
+}
 
-	var (
-		count  int64
-		start  = time.Now()
-		logged = time.Now()
-	)
+// processAncients would output both start and end block.
+func processAncients(th *y.Throttle, db ethdb.Database, startBlock, endBlock uint64) {
+	defer th.Done(nil)
 
+	oneWriter := NewWriter(filepath.Join(*out, fmt.Sprintf("data-%04d.json.gz", endBlock/Width)))
+	defer oneWriter.Close()
+
+	err := db.ReadAncients(func(op ethdb.AncientReaderOp) error {
+		for curBlock := startBlock; curBlock <= endBlock; curBlock++ {
+			// fmt.Printf("Block: %d\n", curBlock)
+			atomic.AddUint64(&numBlocks, 1)
+
+			var h types.Header
+			var b types.Body
+			var rs []*types.ReceiptForStorage
+
+			// We can check this, if needed. But, the error handling in
+			// op.Ancient calls is sufficient.
+			if false {
+				has1, err := op.HasAncient(freezerHeaderTable, curBlock)
+				Check(err)
+				has2, err := op.HasAncient(freezerBodiesTable, curBlock)
+				Check(err)
+				has3, err := op.HasAncient(freezerReceiptTable, curBlock)
+				Check(err)
+				if !(has1 && has2 && has3) {
+					fmt.Printf("---> Didn't find block: %d\n", curBlock)
+					return nil
+				}
+			}
+
+			if true {
+				val, err := op.Ancient(freezerHeaderTable, curBlock)
+				Check(err)
+				Check(rlp.DecodeBytes(val, &h))
+				data, err := json.Marshal(h)
+				Check(err)
+				oneWriter.Write(data)
+			}
+			if true {
+				val, err := op.Ancient(freezerBodiesTable, curBlock)
+				Check(err)
+				Check(rlp.DecodeBytes(val, &b))
+				parseBody(oneWriter, &b, h.Hash().String(), h.Number)
+			}
+			if true {
+				val, err := op.Ancient(freezerReceiptTable, curBlock)
+				Check(err)
+				Check(rlp.DecodeBytes(val, &rs))
+				parseReceipts(oneWriter, rs, &h, &b)
+			}
+		}
+		return nil
+	})
+	Check(err)
+}
+
+var numBlocks uint64
+
+func printMetrics() {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	rm := y.NewRateMonitor(300)
+	start := time.Now()
+	for range ticker.C {
+		numBlocks := atomic.LoadUint64(&numBlocks)
+		rm.Capture(numBlocks)
+		fmt.Printf("Processed %8d blocks | Elapsed: %6s | %5d blocks/min\n",
+			numBlocks, time.Since(start).Truncate(time.Second),
+			rm.Rate()*60.0)
+	}
+}
+
+func runIteratorXXX(db ethdb.Database) {
 	itr := db.NewIterator(nil, nil)
 	defer itr.Release()
 
@@ -155,145 +264,27 @@ func main() {
 		default:
 			// pass
 		}
-
-		count++
-		if count%1000 == 0 || time.Since(logged) > 8*time.Second {
-			fmt.Printf("Inspecting database | count: %d | elapsed: %s\n", count, common.PrettyDuration(time.Since(start)))
-			logged = time.Now()
-		}
-		break // HACK
 	}
+}
 
-	receiptWriter := NewWriter(filepath.Join(*out, "receipts.json.gz"))
-	defer receiptWriter.Close()
+const Width = uint64(100000)
 
-	headerWriter := NewWriter(filepath.Join(*out, "headers.json.gz"))
-	defer headerWriter.Close()
+func main() {
+	flag.Parse()
 
-	bodyWriter := NewWriter(filepath.Join(*out, "bodies.json.gz"))
-	defer bodyWriter.Close()
-
-	// Inspect append-only file store then.
-	// for _, category := range []string{freezerHeaderTable, freezerBodiesTable, freezerReceiptTable, freezerHashTable, freezerDifficultyTable} {
-
-	err = db.ReadAncients(func(op ethdb.AncientReaderOp) error {
-		count := 0
-		for curBlock := *startBlock; curBlock < *endBlock; curBlock++ {
-			fmt.Printf("Block: %d\n", curBlock)
-
-			// block := new(Block)
-			var h types.Header
-			var r types.Body
-			var rs []*types.ReceiptForStorage
-			if true {
-				val, err := op.Ancient(freezerHeaderTable, curBlock)
-				Check(err)
-				Check(rlp.DecodeBytes(val, &h))
-				data, err := json.Marshal(h)
-				Check(err)
-				headerWriter.Write(data)
-				// block.Header = h
-				// fmt.Printf("Header:\n%s\n", data)
-			}
-			if true {
-				val, err := op.Ancient(freezerBodiesTable, curBlock)
-				Check(err)
-				Check(rlp.DecodeBytes(val, &r))
-				parseBody(bodyWriter, &r, h.Hash().String(), h.Number)
-
-				// data, err := json.Marshal(r)
-				// Check(err)
-				// fmt.Printf("body:\n%s\n", data[0:100])
-				// data = bytes.ReplaceAll(data, []byte(`"Transactions":`), []byte(`"transactions":`))
-				// data = bytes.ReplaceAll(data, []byte(`"Uncles":`), []byte(`"uncles":`))
-				// if data[0] == '{' {
-				// 	bl := fmt.Sprintf(`{"hash": %q, `, h.Hash())
-				// 	dst := append([]byte(bl), data[1:]...)
-				// 	data = dst
-				// 	fmt.Printf("data:\n%s\n", data[:100])
-				// } else {
-				// 	log.Fatalf("Invalid data: %s\n", data)
-				// }
-				// bodyWriter.Write(data)
-
-				// type B struct {
-				// 	Transactions json.RawMessage `json:"Transactions,omitempty"`
-				// 	Uncles       json.RawMessage `json:"Uncles,omitempty"`
-				// }
-				// var tmp B
-				// Check(json.Unmarshal(data, &tmp))
-				// fmt.Printf("Got tmp\n%+v\n", tmp)
-
-				// block.Transactions = tmp.Transactions
-				// block.Uncles = tmp.Uncles
-				// data, err = json.Marshal(block)
-				// Check(err)
-				// fmt.Printf("Got block\n%s\n", data)
-
-				// data, err = json.Marshal(r.Transactions)
-				// Check(err)
-				// block.Transactions = data
-				// data, err = json.Marshal(r.Uncles)
-				// Check(err)
-				// block.Uncles = data
-				// _, err = gzWriter.Write(data)
-				// Check(err)
-				// fmt.Printf("Body:\n%s\n", data)
-				// block.Body = &r
-				// block.Transactions = r.Transactions
-				// block.Uncles = r.Uncles
-			}
-			if true {
-				val, err := op.Ancient(freezerReceiptTable, curBlock)
-				Check(err)
-				Check(rlp.DecodeBytes(val, &rs))
-				logIndex := uint(0)
-				if len(r.Transactions) != len(rs) {
-					panic(fmt.Sprintf("len txns: %d len(rs): %d. Mismatch\n", len(r.Transactions), len(rs)))
-				}
-				var cumGas uint64
-				for i := 0; i < len(rs); i++ {
-					dst := rs[i]
-					dst.GasUsed, cumGas = dst.CumulativeGasUsed-cumGas, dst.CumulativeGasUsed
-					dst.TxHash = r.Transactions[i].Hash()
-					dst.BlockHash = h.Hash()
-					dst.TransactionIndex = uint(i)
-					dst.BlockNumber = h.Number
-
-					// nilAddr := common.BytesToAddress(nil).Bytes()
-					// if bytes.Equal(dst.ContractAddress.Bytes(), nilAddr) {
-					// 	dst.ContractAddress = nil
-					// }
-					// common.BytesToAddress(nil)
-
-					for j := 0; j < len(rs[i].Logs); j++ {
-						dst.Logs[j].BlockNumber = curBlock
-						dst.Logs[j].TxIndex = dst.TransactionIndex
-						dst.Logs[j].Index = logIndex
-						logIndex++
-					}
-				}
-				data, err := json.Marshal(rs)
-				Check(err)
-				receiptWriter.Write(data)
-				// block.Receipts = data
-				// _, err = gzWriter.Write(data)
-				// Check(err)
-				// fmt.Printf("Receipts:\n%s\n", data)
-			}
-			// data, err := json.Marshal(block)
-			// Check(err)
-			// _, err = gzWriter.Write(data)
-			// Check(err)
-
-			count++
-			if count >= 1 {
-				return nil
-			}
-		}
-		return nil
-	})
+	ldb := filepath.Join(*root, "geth/chaindata")
+	ancient := filepath.Join(*root, "geth/chaindata/ancient")
+	db, err := rawdb.NewLevelDBDatabaseWithFreezer(ldb, 2048, 524288, ancient, "eth/db/chaindata/", true)
 	Check(err)
-	// }
+
+	go printMetrics()
+
+	th := y.NewThrottle(*numGo)
+	for i := *startBlock; i < *endBlock; {
+		Check(th.Do())
+		go processAncients(th, db, i+1, i+Width)
+		i += Width
+	}
+	th.Finish()
 	fmt.Println("DONE")
 }
