@@ -8,15 +8,19 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/big"
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/outcaste-io/outserv/x"
 )
@@ -33,15 +37,15 @@ func Check(err error) {
 	}
 }
 
-type Block struct {
-	types.Header
-	Transactions json.RawMessage `json:"transactions"`
-	Uncles       json.RawMessage `json:"uncles"`
-	// Transactions []*types.Transaction
-	// Uncles       []*types.Header
-	Receipts json.RawMessage `json:"receipts"`
-	// Receipts []*types.ReceiptForStorage
-}
+// type Block struct {
+// 	types.Header
+// 	Transactions json.RawMessage `json:"transactions"`
+// 	Uncles       json.RawMessage `json:"uncles"`
+// 	// Transactions []*types.Transaction
+// 	// Uncles       []*types.Header
+// 	Receipts json.RawMessage `json:"receipts"`
+// 	// Receipts []*types.ReceiptForStorage
+// }
 
 type Writer struct {
 	gw      *gzip.Writer
@@ -73,6 +77,38 @@ func NewWriter(fileName string) *Writer {
 	w.gw, err = gzip.NewWriterLevel(w.bw, gzip.BestCompression)
 	x.Check(err)
 	return w
+}
+
+func parseBody(writer *Writer, b *types.Body, bHash string, bNum *big.Int) {
+	dst := Block{Hash: bHash}
+	cc := params.MainnetChainConfig
+	for i, tx := range b.Transactions {
+		data, err := json.Marshal(tx)
+		Check(err)
+		var txn TransactionIn
+		Check(json.Unmarshal(data, &txn))
+
+		// Fill in the fields which won't be present.
+		signer := types.MakeSigner(cc, bNum)
+		from, _ := types.Sender(signer, tx)
+		txn.From = from.Hex()
+		txn.BlockNumber = (*hexutil.Big)(bNum).String()
+		txn.TransactionIndex = hexutil.Uint(i).String()
+
+		txout := TransactionOut{Transaction: txn.Transaction}
+		txout.From = &Account{Address: strings.ToLower(txn.From)}
+		txout.To = &Account{Address: strings.ToLower(txn.To)}
+		dst.Transactions = append(dst.Transactions, txout)
+	}
+
+	// Marshal each uncle and parse back to Block struct.
+	udata, err := json.Marshal(b.Uncles)
+	Check(err)
+	dst.Uncles = udata
+
+	data, err := json.Marshal(dst)
+	Check(err)
+	writer.Write(data)
 }
 
 func main() {
@@ -139,6 +175,7 @@ func main() {
 
 	// Inspect append-only file store then.
 	// for _, category := range []string{freezerHeaderTable, freezerBodiesTable, freezerReceiptTable, freezerHashTable, freezerDifficultyTable} {
+
 	err = db.ReadAncients(func(op ethdb.AncientReaderOp) error {
 		count := 0
 		for curBlock := *startBlock; curBlock < *endBlock; curBlock++ {
@@ -162,21 +199,22 @@ func main() {
 				val, err := op.Ancient(freezerBodiesTable, curBlock)
 				Check(err)
 				Check(rlp.DecodeBytes(val, &r))
+				parseBody(bodyWriter, &r, h.Hash().String(), h.Number)
 
-				data, err := json.Marshal(r)
-				Check(err)
-				fmt.Printf("body:\n%s\n", data[0:100])
-				data = bytes.ReplaceAll(data, []byte(`"Transactions":`), []byte(`"transactions":`))
-				data = bytes.ReplaceAll(data, []byte(`"Uncles":`), []byte(`"uncles":`))
-				if data[0] == '{' {
-					bl := fmt.Sprintf(`{"hash": %q, `, h.Hash())
-					dst := append([]byte(bl), data[1:]...)
-					data = dst
-					fmt.Printf("data:\n%s\n", data[:100])
-				} else {
-					log.Fatalf("Invalid data: %s\n", data)
-				}
-				bodyWriter.Write(data)
+				// data, err := json.Marshal(r)
+				// Check(err)
+				// fmt.Printf("body:\n%s\n", data[0:100])
+				// data = bytes.ReplaceAll(data, []byte(`"Transactions":`), []byte(`"transactions":`))
+				// data = bytes.ReplaceAll(data, []byte(`"Uncles":`), []byte(`"uncles":`))
+				// if data[0] == '{' {
+				// 	bl := fmt.Sprintf(`{"hash": %q, `, h.Hash())
+				// 	dst := append([]byte(bl), data[1:]...)
+				// 	data = dst
+				// 	fmt.Printf("data:\n%s\n", data[:100])
+				// } else {
+				// 	log.Fatalf("Invalid data: %s\n", data)
+				// }
+				// bodyWriter.Write(data)
 
 				// type B struct {
 				// 	Transactions json.RawMessage `json:"Transactions,omitempty"`
@@ -213,13 +251,25 @@ func main() {
 				if len(r.Transactions) != len(rs) {
 					panic(fmt.Sprintf("len txns: %d len(rs): %d. Mismatch\n", len(r.Transactions), len(rs)))
 				}
+				var cumGas uint64
 				for i := 0; i < len(rs); i++ {
+					dst := rs[i]
+					dst.GasUsed, cumGas = dst.CumulativeGasUsed-cumGas, dst.CumulativeGasUsed
+					dst.TxHash = r.Transactions[i].Hash()
+					dst.BlockHash = h.Hash()
+					dst.TransactionIndex = uint(i)
+					dst.BlockNumber = h.Number
+
+					// nilAddr := common.BytesToAddress(nil).Bytes()
+					// if bytes.Equal(dst.ContractAddress.Bytes(), nilAddr) {
+					// 	dst.ContractAddress = nil
+					// }
+					// common.BytesToAddress(nil)
+
 					for j := 0; j < len(rs[i].Logs); j++ {
-						rs[i].Logs[j].BlockNumber = curBlock
-						rs[i].Logs[j].BlockHash = h.Hash()
-						rs[i].Logs[j].TxHash = r.Transactions[i].Hash()
-						rs[i].Logs[j].TxIndex = uint(i)
-						rs[i].Logs[j].Index = logIndex
+						dst.Logs[j].BlockNumber = curBlock
+						dst.Logs[j].TxIndex = dst.TransactionIndex
+						dst.Logs[j].Index = logIndex
 						logIndex++
 					}
 				}
