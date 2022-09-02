@@ -15,7 +15,6 @@ require (
 	github.com/Microsoft/go-winio v0.4.15 // indirect
 	github.com/Shopify/sarama v1.27.2
 	github.com/blevesearch/bleve v1.0.13
-	// github.com/btcsuite/btcd v0.22.0-beta // indirect
 	github.com/cespare/cp v1.1.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.1
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd
