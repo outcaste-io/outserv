@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math/big"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -39,16 +38,6 @@ func Check(err error) {
 		log.Fatal(err)
 	}
 }
-
-// type Block struct {
-// 	types.Header
-// 	Transactions json.RawMessage `json:"transactions"`
-// 	Uncles       json.RawMessage `json:"uncles"`
-// 	// Transactions []*types.Transaction
-// 	// Uncles       []*types.Header
-// 	Receipts json.RawMessage `json:"receipts"`
-// 	// Receipts []*types.ReceiptForStorage
-// }
 
 type Writer struct {
 	gw      *gzip.Writer
@@ -82,9 +71,10 @@ func NewWriter(fileName string) *Writer {
 	return w
 }
 
-func parseBody(writer *Writer, b *types.Body, bHash string, bNum *big.Int) {
-	dst := Block{Hash: bHash}
+func parseBody(dst *BlockOut, b *types.Body) {
 	cc := params.MainnetChainConfig
+	bNum, err := hexutil.DecodeBig(dst.Number)
+	Check(err)
 	for i, tx := range b.Transactions {
 		data, err := json.Marshal(tx)
 		Check(err)
@@ -95,10 +85,10 @@ func parseBody(writer *Writer, b *types.Body, bHash string, bNum *big.Int) {
 		signer := types.MakeSigner(cc, bNum)
 		from, _ := types.Sender(signer, tx)
 		txn.From = from.Hex()
-		txn.BlockNumber = (*hexutil.Big)(bNum).String()
+		txn.BlockNumber = dst.Number
 		txn.TransactionIndex = hexutil.Uint(i).String()
 
-		txout := TransactionOut{Transaction: txn.Transaction}
+		txout := &TransactionOut{Transaction: txn.Transaction}
 		txout.From = &Account{Address: strings.ToLower(txn.From)}
 		txout.To = &Account{Address: strings.ToLower(txn.To)}
 		dst.Transactions = append(dst.Transactions, txout)
@@ -107,33 +97,30 @@ func parseBody(writer *Writer, b *types.Body, bHash string, bNum *big.Int) {
 	// Marshal each uncle and parse back to Block struct.
 	udata, err := json.Marshal(b.Uncles)
 	Check(err)
-	dst.Uncles = udata
-
-	data, err := json.Marshal(dst)
-	Check(err)
-	writer.Write(data)
+	dst.Ommers = udata
+	dst.OmmerCount = hexutil.Uint(len(b.Uncles)).String()
 }
 
 var nilAddr = make([]byte, common.AddressLength)
 
-func parseReceipts(writer *Writer, rs []*types.ReceiptForStorage, h *types.Header, b *types.Body) {
-	out := Block{Hash: h.Hash().Hex()}
-	if len(b.Transactions) != len(rs) {
-		panic(fmt.Sprintf("len txns: %d len(rs): %d. Mismatch\n", len(b.Transactions), len(rs)))
+func parseReceipts(out *BlockOut, rs []*types.ReceiptForStorage) {
+	if len(out.Transactions) != len(rs) {
+		panic(fmt.Sprintf("len txns: %d len(rs): %d. Mismatch\n", len(out.Transactions), len(rs)))
 	}
 	var cumGas uint64
 	var logIndex uint
 	for i := 0; i < len(rs); i++ {
-		var txn TransactionOut
+		txn := out.Transactions[i]
 		dst := rs[i]
 		if !bytes.Equal(dst.ContractAddress.Bytes(), nilAddr) {
 			txn.ContractAddress = dst.ContractAddress.Hex()
 		} // else nil
+		txn.Root = hexutil.Bytes(dst.PostState).String()
 		txn.CumulativeGasUsed = hexutil.Uint64(dst.CumulativeGasUsed).String()
 		txn.GasUsed = hexutil.Uint64(dst.CumulativeGasUsed - cumGas).String()
 		cumGas = dst.CumulativeGasUsed
 		txn.Status = hexutil.Uint64(dst.Status).String()
-		txn.Hash = b.Transactions[i].Hash().Hex()
+		txn.Hash = out.Transactions[i].Hash
 		txn.LogsBloom = hexutil.Bytes(dst.Bloom.Bytes()).String()
 
 		for j := 0; j < len(rs[i].Logs); j++ {
@@ -145,18 +132,15 @@ func parseReceipts(writer *Writer, rs []*types.ReceiptForStorage, h *types.Heade
 			Check(json.Unmarshal(data, &log))
 
 			log.Lid = fmt.Sprintf("%s|%d", out.Hash, logIndex)
-			log.BlockNumber = (*hexutil.Big)(h.Number).String()
+			log.BlockNumber = out.Number
 			log.TransactionIndex = hexutil.Uint(i).String()
 			log.LogIndex = hexutil.Uint(logIndex).String()
 			logIndex++
-			out.Logs = append(out.Logs, log)
-			txn.Logs = append(txn.Logs, Log{Lid: log.Lid}) // Just a ref is sufficient.
+			txn.Logs = append(txn.Logs, log)
+			out.Logs = append(out.Logs, Log{Lid: log.Lid}) // Just a ref is sufficient.
 		}
 		out.Transactions = append(out.Transactions, txn)
 	}
-	data, err := json.Marshal(out)
-	Check(err)
-	writer.Write(data)
 }
 
 // processAncients would output both start and end block.
@@ -166,51 +150,70 @@ func processAncients(th *y.Throttle, db ethdb.Database, startBlock, endBlock uin
 	oneWriter := NewWriter(filepath.Join(*out, fmt.Sprintf("data-%04d.json.gz", endBlock/Width)))
 	defer oneWriter.Close()
 
-	err := db.ReadAncients(func(op ethdb.AncientReaderOp) error {
-		for curBlock := startBlock; curBlock <= endBlock; curBlock++ {
-			// fmt.Printf("Block: %d\n", curBlock)
-			atomic.AddUint64(&numBlocks, 1)
+	handleBlock := func(op ethdb.AncientReaderOp, curBlock uint64) {
+		// fmt.Printf("Block: %d\n", curBlock)
+		atomic.AddUint64(&numBlocks, 1)
 
-			var h types.Header
-			var b types.Body
-			var rs []*types.ReceiptForStorage
+		var h types.Header
+		var b types.Body
+		var rs []*types.ReceiptForStorage
 
-			// We can check this, if needed. But, the error handling in
-			// op.Ancient calls is sufficient.
-			if false {
-				has1, err := op.HasAncient(freezerHeaderTable, curBlock)
-				Check(err)
-				has2, err := op.HasAncient(freezerBodiesTable, curBlock)
-				Check(err)
-				has3, err := op.HasAncient(freezerReceiptTable, curBlock)
-				Check(err)
-				if !(has1 && has2 && has3) {
-					fmt.Printf("---> Didn't find block: %d\n", curBlock)
-					return nil
-				}
-			}
-
-			if true {
-				val, err := op.Ancient(freezerHeaderTable, curBlock)
-				Check(err)
-				Check(rlp.DecodeBytes(val, &h))
-				data, err := json.Marshal(h)
-				Check(err)
-				oneWriter.Write(data)
-			}
-			if true {
-				val, err := op.Ancient(freezerBodiesTable, curBlock)
-				Check(err)
-				Check(rlp.DecodeBytes(val, &b))
-				parseBody(oneWriter, &b, h.Hash().String(), h.Number)
-			}
-			if true {
-				val, err := op.Ancient(freezerReceiptTable, curBlock)
-				Check(err)
-				Check(rlp.DecodeBytes(val, &rs))
-				parseReceipts(oneWriter, rs, &h, &b)
+		// We can check this, if needed. But, the error handling in
+		// op.Ancient calls is sufficient.
+		if false {
+			has1, err := op.HasAncient(freezerHeaderTable, curBlock)
+			Check(err)
+			has2, err := op.HasAncient(freezerBodiesTable, curBlock)
+			Check(err)
+			has3, err := op.HasAncient(freezerReceiptTable, curBlock)
+			Check(err)
+			if !(has1 && has2 && has3) {
+				fmt.Printf("---> Didn't find block: %d\n", curBlock)
+				os.Exit(1)
 			}
 		}
+
+		block := new(BlockOut)
+		{
+			val, err := op.Ancient(freezerHeaderTable, curBlock)
+			Check(err)
+			Check(rlp.DecodeBytes(val, &h))
+
+			data, err := json.Marshal(h)
+			Check(err)
+			var b BlockIn
+			Check(json.Unmarshal(data, &b))
+			block.Block = b.Block
+			if len(b.Miner) > 0 {
+				block.Miner = &Account{Address: b.Miner}
+			}
+		}
+		{
+			val, err := op.Ancient(freezerBodiesTable, curBlock)
+			Check(err)
+			Check(rlp.DecodeBytes(val, &b))
+			parseBody(block, &b)
+		}
+		{
+			val, err := op.Ancient(freezerReceiptTable, curBlock)
+			Check(err)
+			Check(rlp.DecodeBytes(val, &rs))
+			parseReceipts(block, rs)
+		}
+		data, err := json.Marshal(block)
+		Check(err)
+		oneWriter.Write(data)
+	}
+
+	err := db.ReadAncients(func(op ethdb.AncientReaderOp) error {
+		oneWriter.Write([]byte(`[`))
+		for curBlock := startBlock; curBlock <= endBlock; curBlock++ {
+			handleBlock(op, curBlock)
+			if curBlock != endBlock {
+				oneWriter.Write([]byte(`,`))
+			}
+		}
+		oneWriter.Write([]byte(`]`))
 		return nil
 	})
 	Check(err)

@@ -3,10 +3,39 @@ package main
 import "encoding/json"
 
 type Block struct {
-	Hash         string           `json:"hash,omitempty"`
-	Transactions []TransactionOut `json:"transactions,omitempty"`
-	Logs         []Log            `json:"logs,omitempty"`
-	Uncles       json.RawMessage  `json:"uncles,omitempty"`
+	Hash             string            `json:"hash,omitempty"`
+	Number           string            `json:"number,omitempty"`
+	BaseFeePerGas    string            `json:"baseFeePerGas,omitempty"`
+	Difficulty       string            `json:"difficulty,omitempty"`
+	ExtraData        string            `json:"extraData,omitempty"`
+	GasLimit         string            `json:"gasLimit,omitempty"`
+	GasUsed          string            `json:"gasUsed,omitempty"`
+	LogsBloom        string            `json:"logsBloom,omitempty"`
+	MixHash          string            `json:"mixHash,omitempty"`
+	Nonce            string            `json:"nonce,omitempty"`
+	ParentHash       string            `json:"parentHash,omitempty"`
+	ReceiptsRoot     string            `json:"receiptsRoot,omitempty"`
+	Sha3Uncles       string            `json:"sha3Uncles,omitempty"`
+	Size             string            `json:"size,omitempty"`
+	StateRoot        string            `json:"stateRoot,omitempty"`
+	Timestamp        string            `json:"timestamp,omitempty"`
+	TotalDifficulty  string            `json:"totalDifficulty,omitempty"`
+	TransactionsRoot string            `json:"transactionsRoot,omitempty"`
+	Transactions     []*TransactionOut `json:"transactions,omitempty"`
+	Logs             []Log             `json:"logs,omitempty"`
+	Ommers           json.RawMessage   `json:"ommers,omitempty"`
+	OmmerCount       string            `json:"ommerCount,omitempty"`
+}
+
+type BlockIn struct {
+	Block
+	Miner string
+}
+
+type BlockOut struct {
+	Block
+	Uid   string   `json:"uid,omitempty"`
+	Miner *Account `json:"miner,omitempty"`
 }
 
 type Transaction struct {
@@ -29,6 +58,7 @@ type Transaction struct {
 	Logs                 []Log  `json:"logs,omitempty"`
 
 	// Fields picked from Receipt.
+	Root              string `json:"root,omitempty"` // PostState
 	ContractAddress   string `json:"contractAddress,omitempty"`
 	CumulativeGasUsed string `json:"cumulativeGasUsed,omitempty"`
 	// EffectiveGasPrice string `json:"effectiveGasPrice,omitempty"` // = GasPrice
@@ -59,7 +89,7 @@ type Log struct {
 	BlockNumber      string   `json:"blockNumber,omitempty"`
 	TransactionIndex string   `json:"transactionIndex,omitempty"`
 	LogIndex         string   `json:"logIndex,omitempty"`
-	Removed          bool     `json:"removed"`
+	Removed          bool     `json:"removed,omitempty"`
 
 	Lid         string       `json:"lid,omitempty"`
 	Transaction *Transaction `json:"transaction,omitempty"`
