@@ -1158,7 +1158,6 @@ func (sg *SubGraph) updateUidMatrix() {
 		if len(sg.Params.Order) > 0 {
 			// We can't do intersection directly as the list is not sorted by UIDs.
 			// So do filter.
-			glog.Infof("l has %d bitmap and %d uids\n", len(l.Bitmap), len(l.SortedUids))
 			algo.ApplyFilter(l, func(uid uint64, idx int) bool {
 				return sg.DestMap.Contains(uid)
 			})
@@ -1809,7 +1808,6 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 			}
 		default:
 			taskQuery, err := createTaskQuery(ctx, sg)
-			// glog.Infof("TaskQuery: %+v\n Error:%v\n", taskQuery, err)
 			if err != nil {
 				rch <- err
 				return
@@ -2118,6 +2116,8 @@ func (sg *SubGraph) applyOrderAndPagination(ctx context.Context) error {
 		return nil
 	}
 
+	// Note: I think we only need to update the UID matrix if we had applied
+	// filters. If we didn't, then there's no point. Do verify this.
 	if len(sg.Filters) > 0 {
 		sg.updateUidMatrix()
 	}

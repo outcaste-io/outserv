@@ -1686,6 +1686,8 @@ func (qs *queryState) evaluate(cp countParams, out *pb.Result) error {
 	return nil
 }
 
+// TODO(mrjn): We need to keep this cache in-sync as data is coming in. Work on
+// that.
 var cacheHasFunc sync.Map
 
 func (qs *queryState) handleHasFunction(ctx context.Context, q *pb.Query, out *pb.Result,

@@ -28,7 +28,7 @@ import (
 
 var root = flag.String("datadir", "", "Root ETH dir")
 var startBlock = flag.Uint64("start", 0, "Start block")
-var endBlock = flag.Uint64("end", 15000000, "End block")
+var endBlock = flag.Uint64("end", 15300000, "End block")
 var out = flag.String("out", "", "Output Directory")
 var numGo = flag.Int("gor", 8, "Number of goroutines")
 

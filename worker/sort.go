@@ -169,7 +169,6 @@ func sortWithIndex(ctx context.Context, ts *pb.SortMessage) *sortresult {
 
 	span := otrace.FromContext(ctx)
 	span.Annotate(nil, "sortWithIndex")
-	// glog.V(2).Infof("Sort Message: %+v\n", ts)
 
 	n := len(ts.UidMatrix)
 	out := make([]intersectedList, n)
