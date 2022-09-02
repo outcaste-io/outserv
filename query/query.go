@@ -2116,7 +2116,11 @@ func (sg *SubGraph) applyOrderAndPagination(ctx context.Context) error {
 		return nil
 	}
 
-	sg.updateUidMatrix()
+	// Note: I think we only need to update the UID matrix if we had applied
+	// filters. If we didn't, then there's no point. Do verify this.
+	if len(sg.Filters) > 0 {
+		sg.updateUidMatrix()
+	}
 
 	for _, it := range sg.Params.NeedsVar {
 		// TODO(pawan) - Return error if user uses var order with predicates.

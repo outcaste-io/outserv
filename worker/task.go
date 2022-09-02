@@ -9,8 +9,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/algo"
 	"github.com/outcaste-io/outserv/badger"
@@ -1684,13 +1686,25 @@ func (qs *queryState) evaluate(cp countParams, out *pb.Result) error {
 	return nil
 }
 
+// TODO(mrjn): We need to keep this cache in-sync as data is coming in. Work on
+// that.
+var cacheHasFunc sync.Map
+
 func (qs *queryState) handleHasFunction(ctx context.Context, q *pb.Query, out *pb.Result,
 	srcFn *functionContext) error {
 	span := otrace.FromContext(ctx)
 	stop := x.SpanTimer(span, "handleHasFunction")
 	defer stop()
-	if glog.V(3) {
+	if glog.V(2) {
 		glog.Infof("handleHasFunction query: %+v\n", q)
+	}
+
+	if val, ok := cacheHasFunc.Load(q.Attr); ok {
+		glog.V(2).Infof("Cache HIT: Returning %s from cache\n", q.Attr)
+		v := val.(*pb.List)
+		result := proto.Clone(v).(*pb.List)
+		out.UidMatrix = append(out.UidMatrix, result)
+		return nil
 	}
 
 	txn := pstore.NewReadTxn(q.ReadTs)
@@ -1715,8 +1729,7 @@ func (qs *queryState) handleHasFunction(ctx context.Context, q *pb.Query, out *p
 	res := sroar.NewBitmap()
 loop:
 	// This function could be switched to the stream.Lists framework, but after the change to use
-	// BitCompletePosting, the speed here is already pretty fast. The slowdown for @lang predicates
-	// occurs in filterStringFunction (like has(name) queries).
+	// BitCompletePosting, the speed here is already pretty fast.
 	for it.Seek(startKey); it.Valid(); {
 		item := it.Item()
 		if bytes.Equal(item.Key(), prevKey) {
@@ -1797,6 +1810,9 @@ loop:
 		span.Annotatef(nil, "handleHasFunction found %d uids", setCnt)
 	}
 	result := &pb.List{Bitmap: res.ToBuffer()}
+	if _, loaded := cacheHasFunc.LoadOrStore(q.Attr, result); !loaded {
+		glog.Infof("Stored has cache for %s", q.Attr)
+	}
 	out.UidMatrix = append(out.UidMatrix, result)
 	return nil
 }

@@ -474,7 +474,7 @@ func processSort(ctx context.Context, ts *pb.SortMessage) (*pb.SortResult, error
 	resCh := make(chan *sortresult, 2)
 	go func() {
 		select {
-		case <-time.After(3 * time.Millisecond):
+		case <-time.After(time.Second):
 			// Wait between ctx chan and time chan.
 		case <-ctx.Done():
 			resCh <- &sortresult{err: ctx.Err()}

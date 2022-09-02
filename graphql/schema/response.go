@@ -14,6 +14,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 
+	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/x"
 )
 
@@ -166,7 +167,8 @@ func (r *Response) Output() interface{} {
 
 // Extensions represents GraphQL extensions
 type Extensions struct {
-	TouchedUids uint64 `json:"touched_uids,omitempty"`
+	TouchedUids uint64      `json:"touched_uids,omitempty"`
+	Latency     *pb.Latency `json:"latency,omitempty"`
 }
 
 // GetTouchedUids returns TouchedUids
@@ -184,4 +186,16 @@ func (e *Extensions) Merge(ext *Extensions) {
 	}
 
 	e.TouchedUids += ext.TouchedUids
+	dst := e.Latency
+	src := ext.Latency
+	if dst == nil {
+		e.Latency = ext.Latency
+	} else if src == nil {
+		// do nothing
+	} else {
+		dst.EncodingMs += src.EncodingMs
+		dst.ParsingMs += src.ParsingMs
+		dst.ProcessingMs += src.ProcessingMs
+		dst.TotalMs += src.TotalMs
+	}
 }

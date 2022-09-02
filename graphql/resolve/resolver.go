@@ -105,7 +105,6 @@ func (dg *DgraphEx) Execute(ctx context.Context,
 	if !x.IsGqlErrorList(err) {
 		err = schema.GQLWrapf(err, "Dgraph execution failed")
 	}
-
 	return resp, err
 }
 
@@ -120,11 +119,6 @@ type Resolved struct {
 // CompletionFunc is an adapter that allows us to compose completions and build a
 // ResultCompleter from a function.  Based on the http.HandlerFunc pattern.
 type CompletionFunc func(ctx context.Context, resolved *Resolved)
-
-// Complete calls cf(ctx, resolved)
-func (cf CompletionFunc) Complete(ctx context.Context, resolved *Resolved) {
-	cf(ctx, resolved)
-}
 
 // NewDgraphExecutor builds a DgraphExecutor for proxying requests through dgraph.
 func NewDgraphExecutor() DgraphExecutor {
@@ -251,9 +245,6 @@ func NewResolverFactory(
 	}
 }
 
-// noopCompletion just passes back it's result and err arguments
-func noopCompletion(ctx context.Context, resolved *Resolved) {}
-
 func (rf *ResolverFactory) queryResolverFor(query *schema.Field) QueryResolver {
 	rf.RLock()
 	defer rf.RUnlock()
@@ -367,7 +358,6 @@ func (r *RequestResolver) Resolve(ctx context.Context, gqlReq *schema.Request) (
 			// Errors and data in the same response is valid.  Both WithError and
 			// AddData handle nil cases.
 			addResult(resp, res)
-
 		}
 	}
 	// A single request can contain either queries or mutations - not both.
@@ -593,14 +583,13 @@ func (qr QueryResolverFunc) Resolve(ctx context.Context, query *schema.Field) *R
 // 2) execute the rewritten query with ex (return error if failed)
 // 3) process the result with rc
 func NewQueryResolver(qr *QueryRewriter, ex DgraphExecutor) QueryResolver {
-	return &queryResolver{queryRewriter: qr, executor: ex, resultCompleter: CompletionFunc(noopCompletion)}
+	return &queryResolver{queryRewriter: qr, executor: ex}
 }
 
 // a queryResolver can resolve a single GraphQL query field.
 type queryResolver struct {
-	queryRewriter   *QueryRewriter
-	executor        DgraphExecutor
-	resultCompleter CompletionFunc
+	queryRewriter *QueryRewriter
+	executor      DgraphExecutor
 }
 
 func (qr *queryResolver) Resolve(ctx context.Context, query *schema.Field) *Resolved {
@@ -608,9 +597,7 @@ func (qr *queryResolver) Resolve(ctx context.Context, query *schema.Field) *Reso
 	stop := x.SpanTimer(span, "resolveQuery")
 	defer stop()
 
-	resolved := qr.rewriteAndExecute(ctx, query)
-	qr.resultCompleter.Complete(ctx, resolved)
-	return resolved
+	return qr.rewriteAndExecute(ctx, query)
 }
 
 func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query *schema.Field) *Resolved {
@@ -650,6 +637,7 @@ func (qr *queryResolver) rewriteAndExecute(ctx context.Context, query *schema.Fi
 	}
 
 	ext.TouchedUids = resp.GetMetrics().GetNumUids()[touchedUidsKey]
+	ext.Latency = resp.Latency
 	resolved := &Resolved{
 		Data:       resp.GetJson(),
 		Field:      query,

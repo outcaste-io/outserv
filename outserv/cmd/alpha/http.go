@@ -137,7 +137,6 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 	if commonHandler(w, r) {
 		return
 	}
-	glog.Warningln("/query endpoint is DEPRECATED and would be removed in future versions.")
 
 	isDebugMode, err := parseBool(r, "debug")
 	if err != nil {
