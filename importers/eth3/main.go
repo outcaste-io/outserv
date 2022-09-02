@@ -34,6 +34,7 @@ var numGo = flag.Int("gor", 8, "Number of goroutines")
 
 func Check(err error) {
 	if err != nil {
+		fmt.Printf("Got error: %v\n", err)
 		debug.PrintStack()
 		log.Fatal(err)
 	}
