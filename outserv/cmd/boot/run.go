@@ -64,6 +64,8 @@ func init() {
 	flag.StringP("files", "f", "",
 		"Location of *.json(.gz) file(s) to load.")
 	flag.StringP("schema", "s", "", "Location of the GraphQL schema file.")
+	flag.StringP("type", "t", "", "GraphQL type of the root object in file."+
+		" Useful if no @type field is present in the JSON objects.")
 	flag.String("out", defaultOutDir,
 		"Location to write the final dgraph data directories.")
 	flag.Bool("replace_out", false,
@@ -72,7 +74,7 @@ func init() {
 		"Temp directory used to use for on-disk scratch space. Requires free space proportional"+
 			" to the size of the RDF file and the amount of indexing used.")
 
-	flag.IntP("num_go_routines", "j", int(math.Ceil(float64(runtime.NumCPU())/4.0)),
+	flag.IntP("num_go_routines", "j", int(math.Ceil(float64(runtime.NumCPU())*0.85)),
 		"Number of worker threads to use. MORE THREADS LEAD TO HIGHER RAM USAGE.")
 	flag.Int64("mapoutput_mb", 2048,
 		"The estimated size of each map file output. Increasing this increases memory usage.")
@@ -133,6 +135,7 @@ func run() {
 		DataIPC:          Boot.Conf.GetString("ipc"),
 		EncryptionKey:    keys.EncKey,
 		GqlSchemaFile:    Boot.Conf.GetString("schema"),
+		GqlType:          Boot.Conf.GetString("type"),
 		OutDir:           Boot.Conf.GetString("out"),
 		ReplaceOutDir:    Boot.Conf.GetBool("replace_out"),
 		TmpDir:           Boot.Conf.GetString("tmp"),
@@ -331,6 +334,7 @@ type options struct {
 	DataFiles        string
 	DataIPC          string
 	GqlSchemaFile    string
+	GqlType          string
 	OutDir           string
 	ReplaceOutDir    bool
 	TmpDir           string
@@ -457,7 +461,7 @@ func (ld *loader) blockingFileReader() {
 			r, cleanup := fs.ChunkReader(file, nil)
 			defer cleanup()
 
-			chunk := chunker.NewChunker(1000)
+			chunk := chunker.NewChunker(ld.gqlSchema, 1000)
 			for {
 				chunkBuf, err := chunk.Chunk(r)
 				if chunkBuf != nil && chunkBuf.Len() > 0 {
@@ -493,7 +497,7 @@ func (ld *loader) blockingIPCReader() {
 			defer fd.Close()
 
 			r := bufio.NewReaderSize(fd, 32<<20)
-			chunk := chunker.NewChunker(1000)
+			chunk := chunker.NewChunker(ld.gqlSchema, 1000)
 			for {
 				chunkBuf, err := chunk.Chunk(r)
 				if chunkBuf != nil && chunkBuf.Len() > 0 {

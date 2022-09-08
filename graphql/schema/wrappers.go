@@ -93,15 +93,6 @@ const (
 	FilterArgName                     = "filter"
 )
 
-// A Type is a GraphQL type like: Float, T, T! and [T!]!.  If it's not a list, then
-// ListType is nil.  If it's an object type then Field gets field definitions by
-// name from the definition of the type; IDField gets the ID field of the type.
-type Type struct {
-	typ             *ast.Type
-	inSchema        *Schema
-	dgraphPredicate map[string]map[string]string
-}
-
 type Schema struct {
 	schema *ast.Schema
 	// dgraphPredicate gives us the dgraph predicate corresponding to a typeName + fieldName.
@@ -366,6 +357,7 @@ func dgraphMapping(sch *ast.Schema) map[string]map[string]string {
 		payload = "Payload"
 	)
 
+	// TODO(mrjn): Remove this dgraphPredicate stuff.
 	dgraphPredicate := make(map[string]map[string]string)
 	for _, inputTyp := range sch.Types {
 		// We only want to consider input types (object and interface) defined by the user as part
@@ -1540,12 +1532,19 @@ func mutationType(name string, custom *ast.Directive) MutationType {
 	}
 }
 
-func (t *Type) IsGeo() bool {
-	return t.Name() == "Point" || t.Name() == "Polygon" || t.Name() == "MultiPolygon"
+// A Type is a GraphQL type like: Float, T, T! and [T!]!.  If it's not a list, then
+// ListType is nil.  If it's an object type then Field gets field definitions by
+// name from the definition of the type; IDField gets the ID field of the type.
+type Type struct {
+	typ             *ast.Type
+	inSchema        *Schema
+	dgraphPredicate map[string]map[string]string
 }
 
-func (t *Type) IsAggregateResult() bool {
-	return strings.HasSuffix(t.Name(), "AggregateResult")
+func (t *Type) Schema() *Schema         { return t.inSchema }
+func (t *Type) IsAggregateResult() bool { return strings.HasSuffix(t.Name(), "AggregateResult") }
+func (t *Type) IsGeo() bool {
+	return t.Name() == "Point" || t.Name() == "Polygon" || t.Name() == "MultiPolygon"
 }
 
 func (t *Type) Field(name string) *FieldDefinition {

@@ -201,11 +201,12 @@ func (m *mapper) writeMapEntriesToFile(cbuf *z.Buffer, shardIdx int) {
 var once sync.Once
 
 func (m *mapper) run() {
-	chunk := chunker.NewChunker(1000)
+	typ := m.gqlSchema.Type(m.opt.GqlType)
+	chunk := chunker.NewChunker(m.gqlSchema, 1000)
 	nquads := chunk.NQuads()
 	go func() {
 		for chunkBuf := range m.readerChunkCh {
-			if err := chunk.Parse(chunkBuf); err != nil {
+			if err := chunk.Parse(chunkBuf, typ); err != nil {
 				atomic.AddInt64(&m.prog.errCount, 1)
 				if !m.opt.IgnoreErrors {
 					x.Check(err)
@@ -365,7 +366,7 @@ func (m *mapper) createPostings(nq *pb.Edge) *pb.Posting {
 	sch := m.dqlSchema.getSchema(nq.Predicate)
 	if sch == nil {
 		fmt.Printf("schema: %+v\n", m.dqlSchema.schemaMap)
-		fmt.Printf("asking for: %q\n", nq.Predicate)
+		fmt.Printf("asking for: %q in nq: %+v\n", nq.Predicate, nq)
 		x.AssertTrue(sch != nil)
 	}
 	if nq.GetObjectValue() != nil {
@@ -394,7 +395,10 @@ func (m *mapper) addIndexMapEntries(nq *pb.Edge) {
 
 	toType := types.TypeID(sch.GetValueType())
 	tokens, err := posting.TokensFromVal(tokenizers, toType, nq.ObjectValue)
-	x.Check(err)
+	if err != nil {
+		fmt.Printf("Got error: %v from nq: %+v\n", err, nq)
+		x.Check(err)
+	}
 
 	// Store index posting.
 	uid := x.FromHex(nq.Subject)

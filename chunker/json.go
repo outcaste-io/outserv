@@ -15,6 +15,8 @@ import (
 
 	simdjson "github.com/dgraph-io/simdjson-go"
 	"github.com/outcaste-io/outserv/badger/y"
+	"github.com/outcaste-io/outserv/graphql/schema"
+	gqlSchema "github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/protos/pb"
 	"github.com/outcaste-io/outserv/types"
 	"github.com/outcaste-io/outserv/x"
@@ -184,13 +186,15 @@ type NQuadBuffer struct {
 	batchSize int
 	nquads    []*pb.Edge
 	nqCh      chan []*pb.Edge
+	schema    *gqlSchema.Schema
 }
 
 // NewNQuadBuffer returns a new NQuadBuffer instance with the specified batch size.
-func NewNQuadBuffer(batchSize int) *NQuadBuffer {
+func NewNQuadBuffer(schema *gqlSchema.Schema, batchSize int) *NQuadBuffer {
 	buf := &NQuadBuffer{
 		batchSize: batchSize,
 		nqCh:      make(chan []*pb.Edge, 10),
+		schema:    schema,
 	}
 	if buf.batchSize > 0 {
 		buf.nquads = make([]*pb.Edge, 0, batchSize)
@@ -242,8 +246,14 @@ func getNextBlank() string {
 	return fmt.Sprintf("_:dg.%d.%d", randomID, id)
 }
 
-func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred string) (
+func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, typ *gqlSchema.Type, op int) (
 	mapResponse, error) {
+	if typ == nil {
+		if val, ok := m["@type"]; ok {
+			typ = buf.schema.Type(val.(string))
+		}
+	}
+	x.AssertTrue(typ != nil)
 	var mr mapResponse
 
 	// Check field in map.
@@ -279,6 +289,19 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 		if uid > 0 {
 			mr.uid = x.ToHexString(uid)
 		}
+	}
+
+	// Use the type of the object and the corresponding XID fields to
+	// determine the UID.
+	if mr.uid == "" {
+		var comp []string
+		for _, fd := range typ.XIDFields() {
+			val, ok := m[fd.Name()]
+			if ok {
+				comp = append(comp, val.(string))
+			}
+		}
+		mr.uid = fmt.Sprintf("_:%s.%s", typ.Name(), strings.Join(comp, "|"))
 	}
 
 	if mr.uid == "" {
@@ -320,7 +343,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 		// v can be nil if user didn't set a value and if omitEmpty was not supplied as JSON
 		// option.
 		// We also skip facets here because we parse them with the corresponding predicate.
-		if pred == "uid" || pred == "namespace" {
+		if pred == "@type" || pred == "uid" || pred == "namespace" {
 			continue
 		}
 
@@ -343,11 +366,14 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 			continue
 		}
 
+		// TODO: We should perhaps create the type.predicate here.
 		nq := pb.Edge{
 			Subject:   mr.uid,
 			Predicate: pred,
 			Namespace: namespace,
 		}
+
+		fd := typ.Field(pred)
 
 		switch v := v.(type) {
 		// these int64/float64 cases are needed for FastParseJSON, which doesn't use json.Number
@@ -374,8 +400,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 				buf.Push(&nq)
 				continue
 			}
-
-			cr, err := buf.mapToNquads(v, op, pred)
+			cr, err := buf.mapToNquads(v, fd.Type(), op)
 			if err != nil {
 				return mr, err
 			}
@@ -391,6 +416,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 					Predicate: pred,
 					Namespace: namespace,
 				}
+				childType := typ.Field(pred).Type()
 
 				switch iv := item.(type) {
 				case string, float64, json.Number, int64:
@@ -417,7 +443,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, op int, parentPred
 						continue
 					}
 
-					cr, err := buf.mapToNquads(iv, op, pred)
+					cr, err := buf.mapToNquads(iv, childType, op)
 					if err != nil {
 						return mr, err
 					}
@@ -452,10 +478,10 @@ const (
 //
 // This function is very similar to buf.ParseJSON, but we just replace encoding/json with
 // simdjson-go.
-func (buf *NQuadBuffer) FastParseJSON(b []byte, op int) error {
+func (buf *NQuadBuffer) FastParseJSON(b []byte, gqlType *schema.Type, op int) error {
 	if !simdjson.SupportedCPU() {
 		// default to slower / old parser
-		return buf.ParseJSON(b, op)
+		return buf.ParseJSON(b, gqlType, op)
 	}
 	// parse the json into tape format
 	tape, err := simdjson.Parse(b, nil)
@@ -491,7 +517,7 @@ func (buf *NQuadBuffer) FastParseJSON(b []byte, op int) error {
 				return err
 			}
 			// pass to next parsing stage
-			mr, err := buf.mapToNquads(m, op, "")
+			mr, err := buf.mapToNquads(m, gqlType, op)
 			if err != nil {
 				return err
 			}
@@ -515,7 +541,7 @@ func (buf *NQuadBuffer) FastParseJSON(b []byte, op int) error {
 						return errors.Errorf("only array of map allowed at root")
 					}
 					// pass to next parsing stage
-					mr, err := buf.mapToNquads(o.(map[string]interface{}), op, "")
+					mr, err := buf.mapToNquads(o.(map[string]interface{}), gqlType, op)
 					if err != nil {
 						return err
 					}
@@ -530,7 +556,7 @@ func (buf *NQuadBuffer) FastParseJSON(b []byte, op int) error {
 }
 
 // ParseJSON parses the given byte slice and pushes the parsed NQuads into the buffer.
-func (buf *NQuadBuffer) ParseJSON(b []byte, op int) error {
+func (buf *NQuadBuffer) ParseJSON(b []byte, typ *gqlSchema.Type, op int) error {
 	buffer := bytes.NewBuffer(b)
 	dec := json.NewDecoder(buffer)
 	dec.UseNumber()
@@ -555,7 +581,7 @@ func (buf *NQuadBuffer) ParseJSON(b []byte, op int) error {
 			if _, ok := obj.(map[string]interface{}); !ok {
 				return errors.Errorf("Only array of map allowed at root.")
 			}
-			mr, err := buf.mapToNquads(obj.(map[string]interface{}), op, "")
+			mr, err := buf.mapToNquads(obj.(map[string]interface{}), nil, op)
 			if err != nil {
 				return err
 			}
@@ -563,7 +589,7 @@ func (buf *NQuadBuffer) ParseJSON(b []byte, op int) error {
 		}
 		return nil
 	}
-	mr, err := buf.mapToNquads(ms, op, "")
+	mr, err := buf.mapToNquads(ms, typ, op)
 	if err != nil {
 		return err
 	}
@@ -573,9 +599,9 @@ func (buf *NQuadBuffer) ParseJSON(b []byte, op int) error {
 
 // ParseJSON is a convenience wrapper function to get all NQuads in one call. This can however, lead
 // to high memory usage. So be careful using this.
-func ParseJSON(b []byte, op int) ([]*pb.Edge, error) {
-	buf := NewNQuadBuffer(-1)
-	err := buf.FastParseJSON(b, op)
+func ParseJSON(b []byte, typ *gqlSchema.Type, op int) ([]*pb.Edge, error) {
+	buf := NewNQuadBuffer(typ.Schema(), -1)
+	err := buf.FastParseJSON(b, typ, op)
 	if err != nil {
 		return nil, err
 	}

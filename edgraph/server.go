@@ -1574,7 +1574,7 @@ func parseMutationObject(mu *pb.Mutation, qc *queryContext) (*pb.Mutation, error
 	res := &pb.Mutation{Cond: mu.Cond}
 
 	if len(mu.SetJson) > 0 {
-		nqs, err := chunker.ParseJSON(mu.SetJson, chunker.SetNquads)
+		nqs, err := chunker.ParseJSON(mu.SetJson, qc.gqlField.Type(), chunker.SetNquads)
 		if err != nil {
 			return nil, err
 		}
@@ -1582,7 +1582,7 @@ func parseMutationObject(mu *pb.Mutation, qc *queryContext) (*pb.Mutation, error
 	}
 	if len(mu.DeleteJson) > 0 {
 		// The metadata is not currently needed for delete operations so it can be safely ignored.
-		nqs, err := chunker.ParseJSON(mu.DeleteJson, chunker.DeleteNquads)
+		nqs, err := chunker.ParseJSON(mu.DeleteJson, qc.gqlField.Type(), chunker.DeleteNquads)
 		if err != nil {
 			return nil, err
 		}
