@@ -303,7 +303,6 @@ func main() {
 	}
 	th := y.NewThrottle(*numGo)
 	for i := *endBlock; i > *startBlock; {
-		// for i := *startBlock; i < *endBlock; {
 		Check(th.Do())
 		start, end := i-Width+1, i
 		fmt.Printf("Pushing start: %d end: %d\n", start, end)
