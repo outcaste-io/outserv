@@ -91,12 +91,7 @@ func parseBody(dst *BlockOut, b *types.Body) {
 
 		txout := &TransactionOut{Transaction: txn.Transaction}
 		txout.From = &Account{Address: strings.ToLower(txn.From)}
-		txout.From.Uid = uid("Address", txout.From.Address)
-
 		txout.To = &Account{Address: strings.ToLower(txn.To)}
-		txout.To.Uid = uid("Address", txout.To.Address)
-
-		txout.Uid = uid("Transaction", txout.Hash)
 		dst.Transactions = append(dst.Transactions, txout)
 	}
 
@@ -108,7 +103,6 @@ func parseBody(dst *BlockOut, b *types.Body) {
 		Check(json.Unmarshal(data, &uin))
 		var uout BlockOut
 		uout.Block = uin.Block
-		uout.Uid = uid("Block", uin.Hash)
 		dst.Ommers = append(dst.Ommers, uout)
 	}
 	dst.OmmerCount = hexutil.Uint(len(b.Uncles)).String()
@@ -145,13 +139,12 @@ func parseReceipts(out *BlockOut, rs []*types.ReceiptForStorage) {
 			Check(json.Unmarshal(data, &log))
 
 			log.Lid = fmt.Sprintf("%s|%d", out.Hash, logIndex)
-			log.Uid = uid("Log", log.Lid)
 			log.BlockNumber = out.Number
 			log.TransactionIndex = hexutil.Uint(i).String()
 			log.LogIndex = hexutil.Uint(logIndex).String()
 			logIndex++
 			txn.Logs = append(txn.Logs, log)
-			out.Logs = append(out.Logs, Log{Lid: log.Lid, Uid: log.Uid}) // Just a ref is sufficient.
+			out.Logs = append(out.Logs, Log{Lid: log.Lid}) // Just a ref is sufficient.
 		}
 		out.Transactions = append(out.Transactions, txn)
 	}
@@ -202,10 +195,8 @@ func processAncients(th *y.Throttle, db ethdb.Database, startBlock, endBlock uin
 			var b BlockIn
 			Check(json.Unmarshal(data, &b))
 			block.Block = b.Block
-			block.Uid = uid("Block", b.Hash)
 			if len(b.Miner) > 0 {
 				block.Miner = &Account{
-					Uid:     uid("Address", b.Miner),
 					Address: b.Miner,
 				}
 			}

@@ -1,5 +1,7 @@
 package main
 
+import "encoding/json"
+
 type Block struct {
 	Hash             string            `json:"hash,omitempty"`
 	Number           string            `json:"number,omitempty"`
@@ -30,10 +32,15 @@ type BlockIn struct {
 
 type BlockOut struct {
 	Block
-	Uid        string     `json:"uid,omitempty"`
+	Type       string     `json:"@type,omitempty"`
 	Miner      *Account   `json:"miner,omitempty"`
 	Ommers     []BlockOut `json:"ommers,omitempty"`
 	OmmerCount string     `json:"ommerCount,omitempty"`
+}
+
+func (b *BlockOut) MarshalJSON() ([]byte, error) {
+	b.Type = "Block"
+	return json.Marshal(b)
 }
 
 type Transaction struct {
@@ -70,15 +77,26 @@ type TransactionIn struct {
 }
 type TransactionOut struct {
 	Transaction
-	Uid  string   `json:"uid,omitempty"`
+	Type string   `json:"@type,omitempty"`
 	Fee  string   `json:"fee,omitempty"`
 	From *Account `json:"from,omitempty"`
 	To   *Account `json:"to,omitempty"`
 }
 
+func (t *TransactionOut) MarshalJSON() ([]byte, error) {
+	t.Type = "Transaction"
+	return json.Marshal(t)
+}
+
 type Account struct {
-	Uid     string `json:"uid,omitempty"`
+	Type    string `json:"@type"`
 	Address string `json:"address,omitempty"`
+}
+
+func (a *Account) MarshalJSON() ([]byte, error) {
+	// type Alias BlockOut
+	a.Type = "Account"
+	return json.Marshal(a)
 }
 
 type Log struct {
@@ -90,8 +108,13 @@ type Log struct {
 	LogIndex         string   `json:"logIndex,omitempty"`
 	Removed          bool     `json:"removed,omitempty"`
 
-	Uid         string       `json:"uid,omitempty"`
+	Type        string       `json:"@type,omitempty"`
 	Lid         string       `json:"lid,omitempty"`
 	Transaction *Transaction `json:"transaction,omitempty"`
 	Block       *Block       `json:"block,omitempty"`
+}
+
+func (l *Log) MarshalJSON() ([]byte, error) {
+	l.Type = "Log"
+	return json.Marshal(l)
 }
