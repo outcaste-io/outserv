@@ -41,10 +41,11 @@ func Check(err error) {
 }
 
 type Writer struct {
-	gw      *gzip.Writer
-	bw      *bufio.Writer
-	fd      *os.File
-	written uint64
+	fileName string
+	gw       *gzip.Writer
+	bw       *bufio.Writer
+	fd       *os.File
+	written  uint64
 }
 
 func (w *Writer) Write(data []byte) {
@@ -57,12 +58,14 @@ func (w *Writer) Close() error {
 	Check(w.bw.Flush())
 	Check(w.fd.Sync())
 	Check(w.fd.Close())
+	Check(os.Rename(w.fd.Name(), w.fileName))
+	fmt.Printf("File renamed to %s\n", w.fileName)
 	return nil
 }
 func NewWriter(fileName string) *Writer {
-	w := &Writer{}
+	w := &Writer{fileName: fileName}
 	var err error
-	w.fd, err = os.Create(fileName)
+	w.fd, err = os.Create(fileName + ".tmp")
 	x.Check(err)
 	fmt.Printf("Created file: %s\n", w.fd.Name())
 
@@ -96,9 +99,18 @@ func parseBody(dst *BlockOut, b *types.Body) {
 	}
 
 	// Marshal each uncle and parse back to Block struct.
-	udata, err := json.Marshal(b.Uncles)
-	Check(err)
-	dst.Ommers = udata
+	for _, u := range b.Uncles {
+		data, err := json.Marshal(u)
+		Check(err)
+		var uin BlockIn
+		Check(json.Unmarshal(data, &uin))
+		var uout BlockOut
+		uout.Block = uin.Block
+		if len(uin.Miner) > 0 {
+			uout.Miner = &Account{Address: uin.Miner}
+		}
+		dst.Ommers = append(dst.Ommers, uout)
+	}
 	dst.OmmerCount = hexutil.Uint(len(b.Uncles)).String()
 }
 
@@ -148,7 +160,7 @@ func parseReceipts(out *BlockOut, rs []*types.ReceiptForStorage) {
 func processAncients(th *y.Throttle, db ethdb.Database, startBlock, endBlock uint64) {
 	defer th.Done(nil)
 
-	oneWriter := NewWriter(filepath.Join(*out, fmt.Sprintf("data-%04d.json.gz", endBlock/Width)))
+	oneWriter := NewWriter(filepath.Join(*out, fmt.Sprintf("eth-%04d.json.gz", endBlock/Width)))
 	defer oneWriter.Close()
 
 	handleBlock := func(op ethdb.AncientReaderOp, curBlock uint64) {
@@ -186,7 +198,9 @@ func processAncients(th *y.Throttle, db ethdb.Database, startBlock, endBlock uin
 			Check(json.Unmarshal(data, &b))
 			block.Block = b.Block
 			if len(b.Miner) > 0 {
-				block.Miner = &Account{Address: b.Miner}
+				block.Miner = &Account{
+					Address: b.Miner,
+				}
 			}
 		}
 		{
@@ -201,20 +215,20 @@ func processAncients(th *y.Throttle, db ethdb.Database, startBlock, endBlock uin
 			Check(rlp.DecodeBytes(val, &rs))
 			parseReceipts(block, rs)
 		}
-		data, err := json.Marshal(block)
+
+		// We use an array to make it work with chunker. And we output one entry
+		// at a time, so jq can parse things easily, otherwise it chokes on the
+		// volume of the data. Ideally, we output a map at a time, no array.
+		// TODO(mrjn): Needs a bit of work for the chunker to parse those correctly.
+		data, err := json.Marshal([]*BlockOut{block})
 		Check(err)
 		oneWriter.Write(data)
 	}
 
 	err := db.ReadAncients(func(op ethdb.AncientReaderOp) error {
-		oneWriter.Write([]byte(`[`))
 		for curBlock := startBlock; curBlock <= endBlock; curBlock++ {
 			handleBlock(op, curBlock)
-			if curBlock != endBlock {
-				oneWriter.Write([]byte(`,`))
-			}
 		}
-		oneWriter.Write([]byte(`]`))
 		return nil
 	})
 	Check(err)
@@ -271,7 +285,7 @@ func runIteratorXXX(db ethdb.Database) {
 	}
 }
 
-const Width = uint64(100000)
+const Width = uint64(10000)
 
 func main() {
 	flag.Parse()
@@ -283,11 +297,17 @@ func main() {
 
 	go printMetrics()
 
+	if *endBlock%Width != 0 || *startBlock%Width != 0 {
+		fmt.Printf("Both start and end must match width: %d\n", Width)
+		os.Exit(1)
+	}
 	th := y.NewThrottle(*numGo)
-	for i := *startBlock; i < *endBlock; {
+	for i := *endBlock; i > *startBlock; {
 		Check(th.Do())
-		go processAncients(th, db, i+1, i+Width)
-		i += Width
+		start, end := i-Width+1, i
+		fmt.Printf("Pushing start: %d end: %d\n", start, end)
+		go processAncients(th, db, start, end)
+		i -= Width
 	}
 	th.Finish()
 	fmt.Println("DONE")

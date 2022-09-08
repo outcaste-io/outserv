@@ -23,8 +23,6 @@ type Block struct {
 	TransactionsRoot string            `json:"transactionsRoot,omitempty"`
 	Transactions     []*TransactionOut `json:"transactions,omitempty"`
 	Logs             []Log             `json:"logs,omitempty"`
-	Ommers           json.RawMessage   `json:"ommers,omitempty"`
-	OmmerCount       string            `json:"ommerCount,omitempty"`
 }
 
 type BlockIn struct {
@@ -34,8 +32,16 @@ type BlockIn struct {
 
 type BlockOut struct {
 	Block
-	Uid   string   `json:"uid,omitempty"`
-	Miner *Account `json:"miner,omitempty"`
+	Type       string     `json:"@type,omitempty"`
+	Miner      *Account   `json:"miner,omitempty"`
+	Ommers     []BlockOut `json:"ommers,omitempty"`
+	OmmerCount string     `json:"ommerCount,omitempty"`
+}
+
+func (b *BlockOut) MarshalJSON() ([]byte, error) {
+	b.Type = "Block"
+	type Alias BlockOut
+	return json.Marshal(Alias(*b))
 }
 
 type Transaction struct {
@@ -72,14 +78,28 @@ type TransactionIn struct {
 }
 type TransactionOut struct {
 	Transaction
+	Type string   `json:"@type,omitempty"`
 	Fee  string   `json:"fee,omitempty"`
 	From *Account `json:"from,omitempty"`
 	To   *Account `json:"to,omitempty"`
 }
 
+func (t *TransactionOut) MarshalJSON() ([]byte, error) {
+	t.Type = "Transaction"
+	type Alias TransactionOut
+	return json.Marshal(Alias(*t))
+}
+
 type Account struct {
-	Uid     string `json:"uid,omitempty"`
+	Type    string `json:"@type"`
 	Address string `json:"address,omitempty"`
+}
+
+func (a *Account) MarshalJSON() ([]byte, error) {
+	// type Alias BlockOut
+	a.Type = "Account"
+	type Alias Account
+	return json.Marshal(Alias(*a))
 }
 
 type Log struct {
@@ -91,7 +111,14 @@ type Log struct {
 	LogIndex         string   `json:"logIndex,omitempty"`
 	Removed          bool     `json:"removed,omitempty"`
 
+	Type        string       `json:"@type,omitempty"`
 	Lid         string       `json:"lid,omitempty"`
 	Transaction *Transaction `json:"transaction,omitempty"`
 	Block       *Block       `json:"block,omitempty"`
+}
+
+func (l *Log) MarshalJSON() ([]byte, error) {
+	l.Type = "Log"
+	type Alias Log
+	return json.Marshal(Alias(*l))
 }
