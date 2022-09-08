@@ -216,7 +216,7 @@ func processAncients(th *y.Throttle, db ethdb.Database, startBlock, endBlock uin
 			Check(rlp.DecodeBytes(val, &rs))
 			parseReceipts(block, rs)
 		}
-		data, err := json.Marshal(block)
+		data, err := json.Marshal([]*BlockOut{block}) // Use an array structure to make it work with chunker.
 		Check(err)
 		oneWriter.Write(data)
 	}
