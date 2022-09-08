@@ -218,7 +218,6 @@ func (m *mapper) run() {
 
 	for nqs := range nquads.Ch() {
 		for _, nq := range nqs {
-			// fmt.Printf("got nq: %+v\n", nq)
 			m.processNQuad(nq)
 			atomic.AddInt64(&m.prog.nquadCount, 1)
 		}
