@@ -1,7 +1,5 @@
 package main
 
-import "encoding/json"
-
 type Block struct {
 	Hash             string            `json:"hash,omitempty"`
 	Number           string            `json:"number,omitempty"`
@@ -23,8 +21,6 @@ type Block struct {
 	TransactionsRoot string            `json:"transactionsRoot,omitempty"`
 	Transactions     []*TransactionOut `json:"transactions,omitempty"`
 	Logs             []Log             `json:"logs,omitempty"`
-	Ommers           json.RawMessage   `json:"ommers,omitempty"`
-	OmmerCount       string            `json:"ommerCount,omitempty"`
 }
 
 type BlockIn struct {
@@ -34,8 +30,10 @@ type BlockIn struct {
 
 type BlockOut struct {
 	Block
-	Uid   string   `json:"uid,omitempty"`
-	Miner *Account `json:"miner,omitempty"`
+	Uid        string     `json:"uid,omitempty"`
+	Miner      *Account   `json:"miner,omitempty"`
+	Ommers     []BlockOut `json:"ommers,omitempty"`
+	OmmerCount string     `json:"ommerCount,omitempty"`
 }
 
 type Transaction struct {
@@ -72,6 +70,7 @@ type TransactionIn struct {
 }
 type TransactionOut struct {
 	Transaction
+	Uid  string   `json:"uid,omitempty"`
 	Fee  string   `json:"fee,omitempty"`
 	From *Account `json:"from,omitempty"`
 	To   *Account `json:"to,omitempty"`
@@ -91,6 +90,7 @@ type Log struct {
 	LogIndex         string   `json:"logIndex,omitempty"`
 	Removed          bool     `json:"removed,omitempty"`
 
+	Uid         string       `json:"uid,omitempty"`
 	Lid         string       `json:"lid,omitempty"`
 	Transaction *Transaction `json:"transaction,omitempty"`
 	Block       *Block       `json:"block,omitempty"`
