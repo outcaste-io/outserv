@@ -103,6 +103,9 @@ func parseBody(dst *BlockOut, b *types.Body) {
 		Check(json.Unmarshal(data, &uin))
 		var uout BlockOut
 		uout.Block = uin.Block
+		if len(uin.Miner) > 0 {
+			uout.Miner = &Account{Address: uin.Miner}
+		}
 		dst.Ommers = append(dst.Ommers, uout)
 	}
 	dst.OmmerCount = hexutil.Uint(len(b.Uncles)).String()
