@@ -40,7 +40,8 @@ type BlockOut struct {
 
 func (b *BlockOut) MarshalJSON() ([]byte, error) {
 	b.Type = "Block"
-	return json.Marshal(b)
+	type Alias BlockOut
+	return json.Marshal(Alias(*b))
 }
 
 type Transaction struct {
@@ -85,7 +86,8 @@ type TransactionOut struct {
 
 func (t *TransactionOut) MarshalJSON() ([]byte, error) {
 	t.Type = "Transaction"
-	return json.Marshal(t)
+	type Alias TransactionOut
+	return json.Marshal(Alias(*t))
 }
 
 type Account struct {
@@ -96,7 +98,8 @@ type Account struct {
 func (a *Account) MarshalJSON() ([]byte, error) {
 	// type Alias BlockOut
 	a.Type = "Account"
-	return json.Marshal(a)
+	type Alias Account
+	return json.Marshal(Alias(*a))
 }
 
 type Log struct {
@@ -116,5 +119,6 @@ type Log struct {
 
 func (l *Log) MarshalJSON() ([]byte, error) {
 	l.Type = "Log"
-	return json.Marshal(l)
+	type Alias Log
+	return json.Marshal(Alias(*l))
 }
