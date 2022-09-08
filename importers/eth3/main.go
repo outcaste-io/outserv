@@ -151,7 +151,7 @@ func parseReceipts(out *BlockOut, rs []*types.ReceiptForStorage) {
 			log.LogIndex = hexutil.Uint(logIndex).String()
 			logIndex++
 			txn.Logs = append(txn.Logs, log)
-			out.Logs = append(out.Logs, Log{Lid: log.Lid}) // Just a ref is sufficient.
+			out.Logs = append(out.Logs, Log{Lid: log.Lid, Uid: log.Uid}) // Just a ref is sufficient.
 		}
 		out.Transactions = append(out.Transactions, txn)
 	}
