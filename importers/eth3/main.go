@@ -41,10 +41,11 @@ func Check(err error) {
 }
 
 type Writer struct {
-	gw      *gzip.Writer
-	bw      *bufio.Writer
-	fd      *os.File
-	written uint64
+	fileName string
+	gw       *gzip.Writer
+	bw       *bufio.Writer
+	fd       *os.File
+	written  uint64
 }
 
 func (w *Writer) Write(data []byte) {
@@ -57,12 +58,14 @@ func (w *Writer) Close() error {
 	Check(w.bw.Flush())
 	Check(w.fd.Sync())
 	Check(w.fd.Close())
+	Check(os.Rename(w.fd.Name(), w.fileName))
+	fmt.Printf("File renamed to %s\n", w.fileName)
 	return nil
 }
 func NewWriter(fileName string) *Writer {
-	w := &Writer{}
+	w := &Writer{fileName: fileName}
 	var err error
-	w.fd, err = os.Create(fileName)
+	w.fd, err = os.Create(fileName + ".tmp")
 	x.Check(err)
 	fmt.Printf("Created file: %s\n", w.fd.Name())
 
@@ -161,7 +164,7 @@ func uid(typ, id string) string {
 func processAncients(th *y.Throttle, db ethdb.Database, startBlock, endBlock uint64) {
 	defer th.Done(nil)
 
-	oneWriter := NewWriter(filepath.Join(*out, fmt.Sprintf("data-%04d.json.gz", endBlock/Width)))
+	oneWriter := NewWriter(filepath.Join(*out, fmt.Sprintf("eth-%04d.json.gz", endBlock/Width)))
 	defer oneWriter.Close()
 
 	handleBlock := func(op ethdb.AncientReaderOp, curBlock uint64) {
