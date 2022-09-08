@@ -357,6 +357,7 @@ func dgraphMapping(sch *ast.Schema) map[string]map[string]string {
 		payload = "Payload"
 	)
 
+	// TODO(mrjn): Remove this dgraphPredicate stuff.
 	dgraphPredicate := make(map[string]map[string]string)
 	for _, inputTyp := range sch.Types {
 		// We only want to consider input types (object and interface) defined by the user as part
