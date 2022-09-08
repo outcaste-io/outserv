@@ -64,7 +64,8 @@ func init() {
 	flag.StringP("files", "f", "",
 		"Location of *.json(.gz) file(s) to load.")
 	flag.StringP("schema", "s", "", "Location of the GraphQL schema file.")
-	flag.StringP("type", "t", "", "GraphQL type of the root object in file")
+	flag.StringP("type", "t", "", "GraphQL type of the root object in file."+
+		" Useful if no @type field is present in the JSON objects.")
 	flag.String("out", defaultOutDir,
 		"Location to write the final dgraph data directories.")
 	flag.Bool("replace_out", false,
@@ -460,7 +461,7 @@ func (ld *loader) blockingFileReader() {
 			r, cleanup := fs.ChunkReader(file, nil)
 			defer cleanup()
 
-			chunk := chunker.NewChunker(1000)
+			chunk := chunker.NewChunker(ld.gqlSchema, 1000)
 			for {
 				chunkBuf, err := chunk.Chunk(r)
 				if chunkBuf != nil && chunkBuf.Len() > 0 {
@@ -496,7 +497,7 @@ func (ld *loader) blockingIPCReader() {
 			defer fd.Close()
 
 			r := bufio.NewReaderSize(fd, 32<<20)
-			chunk := chunker.NewChunker(1000)
+			chunk := chunker.NewChunker(ld.gqlSchema, 1000)
 			for {
 				chunkBuf, err := chunk.Chunk(r)
 				if chunkBuf != nil && chunkBuf.Len() > 0 {

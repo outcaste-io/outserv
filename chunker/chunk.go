@@ -46,9 +46,9 @@ func (jc *Chunker) NQuads() *NQuadBuffer {
 }
 
 // NewChunker returns a new chunker for the specified format.
-func NewChunker(batchSize int) *Chunker {
+func NewChunker(schema *gqlSchema.Schema, batchSize int) *Chunker {
 	return &Chunker{
-		nqs: NewNQuadBuffer(batchSize),
+		nqs: NewNQuadBuffer(schema, batchSize),
 	}
 }
 

@@ -202,7 +202,7 @@ var once sync.Once
 
 func (m *mapper) run() {
 	typ := m.gqlSchema.Type(m.opt.GqlType)
-	chunk := chunker.NewChunker(1000)
+	chunk := chunker.NewChunker(m.gqlSchema, 1000)
 	nquads := chunk.NQuads()
 	go func() {
 		for chunkBuf := range m.readerChunkCh {

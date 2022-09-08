@@ -186,13 +186,15 @@ type NQuadBuffer struct {
 	batchSize int
 	nquads    []*pb.Edge
 	nqCh      chan []*pb.Edge
+	schema    *gqlSchema.Schema
 }
 
 // NewNQuadBuffer returns a new NQuadBuffer instance with the specified batch size.
-func NewNQuadBuffer(batchSize int) *NQuadBuffer {
+func NewNQuadBuffer(schema *gqlSchema.Schema, batchSize int) *NQuadBuffer {
 	buf := &NQuadBuffer{
 		batchSize: batchSize,
 		nqCh:      make(chan []*pb.Edge, 10),
+		schema:    schema,
 	}
 	if buf.batchSize > 0 {
 		buf.nquads = make([]*pb.Edge, 0, batchSize)
@@ -246,6 +248,11 @@ func getNextBlank() string {
 
 func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, typ *gqlSchema.Type, op int) (
 	mapResponse, error) {
+	if typ == nil {
+		if val, ok := m["@type"]; ok {
+			typ = buf.schema.Type(val.(string))
+		}
+	}
 	x.AssertTrue(typ != nil)
 	var mr mapResponse
 
@@ -287,11 +294,6 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, typ *gqlSchema.Typ
 		}
 	}
 	if mr.uid == "" {
-		// Try to fill using the ID field.
-		// fmt.Printf("no uid found for type: %s\n", typ.Name())
-		// for _, fd := range typ.Fields() {
-		// 	fmt.Printf("type: %s Field: %s\n", typ.Name(), fd.DgraphAlias())
-		// }
 		var comp []string
 		for _, fd := range typ.XIDFields() {
 			val, ok := m[fd.Name()]
@@ -342,7 +344,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, typ *gqlSchema.Typ
 		// v can be nil if user didn't set a value and if omitEmpty was not supplied as JSON
 		// option.
 		// We also skip facets here because we parse them with the corresponding predicate.
-		if pred == "uid" || pred == "namespace" {
+		if pred == "@type" || pred == "uid" || pred == "namespace" {
 			continue
 		}
 
@@ -599,7 +601,7 @@ func (buf *NQuadBuffer) ParseJSON(b []byte, typ *gqlSchema.Type, op int) error {
 // ParseJSON is a convenience wrapper function to get all NQuads in one call. This can however, lead
 // to high memory usage. So be careful using this.
 func ParseJSON(b []byte, typ *gqlSchema.Type, op int) ([]*pb.Edge, error) {
-	buf := NewNQuadBuffer(-1)
+	buf := NewNQuadBuffer(typ.Schema(), -1)
 	err := buf.FastParseJSON(b, typ, op)
 	if err != nil {
 		return nil, err
