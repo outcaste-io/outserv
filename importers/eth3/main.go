@@ -156,10 +156,6 @@ func parseReceipts(out *BlockOut, rs []*types.ReceiptForStorage) {
 	}
 }
 
-func uid(typ, id string) string {
-	return fmt.Sprintf("_:%s.%s", typ, id)
-}
-
 // processAncients would output both start and end block.
 func processAncients(th *y.Throttle, db ethdb.Database, startBlock, endBlock uint64) {
 	defer th.Done(nil)
@@ -219,7 +215,12 @@ func processAncients(th *y.Throttle, db ethdb.Database, startBlock, endBlock uin
 			Check(rlp.DecodeBytes(val, &rs))
 			parseReceipts(block, rs)
 		}
-		data, err := json.Marshal([]*BlockOut{block}) // Use an array structure to make it work with chunker.
+
+		// We use an array to make it work with chunker. And we output one entry
+		// at a time, so jq can parse things easily, otherwise it chokes on the
+		// volume of the data. Ideally, we output a map at a time, no array.
+		// TODO(mrjn): Needs a bit of work for the chunker to parse those correctly.
+		data, err := json.Marshal([]*BlockOut{block})
 		Check(err)
 		oneWriter.Write(data)
 	}
