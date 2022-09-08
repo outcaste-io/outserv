@@ -29,6 +29,7 @@ import (
 	"unicode"
 
 	"github.com/outcaste-io/outserv/ee/enc"
+	gqlSchema "github.com/outcaste-io/outserv/graphql/schema"
 	"github.com/outcaste-io/outserv/x"
 
 	"github.com/pkg/errors"
@@ -200,11 +201,11 @@ func (*Chunker) nextRune(r *bufio.Reader) (rune, error) {
 	return ch, nil
 }
 
-func (jc *Chunker) Parse(chunkBuf *bytes.Buffer) error {
+func (jc *Chunker) Parse(chunkBuf *bytes.Buffer, typ *gqlSchema.Type) error {
 	if chunkBuf == nil || chunkBuf.Len() == 0 {
 		return nil
 	}
-	return jc.nqs.FastParseJSON(chunkBuf.Bytes(), SetNquads)
+	return jc.nqs.FastParseJSON(chunkBuf.Bytes(), typ, SetNquads)
 }
 
 func slurpSpace(r *bufio.Reader) error {

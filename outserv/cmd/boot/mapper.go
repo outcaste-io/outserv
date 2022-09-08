@@ -201,11 +201,12 @@ func (m *mapper) writeMapEntriesToFile(cbuf *z.Buffer, shardIdx int) {
 var once sync.Once
 
 func (m *mapper) run() {
+	typ := m.gqlSchema.Type(m.opt.GqlType)
 	chunk := chunker.NewChunker(1000)
 	nquads := chunk.NQuads()
 	go func() {
 		for chunkBuf := range m.readerChunkCh {
-			if err := chunk.Parse(chunkBuf); err != nil {
+			if err := chunk.Parse(chunkBuf, typ); err != nil {
 				atomic.AddInt64(&m.prog.errCount, 1)
 				if !m.opt.IgnoreErrors {
 					x.Check(err)

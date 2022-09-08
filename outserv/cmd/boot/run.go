@@ -64,6 +64,7 @@ func init() {
 	flag.StringP("files", "f", "",
 		"Location of *.json(.gz) file(s) to load.")
 	flag.StringP("schema", "s", "", "Location of the GraphQL schema file.")
+	flag.StringP("type", "t", "", "GraphQL type of the root object in file")
 	flag.String("out", defaultOutDir,
 		"Location to write the final dgraph data directories.")
 	flag.Bool("replace_out", false,
@@ -133,6 +134,7 @@ func run() {
 		DataIPC:          Boot.Conf.GetString("ipc"),
 		EncryptionKey:    keys.EncKey,
 		GqlSchemaFile:    Boot.Conf.GetString("schema"),
+		GqlType:          Boot.Conf.GetString("type"),
 		OutDir:           Boot.Conf.GetString("out"),
 		ReplaceOutDir:    Boot.Conf.GetBool("replace_out"),
 		TmpDir:           Boot.Conf.GetString("tmp"),
@@ -331,6 +333,7 @@ type options struct {
 	DataFiles        string
 	DataIPC          string
 	GqlSchemaFile    string
+	GqlType          string
 	OutDir           string
 	ReplaceOutDir    bool
 	TmpDir           string
