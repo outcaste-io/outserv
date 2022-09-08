@@ -256,9 +256,6 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, typ *gqlSchema.Typ
 	x.AssertTrue(typ != nil)
 	var mr mapResponse
 
-	// Find the type of the object, and the corresponding ID field. And use that
-	// for determining the UID.
-	//
 	// Check field in map.
 	if uidVal, ok := m["uid"]; ok {
 		var uid uint64
@@ -293,6 +290,9 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, typ *gqlSchema.Typ
 			mr.uid = x.ToHexString(uid)
 		}
 	}
+
+	// Use the type of the object and the corresponding XID fields to
+	// determine the UID.
 	if mr.uid == "" {
 		var comp []string
 		for _, fd := range typ.XIDFields() {
@@ -302,7 +302,6 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, typ *gqlSchema.Typ
 			}
 		}
 		mr.uid = fmt.Sprintf("_:%s.%s", typ.Name(), strings.Join(comp, "|"))
-		// fmt.Printf("Assigned UID to %s -> %s\n", typ.Name(), mr.uid)
 	}
 
 	if mr.uid == "" {
