@@ -91,7 +91,11 @@ func parseBody(dst *BlockOut, b *types.Body) {
 
 		txout := &TransactionOut{Transaction: txn.Transaction}
 		txout.From = &Account{Address: strings.ToLower(txn.From)}
+		txout.From.Uid = uid("Address", txout.From.Address)
+
 		txout.To = &Account{Address: strings.ToLower(txn.To)}
+		txout.To.Uid = uid("Address", txout.To.Address)
+
 		txout.Uid = uid("Transaction", txout.Hash)
 		dst.Transactions = append(dst.Transactions, txout)
 	}
