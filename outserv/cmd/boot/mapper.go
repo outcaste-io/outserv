@@ -218,6 +218,7 @@ func (m *mapper) run() {
 
 	for nqs := range nquads.Ch() {
 		for _, nq := range nqs {
+			// fmt.Printf("got nq: %+v\n", nq)
 			m.processNQuad(nq)
 			atomic.AddInt64(&m.prog.nquadCount, 1)
 		}
@@ -366,7 +367,7 @@ func (m *mapper) createPostings(nq *pb.Edge) *pb.Posting {
 	sch := m.dqlSchema.getSchema(nq.Predicate)
 	if sch == nil {
 		fmt.Printf("schema: %+v\n", m.dqlSchema.schemaMap)
-		fmt.Printf("asking for: %q\n", nq.Predicate)
+		fmt.Printf("asking for: %q in nq: %+v\n", nq.Predicate, nq)
 		x.AssertTrue(sch != nil)
 	}
 	if nq.GetObjectValue() != nil {
@@ -395,7 +396,10 @@ func (m *mapper) addIndexMapEntries(nq *pb.Edge) {
 
 	toType := types.TypeID(sch.GetValueType())
 	tokens, err := posting.TokensFromVal(tokenizers, toType, nq.ObjectValue)
-	x.Check(err)
+	if err != nil {
+		fmt.Printf("Got error: %v from nq: %+v\n", err, nq)
+		x.Check(err)
+	}
 
 	// Store index posting.
 	uid := x.FromHex(nq.Subject)

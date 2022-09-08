@@ -14,7 +14,6 @@ import (
 	"unicode"
 
 	simdjson "github.com/dgraph-io/simdjson-go"
-	"github.com/golang/glog"
 	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/outcaste-io/outserv/graphql/schema"
 	gqlSchema "github.com/outcaste-io/outserv/graphql/schema"
@@ -289,14 +288,19 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, typ *gqlSchema.Typ
 	}
 	if mr.uid == "" {
 		// Try to fill using the ID field.
-
-		fd := typ.IDField()
-		if fd != nil {
-			if val, ok := m[fd.DgraphAlias()]; ok {
-				mr.uid = fmt.Sprintf("_:%s.%s", typ.Name(), val)
-				glog.Infof("Assigning uid: %s\n to %v\n", mr.uid, m)
+		// fmt.Printf("no uid found for type: %s\n", typ.Name())
+		// for _, fd := range typ.Fields() {
+		// 	fmt.Printf("type: %s Field: %s\n", typ.Name(), fd.DgraphAlias())
+		// }
+		var comp []string
+		for _, fd := range typ.XIDFields() {
+			val, ok := m[fd.Name()]
+			if ok {
+				comp = append(comp, val.(string))
 			}
 		}
+		mr.uid = fmt.Sprintf("_:%s.%s", typ.Name(), strings.Join(comp, "|"))
+		// fmt.Printf("Assigned UID to %s -> %s\n", typ.Name(), mr.uid)
 	}
 
 	if mr.uid == "" {
@@ -361,6 +365,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, typ *gqlSchema.Typ
 			continue
 		}
 
+		// TODO: We should perhaps create the type.predicate here.
 		nq := pb.Edge{
 			Subject:   mr.uid,
 			Predicate: pred,
@@ -386,15 +391,13 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, typ *gqlSchema.Typ
 				continue
 			}
 
-			if fd.Type().IsGeo() {
-				ok, err := handleGeoType(v, &nq)
-				if err != nil {
-					return mr, err
-				}
-				if ok {
-					buf.Push(&nq)
-					continue
-				}
+			ok, err := handleGeoType(v, &nq)
+			if err != nil {
+				return mr, err
+			}
+			if ok {
+				buf.Push(&nq)
+				continue
 			}
 			cr, err := buf.mapToNquads(v, fd.Type(), op)
 			if err != nil {
