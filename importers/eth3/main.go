@@ -293,11 +293,18 @@ func main() {
 
 	go printMetrics()
 
+	if *endBlock%Width != 0 || *startBlock%Width != 0 {
+		fmt.Printf("Both start and end must match width: %d\n", Width)
+		os.Exit(1)
+	}
 	th := y.NewThrottle(*numGo)
-	for i := *startBlock; i < *endBlock; {
+	for i := *endBlock; i > *startBlock; {
+		// for i := *startBlock; i < *endBlock; {
 		Check(th.Do())
-		go processAncients(th, db, i+1, i+Width)
-		i += Width
+		start, end := i-Width+1, i
+		fmt.Printf("Pushing start: %d end: %d\n", start, end)
+		go processAncients(th, db, start, end)
+		i -= Width
 	}
 	th.Finish()
 	fmt.Println("DONE")
