@@ -1,0 +1,818 @@
+Time now: 2022-09-08 17:28:33 -0700 PDT . Ending at 2022-09-08 17:38:33 -0700 PDT
+Bounds are: [1 2 4 8 16 32 64 128 256 512 1024 2048 3072 4096 5120 6144 7168 8192 9216 10240 11264 12288 13312 14336 15360 16384 17408 18432 19456 20480 21504 22528 23552 24576 25600 26624 27648 28672 29696 30720 31744 32768 33792 34816 35840 36864 37888 38912 39936 40960 41984 43008 44032 45056 46080 47104 48128 49152 50176 51200 52224 53248 54272 55296 56320 57344 58368 59392 60416 61440 62464 63488 64512 65536 66560 67584 68608 69632 70656 71680 72704 73728 74752 75776 76800 77824 78848 79872 80896 81920 82944 83968 84992 86016 87040 88064 89088 90112 91136 92160 93184 94208 95232 96256 97280 98304 99328 100352 101376 102400 103424 104448 105472 106496 107520 108544 109568 110592 111616 112640 113664 114688 115712 116736 117760 118784 119808 120832 121856 122880 123904 124928 125952 126976 128000 129024 130048 131072 132096 133120 134144 135168 136192 137216 138240 139264 140288 141312 142336 143360 144384 145408 146432 147456 148480 149504 150528 151552 152576 153600 154624 155648 156672 157696 158720 159744 160768 161792 162816 163840 164864 165888 166912 167936 168960 169984 171008 172032 173056 174080 175104 176128 177152 178176 179200 180224 181248 182272 183296 184320 185344 186368 187392 188416 189440 190464 191488 192512 193536 194560 195584 196608 197632 198656 199680 200704 201728 202752 203776 204800 205824 206848 207872 208896 209920 210944 211968 212992 214016 215040 216064 217088 218112 219136 220160 221184 222208 223232 224256 225280 226304 227328 228352 229376 230400 231424 232448 233472 234496 235520 236544 237568 238592 239616 240640 241664 242688 243712 244736 245760 246784 247808 248832 249856 250880 251904 252928 253952 254976 256000 257024 258048 259072 260096 261120 262144 263168 264192 265216 266240 267264 268288 269312 270336 271360 272384 273408 274432 275456 276480 277504 278528 279552 280576 281600 282624 283648 284672 285696 286720 287744 288768 289792 290816 291840 292864 293888 294912 295936 296960 297984 299008 300032 301056 302080 303104 304128 305152 306176 307200 308224 309248 310272 311296 312320 313344 314368 315392 316416 317440 318464 319488 320512 321536 322560 323584 324608 325632 326656 327680 328704 329728 330752 331776 332800 333824 334848 335872 336896 337920 338944 339968 340992 342016 343040 344064 345088 346112 347136 348160 349184 350208 351232 352256 353280 354304 355328 356352 357376 358400 359424 360448 361472 362496 363520 364544 365568 366592 367616 368640 369664 370688 371712 372736 373760 374784 375808 376832 377856 378880 379904 380928 381952 382976 384000 385024 386048 387072 388096 389120 390144 391168 392192 393216 394240 395264 396288 397312 398336 399360 400384 401408 402432 403456 404480 405504 406528 407552 408576 409600 410624 411648 412672 413696 414720 415744 416768 417792 418816 419840 420864 421888 422912 423936 424960 425984 427008 428032 429056 430080 431104 432128 433152 434176 435200 436224 437248 438272 439296 440320 441344 442368 443392 444416 445440 446464 447488 448512 449536 450560 451584 452608 453632 454656 455680 456704 457728 458752 459776 460800 461824 462848 463872 464896 465920 466944 467968 468992 470016 471040 472064 473088 474112 475136 476160 477184 478208 479232 480256 481280 482304 483328 484352 485376 486400 487424 488448 489472 490496 491520 492544 493568 494592 495616 496640 497664 498688 499712 500736 501760 502784 503808 504832 505856 506880 507904 508928 509952 510976 512000 513024 514048 515072 516096 517120 518144 519168 520192 521216 522240 523264 524288 525312 526336 527360 528384 529408 530432 531456 532480 533504 534528 535552 536576 537600 538624 539648 540672 541696 542720 543744 544768 545792 546816 547840 548864 549888 550912 551936 552960 553984 555008 556032 557056 558080 559104 560128 561152 562176 563200 564224 565248 566272 567296 568320 569344 570368 571392 572416 573440 574464 575488 576512 577536 578560 579584 580608 581632 582656 583680 584704 585728 586752 587776 588800 589824 590848 591872 592896 593920 594944 595968 596992 598016 599040 600064 601088 602112 603136 604160 605184 606208 607232 608256 609280 610304 611328 612352 613376 614400 615424 616448 617472 618496 619520 620544 621568 622592 623616 624640 625664 626688 627712 628736 629760 630784 631808 632832 633856 634880 635904 636928 637952 638976 640000 641024 642048 643072 644096 645120 646144 647168 648192 649216 650240 651264 652288 653312 654336 655360 656384 657408 658432 659456 660480 661504 662528 663552 664576 665600 666624 667648 668672 669696 670720 671744 672768 673792 674816 675840 676864 677888 678912 679936 680960 681984 683008 684032 685056 686080 687104 688128 689152 690176 691200 692224 693248 694272 695296 696320 697344 698368 699392 700416 701440 702464 703488 704512 705536 706560 707584 708608 709632 710656 711680 712704 713728 714752 715776 716800 717824 718848 719872 720896 721920 722944 723968 724992 726016 727040 728064 729088 730112 731136 732160 733184 734208 735232 736256 737280 738304 739328 740352 741376 742400 743424 744448 745472 746496 747520 748544 749568 750592 751616 752640 753664 754688 755712 756736 757760 758784 759808 760832 761856 762880 763904 764928 765952 766976 768000 769024 770048 771072 772096 773120 774144 775168 776192 777216 778240 779264 780288 781312 782336 783360 784384 785408 786432 787456 788480 789504 790528 791552 792576 793600 794624 795648 796672 797696 798720 799744 800768 801792 802816 803840 804864 805888 806912 807936 808960 809984 811008 812032 813056 814080 815104 816128 817152 818176 819200 820224 821248 822272 823296 824320 825344 826368 827392 828416 829440 830464 831488 832512 833536 834560 835584 836608 837632 838656 839680 840704 841728 842752 843776 844800 845824 846848 847872 848896 849920 850944 851968 852992 854016 855040 856064 857088 858112 859136 860160 861184 862208 863232 864256 865280 866304 867328 868352 869376 870400 871424 872448 873472 874496 875520 876544 877568 878592 879616 880640 881664 882688 883712 884736 885760 886784 887808 888832 889856 890880 891904 892928 893952 894976 896000 897024 898048 899072 900096 901120 902144 903168 904192 905216 906240 907264 908288 909312 910336 911360 912384 913408 914432 915456 916480 917504 918528 919552 920576 921600 922624 923648 924672 925696 926720 927744 928768 929792 930816 931840 932864 933888 934912 935936 936960 937984 939008 940032 941056 942080 943104 944128 945152 946176 947200 948224 949248 950272 951296 952320 953344 954368 955392 956416 957440 958464 959488 960512 961536 962560 963584 964608 965632 966656 967680 968704 969728 970752 971776 972800 973824 974848 975872 976896 977920 978944 979968 980992 982016 983040 984064 985088 986112 987136 988160 989184 990208 991232 992256 993280 994304 995328 996352 997376 998400 999424 1.000448e+06 1.001472e+06 1.002496e+06 1.00352e+06 1.004544e+06 1.005568e+06 1.006592e+06 1.007616e+06 1.00864e+06 1.009664e+06 1.010688e+06 1.011712e+06 1.012736e+06 1.01376e+06 1.014784e+06 1.015808e+06 1.016832e+06 1.017856e+06 1.01888e+06 1.019904e+06 1.020928e+06 1.021952e+06 1.022976e+06 1.024e+06 1.025024e+06 1.026048e+06 1.027072e+06 1.028096e+06 1.02912e+06 1.030144e+06 1.031168e+06 1.032192e+06 1.033216e+06 1.03424e+06 1.035264e+06 1.036288e+06 1.037312e+06 1.038336e+06 1.03936e+06 1.040384e+06 1.041408e+06 1.042432e+06 1.043456e+06 1.04448e+06 1.045504e+06 1.046528e+06 1.047552e+06 1.048576e+06 1.0496e+06]
+Num Blocks:     0 | Num Queries:   47 | Num 429:    0 | CUs:  713 | Data: 0 B [     1s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:   79 | Num 429:    8 | CUs: 1193 | Data: 0 B [     2s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  108 | Num 429:    8 | CUs: 1628 | Data: 0 B [     3s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  149 | Num 429:   16 | CUs: 2243 | Data: 0 B [     4s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  165 | Num 429:   16 | CUs: 2483 | Data: 0 B [     5s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  219 | Num 429:   24 | CUs: 3293 | Data: 0 B [     6s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  227 | Num 429:   24 | CUs: 3413 | Data: 0 B [     7s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  287 | Num 429:   32 | CUs: 4313 | Data: 0 B [     8s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  289 | Num 429:   32 | CUs: 4343 | Data: 0 B [     9s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  356 | Num 429:   38 | CUs: 5348 | Data: 0 B [    10s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  356 | Num 429:   40 | CUs: 5348 | Data: 0 B [    11s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  423 | Num 429:   41 | CUs: 6353 | Data: 0 B [    12s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  423 | Num 429:   48 | CUs: 6353 | Data: 0 B [    13s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  488 | Num 429:   48 | CUs: 7328 | Data: 0 B [    14s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  492 | Num 429:   56 | CUs: 7388 | Data: 0 B [    15s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  536 | Num 429:   56 | CUs: 8048 | Data: 0 B [    16s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  562 | Num 429:   64 | CUs: 8438 | Data: 0 B [    17s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  598 | Num 429:   64 | CUs: 8978 | Data: 0 B [    18s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  630 | Num 429:   72 | CUs: 9458 | Data: 0 B [    19s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  659 | Num 429:   72 | CUs: 9893 | Data: 0 B [    20s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  698 | Num 429:   80 | CUs: 10478 | Data: 0 B [    21s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  719 | Num 429:   80 | CUs: 10793 | Data: 0 B [    22s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  768 | Num 429:   87 | CUs: 11528 | Data: 0 B [    23s @ 0 blocks/sec ]
+Num Blocks:     0 | Num Queries:  790 | Num 429:   87 | CUs: 11858 | Data: 0 B [    24s @ 0 blocks/sec ]
+Num Blocks:     1 | Num Queries:  841 | Num 429:   94 | CUs: 12624 | Data: 331 KiB [    25s @ 0 blocks/sec ]
+Num Blocks:     1 | Num Queries:  853 | Num 429:   94 | CUs: 12804 | Data: 331 KiB [    26s @ 0 blocks/sec ]
+Num Blocks:     1 | Num Queries:  917 | Num 429:  100 | CUs: 13764 | Data: 331 KiB [    27s @ 0 blocks/sec ]
+Num Blocks:     1 | Num Queries:  934 | Num 429:  100 | CUs: 14019 | Data: 331 KiB [    28s @ 0 blocks/sec ]
+Num Blocks:     1 | Num Queries:  998 | Num 429:  100 | CUs: 14979 | Data: 331 KiB [    29s @ 0 blocks/sec ]
+Num Blocks:     1 | Num Queries: 1005 | Num 429:  108 | CUs: 15084 | Data: 331 KiB [    30s @ 0 blocks/sec ]
+Num Blocks:     3 | Num Queries: 1048 | Num 429:  108 | CUs: 15731 | Data: 1.2 MiB [    31s @ 0 blocks/sec ]
+Num Blocks:     3 | Num Queries: 1104 | Num 429:  110 | CUs: 16571 | Data: 1.2 MiB [    32s @ 0 blocks/sec ]
+Num Blocks:     4 | Num Queries: 1160 | Num 429:  110 | CUs: 17412 | Data: 1.4 MiB [    33s @ 0 blocks/sec ]
+Num Blocks:     4 | Num Queries: 1188 | Num 429:  115 | CUs: 17832 | Data: 1.4 MiB [    34s @ 0 blocks/sec ]
+Num Blocks:     4 | Num Queries: 1245 | Num 429:  115 | CUs: 18687 | Data: 1.4 MiB [    35s @ 0 blocks/sec ]
+Num Blocks:     4 | Num Queries: 1261 | Num 429:  123 | CUs: 18927 | Data: 1.4 MiB [    36s @ 0 blocks/sec ]
+Num Blocks:     4 | Num Queries: 1303 | Num 429:  123 | CUs: 19557 | Data: 1.4 MiB [    37s @ 0 blocks/sec ]
+Num Blocks:     4 | Num Queries: 1333 | Num 429:  131 | CUs: 20007 | Data: 1.4 MiB [    38s @ 0 blocks/sec ]
+Num Blocks:     4 | Num Queries: 1360 | Num 429:  131 | CUs: 20412 | Data: 1.4 MiB [    39s @ 0 blocks/sec ]
+Num Blocks:     5 | Num Queries: 1402 | Num 429:  139 | CUs: 21043 | Data: 1.9 MiB [    40s @ 0 blocks/sec ]
+Num Blocks:     5 | Num Queries: 1420 | Num 429:  139 | CUs: 21313 | Data: 1.9 MiB [    41s @ 0 blocks/sec ]
+Num Blocks:     5 | Num Queries: 1476 | Num 429:  147 | CUs: 22153 | Data: 1.9 MiB [    42s @ 0 blocks/sec ]
+Num Blocks:     5 | Num Queries: 1480 | Num 429:  147 | CUs: 22213 | Data: 1.9 MiB [    43s @ 0 blocks/sec ]
+Num Blocks:     5 | Num Queries: 1546 | Num 429:  147 | CUs: 23203 | Data: 1.9 MiB [    44s @ 0 blocks/sec ]
+Num Blocks:     5 | Num Queries: 1550 | Num 429:  155 | CUs: 23263 | Data: 1.9 MiB [    45s @ 0 blocks/sec ]
+Num Blocks:     5 | Num Queries: 1607 | Num 429:  155 | CUs: 24118 | Data: 1.9 MiB [    46s @ 0 blocks/sec ]
+Num Blocks:     5 | Num Queries: 1620 | Num 429:  163 | CUs: 24313 | Data: 1.9 MiB [    47s @ 0 blocks/sec ]
+Num Blocks:     5 | Num Queries: 1666 | Num 429:  163 | CUs: 25003 | Data: 1.9 MiB [    48s @ 0 blocks/sec ]
+Num Blocks:     5 | Num Queries: 1693 | Num 429:  171 | CUs: 25408 | Data: 1.9 MiB [    49s @ 0 blocks/sec ]
+Num Blocks:     5 | Num Queries: 1726 | Num 429:  171 | CUs: 25903 | Data: 1.9 MiB [    50s @ 0 blocks/sec ]
+Num Blocks:     5 | Num Queries: 1765 | Num 429:  179 | CUs: 26488 | Data: 1.9 MiB [    51s @ 0 blocks/sec ]
+Num Blocks:     5 | Num Queries: 1785 | Num 429:  179 | CUs: 26788 | Data: 1.9 MiB [    52s @ 0 blocks/sec ]
+Num Blocks:     6 | Num Queries: 1835 | Num 429:  187 | CUs: 27539 | Data: 2.1 MiB [    53s @ 0 blocks/sec ]
+Num Blocks:     6 | Num Queries: 1844 | Num 429:  187 | CUs: 27674 | Data: 2.1 MiB [    54s @ 0 blocks/sec ]
+Num Blocks:     6 | Num Queries: 1904 | Num 429:  194 | CUs: 28574 | Data: 2.1 MiB [    55s @ 0 blocks/sec ]
+Num Blocks:     6 | Num Queries: 1913 | Num 429:  194 | CUs: 28709 | Data: 2.1 MiB [    56s @ 0 blocks/sec ]
+Num Blocks:     6 | Num Queries: 1981 | Num 429:  194 | CUs: 29729 | Data: 2.1 MiB [    57s @ 0 blocks/sec ]
+Num Blocks:     6 | Num Queries: 1983 | Num 429:  202 | CUs: 29759 | Data: 2.1 MiB [    58s @ 0 blocks/sec ]
+Num Blocks:     7 | Num Queries: 2039 | Num 429:  202 | CUs: 30600 | Data: 2.7 MiB [    59s @ 0 blocks/sec ]
+Num Blocks:     7 | Num Queries: 2052 | Num 429:  210 | CUs: 30795 | Data: 2.7 MiB [   1m0s @ 0 blocks/sec ]
+Num Blocks:     7 | Num Queries: 2100 | Num 429:  210 | CUs: 31515 | Data: 2.7 MiB [   1m1s @ 0 blocks/sec ]
+Num Blocks:     8 | Num Queries: 2139 | Num 429:  215 | CUs: 32101 | Data: 3.1 MiB [   1m2s @ 0 blocks/sec ]
+Num Blocks:     8 | Num Queries: 2188 | Num 429:  215 | CUs: 32836 | Data: 3.1 MiB [   1m3s @ 0 blocks/sec ]
+Num Blocks:     8 | Num Queries: 2217 | Num 429:  223 | CUs: 33271 | Data: 3.1 MiB [   1m4s @ 0 blocks/sec ]
+Num Blocks:     9 | Num Queries: 2250 | Num 429:  223 | CUs: 33767 | Data: 4.0 MiB [   1m5s @ 0 blocks/sec ]
+Num Blocks:     9 | Num Queries: 2286 | Num 429:  231 | CUs: 34307 | Data: 4.0 MiB [   1m6s @ 0 blocks/sec ]
+Num Blocks:     9 | Num Queries: 2308 | Num 429:  231 | CUs: 34637 | Data: 4.0 MiB [   1m7s @ 0 blocks/sec ]
+Num Blocks:     9 | Num Queries: 2355 | Num 429:  239 | CUs: 35342 | Data: 4.0 MiB [   1m8s @ 0 blocks/sec ]
+Num Blocks:     9 | Num Queries: 2371 | Num 429:  239 | CUs: 35582 | Data: 4.0 MiB [   1m9s @ 0 blocks/sec ]
+Num Blocks:     9 | Num Queries: 2424 | Num 429:  247 | CUs: 36377 | Data: 4.0 MiB [  1m10s @ 0 blocks/sec ]
+Num Blocks:     9 | Num Queries: 2430 | Num 429:  247 | CUs: 36467 | Data: 4.0 MiB [  1m11s @ 0 blocks/sec ]
+Num Blocks:     9 | Num Queries: 2492 | Num 429:  254 | CUs: 37397 | Data: 4.0 MiB [  1m12s @ 0 blocks/sec ]
+Num Blocks:     9 | Num Queries: 2501 | Num 429:  254 | CUs: 37532 | Data: 4.0 MiB [  1m13s @ 0 blocks/sec ]
+Num Blocks:     9 | Num Queries: 2556 | Num 429:  254 | CUs: 38357 | Data: 4.0 MiB [  1m14s @ 0 blocks/sec ]
+Num Blocks:     9 | Num Queries: 2621 | Num 429:  254 | CUs: 39332 | Data: 4.0 MiB [  1m15s @ 0 blocks/sec ]
+Num Blocks:     9 | Num Queries: 2626 | Num 429:  262 | CUs: 39407 | Data: 4.0 MiB [  1m16s @ 0 blocks/sec ]
+Num Blocks:     9 | Num Queries: 2683 | Num 429:  262 | CUs: 40262 | Data: 4.0 MiB [  1m17s @ 0 blocks/sec ]
+Num Blocks:     9 | Num Queries: 2697 | Num 429:  270 | CUs: 40472 | Data: 4.0 MiB [  1m18s @ 0 blocks/sec ]
+Num Blocks:     9 | Num Queries: 2744 | Num 429:  270 | CUs: 41177 | Data: 4.0 MiB [  1m19s @ 0 blocks/sec ]
+Num Blocks:    10 | Num Queries: 2769 | Num 429:  278 | CUs: 41553 | Data: 4.3 MiB [  1m20s @ 0 blocks/sec ]
+Num Blocks:    11 | Num Queries: 2799 | Num 429:  278 | CUs: 42004 | Data: 4.8 MiB [  1m21s @ 0 blocks/sec ]
+Num Blocks:    11 | Num Queries: 2845 | Num 429:  286 | CUs: 42694 | Data: 4.8 MiB [  1m22s @ 0 blocks/sec ]
+Num Blocks:    11 | Num Queries: 2862 | Num 429:  286 | CUs: 42949 | Data: 4.8 MiB [  1m23s @ 0 blocks/sec ]
+Num Blocks:    11 | Num Queries: 2917 | Num 429:  294 | CUs: 43774 | Data: 4.8 MiB [  1m24s @ 0 blocks/sec ]
+Num Blocks:    11 | Num Queries: 2920 | Num 429:  294 | CUs: 43819 | Data: 4.8 MiB [  1m25s @ 0 blocks/sec ]
+Num Blocks:    11 | Num Queries: 2987 | Num 429:  295 | CUs: 44824 | Data: 4.8 MiB [  1m26s @ 0 blocks/sec ]
+Num Blocks:    11 | Num Queries: 2987 | Num 429:  302 | CUs: 44824 | Data: 4.8 MiB [  1m27s @ 0 blocks/sec ]
+Num Blocks:    11 | Num Queries: 3045 | Num 429:  302 | CUs: 45694 | Data: 4.8 MiB [  1m28s @ 0 blocks/sec ]
+Num Blocks:    11 | Num Queries: 3081 | Num 429:  306 | CUs: 46234 | Data: 4.8 MiB [  1m29s @ 0 blocks/sec ]
+Num Blocks:    13 | Num Queries: 3134 | Num 429:  306 | CUs: 47031 | Data: 6.0 MiB [  1m30s @ 0 blocks/sec ]
+Num Blocks:    13 | Num Queries: 3172 | Num 429:  310 | CUs: 47601 | Data: 6.0 MiB [  1m31s @ 0 blocks/sec ]
+Num Blocks:    13 | Num Queries: 3225 | Num 429:  310 | CUs: 48396 | Data: 6.0 MiB [  1m32s @ 0 blocks/sec ]
+Num Blocks:    13 | Num Queries: 3253 | Num 429:  318 | CUs: 48816 | Data: 6.0 MiB [  1m33s @ 0 blocks/sec ]
+Num Blocks:    13 | Num Queries: 3282 | Num 429:  318 | CUs: 49251 | Data: 6.0 MiB [  1m34s @ 0 blocks/sec ]
+Num Blocks:    14 | Num Queries: 3322 | Num 429:  326 | CUs: 49852 | Data: 6.5 MiB [  1m35s @ 0 blocks/sec ]
+Num Blocks:    14 | Num Queries: 3343 | Num 429:  326 | CUs: 50167 | Data: 6.5 MiB [  1m36s @ 0 blocks/sec ]
+Num Blocks:    14 | Num Queries: 3400 | Num 429:  334 | CUs: 51022 | Data: 6.5 MiB [  1m37s @ 0 blocks/sec ]
+Num Blocks:    14 | Num Queries: 3400 | Num 429:  334 | CUs: 51022 | Data: 6.5 MiB [  1m38s @ 0 blocks/sec ]
+Num Blocks:    15 | Num Queries: 3463 | Num 429:  334 | CUs: 51968 | Data: 7.8 MiB [  1m39s @ 0 blocks/sec ]
+Num Blocks:    15 | Num Queries: 3467 | Num 429:  342 | CUs: 52028 | Data: 7.8 MiB [  1m40s @ 0 blocks/sec ]
+Num Blocks:    15 | Num Queries: 3519 | Num 429:  342 | CUs: 52808 | Data: 7.8 MiB [  1m41s @ 0 blocks/sec ]
+Num Blocks:    16 | Num Queries: 3550 | Num 429:  348 | CUs: 53274 | Data: 8.7 MiB [  1m42s @ 0 blocks/sec ]
+Num Blocks:    16 | Num Queries: 3595 | Num 429:  348 | CUs: 53949 | Data: 8.7 MiB [  1m43s @ 0 blocks/sec ]
+Num Blocks:    16 | Num Queries: 3624 | Num 429:  356 | CUs: 54384 | Data: 8.7 MiB [  1m44s @ 0 blocks/sec ]
+Num Blocks:    16 | Num Queries: 3655 | Num 429:  356 | CUs: 54849 | Data: 8.7 MiB [  1m45s @ 0 blocks/sec ]
+Num Blocks:    16 | Num Queries: 3696 | Num 429:  364 | CUs: 55464 | Data: 8.7 MiB [  1m46s @ 0 blocks/sec ]
+Num Blocks:    16 | Num Queries: 3716 | Num 429:  364 | CUs: 55764 | Data: 8.7 MiB [  1m47s @ 0 blocks/sec ]
+Num Blocks:    16 | Num Queries: 3769 | Num 429:  370 | CUs: 56559 | Data: 8.7 MiB [  1m48s @ 0 blocks/sec ]
+Num Blocks:    16 | Num Queries: 3797 | Num 429:  370 | CUs: 56979 | Data: 8.7 MiB [  1m49s @ 0 blocks/sec ]
+Num Blocks:    16 | Num Queries: 3851 | Num 429:  378 | CUs: 57789 | Data: 8.7 MiB [  1m50s @ 0 blocks/sec ]
+Num Blocks:    16 | Num Queries: 3856 | Num 429:  378 | CUs: 57864 | Data: 8.7 MiB [  1m51s @ 0 blocks/sec ]
+Num Blocks:    16 | Num Queries: 3919 | Num 429:  383 | CUs: 58809 | Data: 8.7 MiB [  1m52s @ 0 blocks/sec ]
+Num Blocks:    16 | Num Queries: 3922 | Num 429:  386 | CUs: 58854 | Data: 8.7 MiB [  1m53s @ 0 blocks/sec ]
+Num Blocks:    16 | Num Queries: 3982 | Num 429:  386 | CUs: 59754 | Data: 8.7 MiB [  1m54s @ 0 blocks/sec ]
+Num Blocks:    17 | Num Queries: 4010 | Num 429:  391 | CUs: 60175 | Data: 9.2 MiB [  1m55s @ 0 blocks/sec ]
+Num Blocks:    18 | Num Queries: 4069 | Num 429:  391 | CUs: 61061 | Data: 9.8 MiB [  1m56s @ 0 blocks/sec ]
+Num Blocks:    18 | Num Queries: 4079 | Num 429:  399 | CUs: 61211 | Data: 9.8 MiB [  1m57s @ 0 blocks/sec ]
+Num Blocks:    19 | Num Queries: 4129 | Num 429:  399 | CUs: 61962 | Data: 10 MiB [  1m58s @ 0 blocks/sec ]
+Num Blocks:    19 | Num Queries: 4148 | Num 429:  407 | CUs: 62247 | Data: 10 MiB [  1m59s @ 0 blocks/sec ]
+Num Blocks:    19 | Num Queries: 4190 | Num 429:  407 | CUs: 62877 | Data: 10 MiB [   2m0s @ 0 blocks/sec ]
+Num Blocks:    19 | Num Queries: 4219 | Num 429:  415 | CUs: 63312 | Data: 10 MiB [   2m1s @ 0 blocks/sec ]
+Num Blocks:    19 | Num Queries: 4250 | Num 429:  415 | CUs: 63777 | Data: 10 MiB [   2m2s @ 0 blocks/sec ]
+Num Blocks:    19 | Num Queries: 4291 | Num 429:  423 | CUs: 64392 | Data: 10 MiB [   2m3s @ 0 blocks/sec ]
+Num Blocks:    19 | Num Queries: 4310 | Num 429:  423 | CUs: 64677 | Data: 10 MiB [   2m4s @ 0 blocks/sec ]
+Num Blocks:    19 | Num Queries: 4363 | Num 429:  431 | CUs: 65472 | Data: 10 MiB [   2m5s @ 0 blocks/sec ]
+Num Blocks:    19 | Num Queries: 4371 | Num 429:  431 | CUs: 65592 | Data: 10 MiB [   2m6s @ 0 blocks/sec ]
+Num Blocks:    19 | Num Queries: 4434 | Num 429:  434 | CUs: 66537 | Data: 10 MiB [   2m7s @ 0 blocks/sec ]
+Num Blocks:    19 | Num Queries: 4439 | Num 429:  439 | CUs: 66612 | Data: 10 MiB [   2m8s @ 0 blocks/sec ]
+Num Blocks:    19 | Num Queries: 4498 | Num 429:  439 | CUs: 67497 | Data: 10 MiB [   2m9s @ 0 blocks/sec ]
+Num Blocks:    19 | Num Queries: 4509 | Num 429:  447 | CUs: 67662 | Data: 10 MiB [  2m10s @ 0 blocks/sec ]
+Num Blocks:    19 | Num Queries: 4554 | Num 429:  447 | CUs: 68337 | Data: 10 MiB [  2m11s @ 0 blocks/sec ]
+Num Blocks:    19 | Num Queries: 4582 | Num 429:  455 | CUs: 68757 | Data: 10 MiB [  2m12s @ 0 blocks/sec ]
+Num Blocks:    19 | Num Queries: 4615 | Num 429:  455 | CUs: 69252 | Data: 10 MiB [  2m13s @ 0 blocks/sec ]
+Num Blocks:    19 | Num Queries: 4653 | Num 429:  463 | CUs: 69822 | Data: 10 MiB [  2m14s @ 0 blocks/sec ]
+Num Blocks:    20 | Num Queries: 4673 | Num 429:  463 | CUs: 70123 | Data: 10 MiB [  2m15s @ 0 blocks/sec ]
+Num Blocks:    20 | Num Queries: 4725 | Num 429:  471 | CUs: 70903 | Data: 10 MiB [  2m16s @ 0 blocks/sec ]
+Num Blocks:    20 | Num Queries: 4730 | Num 429:  471 | CUs: 70978 | Data: 10 MiB [  2m17s @ 0 blocks/sec ]
+Num Blocks:    20 | Num Queries: 4792 | Num 429:  475 | CUs: 71908 | Data: 10 MiB [  2m18s @ 0 blocks/sec ]
+Num Blocks:    20 | Num Queries: 4796 | Num 429:  479 | CUs: 71968 | Data: 10 MiB [  2m19s @ 0 blocks/sec ]
+Num Blocks:    20 | Num Queries: 4856 | Num 429:  479 | CUs: 72868 | Data: 10 MiB [  2m20s @ 0 blocks/sec ]
+Num Blocks:    21 | Num Queries: 4876 | Num 429:  485 | CUs: 73169 | Data: 11 MiB [  2m21s @ 0 blocks/sec ]
+Num Blocks:    21 | Num Queries: 4932 | Num 429:  485 | CUs: 74009 | Data: 11 MiB [  2m22s @ 0 blocks/sec ]
+Num Blocks:    21 | Num Queries: 4947 | Num 429:  493 | CUs: 74234 | Data: 11 MiB [  2m23s @ 0 blocks/sec ]
+Num Blocks:    22 | Num Queries: 4993 | Num 429:  493 | CUs: 74925 | Data: 12 MiB [  2m24s @ 0 blocks/sec ]
+Num Blocks:    22 | Num Queries: 5031 | Num 429:  499 | CUs: 75495 | Data: 12 MiB [  2m25s @ 0 blocks/sec ]
+Num Blocks:    22 | Num Queries: 5067 | Num 429:  499 | CUs: 76035 | Data: 12 MiB [  2m26s @ 0 blocks/sec ]
+Num Blocks:    22 | Num Queries: 5111 | Num 429:  507 | CUs: 76695 | Data: 12 MiB [  2m27s @ 0 blocks/sec ]
+Num Blocks:    22 | Num Queries: 5127 | Num 429:  507 | CUs: 76935 | Data: 12 MiB [  2m28s @ 0 blocks/sec ]
+Num Blocks:    24 | Num Queries: 5180 | Num 429:  515 | CUs: 77732 | Data: 13 MiB [  2m29s @ 0 blocks/sec ]
+Num Blocks:    24 | Num Queries: 5183 | Num 429:  515 | CUs: 77777 | Data: 13 MiB [  2m30s @ 0 blocks/sec ]
+Num Blocks:    24 | Num Queries: 5248 | Num 429:  518 | CUs: 78752 | Data: 13 MiB [  2m31s @ 0 blocks/sec ]
+Num Blocks:    24 | Num Queries: 5251 | Num 429:  523 | CUs: 78797 | Data: 13 MiB [  2m32s @ 0 blocks/sec ]
+Num Blocks:    24 | Num Queries: 5311 | Num 429:  523 | CUs: 79697 | Data: 13 MiB [  2m33s @ 0 blocks/sec ]
+Num Blocks:    24 | Num Queries: 5324 | Num 429:  531 | CUs: 79892 | Data: 13 MiB [  2m34s @ 0 blocks/sec ]
+Num Blocks:    26 | Num Queries: 5366 | Num 429:  531 | CUs: 80524 | Data: 14 MiB [  2m35s @ 0 blocks/sec ]
+Num Blocks:    26 | Num Queries: 5396 | Num 429:  539 | CUs: 80974 | Data: 14 MiB [  2m36s @ 0 blocks/sec ]
+Num Blocks:    26 | Num Queries: 5425 | Num 429:  539 | CUs: 81409 | Data: 14 MiB [  2m37s @ 0 blocks/sec ]
+Num Blocks:    26 | Num Queries: 5467 | Num 429:  547 | CUs: 82039 | Data: 14 MiB [  2m38s @ 0 blocks/sec ]
+Num Blocks:    26 | Num Queries: 5484 | Num 429:  547 | CUs: 82294 | Data: 14 MiB [  2m39s @ 0 blocks/sec ]
+Num Blocks:    26 | Num Queries: 5539 | Num 429:  555 | CUs: 83119 | Data: 14 MiB [  2m40s @ 0 blocks/sec ]
+Num Blocks:    26 | Num Queries: 5543 | Num 429:  555 | CUs: 83179 | Data: 14 MiB [  2m41s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 5606 | Num 429:  557 | CUs: 84125 | Data: 14 MiB [  2m42s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 5616 | Num 429:  562 | CUs: 84275 | Data: 14 MiB [  2m43s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 5677 | Num 429:  562 | CUs: 85190 | Data: 14 MiB [  2m44s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 5684 | Num 429:  570 | CUs: 85295 | Data: 14 MiB [  2m45s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 5732 | Num 429:  570 | CUs: 86015 | Data: 14 MiB [  2m46s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 5763 | Num 429:  576 | CUs: 86480 | Data: 14 MiB [  2m47s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 5808 | Num 429:  576 | CUs: 87155 | Data: 14 MiB [  2m48s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 5839 | Num 429:  584 | CUs: 87620 | Data: 14 MiB [  2m49s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 5864 | Num 429:  584 | CUs: 87995 | Data: 14 MiB [  2m50s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 5909 | Num 429:  592 | CUs: 88670 | Data: 14 MiB [  2m51s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 5925 | Num 429:  592 | CUs: 88910 | Data: 14 MiB [  2m52s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 5980 | Num 429:  600 | CUs: 89735 | Data: 14 MiB [  2m53s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 5982 | Num 429:  600 | CUs: 89765 | Data: 14 MiB [  2m54s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 6051 | Num 429:  600 | CUs: 90800 | Data: 14 MiB [  2m55s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 6051 | Num 429:  608 | CUs: 90800 | Data: 14 MiB [  2m56s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 6111 | Num 429:  608 | CUs: 91700 | Data: 14 MiB [  2m57s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 6125 | Num 429:  616 | CUs: 91910 | Data: 14 MiB [  2m58s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 6169 | Num 429:  616 | CUs: 92570 | Data: 14 MiB [  2m59s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 6196 | Num 429:  624 | CUs: 92975 | Data: 14 MiB [   3m0s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 6226 | Num 429:  624 | CUs: 93425 | Data: 14 MiB [   3m1s @ 0 blocks/sec ]
+Num Blocks:    30 | Num Queries: 6278 | Num 429:  629 | CUs: 94208 | Data: 16 MiB [   3m2s @ 0 blocks/sec ]
+Num Blocks:    30 | Num Queries: 6312 | Num 429:  629 | CUs: 94718 | Data: 16 MiB [   3m3s @ 0 blocks/sec ]
+Num Blocks:    30 | Num Queries: 6366 | Num 429:  637 | CUs: 95528 | Data: 16 MiB [   3m4s @ 0 blocks/sec ]
+Num Blocks:    30 | Num Queries: 6370 | Num 429:  637 | CUs: 95588 | Data: 16 MiB [   3m5s @ 0 blocks/sec ]
+Num Blocks:    30 | Num Queries: 6437 | Num 429:  639 | CUs: 96593 | Data: 16 MiB [   3m6s @ 0 blocks/sec ]
+Num Blocks:    30 | Num Queries: 6438 | Num 429:  645 | CUs: 96608 | Data: 16 MiB [   3m7s @ 0 blocks/sec ]
+Num Blocks:    30 | Num Queries: 6496 | Num 429:  645 | CUs: 97478 | Data: 16 MiB [   3m8s @ 0 blocks/sec ]
+Num Blocks:    30 | Num Queries: 6510 | Num 429:  653 | CUs: 97688 | Data: 16 MiB [   3m9s @ 0 blocks/sec ]
+Num Blocks:    30 | Num Queries: 6554 | Num 429:  653 | CUs: 98348 | Data: 16 MiB [  3m10s @ 0 blocks/sec ]
+Num Blocks:    30 | Num Queries: 6589 | Num 429:  660 | CUs: 98873 | Data: 16 MiB [  3m11s @ 0 blocks/sec ]
+Num Blocks:    30 | Num Queries: 6621 | Num 429:  660 | CUs: 99353 | Data: 16 MiB [  3m12s @ 0 blocks/sec ]
+Num Blocks:    30 | Num Queries: 6661 | Num 429:  668 | CUs: 99953 | Data: 16 MiB [  3m13s @ 0 blocks/sec ]
+Num Blocks:    30 | Num Queries: 6683 | Num 429:  668 | CUs: 100283 | Data: 16 MiB [  3m14s @ 0 blocks/sec ]
+Num Blocks:    30 | Num Queries: 6733 | Num 429:  675 | CUs: 101033 | Data: 16 MiB [  3m15s @ 0 blocks/sec ]
+Num Blocks:    30 | Num Queries: 6749 | Num 429:  675 | CUs: 101273 | Data: 16 MiB [  3m16s @ 0 blocks/sec ]
+Num Blocks:    31 | Num Queries: 6806 | Num 429:  679 | CUs: 102129 | Data: 17 MiB [  3m17s @ 0 blocks/sec ]
+Num Blocks:    31 | Num Queries: 6830 | Num 429:  679 | CUs: 102489 | Data: 17 MiB [  3m18s @ 0 blocks/sec ]
+Num Blocks:    32 | Num Queries: 6891 | Num 429:  679 | CUs: 103405 | Data: 18 MiB [  3m19s @ 0 blocks/sec ]
+Num Blocks:    32 | Num Queries: 6913 | Num 429:  685 | CUs: 103735 | Data: 18 MiB [  3m20s @ 0 blocks/sec ]
+Num Blocks:    32 | Num Queries: 6967 | Num 429:  685 | CUs: 104545 | Data: 18 MiB [  3m21s @ 0 blocks/sec ]
+Num Blocks:    32 | Num Queries: 6985 | Num 429:  693 | CUs: 104815 | Data: 18 MiB [  3m22s @ 0 blocks/sec ]
+Num Blocks:    32 | Num Queries: 7026 | Num 429:  693 | CUs: 105430 | Data: 18 MiB [  3m23s @ 0 blocks/sec ]
+Num Blocks:    33 | Num Queries: 7068 | Num 429:  698 | CUs: 106061 | Data: 18 MiB [  3m24s @ 0 blocks/sec ]
+Num Blocks:    34 | Num Queries: 7109 | Num 429:  698 | CUs: 106677 | Data: 18 MiB [  3m25s @ 0 blocks/sec ]
+Num Blocks:    34 | Num Queries: 7152 | Num 429:  706 | CUs: 107322 | Data: 18 MiB [  3m26s @ 0 blocks/sec ]
+Num Blocks:    34 | Num Queries: 7168 | Num 429:  706 | CUs: 107562 | Data: 18 MiB [  3m27s @ 0 blocks/sec ]
+Num Blocks:    34 | Num Queries: 7221 | Num 429:  714 | CUs: 108357 | Data: 18 MiB [  3m28s @ 0 blocks/sec ]
+Num Blocks:    34 | Num Queries: 7224 | Num 429:  714 | CUs: 108402 | Data: 18 MiB [  3m29s @ 0 blocks/sec ]
+Num Blocks:    34 | Num Queries: 7292 | Num 429:  715 | CUs: 109422 | Data: 18 MiB [  3m30s @ 0 blocks/sec ]
+Num Blocks:    34 | Num Queries: 7292 | Num 429:  722 | CUs: 109422 | Data: 18 MiB [  3m31s @ 0 blocks/sec ]
+Num Blocks:    35 | Num Queries: 7344 | Num 429:  722 | CUs: 110203 | Data: 19 MiB [  3m32s @ 0 blocks/sec ]
+Num Blocks:    36 | Num Queries: 7384 | Num 429:  726 | CUs: 110804 | Data: 19 MiB [  3m33s @ 0 blocks/sec ]
+Num Blocks:    36 | Num Queries: 7437 | Num 429:  726 | CUs: 111599 | Data: 19 MiB [  3m34s @ 0 blocks/sec ]
+Num Blocks:    36 | Num Queries: 7464 | Num 429:  734 | CUs: 112004 | Data: 19 MiB [  3m35s @ 0 blocks/sec ]
+Num Blocks:    36 | Num Queries: 7492 | Num 429:  734 | CUs: 112424 | Data: 19 MiB [  3m36s @ 0 blocks/sec ]
+Num Blocks:    36 | Num Queries: 7535 | Num 429:  742 | CUs: 113069 | Data: 19 MiB [  3m37s @ 0 blocks/sec ]
+Num Blocks:    36 | Num Queries: 7549 | Num 429:  742 | CUs: 113279 | Data: 19 MiB [  3m38s @ 0 blocks/sec ]
+Num Blocks:    36 | Num Queries: 7603 | Num 429:  750 | CUs: 114089 | Data: 19 MiB [  3m39s @ 0 blocks/sec ]
+Num Blocks:    36 | Num Queries: 7607 | Num 429:  750 | CUs: 114149 | Data: 19 MiB [  3m40s @ 0 blocks/sec ]
+Num Blocks:    36 | Num Queries: 7672 | Num 429:  750 | CUs: 115124 | Data: 19 MiB [  3m41s @ 0 blocks/sec ]
+Num Blocks:    36 | Num Queries: 7675 | Num 429:  758 | CUs: 115169 | Data: 19 MiB [  3m42s @ 0 blocks/sec ]
+Num Blocks:    37 | Num Queries: 7724 | Num 429:  758 | CUs: 115905 | Data: 20 MiB [  3m43s @ 0 blocks/sec ]
+Num Blocks:    37 | Num Queries: 7757 | Num 429:  763 | CUs: 116400 | Data: 20 MiB [  3m44s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 7806 | Num 429:  763 | CUs: 117136 | Data: 20 MiB [  3m45s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 7840 | Num 429:  770 | CUs: 117646 | Data: 20 MiB [  3m46s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 7874 | Num 429:  770 | CUs: 118156 | Data: 20 MiB [  3m47s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 7916 | Num 429:  778 | CUs: 118786 | Data: 20 MiB [  3m48s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 7933 | Num 429:  778 | CUs: 119041 | Data: 20 MiB [  3m49s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 7990 | Num 429:  786 | CUs: 119896 | Data: 20 MiB [  3m50s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 7990 | Num 429:  786 | CUs: 119896 | Data: 20 MiB [  3m51s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 8056 | Num 429:  786 | CUs: 120886 | Data: 20 MiB [  3m52s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 8056 | Num 429:  794 | CUs: 120886 | Data: 20 MiB [  3m53s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 8111 | Num 429:  794 | CUs: 121711 | Data: 20 MiB [  3m54s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 8126 | Num 429:  802 | CUs: 121936 | Data: 20 MiB [  3m55s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 8169 | Num 429:  802 | CUs: 122581 | Data: 20 MiB [  3m56s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 8202 | Num 429:  808 | CUs: 123076 | Data: 20 MiB [  3m57s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 8239 | Num 429:  808 | CUs: 123631 | Data: 20 MiB [  3m58s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 8295 | Num 429:  811 | CUs: 124471 | Data: 20 MiB [  3m59s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 8339 | Num 429:  811 | CUs: 125131 | Data: 20 MiB [   4m0s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 8386 | Num 429:  819 | CUs: 125836 | Data: 20 MiB [   4m1s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 8399 | Num 429:  819 | CUs: 126031 | Data: 20 MiB [   4m2s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 8454 | Num 429:  827 | CUs: 126856 | Data: 20 MiB [   4m3s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 8458 | Num 429:  827 | CUs: 126916 | Data: 20 MiB [   4m4s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 8523 | Num 429:  827 | CUs: 127891 | Data: 20 MiB [   4m5s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 8529 | Num 429:  835 | CUs: 127981 | Data: 20 MiB [   4m6s @ 0 blocks/sec ]
+Num Blocks:    38 | Num Queries: 8580 | Num 429:  835 | CUs: 128746 | Data: 20 MiB [   4m7s @ 0 blocks/sec ]
+Num Blocks:    39 | Num Queries: 8617 | Num 429:  840 | CUs: 129302 | Data: 20 MiB [   4m8s @ 0 blocks/sec ]
+Num Blocks:    39 | Num Queries: 8666 | Num 429:  840 | CUs: 130037 | Data: 20 MiB [   4m9s @ 0 blocks/sec ]
+Num Blocks:    39 | Num Queries: 8690 | Num 429:  848 | CUs: 130397 | Data: 20 MiB [  4m10s @ 0 blocks/sec ]
+Num Blocks:    39 | Num Queries: 8721 | Num 429:  848 | CUs: 130862 | Data: 20 MiB [  4m11s @ 0 blocks/sec ]
+Num Blocks:    39 | Num Queries: 8764 | Num 429:  856 | CUs: 131507 | Data: 20 MiB [  4m12s @ 0 blocks/sec ]
+Num Blocks:    39 | Num Queries: 8777 | Num 429:  856 | CUs: 131702 | Data: 20 MiB [  4m13s @ 0 blocks/sec ]
+Num Blocks:    39 | Num Queries: 8834 | Num 429:  862 | CUs: 132557 | Data: 20 MiB [  4m14s @ 0 blocks/sec ]
+Num Blocks:    39 | Num Queries: 8849 | Num 429:  862 | CUs: 132782 | Data: 20 MiB [  4m15s @ 0 blocks/sec ]
+Num Blocks:    39 | Num Queries: 8907 | Num 429:  862 | CUs: 133652 | Data: 20 MiB [  4m16s @ 0 blocks/sec ]
+Num Blocks:    39 | Num Queries: 8939 | Num 429:  868 | CUs: 134132 | Data: 20 MiB [  4m17s @ 0 blocks/sec ]
+Num Blocks:    39 | Num Queries: 8981 | Num 429:  868 | CUs: 134762 | Data: 20 MiB [  4m18s @ 0 blocks/sec ]
+Num Blocks:    39 | Num Queries: 9024 | Num 429:  875 | CUs: 135407 | Data: 20 MiB [  4m19s @ 0 blocks/sec ]
+Num Blocks:    39 | Num Queries: 9045 | Num 429:  875 | CUs: 135722 | Data: 20 MiB [  4m20s @ 0 blocks/sec ]
+Num Blocks:    40 | Num Queries: 9100 | Num 429:  882 | CUs: 136548 | Data: 21 MiB [  4m21s @ 0 blocks/sec ]
+Num Blocks:    40 | Num Queries: 9109 | Num 429:  882 | CUs: 136683 | Data: 21 MiB [  4m22s @ 0 blocks/sec ]
+Num Blocks:    40 | Num Queries: 9154 | Num 429:  882 | CUs: 137358 | Data: 21 MiB [  4m23s @ 0 blocks/sec ]
+Num Blocks:    40 | Num Queries: 9206 | Num 429:  887 | CUs: 138138 | Data: 21 MiB [  4m24s @ 0 blocks/sec ]
+Num Blocks:    40 | Num Queries: 9237 | Num 429:  887 | CUs: 138603 | Data: 21 MiB [  4m25s @ 0 blocks/sec ]
+Num Blocks:    41 | Num Queries: 9294 | Num 429:  892 | CUs: 139459 | Data: 22 MiB [  4m26s @ 0 blocks/sec ]
+Num Blocks:    42 | Num Queries: 9320 | Num 429:  892 | CUs: 139850 | Data: 23 MiB [  4m27s @ 0 blocks/sec ]
+Num Blocks:    42 | Num Queries: 9383 | Num 429:  892 | CUs: 140795 | Data: 23 MiB [  4m28s @ 0 blocks/sec ]
+Num Blocks:    42 | Num Queries: 9389 | Num 429:  900 | CUs: 140885 | Data: 23 MiB [  4m29s @ 0 blocks/sec ]
+Num Blocks:    42 | Num Queries: 9440 | Num 429:  900 | CUs: 141650 | Data: 23 MiB [  4m30s @ 0 blocks/sec ]
+Num Blocks:    42 | Num Queries: 9458 | Num 429:  908 | CUs: 141920 | Data: 23 MiB [  4m31s @ 0 blocks/sec ]
+Num Blocks:    42 | Num Queries: 9497 | Num 429:  908 | CUs: 142505 | Data: 23 MiB [  4m32s @ 0 blocks/sec ]
+Num Blocks:    42 | Num Queries: 9538 | Num 429:  913 | CUs: 143120 | Data: 23 MiB [  4m33s @ 0 blocks/sec ]
+Num Blocks:    42 | Num Queries: 9576 | Num 429:  913 | CUs: 143690 | Data: 23 MiB [  4m34s @ 0 blocks/sec ]
+Num Blocks:    42 | Num Queries: 9622 | Num 429:  920 | CUs: 144380 | Data: 23 MiB [  4m35s @ 0 blocks/sec ]
+Num Blocks:    42 | Num Queries: 9638 | Num 429:  920 | CUs: 144620 | Data: 23 MiB [  4m36s @ 0 blocks/sec ]
+Num Blocks:    42 | Num Queries: 9697 | Num 429:  920 | CUs: 145505 | Data: 23 MiB [  4m37s @ 0 blocks/sec ]
+Num Blocks:    42 | Num Queries: 9749 | Num 429:  920 | CUs: 146285 | Data: 23 MiB [  4m38s @ 0 blocks/sec ]
+Num Blocks:    42 | Num Queries: 9782 | Num 429:  925 | CUs: 146780 | Data: 23 MiB [  4m39s @ 0 blocks/sec ]
+Num Blocks:    42 | Num Queries: 9831 | Num 429:  925 | CUs: 147515 | Data: 23 MiB [  4m40s @ 0 blocks/sec ]
+Num Blocks:    42 | Num Queries: 9870 | Num 429:  931 | CUs: 148100 | Data: 23 MiB [  4m41s @ 0 blocks/sec ]
+Num Blocks:    42 | Num Queries: 9901 | Num 429:  931 | CUs: 148565 | Data: 23 MiB [  4m42s @ 0 blocks/sec ]
+Num Blocks:    42 | Num Queries: 9954 | Num 429:  936 | CUs: 149360 | Data: 23 MiB [  4m43s @ 0 blocks/sec ]
+Num Blocks:    43 | Num Queries: 9982 | Num 429:  936 | CUs: 149781 | Data: 24 MiB [  4m44s @ 0 blocks/sec ]
+Num Blocks:    43 | Num Queries: 10037 | Num 429:  944 | CUs: 150606 | Data: 24 MiB [  4m45s @ 0 blocks/sec ]
+Num Blocks:    43 | Num Queries: 10037 | Num 429:  944 | CUs: 150606 | Data: 24 MiB [  4m46s @ 0 blocks/sec ]
+Num Blocks:    44 | Num Queries: 10097 | Num 429:  944 | CUs: 151507 | Data: 26 MiB [  4m47s @ 0 blocks/sec ]
+Num Blocks:    45 | Num Queries: 10125 | Num 429:  949 | CUs: 151928 | Data: 26 MiB [  4m48s @ 0 blocks/sec ]
+Num Blocks:    45 | Num Queries: 10180 | Num 429:  949 | CUs: 152753 | Data: 26 MiB [  4m49s @ 0 blocks/sec ]
+Num Blocks:    45 | Num Queries: 10198 | Num 429:  957 | CUs: 153023 | Data: 26 MiB [  4m50s @ 0 blocks/sec ]
+Num Blocks:    45 | Num Queries: 10235 | Num 429:  957 | CUs: 153578 | Data: 26 MiB [  4m51s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10284 | Num 429:  960 | CUs: 154314 | Data: 28 MiB [  4m52s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10329 | Num 429:  960 | CUs: 154989 | Data: 28 MiB [  4m53s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10382 | Num 429:  965 | CUs: 155784 | Data: 28 MiB [  4m54s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10413 | Num 429:  965 | CUs: 156249 | Data: 28 MiB [  4m55s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10473 | Num 429:  970 | CUs: 157149 | Data: 28 MiB [  4m56s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10499 | Num 429:  970 | CUs: 157539 | Data: 28 MiB [  4m57s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10560 | Num 429:  971 | CUs: 158454 | Data: 28 MiB [  4m58s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10567 | Num 429:  978 | CUs: 158559 | Data: 28 MiB [  4m59s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10618 | Num 429:  978 | CUs: 159324 | Data: 28 MiB [   5m0s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10650 | Num 429:  984 | CUs: 159804 | Data: 28 MiB [   5m1s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10695 | Num 429:  984 | CUs: 160479 | Data: 28 MiB [   5m2s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10725 | Num 429:  992 | CUs: 160929 | Data: 28 MiB [   5m3s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10752 | Num 429:  992 | CUs: 161334 | Data: 28 MiB [   5m4s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10797 | Num 429: 1000 | CUs: 162009 | Data: 28 MiB [   5m5s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10809 | Num 429: 1000 | CUs: 162189 | Data: 28 MiB [   5m6s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10867 | Num 429: 1004 | CUs: 163059 | Data: 28 MiB [   5m7s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10897 | Num 429: 1004 | CUs: 163509 | Data: 28 MiB [   5m8s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10961 | Num 429: 1004 | CUs: 164469 | Data: 28 MiB [   5m9s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 10964 | Num 429: 1012 | CUs: 164514 | Data: 28 MiB [  5m10s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 11017 | Num 429: 1012 | CUs: 165309 | Data: 28 MiB [  5m11s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 11033 | Num 429: 1020 | CUs: 165549 | Data: 28 MiB [  5m12s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 11071 | Num 429: 1020 | CUs: 166119 | Data: 28 MiB [  5m13s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 11103 | Num 429: 1028 | CUs: 166599 | Data: 28 MiB [  5m14s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 11129 | Num 429: 1028 | CUs: 166989 | Data: 28 MiB [  5m15s @ 0 blocks/sec ]
+Num Blocks:    46 | Num Queries: 11171 | Num 429: 1036 | CUs: 167619 | Data: 28 MiB [  5m16s @ 0 blocks/sec ]
+Num Blocks:    47 | Num Queries: 11190 | Num 429: 1036 | CUs: 167905 | Data: 28 MiB [  5m17s @ 0 blocks/sec ]
+Num Blocks:    47 | Num Queries: 11243 | Num 429: 1042 | CUs: 168700 | Data: 28 MiB [  5m18s @ 0 blocks/sec ]
+Num Blocks:    47 | Num Queries: 11265 | Num 429: 1042 | CUs: 169030 | Data: 28 MiB [  5m19s @ 0 blocks/sec ]
+Num Blocks:    48 | Num Queries: 11325 | Num 429: 1050 | CUs: 169931 | Data: 29 MiB [  5m20s @ 0 blocks/sec ]
+Num Blocks:    48 | Num Queries: 11325 | Num 429: 1050 | CUs: 169931 | Data: 29 MiB [  5m21s @ 0 blocks/sec ]
+Num Blocks:    48 | Num Queries: 11388 | Num 429: 1050 | CUs: 170876 | Data: 29 MiB [  5m22s @ 0 blocks/sec ]
+Num Blocks:    48 | Num Queries: 11394 | Num 429: 1058 | CUs: 170966 | Data: 29 MiB [  5m23s @ 0 blocks/sec ]
+Num Blocks:    49 | Num Queries: 11448 | Num 429: 1058 | CUs: 171777 | Data: 30 MiB [  5m24s @ 0 blocks/sec ]
+Num Blocks:    49 | Num Queries: 11463 | Num 429: 1066 | CUs: 172002 | Data: 30 MiB [  5m25s @ 0 blocks/sec ]
+Num Blocks:    50 | Num Queries: 11505 | Num 429: 1066 | CUs: 172633 | Data: 30 MiB [  5m26s @ 0 blocks/sec ]
+Num Blocks:    50 | Num Queries: 11533 | Num 429: 1074 | CUs: 173053 | Data: 30 MiB [  5m27s @ 0 blocks/sec ]
+Num Blocks:    50 | Num Queries: 11562 | Num 429: 1074 | CUs: 173488 | Data: 30 MiB [  5m28s @ 0 blocks/sec ]
+Num Blocks:    50 | Num Queries: 11609 | Num 429: 1082 | CUs: 174193 | Data: 30 MiB [  5m29s @ 0 blocks/sec ]
+Num Blocks:    50 | Num Queries: 11621 | Num 429: 1082 | CUs: 174373 | Data: 30 MiB [  5m30s @ 0 blocks/sec ]
+Num Blocks:    50 | Num Queries: 11678 | Num 429: 1090 | CUs: 175228 | Data: 30 MiB [  5m31s @ 0 blocks/sec ]
+Num Blocks:    50 | Num Queries: 11681 | Num 429: 1090 | CUs: 175273 | Data: 30 MiB [  5m32s @ 0 blocks/sec ]
+Num Blocks:    50 | Num Queries: 11745 | Num 429: 1090 | CUs: 176233 | Data: 30 MiB [  5m33s @ 0 blocks/sec ]
+Num Blocks:    50 | Num Queries: 11748 | Num 429: 1098 | CUs: 176278 | Data: 30 MiB [  5m34s @ 0 blocks/sec ]
+Num Blocks:    50 | Num Queries: 11805 | Num 429: 1098 | CUs: 177133 | Data: 30 MiB [  5m35s @ 0 blocks/sec ]
+Num Blocks:    50 | Num Queries: 11821 | Num 429: 1106 | CUs: 177373 | Data: 30 MiB [  5m36s @ 0 blocks/sec ]
+Num Blocks:    51 | Num Queries: 11836 | Num 429: 1106 | CUs: 177599 | Data: 31 MiB [  5m37s @ 0 blocks/sec ]
+Num Blocks:    51 | Num Queries: 11889 | Num 429: 1106 | CUs: 178394 | Data: 31 MiB [  5m38s @ 0 blocks/sec ]
+Num Blocks:    51 | Num Queries: 11921 | Num 429: 1113 | CUs: 178874 | Data: 31 MiB [  5m39s @ 0 blocks/sec ]
+Num Blocks:    51 | Num Queries: 11952 | Num 429: 1113 | CUs: 179339 | Data: 31 MiB [  5m40s @ 0 blocks/sec ]
+Num Blocks:    51 | Num Queries: 11994 | Num 429: 1121 | CUs: 179969 | Data: 31 MiB [  5m41s @ 0 blocks/sec ]
+Num Blocks:    51 | Num Queries: 12014 | Num 429: 1121 | CUs: 180269 | Data: 31 MiB [  5m42s @ 0 blocks/sec ]
+Num Blocks:    53 | Num Queries: 12068 | Num 429: 1128 | CUs: 181081 | Data: 33 MiB [  5m43s @ 0 blocks/sec ]
+Num Blocks:    53 | Num Queries: 12081 | Num 429: 1128 | CUs: 181276 | Data: 33 MiB [  5m44s @ 0 blocks/sec ]
+Num Blocks:    54 | Num Queries: 12142 | Num 429: 1132 | CUs: 182192 | Data: 34 MiB [  5m45s @ 0 blocks/sec ]
+Num Blocks:    54 | Num Queries: 12146 | Num 429: 1136 | CUs: 182252 | Data: 34 MiB [  5m46s @ 0 blocks/sec ]
+Num Blocks:    54 | Num Queries: 12209 | Num 429: 1136 | CUs: 183197 | Data: 34 MiB [  5m47s @ 0 blocks/sec ]
+Num Blocks:    54 | Num Queries: 12213 | Num 429: 1144 | CUs: 183257 | Data: 34 MiB [  5m48s @ 0 blocks/sec ]
+Num Blocks:    54 | Num Queries: 12269 | Num 429: 1144 | CUs: 184097 | Data: 34 MiB [  5m49s @ 0 blocks/sec ]
+Num Blocks:    54 | Num Queries: 12286 | Num 429: 1152 | CUs: 184352 | Data: 34 MiB [  5m50s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12325 | Num 429: 1152 | CUs: 184939 | Data: 34 MiB [  5m51s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12357 | Num 429: 1160 | CUs: 185419 | Data: 34 MiB [  5m52s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12386 | Num 429: 1160 | CUs: 185854 | Data: 34 MiB [  5m53s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12432 | Num 429: 1168 | CUs: 186544 | Data: 34 MiB [  5m54s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12447 | Num 429: 1168 | CUs: 186769 | Data: 34 MiB [  5m55s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12501 | Num 429: 1176 | CUs: 187579 | Data: 34 MiB [  5m56s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12505 | Num 429: 1176 | CUs: 187639 | Data: 34 MiB [  5m57s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12571 | Num 429: 1178 | CUs: 188629 | Data: 34 MiB [  5m58s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12580 | Num 429: 1183 | CUs: 188764 | Data: 34 MiB [  5m59s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12641 | Num 429: 1183 | CUs: 189679 | Data: 34 MiB [   6m0s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12647 | Num 429: 1191 | CUs: 189769 | Data: 34 MiB [   6m1s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12700 | Num 429: 1191 | CUs: 190564 | Data: 34 MiB [   6m2s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12715 | Num 429: 1199 | CUs: 190789 | Data: 34 MiB [   6m3s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12760 | Num 429: 1199 | CUs: 191464 | Data: 34 MiB [   6m4s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12790 | Num 429: 1207 | CUs: 191914 | Data: 34 MiB [   6m5s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12816 | Num 429: 1207 | CUs: 192304 | Data: 34 MiB [   6m6s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12863 | Num 429: 1215 | CUs: 193009 | Data: 34 MiB [   6m7s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12879 | Num 429: 1215 | CUs: 193249 | Data: 34 MiB [   6m8s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12934 | Num 429: 1223 | CUs: 194074 | Data: 34 MiB [   6m9s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 12938 | Num 429: 1223 | CUs: 194134 | Data: 34 MiB [  6m10s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 13001 | Num 429: 1223 | CUs: 195079 | Data: 34 MiB [  6m11s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 13006 | Num 429: 1231 | CUs: 195154 | Data: 34 MiB [  6m12s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 13062 | Num 429: 1231 | CUs: 195994 | Data: 34 MiB [  6m13s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 13078 | Num 429: 1239 | CUs: 196234 | Data: 34 MiB [  6m14s @ 0 blocks/sec ]
+Num Blocks:    57 | Num Queries: 13122 | Num 429: 1239 | CUs: 196895 | Data: 35 MiB [  6m15s @ 0 blocks/sec ]
+Num Blocks:    57 | Num Queries: 13147 | Num 429: 1247 | CUs: 197270 | Data: 35 MiB [  6m16s @ 0 blocks/sec ]
+Num Blocks:    57 | Num Queries: 13182 | Num 429: 1247 | CUs: 197795 | Data: 35 MiB [  6m17s @ 0 blocks/sec ]
+Num Blocks:    57 | Num Queries: 13220 | Num 429: 1254 | CUs: 198365 | Data: 35 MiB [  6m18s @ 0 blocks/sec ]
+Num Blocks:    57 | Num Queries: 13249 | Num 429: 1254 | CUs: 198800 | Data: 35 MiB [  6m19s @ 0 blocks/sec ]
+Num Blocks:    57 | Num Queries: 13293 | Num 429: 1262 | CUs: 199460 | Data: 35 MiB [  6m20s @ 0 blocks/sec ]
+Num Blocks:    57 | Num Queries: 13312 | Num 429: 1262 | CUs: 199745 | Data: 35 MiB [  6m21s @ 0 blocks/sec ]
+Num Blocks:    57 | Num Queries: 13366 | Num 429: 1270 | CUs: 200555 | Data: 35 MiB [  6m22s @ 0 blocks/sec ]
+Num Blocks:    57 | Num Queries: 13370 | Num 429: 1270 | CUs: 200615 | Data: 35 MiB [  6m23s @ 0 blocks/sec ]
+Num Blocks:    58 | Num Queries: 13432 | Num 429: 1274 | CUs: 201546 | Data: 35 MiB [  6m24s @ 0 blocks/sec ]
+Num Blocks:    58 | Num Queries: 13436 | Num 429: 1278 | CUs: 201606 | Data: 35 MiB [  6m25s @ 0 blocks/sec ]
+Num Blocks:    58 | Num Queries: 13497 | Num 429: 1278 | CUs: 202521 | Data: 35 MiB [  6m26s @ 0 blocks/sec ]
+Num Blocks:    58 | Num Queries: 13510 | Num 429: 1286 | CUs: 202716 | Data: 35 MiB [  6m27s @ 0 blocks/sec ]
+Num Blocks:    58 | Num Queries: 13553 | Num 429: 1286 | CUs: 203361 | Data: 35 MiB [  6m28s @ 0 blocks/sec ]
+Num Blocks:    58 | Num Queries: 13583 | Num 429: 1294 | CUs: 203811 | Data: 35 MiB [  6m29s @ 0 blocks/sec ]
+Num Blocks:    58 | Num Queries: 13610 | Num 429: 1294 | CUs: 204216 | Data: 35 MiB [  6m30s @ 0 blocks/sec ]
+Num Blocks:    58 | Num Queries: 13653 | Num 429: 1302 | CUs: 204861 | Data: 35 MiB [  6m31s @ 0 blocks/sec ]
+Num Blocks:    58 | Num Queries: 13672 | Num 429: 1302 | CUs: 205146 | Data: 35 MiB [  6m32s @ 0 blocks/sec ]
+Num Blocks:    60 | Num Queries: 13725 | Num 429: 1307 | CUs: 205943 | Data: 36 MiB [  6m33s @ 0 blocks/sec ]
+Num Blocks:    60 | Num Queries: 13756 | Num 429: 1307 | CUs: 206408 | Data: 36 MiB [  6m34s @ 0 blocks/sec ]
+Num Blocks:    62 | Num Queries: 13805 | Num 429: 1307 | CUs: 207145 | Data: 38 MiB [  6m35s @ 0 blocks/sec ]
+Num Blocks:    62 | Num Queries: 13861 | Num 429: 1312 | CUs: 207985 | Data: 38 MiB [  6m36s @ 0 blocks/sec ]
+Num Blocks:    62 | Num Queries: 13887 | Num 429: 1312 | CUs: 208375 | Data: 38 MiB [  6m37s @ 0 blocks/sec ]
+Num Blocks:    62 | Num Queries: 13949 | Num 429: 1315 | CUs: 209305 | Data: 38 MiB [  6m38s @ 0 blocks/sec ]
+Num Blocks:    62 | Num Queries: 13954 | Num 429: 1320 | CUs: 209380 | Data: 38 MiB [  6m39s @ 0 blocks/sec ]
+Num Blocks:    62 | Num Queries: 13996 | Num 429: 1320 | CUs: 210010 | Data: 38 MiB [  6m40s @ 0 blocks/sec ]
+Num Blocks:    62 | Num Queries: 14040 | Num 429: 1328 | CUs: 210670 | Data: 38 MiB [  6m41s @ 0 blocks/sec ]
+Num Blocks:    62 | Num Queries: 14054 | Num 429: 1328 | CUs: 210880 | Data: 38 MiB [  6m42s @ 0 blocks/sec ]
+Num Blocks:    62 | Num Queries: 14110 | Num 429: 1336 | CUs: 211720 | Data: 38 MiB [  6m43s @ 0 blocks/sec ]
+Num Blocks:    62 | Num Queries: 14113 | Num 429: 1336 | CUs: 211765 | Data: 38 MiB [  6m44s @ 0 blocks/sec ]
+Num Blocks:    62 | Num Queries: 14177 | Num 429: 1340 | CUs: 212725 | Data: 38 MiB [  6m45s @ 0 blocks/sec ]
+Num Blocks:    62 | Num Queries: 14181 | Num 429: 1344 | CUs: 212785 | Data: 38 MiB [  6m46s @ 0 blocks/sec ]
+Num Blocks:    63 | Num Queries: 14237 | Num 429: 1344 | CUs: 213626 | Data: 38 MiB [  6m47s @ 0 blocks/sec ]
+Num Blocks:    63 | Num Queries: 14258 | Num 429: 1351 | CUs: 213941 | Data: 38 MiB [  6m48s @ 0 blocks/sec ]
+Num Blocks:    63 | Num Queries: 14309 | Num 429: 1351 | CUs: 214706 | Data: 38 MiB [  6m49s @ 0 blocks/sec ]
+Num Blocks:    63 | Num Queries: 14338 | Num 429: 1357 | CUs: 215141 | Data: 38 MiB [  6m50s @ 0 blocks/sec ]
+Num Blocks:    63 | Num Queries: 14386 | Num 429: 1357 | CUs: 215861 | Data: 38 MiB [  6m51s @ 0 blocks/sec ]
+Num Blocks:    63 | Num Queries: 14415 | Num 429: 1365 | CUs: 216296 | Data: 38 MiB [  6m52s @ 0 blocks/sec ]
+Num Blocks:    63 | Num Queries: 14444 | Num 429: 1365 | CUs: 216731 | Data: 38 MiB [  6m53s @ 0 blocks/sec ]
+Num Blocks:    65 | Num Queries: 14487 | Num 429: 1372 | CUs: 217378 | Data: 39 MiB [  6m54s @ 0 blocks/sec ]
+Num Blocks:    65 | Num Queries: 14509 | Num 429: 1372 | CUs: 217708 | Data: 39 MiB [  6m55s @ 0 blocks/sec ]
+Num Blocks:    65 | Num Queries: 14562 | Num 429: 1380 | CUs: 218503 | Data: 39 MiB [  6m56s @ 0 blocks/sec ]
+Num Blocks:    65 | Num Queries: 14570 | Num 429: 1380 | CUs: 218623 | Data: 39 MiB [  6m57s @ 0 blocks/sec ]
+Num Blocks:    66 | Num Queries: 14632 | Num 429: 1383 | CUs: 219554 | Data: 40 MiB [  6m58s @ 0 blocks/sec ]
+Num Blocks:    66 | Num Queries: 14644 | Num 429: 1387 | CUs: 219734 | Data: 40 MiB [  6m59s @ 0 blocks/sec ]
+Num Blocks:    66 | Num Queries: 14702 | Num 429: 1387 | CUs: 220604 | Data: 40 MiB [   7m0s @ 0 blocks/sec ]
+Num Blocks:    67 | Num Queries: 14718 | Num 429: 1395 | CUs: 220845 | Data: 40 MiB [   7m1s @ 0 blocks/sec ]
+Num Blocks:    67 | Num Queries: 14760 | Num 429: 1395 | CUs: 221475 | Data: 40 MiB [   7m2s @ 0 blocks/sec ]
+Num Blocks:    67 | Num Queries: 14789 | Num 429: 1403 | CUs: 221910 | Data: 40 MiB [   7m3s @ 0 blocks/sec ]
+Num Blocks:    68 | Num Queries: 14822 | Num 429: 1403 | CUs: 222406 | Data: 41 MiB [   7m4s @ 0 blocks/sec ]
+Num Blocks:    68 | Num Queries: 14859 | Num 429: 1410 | CUs: 222961 | Data: 41 MiB [   7m5s @ 0 blocks/sec ]
+Num Blocks:    68 | Num Queries: 14891 | Num 429: 1410 | CUs: 223441 | Data: 41 MiB [   7m6s @ 0 blocks/sec ]
+Num Blocks:    69 | Num Queries: 14931 | Num 429: 1418 | CUs: 224042 | Data: 41 MiB [   7m7s @ 0 blocks/sec ]
+Num Blocks:    69 | Num Queries: 14951 | Num 429: 1418 | CUs: 224342 | Data: 41 MiB [   7m8s @ 0 blocks/sec ]
+Num Blocks:    70 | Num Queries: 15004 | Num 429: 1423 | CUs: 225138 | Data: 42 MiB [   7m9s @ 0 blocks/sec ]
+Num Blocks:    70 | Num Queries: 15038 | Num 429: 1423 | CUs: 225648 | Data: 42 MiB [  7m10s @ 0 blocks/sec ]
+Num Blocks:    70 | Num Queries: 15092 | Num 429: 1431 | CUs: 226458 | Data: 42 MiB [  7m11s @ 0 blocks/sec ]
+Num Blocks:    70 | Num Queries: 15095 | Num 429: 1431 | CUs: 226503 | Data: 42 MiB [  7m12s @ 0 blocks/sec ]
+Num Blocks:    70 | Num Queries: 15163 | Num 429: 1432 | CUs: 227523 | Data: 42 MiB [  7m13s @ 0 blocks/sec ]
+Num Blocks:    70 | Num Queries: 15164 | Num 429: 1439 | CUs: 227538 | Data: 42 MiB [  7m14s @ 0 blocks/sec ]
+Num Blocks:    70 | Num Queries: 15222 | Num 429: 1439 | CUs: 228408 | Data: 42 MiB [  7m15s @ 0 blocks/sec ]
+Num Blocks:    70 | Num Queries: 15241 | Num 429: 1447 | CUs: 228693 | Data: 42 MiB [  7m16s @ 0 blocks/sec ]
+Num Blocks:    70 | Num Queries: 15283 | Num 429: 1447 | CUs: 229323 | Data: 42 MiB [  7m17s @ 0 blocks/sec ]
+Num Blocks:    71 | Num Queries: 15314 | Num 429: 1455 | CUs: 229789 | Data: 42 MiB [  7m18s @ 0 blocks/sec ]
+Num Blocks:    71 | Num Queries: 15339 | Num 429: 1455 | CUs: 230164 | Data: 42 MiB [  7m19s @ 0 blocks/sec ]
+Num Blocks:    71 | Num Queries: 15384 | Num 429: 1463 | CUs: 230839 | Data: 42 MiB [  7m20s @ 0 blocks/sec ]
+Num Blocks:    71 | Num Queries: 15401 | Num 429: 1463 | CUs: 231094 | Data: 42 MiB [  7m21s @ 0 blocks/sec ]
+Num Blocks:    71 | Num Queries: 15457 | Num 429: 1471 | CUs: 231934 | Data: 42 MiB [  7m22s @ 0 blocks/sec ]
+Num Blocks:    71 | Num Queries: 15460 | Num 429: 1471 | CUs: 231979 | Data: 42 MiB [  7m23s @ 0 blocks/sec ]
+Num Blocks:    71 | Num Queries: 15527 | Num 429: 1473 | CUs: 232984 | Data: 42 MiB [  7m24s @ 0 blocks/sec ]
+Num Blocks:    71 | Num Queries: 15527 | Num 429: 1479 | CUs: 232984 | Data: 42 MiB [  7m25s @ 0 blocks/sec ]
+Num Blocks:    71 | Num Queries: 15590 | Num 429: 1479 | CUs: 233929 | Data: 42 MiB [  7m26s @ 0 blocks/sec ]
+Num Blocks:    71 | Num Queries: 15603 | Num 429: 1487 | CUs: 234124 | Data: 42 MiB [  7m27s @ 0 blocks/sec ]
+Num Blocks:    71 | Num Queries: 15649 | Num 429: 1487 | CUs: 234814 | Data: 42 MiB [  7m28s @ 0 blocks/sec ]
+Num Blocks:    71 | Num Queries: 15675 | Num 429: 1495 | CUs: 235204 | Data: 42 MiB [  7m29s @ 0 blocks/sec ]
+Num Blocks:    72 | Num Queries: 15709 | Num 429: 1495 | CUs: 235715 | Data: 43 MiB [  7m30s @ 0 blocks/sec ]
+Num Blocks:    73 | Num Queries: 15751 | Num 429: 1501 | CUs: 236346 | Data: 43 MiB [  7m31s @ 0 blocks/sec ]
+Num Blocks:    73 | Num Queries: 15788 | Num 429: 1501 | CUs: 236901 | Data: 43 MiB [  7m32s @ 0 blocks/sec ]
+Num Blocks:    74 | Num Queries: 15828 | Num 429: 1509 | CUs: 237502 | Data: 43 MiB [  7m33s @ 0 blocks/sec ]
+Num Blocks:    74 | Num Queries: 15848 | Num 429: 1509 | CUs: 237802 | Data: 43 MiB [  7m34s @ 0 blocks/sec ]
+Num Blocks:    74 | Num Queries: 15901 | Num 429: 1515 | CUs: 238597 | Data: 43 MiB [  7m35s @ 0 blocks/sec ]
+Num Blocks:    74 | Num Queries: 15926 | Num 429: 1515 | CUs: 238972 | Data: 43 MiB [  7m36s @ 0 blocks/sec ]
+Num Blocks:    74 | Num Queries: 15984 | Num 429: 1523 | CUs: 239842 | Data: 43 MiB [  7m37s @ 0 blocks/sec ]
+Num Blocks:    74 | Num Queries: 15984 | Num 429: 1523 | CUs: 239842 | Data: 43 MiB [  7m38s @ 0 blocks/sec ]
+Num Blocks:    74 | Num Queries: 16049 | Num 429: 1523 | CUs: 240817 | Data: 43 MiB [  7m39s @ 0 blocks/sec ]
+Num Blocks:    74 | Num Queries: 16055 | Num 429: 1531 | CUs: 240907 | Data: 43 MiB [  7m40s @ 0 blocks/sec ]
+Num Blocks:    74 | Num Queries: 16110 | Num 429: 1531 | CUs: 241732 | Data: 43 MiB [  7m41s @ 0 blocks/sec ]
+Num Blocks:    74 | Num Queries: 16125 | Num 429: 1539 | CUs: 241957 | Data: 43 MiB [  7m42s @ 0 blocks/sec ]
+Num Blocks:    74 | Num Queries: 16167 | Num 429: 1539 | CUs: 242587 | Data: 43 MiB [  7m43s @ 0 blocks/sec ]
+Num Blocks:    74 | Num Queries: 16196 | Num 429: 1547 | CUs: 243022 | Data: 43 MiB [  7m44s @ 0 blocks/sec ]
+Num Blocks:    74 | Num Queries: 16228 | Num 429: 1547 | CUs: 243502 | Data: 43 MiB [  7m45s @ 0 blocks/sec ]
+Num Blocks:    74 | Num Queries: 16267 | Num 429: 1555 | CUs: 244087 | Data: 43 MiB [  7m46s @ 0 blocks/sec ]
+Num Blocks:    74 | Num Queries: 16285 | Num 429: 1555 | CUs: 244357 | Data: 43 MiB [  7m47s @ 0 blocks/sec ]
+Num Blocks:    75 | Num Queries: 16339 | Num 429: 1563 | CUs: 245168 | Data: 44 MiB [  7m48s @ 0 blocks/sec ]
+Num Blocks:    75 | Num Queries: 16344 | Num 429: 1563 | CUs: 245243 | Data: 44 MiB [  7m49s @ 0 blocks/sec ]
+Num Blocks:    76 | Num Queries: 16411 | Num 429: 1564 | CUs: 246249 | Data: 44 MiB [  7m50s @ 0 blocks/sec ]
+Num Blocks:    76 | Num Queries: 16412 | Num 429: 1571 | CUs: 246264 | Data: 44 MiB [  7m51s @ 0 blocks/sec ]
+Num Blocks:    76 | Num Queries: 16467 | Num 429: 1571 | CUs: 247089 | Data: 44 MiB [  7m52s @ 0 blocks/sec ]
+Num Blocks:    76 | Num Queries: 16482 | Num 429: 1579 | CUs: 247314 | Data: 44 MiB [  7m53s @ 0 blocks/sec ]
+Num Blocks:    76 | Num Queries: 16527 | Num 429: 1579 | CUs: 247989 | Data: 44 MiB [  7m54s @ 0 blocks/sec ]
+Num Blocks:    78 | Num Queries: 16553 | Num 429: 1586 | CUs: 248381 | Data: 45 MiB [  7m55s @ 0 blocks/sec ]
+Num Blocks:    80 | Num Queries: 16594 | Num 429: 1586 | CUs: 248998 | Data: 46 MiB [  7m56s @ 0 blocks/sec ]
+Num Blocks:    80 | Num Queries: 16624 | Num 429: 1594 | CUs: 249448 | Data: 46 MiB [  7m57s @ 0 blocks/sec ]
+Num Blocks:    80 | Num Queries: 16655 | Num 429: 1594 | CUs: 249913 | Data: 46 MiB [  7m58s @ 0 blocks/sec ]
+Num Blocks:    80 | Num Queries: 16692 | Num 429: 1602 | CUs: 250468 | Data: 46 MiB [  7m59s @ 0 blocks/sec ]
+Num Blocks:    80 | Num Queries: 16716 | Num 429: 1602 | CUs: 250828 | Data: 46 MiB [   8m0s @ 0 blocks/sec ]
+Num Blocks:    80 | Num Queries: 16761 | Num 429: 1610 | CUs: 251503 | Data: 46 MiB [   8m1s @ 0 blocks/sec ]
+Num Blocks:    80 | Num Queries: 16774 | Num 429: 1610 | CUs: 251698 | Data: 46 MiB [   8m2s @ 0 blocks/sec ]
+Num Blocks:    81 | Num Queries: 16827 | Num 429: 1618 | CUs: 252494 | Data: 46 MiB [   8m3s @ 0 blocks/sec ]
+Num Blocks:    81 | Num Queries: 16832 | Num 429: 1618 | CUs: 252569 | Data: 46 MiB [   8m4s @ 0 blocks/sec ]
+Num Blocks:    81 | Num Queries: 16897 | Num 429: 1620 | CUs: 253544 | Data: 46 MiB [   8m5s @ 0 blocks/sec ]
+Num Blocks:    81 | Num Queries: 16903 | Num 429: 1626 | CUs: 253634 | Data: 46 MiB [   8m6s @ 0 blocks/sec ]
+Num Blocks:    82 | Num Queries: 16959 | Num 429: 1626 | CUs: 254475 | Data: 46 MiB [   8m7s @ 0 blocks/sec ]
+Num Blocks:    82 | Num Queries: 16976 | Num 429: 1634 | CUs: 254730 | Data: 46 MiB [   8m8s @ 0 blocks/sec ]
+Num Blocks:    83 | Num Queries: 17016 | Num 429: 1634 | CUs: 255331 | Data: 47 MiB [   8m9s @ 0 blocks/sec ]
+Num Blocks:    83 | Num Queries: 17046 | Num 429: 1642 | CUs: 255781 | Data: 47 MiB [  8m10s @ 0 blocks/sec ]
+Num Blocks:    83 | Num Queries: 17079 | Num 429: 1642 | CUs: 256276 | Data: 47 MiB [  8m11s @ 0 blocks/sec ]
+Num Blocks:    83 | Num Queries: 17115 | Num 429: 1650 | CUs: 256816 | Data: 47 MiB [  8m12s @ 0 blocks/sec ]
+Num Blocks:    83 | Num Queries: 17135 | Num 429: 1650 | CUs: 257116 | Data: 47 MiB [  8m13s @ 0 blocks/sec ]
+Num Blocks:    84 | Num Queries: 17187 | Num 429: 1656 | CUs: 257897 | Data: 47 MiB [  8m14s @ 0 blocks/sec ]
+Num Blocks:    84 | Num Queries: 17212 | Num 429: 1656 | CUs: 258272 | Data: 47 MiB [  8m15s @ 0 blocks/sec ]
+Num Blocks:    85 | Num Queries: 17268 | Num 429: 1664 | CUs: 259113 | Data: 48 MiB [  8m16s @ 0 blocks/sec ]
+Num Blocks:    85 | Num Queries: 17273 | Num 429: 1664 | CUs: 259188 | Data: 48 MiB [  8m17s @ 0 blocks/sec ]
+Num Blocks:    85 | Num Queries: 17337 | Num 429: 1666 | CUs: 260148 | Data: 48 MiB [  8m18s @ 0 blocks/sec ]
+Num Blocks:    85 | Num Queries: 17341 | Num 429: 1672 | CUs: 260208 | Data: 48 MiB [  8m19s @ 0 blocks/sec ]
+Num Blocks:    85 | Num Queries: 17399 | Num 429: 1672 | CUs: 261078 | Data: 48 MiB [  8m20s @ 0 blocks/sec ]
+Num Blocks:    85 | Num Queries: 17414 | Num 429: 1680 | CUs: 261303 | Data: 48 MiB [  8m21s @ 0 blocks/sec ]
+Num Blocks:    85 | Num Queries: 17459 | Num 429: 1680 | CUs: 261978 | Data: 48 MiB [  8m22s @ 0 blocks/sec ]
+Num Blocks:    85 | Num Queries: 17485 | Num 429: 1688 | CUs: 262368 | Data: 48 MiB [  8m23s @ 0 blocks/sec ]
+Num Blocks:    85 | Num Queries: 17514 | Num 429: 1688 | CUs: 262803 | Data: 48 MiB [  8m24s @ 0 blocks/sec ]
+Num Blocks:    86 | Num Queries: 17559 | Num 429: 1696 | CUs: 263479 | Data: 48 MiB [  8m25s @ 0 blocks/sec ]
+Num Blocks:    86 | Num Queries: 17575 | Num 429: 1696 | CUs: 263719 | Data: 48 MiB [  8m26s @ 0 blocks/sec ]
+Num Blocks:    87 | Num Queries: 17629 | Num 429: 1704 | CUs: 264530 | Data: 49 MiB [  8m27s @ 0 blocks/sec ]
+Num Blocks:    87 | Num Queries: 17631 | Num 429: 1704 | CUs: 264560 | Data: 49 MiB [  8m28s @ 0 blocks/sec ]
+Num Blocks:    87 | Num Queries: 17696 | Num 429: 1704 | CUs: 265535 | Data: 49 MiB [  8m29s @ 0 blocks/sec ]
+Num Blocks:    87 | Num Queries: 17701 | Num 429: 1712 | CUs: 265610 | Data: 49 MiB [  8m30s @ 0 blocks/sec ]
+Num Blocks:    87 | Num Queries: 17757 | Num 429: 1712 | CUs: 266450 | Data: 49 MiB [  8m31s @ 0 blocks/sec ]
+Num Blocks:    87 | Num Queries: 17773 | Num 429: 1720 | CUs: 266690 | Data: 49 MiB [  8m32s @ 0 blocks/sec ]
+Num Blocks:    87 | Num Queries: 17819 | Num 429: 1720 | CUs: 267380 | Data: 49 MiB [  8m33s @ 0 blocks/sec ]
+Num Blocks:    87 | Num Queries: 17842 | Num 429: 1728 | CUs: 267725 | Data: 49 MiB [  8m34s @ 0 blocks/sec ]
+Num Blocks:    87 | Num Queries: 17878 | Num 429: 1728 | CUs: 268265 | Data: 49 MiB [  8m35s @ 0 blocks/sec ]
+Num Blocks:    87 | Num Queries: 17920 | Num 429: 1734 | CUs: 268895 | Data: 49 MiB [  8m36s @ 0 blocks/sec ]
+Num Blocks:    87 | Num Queries: 17954 | Num 429: 1734 | CUs: 269405 | Data: 49 MiB [  8m37s @ 0 blocks/sec ]
+Num Blocks:    88 | Num Queries: 17997 | Num 429: 1742 | CUs: 270051 | Data: 49 MiB [  8m38s @ 0 blocks/sec ]
+Num Blocks:    88 | Num Queries: 18013 | Num 429: 1742 | CUs: 270291 | Data: 49 MiB [  8m39s @ 0 blocks/sec ]
+Num Blocks:    88 | Num Queries: 18069 | Num 429: 1750 | CUs: 271131 | Data: 49 MiB [  8m40s @ 0 blocks/sec ]
+Num Blocks:    88 | Num Queries: 18073 | Num 429: 1750 | CUs: 271191 | Data: 49 MiB [  8m41s @ 0 blocks/sec ]
+Num Blocks:    88 | Num Queries: 18136 | Num 429: 1751 | CUs: 272136 | Data: 49 MiB [  8m42s @ 0 blocks/sec ]
+Num Blocks:    88 | Num Queries: 18150 | Num 429: 1757 | CUs: 272346 | Data: 49 MiB [  8m43s @ 0 blocks/sec ]
+Num Blocks:    89 | Num Queries: 18208 | Num 429: 1757 | CUs: 273217 | Data: 50 MiB [  8m44s @ 0 blocks/sec ]
+Num Blocks:    89 | Num Queries: 18222 | Num 429: 1765 | CUs: 273427 | Data: 50 MiB [  8m45s @ 0 blocks/sec ]
+Num Blocks:    89 | Num Queries: 18248 | Num 429: 1765 | CUs: 273817 | Data: 50 MiB [  8m46s @ 0 blocks/sec ]
+Num Blocks:    91 | Num Queries: 18315 | Num 429: 1765 | CUs: 274824 | Data: 51 MiB [  8m47s @ 0 blocks/sec ]
+Num Blocks:    91 | Num Queries: 18315 | Num 429: 1773 | CUs: 274824 | Data: 51 MiB [  8m48s @ 0 blocks/sec ]
+Num Blocks:    91 | Num Queries: 18369 | Num 429: 1773 | CUs: 275634 | Data: 51 MiB [  8m49s @ 0 blocks/sec ]
+Num Blocks:    91 | Num Queries: 18387 | Num 429: 1781 | CUs: 275904 | Data: 51 MiB [  8m50s @ 0 blocks/sec ]
+Num Blocks:    91 | Num Queries: 18426 | Num 429: 1781 | CUs: 276489 | Data: 51 MiB [  8m51s @ 0 blocks/sec ]
+Num Blocks:    91 | Num Queries: 18457 | Num 429: 1789 | CUs: 276954 | Data: 51 MiB [  8m52s @ 0 blocks/sec ]
+Num Blocks:    91 | Num Queries: 18487 | Num 429: 1789 | CUs: 277404 | Data: 51 MiB [  8m53s @ 0 blocks/sec ]
+Num Blocks:    91 | Num Queries: 18529 | Num 429: 1797 | CUs: 278034 | Data: 51 MiB [  8m54s @ 0 blocks/sec ]
+Num Blocks:    91 | Num Queries: 18545 | Num 429: 1797 | CUs: 278274 | Data: 51 MiB [  8m55s @ 0 blocks/sec ]
+Num Blocks:    91 | Num Queries: 18601 | Num 429: 1805 | CUs: 279114 | Data: 51 MiB [  8m56s @ 0 blocks/sec ]
+Num Blocks:    91 | Num Queries: 18603 | Num 429: 1805 | CUs: 279144 | Data: 51 MiB [  8m57s @ 0 blocks/sec ]
+Num Blocks:    91 | Num Queries: 18671 | Num 429: 1806 | CUs: 280164 | Data: 51 MiB [  8m58s @ 0 blocks/sec ]
+Num Blocks:    91 | Num Queries: 18671 | Num 429: 1813 | CUs: 280164 | Data: 51 MiB [  8m59s @ 0 blocks/sec ]
+Num Blocks:    91 | Num Queries: 18729 | Num 429: 1813 | CUs: 281034 | Data: 51 MiB [   9m0s @ 0 blocks/sec ]
+Num Blocks:    91 | Num Queries: 18744 | Num 429: 1821 | CUs: 281259 | Data: 51 MiB [   9m1s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 18784 | Num 429: 1821 | CUs: 281860 | Data: 51 MiB [   9m2s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 18841 | Num 429: 1821 | CUs: 282715 | Data: 51 MiB [   9m3s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 18858 | Num 429: 1829 | CUs: 282970 | Data: 51 MiB [   9m4s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 18898 | Num 429: 1829 | CUs: 283570 | Data: 51 MiB [   9m5s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 18927 | Num 429: 1837 | CUs: 284005 | Data: 51 MiB [   9m6s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 18955 | Num 429: 1837 | CUs: 284425 | Data: 51 MiB [   9m7s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 19000 | Num 429: 1845 | CUs: 285100 | Data: 51 MiB [   9m8s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 19012 | Num 429: 1845 | CUs: 285280 | Data: 51 MiB [   9m9s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 19075 | Num 429: 1850 | CUs: 286225 | Data: 51 MiB [  9m10s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 19099 | Num 429: 1850 | CUs: 286585 | Data: 51 MiB [  9m11s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 19163 | Num 429: 1852 | CUs: 287545 | Data: 51 MiB [  9m12s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 19175 | Num 429: 1857 | CUs: 287725 | Data: 51 MiB [  9m13s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 19233 | Num 429: 1857 | CUs: 288595 | Data: 51 MiB [  9m14s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 19245 | Num 429: 1865 | CUs: 288775 | Data: 51 MiB [  9m15s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 19293 | Num 429: 1865 | CUs: 289495 | Data: 51 MiB [  9m16s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 19317 | Num 429: 1873 | CUs: 289855 | Data: 51 MiB [  9m17s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 19355 | Num 429: 1873 | CUs: 290425 | Data: 51 MiB [  9m18s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 19386 | Num 429: 1881 | CUs: 290890 | Data: 51 MiB [  9m19s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 19414 | Num 429: 1881 | CUs: 291310 | Data: 51 MiB [  9m20s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 19459 | Num 429: 1889 | CUs: 291985 | Data: 51 MiB [  9m21s @ 0 blocks/sec ]
+Num Blocks:    93 | Num Queries: 19475 | Num 429: 1889 | CUs: 292226 | Data: 52 MiB [  9m22s @ 0 blocks/sec ]
+Num Blocks:    93 | Num Queries: 19530 | Num 429: 1897 | CUs: 293051 | Data: 52 MiB [  9m23s @ 0 blocks/sec ]
+Num Blocks:    93 | Num Queries: 19530 | Num 429: 1897 | CUs: 293051 | Data: 52 MiB [  9m24s @ 0 blocks/sec ]
+Num Blocks:    93 | Num Queries: 19600 | Num 429: 1897 | CUs: 294101 | Data: 52 MiB [  9m25s @ 0 blocks/sec ]
+Num Blocks:    93 | Num Queries: 19601 | Num 429: 1905 | CUs: 294116 | Data: 52 MiB [  9m26s @ 0 blocks/sec ]
+Num Blocks:    93 | Num Queries: 19622 | Num 429: 1905 | CUs: 294431 | Data: 52 MiB [  9m27s @ 0 blocks/sec ]
+Num Blocks:    93 | Num Queries: 19682 | Num 429: 1912 | CUs: 295331 | Data: 52 MiB [  9m28s @ 0 blocks/sec ]
+Num Blocks:    93 | Num Queries: 19690 | Num 429: 1912 | CUs: 295451 | Data: 52 MiB [  9m29s @ 0 blocks/sec ]
+Num Blocks:    94 | Num Queries: 19754 | Num 429: 1912 | CUs: 296412 | Data: 53 MiB [  9m30s @ 0 blocks/sec ]
+Num Blocks:    95 | Num Queries: 19758 | Num 429: 1920 | CUs: 296473 | Data: 53 MiB [  9m31s @ 0 blocks/sec ]
+Num Blocks:    95 | Num Queries: 19809 | Num 429: 1920 | CUs: 297238 | Data: 53 MiB [  9m32s @ 0 blocks/sec ]
+Num Blocks:    95 | Num Queries: 19827 | Num 429: 1928 | CUs: 297508 | Data: 53 MiB [  9m33s @ 0 blocks/sec ]
+Num Blocks:    95 | Num Queries: 19867 | Num 429: 1928 | CUs: 298108 | Data: 53 MiB [  9m34s @ 0 blocks/sec ]
+Num Blocks:    95 | Num Queries: 19896 | Num 429: 1936 | CUs: 298543 | Data: 53 MiB [  9m35s @ 0 blocks/sec ]
+Num Blocks:    95 | Num Queries: 19924 | Num 429: 1936 | CUs: 298963 | Data: 53 MiB [  9m36s @ 0 blocks/sec ]
+Num Blocks:    95 | Num Queries: 19967 | Num 429: 1944 | CUs: 299608 | Data: 53 MiB [  9m37s @ 0 blocks/sec ]
+Num Blocks:    96 | Num Queries: 19983 | Num 429: 1944 | CUs: 299849 | Data: 54 MiB [  9m38s @ 0 blocks/sec ]
+Num Blocks:    98 | Num Queries: 20039 | Num 429: 1952 | CUs: 300691 | Data: 55 MiB [  9m39s @ 0 blocks/sec ]
+Num Blocks:    98 | Num Queries: 20040 | Num 429: 1952 | CUs: 300706 | Data: 55 MiB [  9m40s @ 0 blocks/sec ]
+Num Blocks:    99 | Num Queries: 20107 | Num 429: 1953 | CUs: 301712 | Data: 56 MiB [  9m41s @ 0 blocks/sec ]
+Num Blocks:    99 | Num Queries: 20107 | Num 429: 1960 | CUs: 301712 | Data: 56 MiB [  9m42s @ 0 blocks/sec ]
+Num Blocks:    99 | Num Queries: 20168 | Num 429: 1960 | CUs: 302627 | Data: 56 MiB [  9m43s @ 0 blocks/sec ]
+Num Blocks:    99 | Num Queries: 20183 | Num 429: 1968 | CUs: 302852 | Data: 56 MiB [  9m44s @ 0 blocks/sec ]
+Num Blocks:    99 | Num Queries: 20230 | Num 429: 1968 | CUs: 303557 | Data: 56 MiB [  9m45s @ 0 blocks/sec ]
+Num Blocks:    99 | Num Queries: 20256 | Num 429: 1975 | CUs: 303947 | Data: 56 MiB [  9m46s @ 0 blocks/sec ]
+Num Blocks:    99 | Num Queries: 20293 | Num 429: 1975 | CUs: 304502 | Data: 56 MiB [  9m47s @ 0 blocks/sec ]
+Num Blocks:    99 | Num Queries: 20337 | Num 429: 1983 | CUs: 305162 | Data: 56 MiB [  9m48s @ 0 blocks/sec ]
+Num Blocks:    99 | Num Queries: 20356 | Num 429: 1983 | CUs: 305447 | Data: 56 MiB [  9m49s @ 0 blocks/sec ]
+Num Blocks:    99 | Num Queries: 20407 | Num 429: 1991 | CUs: 306212 | Data: 56 MiB [  9m50s @ 0 blocks/sec ]
+Num Blocks:    99 | Num Queries: 20414 | Num 429: 1991 | CUs: 306317 | Data: 56 MiB [  9m51s @ 0 blocks/sec ]
+Num Blocks:    99 | Num Queries: 20476 | Num 429: 1996 | CUs: 307247 | Data: 56 MiB [  9m52s @ 0 blocks/sec ]
+Num Blocks:    99 | Num Queries: 20503 | Num 429: 1996 | CUs: 307652 | Data: 56 MiB [  9m53s @ 0 blocks/sec ]
+Num Blocks:   100 | Num Queries: 20567 | Num 429: 1997 | CUs: 308613 | Data: 57 MiB [  9m54s @ 0 blocks/sec ]
+Num Blocks:   100 | Num Queries: 20572 | Num 429: 2004 | CUs: 308688 | Data: 57 MiB [  9m55s @ 0 blocks/sec ]
+Num Blocks:   100 | Num Queries: 20629 | Num 429: 2004 | CUs: 309543 | Data: 57 MiB [  9m56s @ 0 blocks/sec ]
+Num Blocks:   100 | Num Queries: 20641 | Num 429: 2012 | CUs: 309723 | Data: 57 MiB [  9m57s @ 0 blocks/sec ]
+Num Blocks:   100 | Num Queries: 20689 | Num 429: 2012 | CUs: 310443 | Data: 57 MiB [  9m58s @ 0 blocks/sec ]
+Num Blocks:   100 | Num Queries: 20710 | Num 429: 2020 | CUs: 310758 | Data: 57 MiB [  9m59s @ 0 blocks/sec ]
+Num Blocks:   100 | Num Queries: 20750 | Num 429: 2020 | CUs: 311358 | Data: 57 MiB [  10m0s @ 0 blocks/sec ]
+Num Blocks:   101 | Num Queries: 20780 | Num 429: 2027 | CUs: 311808 | Data: 58 MiB [  10m1s @ 0 blocks/sec ]
+Num Blocks:   101 | Num Queries: 20803 | Num 429: 2027 | CUs: 312153 | Data: 58 MiB [  10m2s @ 0 blocks/sec ]
+Num Blocks:   101 | Num Queries: 20855 | Num 429: 2027 | CUs: 312933 | Data: 58 MiB [  10m3s @ 0 blocks/sec ]
+Num Blocks:   101 | Num Queries: 20900 | Num 429: 2030 | CUs: 313608 | Data: 58 MiB [  10m4s @ 0 blocks/sec ]
+Num Blocks:   101 | Num Queries: 20949 | Num 429: 2030 | CUs: 314343 | Data: 58 MiB [  10m5s @ 0 blocks/sec ]
+Num Blocks:   101 | Num Queries: 20994 | Num 429: 2034 | CUs: 315018 | Data: 58 MiB [  10m6s @ 0 blocks/sec ]
+Num Blocks:   101 | Num Queries: 21031 | Num 429: 2034 | CUs: 315573 | Data: 58 MiB [  10m7s @ 0 blocks/sec ]
+Num Blocks:   101 | Num Queries: 21088 | Num 429: 2035 | CUs: 316428 | Data: 58 MiB [  10m8s @ 0 blocks/sec ]
+Num Blocks:   102 | Num Queries: 21137 | Num 429: 2035 | CUs: 317163 | Data: 58 MiB [  10m9s @ 0 blocks/sec ]
+Num Blocks:   103 | Num Queries: 21183 | Num 429: 2035 | CUs: 317853 | Data: 59 MiB [ 10m10s @ 0 blocks/sec ]
+Num Blocks:   103 | Num Queries: 21228 | Num 429: 2035 | CUs: 318528 | Data: 59 MiB [ 10m11s @ 0 blocks/sec ]
+Num Blocks:   103 | Num Queries: 21268 | Num 429: 2035 | CUs: 319128 | Data: 59 MiB [ 10m12s @ 0 blocks/sec ]
+Num Blocks:   104 | Num Queries: 21305 | Num 429: 2035 | CUs: 319683 | Data: 59 MiB [ 10m13s @ 0 blocks/sec ]
+Num Blocks:   104 | Num Queries: 21337 | Num 429: 2035 | CUs: 320163 | Data: 59 MiB [ 10m14s @ 0 blocks/sec ]
+Num Blocks:   104 | Num Queries: 21370 | Num 429: 2035 | CUs: 320658 | Data: 59 MiB [ 10m15s @ 0 blocks/sec ]
+Num Blocks:   104 | Num Queries: 21398 | Num 429: 2035 | CUs: 321078 | Data: 59 MiB [ 10m16s @ 0 blocks/sec ]
+Num Blocks:   104 | Num Queries: 21414 | Num 429: 2035 | CUs: 321318 | Data: 59 MiB [ 10m17s @ 0 blocks/sec ]
+Num Blocks:   104 | Num Queries: 21430 | Num 429: 2035 | CUs: 321558 | Data: 59 MiB [ 10m18s @ 0 blocks/sec ]
+Num Blocks:   104 | Num Queries: 21457 | Num 429: 2035 | CUs: 321963 | Data: 59 MiB [ 10m19s @ 0 blocks/sec ]
+Num Blocks:   104 | Num Queries: 21491 | Num 429: 2035 | CUs: 322473 | Data: 59 MiB [ 10m20s @ 0 blocks/sec ]
+Num Blocks:   104 | Num Queries: 21521 | Num 429: 2035 | CUs: 322923 | Data: 59 MiB [ 10m21s @ 0 blocks/sec ]
+Num Blocks:   104 | Num Queries: 21554 | Num 429: 2035 | CUs: 323418 | Data: 59 MiB [ 10m22s @ 0 blocks/sec ]
+Num Blocks:   104 | Num Queries: 21589 | Num 429: 2035 | CUs: 323943 | Data: 59 MiB [ 10m23s @ 0 blocks/sec ]
+Num Blocks:   104 | Num Queries: 21622 | Num 429: 2035 | CUs: 324438 | Data: 59 MiB [ 10m24s @ 0 blocks/sec ]
+Num Blocks:   105 | Num Queries: 21654 | Num 429: 2035 | CUs: 324918 | Data: 60 MiB [ 10m25s @ 0 blocks/sec ]
+Num Blocks:   105 | Num Queries: 21678 | Num 429: 2035 | CUs: 325278 | Data: 60 MiB [ 10m26s @ 0 blocks/sec ]
+Num Blocks:   106 | Num Queries: 21699 | Num 429: 2035 | CUs: 325593 | Data: 61 MiB [ 10m27s @ 0 blocks/sec ]
+Num Blocks:   107 | Num Queries: 21707 | Num 429: 2035 | CUs: 325713 | Data: 62 MiB [ 10m28s @ 0 blocks/sec ]
+Num Blocks:   107 | Num Queries: 21716 | Num 429: 2035 | CUs: 325848 | Data: 62 MiB [ 10m29s @ 0 blocks/sec ]
+Num Blocks:   107 | Num Queries: 21724 | Num 429: 2035 | CUs: 325968 | Data: 62 MiB [ 10m30s @ 0 blocks/sec ]
+Num Blocks:   107 | Num Queries: 21732 | Num 429: 2035 | CUs: 326088 | Data: 62 MiB [ 10m31s @ 0 blocks/sec ]
+Num Blocks:   107 | Num Queries: 21741 | Num 429: 2035 | CUs: 326223 | Data: 62 MiB [ 10m32s @ 0 blocks/sec ]
+Num Blocks:   107 | Num Queries: 21749 | Num 429: 2035 | CUs: 326343 | Data: 62 MiB [ 10m33s @ 0 blocks/sec ]
+-----------------------
+Latency in milliseconds
+ -- Histogram: 
+Min value: 113 
+Max value: 145315 
+Count: 108 
+50p: 44032.00 
+75p: 59392.00 
+90p: 74752.00 
+[64, 128) 2 1.85% 1.85%
+[128, 256) 1 0.93% 2.78%
+[1024, 2048) 1 0.93% 3.70%
+[4096, 5120) 1 0.93% 4.63%
+[6144, 7168) 1 0.93% 5.56%
+[7168, 8192) 1 0.93% 6.48%
+[8192, 9216) 1 0.93% 7.41%
+[10240, 11264) 1 0.93% 8.33%
+[12288, 13312) 1 0.93% 9.26%
+[13312, 14336) 2 1.85% 11.11%
+[16384, 17408) 2 1.85% 12.96%
+[17408, 18432) 1 0.93% 13.89%
+[18432, 19456) 1 0.93% 14.81%
+[20480, 21504) 1 0.93% 15.74%
+[21504, 22528) 1 0.93% 16.67%
+[22528, 23552) 1 0.93% 17.59%
+[23552, 24576) 2 1.85% 19.44%
+[24576, 25600) 2 1.85% 21.30%
+[25600, 26624) 2 1.85% 23.15%
+[26624, 27648) 1 0.93% 24.07%
+[27648, 28672) 1 0.93% 25.00%
+[28672, 29696) 1 0.93% 25.93%
+[29696, 30720) 3 2.78% 28.70%
+[30720, 31744) 3 2.78% 31.48%
+[31744, 32768) 4 3.70% 35.19%
+[32768, 33792) 2 1.85% 37.04%
+[33792, 34816) 3 2.78% 39.81%
+[34816, 35840) 1 0.93% 40.74%
+[35840, 36864) 1 0.93% 41.67%
+[36864, 37888) 1 0.93% 42.59%
+[37888, 38912) 1 0.93% 43.52%
+[38912, 39936) 2 1.85% 45.37%
+[40960, 41984) 2 1.85% 47.22%
+[41984, 43008) 1 0.93% 48.15%
+[43008, 44032) 3 2.78% 50.93%
+[45056, 46080) 1 0.93% 51.85%
+[46080, 47104) 2 1.85% 53.70%
+[47104, 48128) 3 2.78% 56.48%
+[48128, 49152) 1 0.93% 57.41%
+[49152, 50176) 1 0.93% 58.33%
+[50176, 51200) 4 3.70% 62.04%
+[52224, 53248) 1 0.93% 62.96%
+[53248, 54272) 3 2.78% 65.74%
+[54272, 55296) 2 1.85% 67.59%
+[55296, 56320) 1 0.93% 68.52%
+[56320, 57344) 1 0.93% 69.44%
+[57344, 58368) 5 4.63% 74.07%
+[58368, 59392) 2 1.85% 75.93%
+[59392, 60416) 1 0.93% 76.85%
+[61440, 62464) 2 1.85% 78.70%
+[63488, 64512) 2 1.85% 80.56%
+[64512, 65536) 2 1.85% 82.41%
+[66560, 67584) 1 0.93% 83.33%
+[67584, 68608) 1 0.93% 84.26%
+[68608, 69632) 1 0.93% 85.19%
+[70656, 71680) 2 1.85% 87.04%
+[71680, 72704) 1 0.93% 87.96%
+[72704, 73728) 1 0.93% 88.89%
+[73728, 74752) 1 0.93% 89.81%
+[74752, 75776) 1 0.93% 90.74%
+[79872, 80896) 1 0.93% 91.67%
+[84992, 86016) 1 0.93% 92.59%
+[89088, 90112) 1 0.93% 93.52%
+[94208, 95232) 1 0.93% 94.44%
+[97280, 98304) 1 0.93% 95.37%
+[101376, 102400) 1 0.93% 96.30%
+[103424, 104448) 1 0.93% 97.22%
+[106496, 107520) 1 0.93% 98.15%
+[111616, 112640) 1 0.93% 99.07%
+[144384, 145408) 1 0.93% 100.00%
+ --
+
+-----------------------
+Resp size in bytes
+ -- Histogram: 
+Min value: 1468 
+Max value: 1430369 
+Count: 108 
+50p: 544768.00 
+75p: 832512.00 
+90p: 1049600.00 
+[1024, 2048) 3 2.78% 2.78%
+[22528, 23552) 1 0.93% 3.70%
+[75776, 76800) 1 0.93% 4.63%
+[136192, 137216) 1 0.93% 5.56%
+[162816, 163840) 1 0.93% 6.48%
+[175104, 176128) 1 0.93% 7.41%
+[205824, 206848) 1 0.93% 8.33%
+[208896, 209920) 1 0.93% 9.26%
+[222208, 223232) 1 0.93% 10.19%
+[235520, 236544) 1 0.93% 11.11%
+[256000, 257024) 1 0.93% 12.04%
+[263168, 264192) 1 0.93% 12.96%
+[271360, 272384) 1 0.93% 13.89%
+[282624, 283648) 1 0.93% 14.81%
+[288768, 289792) 1 0.93% 15.74%
+[309248, 310272) 1 0.93% 16.67%
+[316416, 317440) 1 0.93% 17.59%
+[319488, 320512) 1 0.93% 18.52%
+[327680, 328704) 1 0.93% 19.44%
+[329728, 330752) 1 0.93% 20.37%
+[337920, 338944) 2 1.85% 22.22%
+[343040, 344064) 1 0.93% 23.15%
+[356352, 357376) 1 0.93% 24.07%
+[366592, 367616) 1 0.93% 25.00%
+[385024, 386048) 1 0.93% 25.93%
+[395264, 396288) 1 0.93% 26.85%
+[403456, 404480) 2 1.85% 28.70%
+[404480, 405504) 1 0.93% 29.63%
+[435200, 436224) 1 0.93% 30.56%
+[445440, 446464) 1 0.93% 31.48%
+[448512, 449536) 1 0.93% 32.41%
+[458752, 459776) 1 0.93% 33.33%
+[465920, 466944) 1 0.93% 34.26%
+[470016, 471040) 1 0.93% 35.19%
+[472064, 473088) 1 0.93% 36.11%
+[478208, 479232) 1 0.93% 37.04%
+[480256, 481280) 1 0.93% 37.96%
+[482304, 483328) 1 0.93% 38.89%
+[490496, 491520) 1 0.93% 39.81%
+[504832, 505856) 1 0.93% 40.74%
+[507904, 508928) 2 1.85% 42.59%
+[510976, 512000) 1 0.93% 43.52%
+[526336, 527360) 1 0.93% 44.44%
+[528384, 529408) 1 0.93% 45.37%
+[529408, 530432) 1 0.93% 46.30%
+[533504, 534528) 1 0.93% 47.22%
+[534528, 535552) 1 0.93% 48.15%
+[539648, 540672) 1 0.93% 49.07%
+[543744, 544768) 1 0.93% 50.00%
+[547840, 548864) 1 0.93% 50.93%
+[557056, 558080) 1 0.93% 51.85%
+[568320, 569344) 1 0.93% 52.78%
+[587776, 588800) 1 0.93% 53.70%
+[591872, 592896) 1 0.93% 54.63%
+[603136, 604160) 2 1.85% 56.48%
+[614400, 615424) 1 0.93% 57.41%
+[615424, 616448) 1 0.93% 58.33%
+[620544, 621568) 1 0.93% 59.26%
+[622592, 623616) 1 0.93% 60.19%
+[631808, 632832) 1 0.93% 61.11%
+[650240, 651264) 1 0.93% 62.04%
+[656384, 657408) 1 0.93% 62.96%
+[669696, 670720) 1 0.93% 63.89%
+[678912, 679936) 1 0.93% 64.81%
+[690176, 691200) 1 0.93% 65.74%
+[691200, 692224) 1 0.93% 66.67%
+[704512, 705536) 1 0.93% 67.59%
+[717824, 718848) 1 0.93% 68.52%
+[724992, 726016) 2 1.85% 70.37%
+[726016, 727040) 1 0.93% 71.30%
+[799744, 800768) 1 0.93% 72.22%
+[820224, 821248) 1 0.93% 73.15%
+[821248, 822272) 1 0.93% 74.07%
+[831488, 832512) 1 0.93% 75.00%
+[855040, 856064) 2 1.85% 76.85%
+[868352, 869376) 1 0.93% 77.78%
+[878592, 879616) 1 0.93% 78.70%
+[889856, 890880) 1 0.93% 79.63%
+[917504, 918528) 1 0.93% 80.56%
+[924672, 925696) 1 0.93% 81.48%
+[925696, 926720) 1 0.93% 82.41%
+[944128, 945152) 1 0.93% 83.33%
+[951296, 952320) 1 0.93% 84.26%
+[952320, 953344) 1 0.93% 85.19%
+[964608, 965632) 1 0.93% 86.11%
+[973824, 974848) 1 0.93% 87.04%
+[1036288, 1037312) 1 0.93% 87.96%
+[1.0 MiB, infinity) 13 12.04% 100.00%
+ --
+
+Num Blocks:   108 | Num Queries: 21756 | Num 429: 2035 | CUs: 326448 | Data: 63 MiB [ 10m34s @ 0 blocks/sec ]
+Num Blocks:   108 | Num Queries: 21756 | Num 429: 2035 | CUs: 326448 | Data: 63 MiB [ 10m35s @ 0 blocks/sec ]
+DONE

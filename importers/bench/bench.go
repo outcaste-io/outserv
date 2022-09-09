@@ -153,10 +153,14 @@ func fetchBlockWithTxnAndLogsWithRPC(client *http.Client, blockNum int64) (int64
 	q := fmt.Sprintf(`{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":[%q, true],"id":1}`, hno)
 	// fmt.Printf("Block Query: %s\n", q)
 	data, err := callRPC(client, q, 16)
+	x.Check(err)
 	sz := int64(len(data))
 
 	var resp BlockResp
-	x.Check(json.Unmarshal(data, &resp))
+	if err := json.Unmarshal(data, &resp); err != nil {
+		fmt.Printf("Got invalid block resp data: %s\n", data)
+		os.Exit(1)
+	}
 	if resp.Result.Number != hno {
 		fmt.Printf("Got result: %+v. Expecting: %s Test Failed.\n", resp.Result, hno)
 		fmt.Printf("Response: %s\n", data)
@@ -176,7 +180,10 @@ func fetchBlockWithTxnAndLogsWithRPC(client *http.Client, blockNum int64) (int64
 		sz += int64(len(data))
 
 		var txnResp TxnResp
-		x.Check(json.Unmarshal(data, &txnResp))
+		if err := json.Unmarshal(data, &txnResp); err != nil {
+			fmt.Printf("Got invalid txn resp data: %s\n", data)
+			os.Exit(1)
+		}
 		if txnResp.Result.BlockNumber != hno {
 			fmt.Printf("Got result: %+v. Expecting: %s Test Failed.\n", txnResp.Result)
 			fmt.Printf("Response: %s\n", data)
