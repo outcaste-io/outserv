@@ -141,7 +141,7 @@ func run() {
 		OutDir:           Boot.Conf.GetString("out"),
 		ReplaceOutDir:    Boot.Conf.GetBool("replace_out"),
 		MapDir:           Boot.Conf.GetString("tmp"),
-		BufDir:           Boot.Conf.GetString("buffer"),
+		BufDir:           Boot.Conf.GetString("buf"),
 		NumGoroutines:    Boot.Conf.GetInt("num_go_routines"),
 		MapBufSize:       uint64(Boot.Conf.GetInt("mapoutput_mb")),
 		PartitionBufSize: int64(Boot.Conf.GetInt("partition_mb")),
