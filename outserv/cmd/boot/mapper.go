@@ -40,7 +40,7 @@ type shardState struct {
 
 func newMapperBuffer(opt *options) *z.Buffer {
 	sz := float64(opt.MapBufSize) * 1.1
-	tmpDir := filepath.Join(opt.TmpDir, bufferDir)
+	tmpDir := filepath.Join(opt.MapDir, bufferDir)
 	buf, err := z.NewBufferTmp(tmpDir, int(sz))
 	x.Check(err)
 	return buf.WithMaxSize(2 * int(opt.MapBufSize))
@@ -120,7 +120,7 @@ func less(lhs, rhs MapEntry) bool {
 func (m *mapper) openOutputFile(shardIdx int) (*os.File, error) {
 	fileNum := atomic.AddUint32(&m.mapFileId, 1)
 	filename := filepath.Join(
-		m.opt.TmpDir,
+		m.opt.MapDir,
 		mapShardDir,
 		fmt.Sprintf("%03d", shardIdx),
 		fmt.Sprintf("%06d.map.gz", fileNum),

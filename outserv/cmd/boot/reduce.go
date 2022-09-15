@@ -45,7 +45,7 @@ type reducer struct {
 }
 
 func (r *reducer) run() error {
-	dirs := readShardDirs(filepath.Join(r.opt.TmpDir, reduceShardDir))
+	dirs := readShardDirs(filepath.Join(r.opt.MapDir, reduceShardDir))
 	x.AssertTrue(len(dirs) == r.opt.ReduceShards)
 	x.AssertTrue(len(r.opt.shardOutputDirs) == r.opt.ReduceShards)
 
@@ -81,7 +81,7 @@ func (r *reducer) run() error {
 				writer:   writer,
 				tmpDb:    tmpDb,
 				splitCh:  make(chan *bpb.KVList, 2*runtime.NumCPU()),
-				countBuf: getBuf(r.opt.TmpDir),
+				countBuf: getBuf(r.opt.BufDir),
 			}
 
 			partitionKeys := make([][]byte, 0, len(partitions))
@@ -140,7 +140,7 @@ func (r *reducer) createBadger(i int) *badger.DB {
 }
 
 func (r *reducer) createTmpBadger() *badger.DB {
-	tmpDir, err := ioutil.TempDir(r.opt.TmpDir, "split")
+	tmpDir, err := ioutil.TempDir(r.opt.MapDir, "split")
 	x.Check(err)
 	// Do not enable compression in temporary badger to improve performance.
 	db := r.createBadgerInternal(tmpDir, false)
@@ -419,7 +419,7 @@ func bufferStats(cbuf *z.Buffer) {
 
 func getBuf(dir string) *z.Buffer {
 	return z.NewBuffer(64<<20, "Reducer.GetBuf").
-		WithAutoMmap(1<<30, filepath.Join(dir, bufferDir)).
+		WithAutoMmap(1<<30, dir).
 		WithMaxSize(128 << 30)
 }
 
@@ -446,7 +446,7 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 			wg:       wg,
 			listCh:   make(chan *z.Buffer, 3),
 			splitCh:  ci.splitCh,
-			countBuf: getBuf(r.opt.TmpDir),
+			countBuf: getBuf(r.opt.BufDir),
 		}
 		encoderCh <- req
 		writerCh <- req
@@ -460,7 +460,7 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 	go func() {
 		// Start collecting buffers.
 		hd := z.NewHistogramData(z.HistogramBounds(16, 40))
-		cbuf := getBuf(r.opt.TmpDir)
+		cbuf := getBuf(r.opt.BufDir)
 		// Append nil for the last entries.
 		partitionKeys = append(partitionKeys, nil)
 
@@ -482,7 +482,7 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 			}
 
 			buffers <- cbuf
-			cbuf = getBuf(r.opt.TmpDir)
+			cbuf = getBuf(r.opt.BufDir)
 		}
 		if !cbuf.IsEmpty() {
 			hd.Update(int64(cbuf.LenNoPadding()))

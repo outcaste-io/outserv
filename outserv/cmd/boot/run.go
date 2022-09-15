@@ -73,6 +73,8 @@ func init() {
 	flag.String("tmp", "tmp",
 		"Temp directory used to use for on-disk scratch space. Requires free space proportional"+
 			" to the size of the RDF file and the amount of indexing used.")
+	flag.String("buf", "tmp/buffer",
+		"Buffer dir used for temporary buffers. Ideally located in a fast drive.")
 
 	flag.IntP("num_go_routines", "j", int(math.Ceil(float64(runtime.NumCPU())*0.85)),
 		"Number of worker threads to use. MORE THREADS LEAD TO HIGHER RAM USAGE.")
@@ -138,7 +140,8 @@ func run() {
 		GqlType:          Boot.Conf.GetString("type"),
 		OutDir:           Boot.Conf.GetString("out"),
 		ReplaceOutDir:    Boot.Conf.GetBool("replace_out"),
-		TmpDir:           Boot.Conf.GetString("tmp"),
+		MapDir:           Boot.Conf.GetString("tmp"),
+		BufDir:           Boot.Conf.GetString("buffer"),
 		NumGoroutines:    Boot.Conf.GetInt("num_go_routines"),
 		MapBufSize:       uint64(Boot.Conf.GetInt("mapoutput_mb")),
 		PartitionBufSize: int64(Boot.Conf.GetInt("partition_mb")),
@@ -241,15 +244,15 @@ func run() {
 
 	// Create a directory just for boot loader's usage.
 	if !opt.SkipMapPhase {
-		x.Check(os.RemoveAll(opt.TmpDir))
-		x.Check(os.MkdirAll(opt.TmpDir, 0700))
+		x.Check(os.RemoveAll(opt.MapDir))
+		x.Check(os.MkdirAll(opt.MapDir, 0700))
 	}
 	if opt.CleanupTmp {
-		defer os.RemoveAll(opt.TmpDir)
+		defer os.RemoveAll(opt.MapDir)
 	}
 
 	// Create directory for temporary buffers used in map-reduce phase
-	bufDir := filepath.Join(opt.TmpDir, bufferDir)
+	bufDir := opt.BufDir
 	x.Check(os.RemoveAll(bufDir))
 	x.Check(os.MkdirAll(bufDir, 0700))
 	defer os.RemoveAll(bufDir)
@@ -257,7 +260,7 @@ func run() {
 	loader := newLoader(&opt)
 
 	const bootMetaFilename = "boot.meta"
-	bootMetaPath := filepath.Join(opt.TmpDir, bootMetaFilename)
+	bootMetaPath := filepath.Join(opt.MapDir, bootMetaFilename)
 
 	if opt.SkipMapPhase {
 		bootMetaData, err := ioutil.ReadFile(bootMetaPath)
@@ -337,7 +340,8 @@ type options struct {
 	GqlType          string
 	OutDir           string
 	ReplaceOutDir    bool
-	TmpDir           string
+	MapDir           string
+	BufDir           string
 	NumGoroutines    int
 	MapBufSize       uint64
 	PartitionBufSize int64
@@ -528,7 +532,7 @@ func (ld *loader) mapStage() {
 	}
 	ld.xids = xidmap.New(xidmap.XidMapOptions{
 		DB:  db,
-		Dir: filepath.Join(ld.opt.TmpDir, bufferDir),
+		Dir: filepath.Join(ld.opt.MapDir, bufferDir),
 	})
 
 	var mapperWg sync.WaitGroup
