@@ -185,6 +185,9 @@ func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte) {
 		key := MapEntry(mi.meBuf).Key()
 
 		if len(partitionKey) == 0 || bytes.Compare(key, partitionKey) < 0 {
+			if cbuf.LenWithPadding() > 64<<30 {
+				fmt.Printf("part key: %x | key: %x | sz: %d\n", partitionKey, key, len(mi.meBuf))
+			}
 			b := cbuf.SliceAllocate(len(mi.meBuf))
 			copy(b, mi.meBuf)
 			mi.meBuf = mi.meBuf[:0]
@@ -481,12 +484,12 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 			default:
 			}
 
-			buffers <- cbuf
+			// buffers <- cbuf
 			cbuf = getBuf(r.opt.BufDir)
 		}
 		if !cbuf.IsEmpty() {
 			hd.Update(int64(cbuf.LenNoPadding()))
-			buffers <- cbuf
+			// buffers <- cbuf
 		} else {
 			cbuf.Release()
 		}
