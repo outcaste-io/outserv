@@ -485,6 +485,7 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 			}
 
 			// buffers <- cbuf
+			cbuf.Reset()
 			cbuf = getBuf(r.opt.BufDir)
 		}
 		if !cbuf.IsEmpty() {
