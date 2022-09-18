@@ -566,7 +566,7 @@ func (ld *loader) mapStage() {
 	}
 	ld.xids = xidmap.New(xidmap.XidMapOptions{
 		DB:  db,
-		Dir: filepath.Join(ld.opt.MapDir, bufferDir),
+		Dir: ld.opt.BufDir,
 	})
 
 	var mapperWg sync.WaitGroup
