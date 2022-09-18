@@ -164,6 +164,9 @@ func (m *XidMap) AssignUid(xid string) (uint64, bool) {
 
 	newUid := atomic.AddUint64(&m.nextUid, 1)
 	sh.tree.Set(fp, newUid)
+	// if fp%1000 == 0 {
+	// 	fmt.Printf("Assigned UID: %x for XID: %s\n", newUid, xid)
+	// }
 
 	if m.writer != nil {
 		var uidBuf [8]byte

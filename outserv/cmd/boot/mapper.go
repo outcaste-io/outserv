@@ -16,7 +16,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/golang/snappy"
+	"github.com/klauspost/compress/zstd"
 	"github.com/outcaste-io/outserv/chunker"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -149,9 +149,19 @@ func (m *mapper) writeMapEntriesToFile(cbuf *z.Buffer, shardIdx int) {
 		x.Check(f.Close())
 	}()
 
-	w := snappy.NewBufferedWriter(f)
+	// We first write everything into a buffer, and then in one shot write it
+	// all out to a file. This way, we can reduce the number of file write
+	// operations needed.
+	var buf bytes.Buffer
+	buf.Grow(int(m.opt.MapBufSize / 8))
+	w, err := zstd.NewWriter(&buf)
+	x.Check(err)
 	defer func() {
 		x.Check(w.Close())
+
+		n, err := f.Write(buf.Bytes())
+		x.Check(err)
+		x.AssertTrue(n == len(buf.Bytes()))
 	}()
 
 	// Create partition keys for the map file.
@@ -202,7 +212,7 @@ var once sync.Once
 
 func (m *mapper) run() {
 	typ := m.gqlSchema.Type(m.opt.GqlType)
-	chunk := chunker.NewChunker(m.gqlSchema, 1000)
+	chunk := chunker.NewChunker(m.gqlSchema, 1000, m.objectModifier)
 	nquads := chunk.NQuads()
 	go func() {
 		for chunkBuf := range m.readerChunkCh {
@@ -269,10 +279,6 @@ func (m *mapper) processNQuad(nq *pb.Edge) {
 		// Use the specified namespace passed through '--force-namespace' flag.
 		nq.Namespace = m.opt.Namespace
 	}
-	var typ string
-	if strings.HasPrefix(nq.GetSubject(), "_:") {
-		typ = strings.SplitN(nq.Subject[2:], ".", 2)[0]
-	}
 
 	sid := m.uid(nq.GetSubject(), nq.Namespace)
 	if sid == 0 {
@@ -287,14 +293,14 @@ func (m *mapper) processNQuad(nq *pb.Edge) {
 		}
 		de = &pb.Edge{
 			Subject:   x.ToHexString(sid),
-			Predicate: typ + "." + nq.Predicate,
+			Predicate: nq.Predicate,
 			ObjectId:  x.ToHexString(oid),
 			Namespace: nq.Namespace,
 		}
 	} else {
 		de = &pb.Edge{
 			Subject:     x.ToHexString(sid),
-			Predicate:   typ + "." + nq.Predicate,
+			Predicate:   nq.Predicate,
 			ObjectValue: nq.ObjectValue,
 			Namespace:   nq.Namespace,
 		}
@@ -315,11 +321,18 @@ func (m *mapper) processNQuad(nq *pb.Edge) {
 
 	createEntries(de)
 
+	splits := strings.SplitN(nq.Predicate, ".", 2)
+	typ, field := splits[0], splits[1]
 	gqlType := m.gqlSchema.Type(typ)
-	if fd := gqlType.Field(nq.Predicate); fd.Inverse() != nil {
+	if gqlType == nil {
+		fmt.Printf("Got nq: %+v typ: %s\n", nq, typ)
+		x.AssertTrue(gqlType != nil)
+	}
+
+	if fd := gqlType.Field(field); fd.Inverse() != nil {
 		re := &pb.Edge{
 			Subject:   x.ToHexString(oid),
-			Predicate: x.NamespaceAttr(de.Namespace, fd.Inverse().DgraphPredicate()),
+			Predicate: x.NamespaceAttr(de.Namespace, fd.Inverse().DgraphAlias()),
 			ObjectId:  x.ToHexString(sid),
 			Namespace: nq.Namespace,
 		}

@@ -42,7 +42,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/graph-gophers/graphql-go v1.3.0
-	github.com/klauspost/compress v1.11.7
+	github.com/klauspost/compress v1.15.10
 	github.com/klauspost/cpuid/v2 v2.0.11 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/minio/minio-go/v6 v6.0.55

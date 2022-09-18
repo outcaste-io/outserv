@@ -1581,7 +1581,8 @@ func (fd *FieldDefinition) DgraphAlias() string {
 	return fd.parentType.Name() + "." + fd.fieldDef.Name
 }
 
-func (fd *FieldDefinition) DgraphPredicate() string {
+// TODO(mrjn): This func is unused. Remove the whole logic.
+func (fd *FieldDefinition) DgraphPredicateX() string {
 	return fd.dgraphPredicate[fd.parentType.Name()][fd.Name()]
 }
 

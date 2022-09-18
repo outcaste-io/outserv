@@ -23,7 +23,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/golang/glog"
-	"github.com/golang/snappy"
+	"github.com/klauspost/compress/zstd"
 	"github.com/outcaste-io/outserv/badger"
 	bo "github.com/outcaste-io/outserv/badger/options"
 	bpb "github.com/outcaste-io/outserv/badger/pb"
@@ -176,6 +176,8 @@ func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte) {
 		x.Check2(io.ReadFull(r, mi.meBuf))
 		return nil
 	}
+	var lastKey, skipKey []byte
+	var count int
 	for {
 		if err := readMapEntry(); err == io.EOF {
 			break
@@ -183,8 +185,26 @@ func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte) {
 			x.Check(err)
 		}
 		key := MapEntry(mi.meBuf).Key()
+		if bytes.Equal(lastKey, key) {
+			count++
+			if count > 100e6 {
+				skipKey = y.SafeCopy(skipKey, key)
+				// TODO: Remove all instances of this key from cbuf.
+			}
+			// TODO(mrjn): If we have too many instances of the same key, then
+			// just skip it. We'd have to iterate over the cbuf, and reset it to
+			// the offset, where the key comes first time.
+		} else {
+			lastKey = y.SafeCopy(lastKey, key)
+			count = 0
+		}
 
 		if len(partitionKey) == 0 || bytes.Compare(key, partitionKey) < 0 {
+			if bytes.Equal(key, skipKey) {
+				// nullify meBuf, and continue to the next key.
+				mi.meBuf = mi.meBuf[:0]
+				continue
+			}
 			if cbuf.LenWithPadding() > 64<<30 {
 				fmt.Printf("part key: %x | key: %x | sz: %d\n", partitionKey, key, len(mi.meBuf))
 			}
@@ -206,10 +226,12 @@ func (mi *mapIterator) Close() error {
 func newMapIterator(filename string) (*pb.MapHeader, *mapIterator) {
 	fd, err := os.Open(filename)
 	x.Check(err)
-	r := snappy.NewReader(fd)
+	dec, err := zstd.NewReader(fd)
+	x.Check(err)
+	// r := snappy.NewReader(fd)
 
 	// Read the header size.
-	reader := bufio.NewReaderSize(r, 16<<10)
+	reader := bufio.NewReaderSize(dec, 1<<20)
 	headerLenBuf := make([]byte, 4)
 	x.Check2(io.ReadFull(reader, headerLenBuf))
 	headerLen := binary.BigEndian.Uint32(headerLenBuf)
