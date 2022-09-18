@@ -40,8 +40,9 @@ type shardState struct {
 
 func newMapperBuffer(opt *options) *z.Buffer {
 	sz := float64(opt.MapBufSize) * 1.1
-	buf, err := z.NewBufferTmp(opt.BufDir, int(sz))
-	x.Check(err)
+	// We don't have a lot of map shards. So, we can just store all this in
+	// memory, instead of writing to a file on disk.
+	buf := z.NewBuffer(int(sz), "map.buffer")
 	return buf.WithMaxSize(2 * int(opt.MapBufSize))
 }
 
