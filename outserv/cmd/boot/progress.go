@@ -41,6 +41,8 @@ type progress struct {
 	phase phase
 }
 
+var bytesRead uint64
+
 func newProgress() *progress {
 	return &progress{
 		start:    time.Now(),
@@ -102,11 +104,12 @@ func (p *progress) reportOnce() {
 		if mapEdgeCount != 0 {
 			pct = fmt.Sprintf("%.2f%% ", 100*float64(reduceEdgeCount)/float64(mapEdgeCount))
 		}
-		fmt.Printf("[%s] REDUCE %s %s| IN count: %s speed: %s/sec "+
+		fmt.Printf("[%s] REDUCE %s %s| IN bytes: %s count: %s speed: %s/sec "+
 			"| OUT count: %s speed: %s/sec | Encoding MBs: %4d | Jemalloc: %s \n",
 			timestamp,
 			x.FixedDuration(now.Sub(p.start)),
 			pct,
+			humanize.IBytes(atomic.LoadUint64(&bytesRead)),
 			niceFloat(float64(reduceEdgeCount)),
 			niceFloat(float64(reduceEdgeCount)/elapsed.Seconds()),
 			niceFloat(float64(reduceKeyCount)),

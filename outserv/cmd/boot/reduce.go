@@ -176,6 +176,8 @@ func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte) (skipKeys []str
 		}
 		mi.meBuf = mi.meBuf[:int(sz)]
 		x.Check2(io.ReadFull(r, mi.meBuf))
+		atomic.AddUint64(&bytesRead, sz+uint64(n))
+		// atomic.AddInt64(&r.prog.reduceEdgeCount, 1)
 		return nil
 	}
 	var lastKey, skipKey []byte
@@ -189,8 +191,12 @@ func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte) (skipKeys []str
 		key := MapEntry(mi.meBuf).Key()
 		if bytes.Equal(lastKey, key) {
 			count++
-			if count > 30e6 { // 30 million instances of this key.
+			if count%100000 == 0 {
+				fmt.Printf("Key %x has %d count\n", key, count)
+			}
+			if count > 10e6 { // 10 million instances of this key.
 				skipKey = y.SafeCopy(skipKey, key)
+				fmt.Printf("Found a key to skip: %x\n", skipKey)
 				skipKeys = append(skipKeys, string(skipKey))
 				// TODO: Remove all instances of this key from cbuf.
 			}
@@ -209,9 +215,9 @@ func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte) (skipKeys []str
 				mi.meBuf = mi.meBuf[:0]
 				continue
 			}
-			if cbuf.LenWithPadding() > 64<<30 {
-				fmt.Printf("part key: %x | key: %x | sz: %d\n", partitionKey, key, len(mi.meBuf))
-			}
+			// if cbuf.LenWithPadding() > 64<<30 {
+			// 	fmt.Printf("part key: %x | key: %x | sz: %d\n", partitionKey, key, len(mi.meBuf))
+			// }
 			b := cbuf.SliceAllocate(len(mi.meBuf))
 			copy(b, mi.meBuf)
 			mi.meBuf = mi.meBuf[:0]
