@@ -458,8 +458,10 @@ func newLoader(opt *options) *loader {
 		state:   st,
 		mappers: make([]*mapper, opt.NumGoroutines),
 	}
-	for i := 0; i < opt.NumGoroutines; i++ {
-		ld.mappers[i] = newMapper(st)
+	if !ld.opt.SkipMapPhase {
+		for i := 0; i < opt.NumGoroutines; i++ {
+			ld.mappers[i] = newMapper(st)
+		}
 	}
 	go ld.prog.report()
 	return ld

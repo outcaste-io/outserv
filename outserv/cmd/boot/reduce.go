@@ -539,13 +539,13 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 			default:
 			}
 
-			// buffers <- cbuf
-			cbuf.Reset()
-			// cbuf = getBuf(r.opt.BufDir)
+			buffers <- cbuf
+			// cbuf.Reset()
+			cbuf = getBuf(r.opt.BufDir)
 		}
 		if !cbuf.IsEmpty() {
 			hd.Update(int64(cbuf.LenNoPadding()))
-			// buffers <- cbuf
+			buffers <- cbuf
 		} else {
 			cbuf.Release()
 		}
