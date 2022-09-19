@@ -237,7 +237,7 @@ func (mi *mapIterator) Close() error {
 func newMapIterator(filename string) (*pb.MapHeader, *mapIterator) {
 	fd, err := os.Open(filename)
 	x.Check(err)
-	dec, err := zstd.NewReader(fd)
+	dec, err := zstd.NewReader(fd, zstd.WithDecoderConcurrency(1), zstd.WithDecoderLowmem(true))
 	x.Check(err)
 	// r := snappy.NewReader(fd)
 
