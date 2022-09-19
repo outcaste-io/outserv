@@ -11,6 +11,7 @@ require (
 	github.com/Azure/azure-storage-blob-go v0.13.0
 	github.com/DataDog/datadog-go v0.0.0-20190425163447-40bafcb5f6c1 // indirect
 	github.com/DataDog/opencensus-go-exporter-datadog v0.0.0-20190503082300-0f32ad59ab08
+	github.com/DataDog/zstd v1.5.3-0.20220606203749-fd035e54e312 // indirect
 	github.com/Masterminds/semver/v3 v3.1.0
 	github.com/Microsoft/go-winio v0.4.15 // indirect
 	github.com/Shopify/sarama v1.27.2

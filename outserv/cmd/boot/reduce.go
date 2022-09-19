@@ -21,9 +21,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/DataDog/zstd"
 	"github.com/dustin/go-humanize"
 	"github.com/golang/glog"
-	"github.com/klauspost/compress/zstd"
+
+	// "github.com/klauspost/compress/zstd"
 	"github.com/outcaste-io/outserv/badger"
 	bo "github.com/outcaste-io/outserv/badger/options"
 	bpb "github.com/outcaste-io/outserv/badger/pb"
@@ -237,12 +239,15 @@ func (mi *mapIterator) Close() error {
 func newMapIterator(filename string) (*pb.MapHeader, *mapIterator) {
 	fd, err := os.Open(filename)
 	x.Check(err)
-	dec, err := zstd.NewReader(fd, zstd.WithDecoderConcurrency(1), zstd.WithDecoderLowmem(true))
-	x.Check(err)
+
+	// TODO: Release dec in the end.
+	dec := zstd.NewReader(fd)
+	// dec, err := zstd.NewReader(fd, zstd.WithDecoderConcurrency(1), zstd.WithDecoderLowmem(true))
+	// x.Check(err)
 	// r := snappy.NewReader(fd)
 
 	// Read the header size.
-	reader := bufio.NewReaderSize(dec, 16<<10)
+	reader := bufio.NewReaderSize(dec, 1<<20)
 	headerLenBuf := make([]byte, 4)
 	x.Check2(io.ReadFull(reader, headerLenBuf))
 	headerLen := binary.BigEndian.Uint32(headerLenBuf)
