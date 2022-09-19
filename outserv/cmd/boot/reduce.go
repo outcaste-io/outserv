@@ -242,7 +242,7 @@ func newMapIterator(filename string) (*pb.MapHeader, *mapIterator) {
 	// r := snappy.NewReader(fd)
 
 	// Read the header size.
-	reader := bufio.NewReaderSize(dec, 1<<20)
+	reader := bufio.NewReaderSize(dec, 16<<10)
 	headerLenBuf := make([]byte, 4)
 	x.Check2(io.ReadFull(reader, headerLenBuf))
 	headerLen := binary.BigEndian.Uint32(headerLenBuf)
