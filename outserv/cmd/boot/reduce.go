@@ -154,7 +154,9 @@ type mapIterator struct {
 	meBuf  []byte
 }
 
-func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte) {
+// Next adds keys below the partitionKey, and returns back any keys that need to
+// be skipped.
+func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte) (skipKeys []string) {
 	readMapEntry := func() error {
 		if len(mi.meBuf) > 0 {
 			return nil
@@ -187,8 +189,9 @@ func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte) {
 		key := MapEntry(mi.meBuf).Key()
 		if bytes.Equal(lastKey, key) {
 			count++
-			if count > 100e6 {
+			if count > 30e6 { // 30 million instances of this key.
 				skipKey = y.SafeCopy(skipKey, key)
+				skipKeys = append(skipKeys, string(skipKey))
 				// TODO: Remove all instances of this key from cbuf.
 			}
 			// TODO(mrjn): If we have too many instances of the same key, then
@@ -197,6 +200,7 @@ func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte) {
 		} else {
 			lastKey = y.SafeCopy(lastKey, key)
 			count = 0
+			skipKey = nil
 		}
 
 		if len(partitionKey) == 0 || bytes.Compare(key, partitionKey) < 0 {
@@ -217,6 +221,7 @@ func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte) {
 		// Current key is not part of this batch so track that we have already read the key.
 		return
 	}
+	return
 }
 
 func (mi *mapIterator) Close() error {
@@ -491,8 +496,36 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 
 		for i := 0; i < len(partitionKeys); i++ {
 			pkey := partitionKeys[i]
+
+			var skipKeys []string
 			for _, itr := range mapItrs {
-				itr.Next(cbuf, pkey)
+				skip := itr.Next(cbuf, pkey)
+				skipKeys = append(skipKeys, skip...)
+			}
+			if len(skipKeys) > 0 {
+				fps := make(map[uint64]bool)
+				for _, key := range skipKeys {
+					fps[z.MemHashString(key)] = true
+					fmt.Printf("SKIPPING key: %x\n", key)
+				}
+				dst := getBuf(r.opt.BufDir)
+				var skipCount, skipBytes uint64
+				err := cbuf.SliceIterate(func(slice []byte) error {
+					me := MapEntry(slice)
+					fp := z.MemHash(me.Key())
+					if _, has := fps[fp]; !has {
+						dst.WriteSlice(slice)
+					} else {
+						skipCount++
+						skipBytes += uint64(len(slice))
+					}
+					return nil
+				})
+				x.Check(err)
+				fmt.Printf("Skipped over %d keys | data: %s\n",
+					skipCount, humanize.IBytes(skipBytes))
+				cbuf.Release()
+				cbuf = dst
 			}
 			if cbuf.LenNoPadding() < 256<<20 {
 				// Pick up more data.
