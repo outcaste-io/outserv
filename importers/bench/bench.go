@@ -21,6 +21,7 @@ import (
 	"github.com/outcaste-io/outserv/badger/y"
 	"github.com/outcaste-io/outserv/x"
 	"github.com/outcaste-io/ristretto/z"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -111,9 +112,8 @@ type TxnResp struct {
 	Error  Error
 }
 
-func callRPC(client *http.Client, q string, cu uint64) ([]byte, error) {
+func callRPC(client *http.Client, q string) ([]byte, error) {
 	atomic.AddUint64(&numQueries, 1)
-	atomic.AddUint64(&numCUs, cu)
 
 	for i := 0; ; i++ {
 		buf := bytes.NewBufferString(q)
@@ -123,12 +123,26 @@ func callRPC(client *http.Client, q string, cu uint64) ([]byte, error) {
 
 		resp, err := client.Do(req)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "client.Do")
 		}
-		defer resp.Body.Close()
+		if resp.StatusCode == 200 {
+			// OK
+		} else if resp.StatusCode == 429 {
+			atomic.AddUint64(&numLimits, 1)
+			time.Sleep(time.Second)
+			continue
+		} else {
+			fmt.Printf("got status code: %d\n", resp.StatusCode)
+			os.Exit(1)
+		}
 		data, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "readall")
+		}
+		resp.Body.Close()
+		if len(data) == 0 {
+			fmt.Printf("len(data) == 0\n")
+			os.Exit(1)
 		}
 
 		ds := string(data)
@@ -148,12 +162,19 @@ func callRPC(client *http.Client, q string, cu uint64) ([]byte, error) {
 
 // The CUs are derived from:
 // https://docs.alchemy.com/reference/compute-units
+// Quick CUs are derived from:
+// https://www.quicknode.com/api-credits/eth
 func fetchBlockWithTxnAndLogsWithRPC(client *http.Client, blockNum int64) (int64, error) {
+	if client == nil {
+		client = &http.Client{}
+	}
 	hno := hexutil.EncodeUint64(uint64(blockNum))
 	q := fmt.Sprintf(`{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":[%q, true],"id":1}`, hno)
 	// fmt.Printf("Block Query: %s\n", q)
-	data, err := callRPC(client, q, 16)
+	data, err := callRPC(client, q)
 	x.Check(err)
+	atomic.AddUint64(&numCUs, 16)
+	atomic.AddUint64(&numQuickCUs, 2)
 	sz := int64(len(data))
 
 	var resp BlockResp
@@ -175,13 +196,15 @@ func fetchBlockWithTxnAndLogsWithRPC(client *http.Client, blockNum int64) (int64
 		q = fmt.Sprintf(
 			`{"jsonrpc":"2.0","method":"eth_getTransactionReceipt","params":[%q],"id":1}`, txn.Hash)
 		// fmt.Printf("Receipt query: %s\n", q)
-		data, err = callRPC(client, q, 15)
+		data, err = callRPC(client, q)
 		x.Check(err)
+		atomic.AddUint64(&numCUs, 15)
+		atomic.AddUint64(&numQuickCUs, 2)
 		sz += int64(len(data))
 
 		var txnResp TxnResp
 		if err := json.Unmarshal(data, &txnResp); err != nil {
-			fmt.Printf("Got invalid txn resp data: %s\n", data)
+			fmt.Printf("Got invalid txn resp data: %q\n | query was: %s | error: %v", data, q, err)
 			os.Exit(1)
 		}
 		if txnResp.Result.BlockNumber != hno {
@@ -200,7 +223,7 @@ func fetchBlockWithTxnAndLogsWithRPC(client *http.Client, blockNum int64) (int64
 	return sz, nil
 }
 
-var numBlocks, numQueries, numBytes, numLimits, numCUs uint64
+var numBlocks, numQueries, numBytes, numLimits, numCUs, numQuickCUs uint64
 
 func printQps() {
 	ticker := time.NewTicker(time.Second)
@@ -214,11 +237,13 @@ func printQps() {
 		numQ := atomic.LoadUint64(&numQueries)
 		numL := atomic.LoadUint64(&numLimits)
 		numC := atomic.LoadUint64(&numCUs)
+		quiC := atomic.LoadUint64(&numQuickCUs)
 		bytes := atomic.LoadUint64(&numBytes)
 
 		dur := time.Since(start)
-		fmt.Printf("Num Blocks: %5d | Num Queries: %4d | Num 429: %4d | CUs: %4d | Data: %s [ %6s @ %d blocks/sec ]\n",
-			numB, numQ, numL, numC, humanize.IBytes(bytes), dur.Round(time.Second), rm.Rate())
+		fmt.Printf("Num Blocks: %5d | Num Queries: %4d | Num 429: %4d | Alchemy CUs: %4d | QuickNode CUs: %4d | Data: %s [ %6s @ %d blocks/sec ]\n",
+			numB, numQ, numL, numC, quiC,
+			humanize.IBytes(bytes), dur.Round(time.Second), rm.Rate())
 	}
 }
 

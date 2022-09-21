@@ -1,0 +1,996 @@
+Time now: 2022-09-21 15:46:29 -0700 PDT . Ending at 2022-09-21 15:56:29 -0700 PDT
+Bounds are: [1 2 4 8 16 32 64 128 256 512 1024 2048 3072 4096 5120 6144 7168 8192 9216 10240 11264 12288 13312 14336 15360 16384 17408 18432 19456 20480 21504 22528 23552 24576 25600 26624 27648 28672 29696 30720 31744 32768 33792 34816 35840 36864 37888 38912 39936 40960 41984 43008 44032 45056 46080 47104 48128 49152 50176 51200 52224 53248 54272 55296 56320 57344 58368 59392 60416 61440 62464 63488 64512 65536 66560 67584 68608 69632 70656 71680 72704 73728 74752 75776 76800 77824 78848 79872 80896 81920 82944 83968 84992 86016 87040 88064 89088 90112 91136 92160 93184 94208 95232 96256 97280 98304 99328 100352 101376 102400 103424 104448 105472 106496 107520 108544 109568 110592 111616 112640 113664 114688 115712 116736 117760 118784 119808 120832 121856 122880 123904 124928 125952 126976 128000 129024 130048 131072 132096 133120 134144 135168 136192 137216 138240 139264 140288 141312 142336 143360 144384 145408 146432 147456 148480 149504 150528 151552 152576 153600 154624 155648 156672 157696 158720 159744 160768 161792 162816 163840 164864 165888 166912 167936 168960 169984 171008 172032 173056 174080 175104 176128 177152 178176 179200 180224 181248 182272 183296 184320 185344 186368 187392 188416 189440 190464 191488 192512 193536 194560 195584 196608 197632 198656 199680 200704 201728 202752 203776 204800 205824 206848 207872 208896 209920 210944 211968 212992 214016 215040 216064 217088 218112 219136 220160 221184 222208 223232 224256 225280 226304 227328 228352 229376 230400 231424 232448 233472 234496 235520 236544 237568 238592 239616 240640 241664 242688 243712 244736 245760 246784 247808 248832 249856 250880 251904 252928 253952 254976 256000 257024 258048 259072 260096 261120 262144 263168 264192 265216 266240 267264 268288 269312 270336 271360 272384 273408 274432 275456 276480 277504 278528 279552 280576 281600 282624 283648 284672 285696 286720 287744 288768 289792 290816 291840 292864 293888 294912 295936 296960 297984 299008 300032 301056 302080 303104 304128 305152 306176 307200 308224 309248 310272 311296 312320 313344 314368 315392 316416 317440 318464 319488 320512 321536 322560 323584 324608 325632 326656 327680 328704 329728 330752 331776 332800 333824 334848 335872 336896 337920 338944 339968 340992 342016 343040 344064 345088 346112 347136 348160 349184 350208 351232 352256 353280 354304 355328 356352 357376 358400 359424 360448 361472 362496 363520 364544 365568 366592 367616 368640 369664 370688 371712 372736 373760 374784 375808 376832 377856 378880 379904 380928 381952 382976 384000 385024 386048 387072 388096 389120 390144 391168 392192 393216 394240 395264 396288 397312 398336 399360 400384 401408 402432 403456 404480 405504 406528 407552 408576 409600 410624 411648 412672 413696 414720 415744 416768 417792 418816 419840 420864 421888 422912 423936 424960 425984 427008 428032 429056 430080 431104 432128 433152 434176 435200 436224 437248 438272 439296 440320 441344 442368 443392 444416 445440 446464 447488 448512 449536 450560 451584 452608 453632 454656 455680 456704 457728 458752 459776 460800 461824 462848 463872 464896 465920 466944 467968 468992 470016 471040 472064 473088 474112 475136 476160 477184 478208 479232 480256 481280 482304 483328 484352 485376 486400 487424 488448 489472 490496 491520 492544 493568 494592 495616 496640 497664 498688 499712 500736 501760 502784 503808 504832 505856 506880 507904 508928 509952 510976 512000 513024 514048 515072 516096 517120 518144 519168 520192 521216 522240 523264 524288 525312 526336 527360 528384 529408 530432 531456 532480 533504 534528 535552 536576 537600 538624 539648 540672 541696 542720 543744 544768 545792 546816 547840 548864 549888 550912 551936 552960 553984 555008 556032 557056 558080 559104 560128 561152 562176 563200 564224 565248 566272 567296 568320 569344 570368 571392 572416 573440 574464 575488 576512 577536 578560 579584 580608 581632 582656 583680 584704 585728 586752 587776 588800 589824 590848 591872 592896 593920 594944 595968 596992 598016 599040 600064 601088 602112 603136 604160 605184 606208 607232 608256 609280 610304 611328 612352 613376 614400 615424 616448 617472 618496 619520 620544 621568 622592 623616 624640 625664 626688 627712 628736 629760 630784 631808 632832 633856 634880 635904 636928 637952 638976 640000 641024 642048 643072 644096 645120 646144 647168 648192 649216 650240 651264 652288 653312 654336 655360 656384 657408 658432 659456 660480 661504 662528 663552 664576 665600 666624 667648 668672 669696 670720 671744 672768 673792 674816 675840 676864 677888 678912 679936 680960 681984 683008 684032 685056 686080 687104 688128 689152 690176 691200 692224 693248 694272 695296 696320 697344 698368 699392 700416 701440 702464 703488 704512 705536 706560 707584 708608 709632 710656 711680 712704 713728 714752 715776 716800 717824 718848 719872 720896 721920 722944 723968 724992 726016 727040 728064 729088 730112 731136 732160 733184 734208 735232 736256 737280 738304 739328 740352 741376 742400 743424 744448 745472 746496 747520 748544 749568 750592 751616 752640 753664 754688 755712 756736 757760 758784 759808 760832 761856 762880 763904 764928 765952 766976 768000 769024 770048 771072 772096 773120 774144 775168 776192 777216 778240 779264 780288 781312 782336 783360 784384 785408 786432 787456 788480 789504 790528 791552 792576 793600 794624 795648 796672 797696 798720 799744 800768 801792 802816 803840 804864 805888 806912 807936 808960 809984 811008 812032 813056 814080 815104 816128 817152 818176 819200 820224 821248 822272 823296 824320 825344 826368 827392 828416 829440 830464 831488 832512 833536 834560 835584 836608 837632 838656 839680 840704 841728 842752 843776 844800 845824 846848 847872 848896 849920 850944 851968 852992 854016 855040 856064 857088 858112 859136 860160 861184 862208 863232 864256 865280 866304 867328 868352 869376 870400 871424 872448 873472 874496 875520 876544 877568 878592 879616 880640 881664 882688 883712 884736 885760 886784 887808 888832 889856 890880 891904 892928 893952 894976 896000 897024 898048 899072 900096 901120 902144 903168 904192 905216 906240 907264 908288 909312 910336 911360 912384 913408 914432 915456 916480 917504 918528 919552 920576 921600 922624 923648 924672 925696 926720 927744 928768 929792 930816 931840 932864 933888 934912 935936 936960 937984 939008 940032 941056 942080 943104 944128 945152 946176 947200 948224 949248 950272 951296 952320 953344 954368 955392 956416 957440 958464 959488 960512 961536 962560 963584 964608 965632 966656 967680 968704 969728 970752 971776 972800 973824 974848 975872 976896 977920 978944 979968 980992 982016 983040 984064 985088 986112 987136 988160 989184 990208 991232 992256 993280 994304 995328 996352 997376 998400 999424 1.000448e+06 1.001472e+06 1.002496e+06 1.00352e+06 1.004544e+06 1.005568e+06 1.006592e+06 1.007616e+06 1.00864e+06 1.009664e+06 1.010688e+06 1.011712e+06 1.012736e+06 1.01376e+06 1.014784e+06 1.015808e+06 1.016832e+06 1.017856e+06 1.01888e+06 1.019904e+06 1.020928e+06 1.021952e+06 1.022976e+06 1.024e+06 1.025024e+06 1.026048e+06 1.027072e+06 1.028096e+06 1.02912e+06 1.030144e+06 1.031168e+06 1.032192e+06 1.033216e+06 1.03424e+06 1.035264e+06 1.036288e+06 1.037312e+06 1.038336e+06 1.03936e+06 1.040384e+06 1.041408e+06 1.042432e+06 1.043456e+06 1.04448e+06 1.045504e+06 1.046528e+06 1.047552e+06 1.048576e+06 1.0496e+06]
+Num Blocks:     0 | Num Queries:  274 | Num 429:    0 | Alchemy CUs: 3998 | QuickNode CUs:  532 | Data: 0 B [     1s @ 0 blocks/sec ]
+Num Blocks:     1 | Num Queries:  566 | Num 429:    8 | Alchemy CUs: 8379 | QuickNode CUs: 1116 | Data: 158 KiB [     2s @ 0 blocks/sec ]
+Num Blocks:     1 | Num Queries:  671 | Num 429:   16 | Alchemy CUs: 9954 | QuickNode CUs: 1326 | Data: 158 KiB [     3s @ 0 blocks/sec ]
+Num Blocks:     3 | Num Queries:  771 | Num 429:   24 | Alchemy CUs: 11456 | QuickNode CUs: 1526 | Data: 395 KiB [     4s @ 0 blocks/sec ]
+Num Blocks:     3 | Num Queries:  788 | Num 429:   24 | Alchemy CUs: 11711 | QuickNode CUs: 1560 | Data: 395 KiB [     5s @ 0 blocks/sec ]
+Num Blocks:     5 | Num Queries: 1303 | Num 429:   24 | Alchemy CUs: 19438 | QuickNode CUs: 2590 | Data: 1.0 MiB [     6s @ 0 blocks/sec ]
+Num Blocks:     5 | Num Queries: 1492 | Num 429:   32 | Alchemy CUs: 22273 | QuickNode CUs: 2968 | Data: 1.0 MiB [     7s @ 0 blocks/sec ]
+Num Blocks:     8 | Num Queries: 1687 | Num 429:   40 | Alchemy CUs: 25201 | QuickNode CUs: 3358 | Data: 2.7 MiB [     8s @ 1 blocks/sec ]
+Num Blocks:     8 | Num Queries: 1795 | Num 429:   48 | Alchemy CUs: 26821 | QuickNode CUs: 3574 | Data: 2.7 MiB [     9s @ 0 blocks/sec ]
+Num Blocks:     8 | Num Queries: 1805 | Num 429:   48 | Alchemy CUs: 26971 | QuickNode CUs: 3594 | Data: 2.7 MiB [    10s @ 0 blocks/sec ]
+Num Blocks:     9 | Num Queries: 2094 | Num 429:   48 | Alchemy CUs: 31306 | QuickNode CUs: 4172 | Data: 3.4 MiB [    11s @ 0 blocks/sec ]
+Num Blocks:     9 | Num Queries: 2157 | Num 429:   56 | Alchemy CUs: 32252 | QuickNode CUs: 4298 | Data: 3.4 MiB [    12s @ 0 blocks/sec ]
+Num Blocks:    10 | Num Queries: 2339 | Num 429:   64 | Alchemy CUs: 34983 | QuickNode CUs: 4662 | Data: 3.7 MiB [    13s @ 0 blocks/sec ]
+Num Blocks:    10 | Num Queries: 2524 | Num 429:   72 | Alchemy CUs: 37758 | QuickNode CUs: 5032 | Data: 3.7 MiB [    14s @ 0 blocks/sec ]
+Num Blocks:    10 | Num Queries: 2544 | Num 429:   72 | Alchemy CUs: 38058 | QuickNode CUs: 5072 | Data: 3.7 MiB [    15s @ 0 blocks/sec ]
+Num Blocks:    12 | Num Queries: 2695 | Num 429:   80 | Alchemy CUs: 40325 | QuickNode CUs: 5374 | Data: 5.4 MiB [    16s @ 0 blocks/sec ]
+Num Blocks:    12 | Num Queries: 2795 | Num 429:   88 | Alchemy CUs: 41825 | QuickNode CUs: 5574 | Data: 5.4 MiB [    17s @ 0 blocks/sec ]
+Num Blocks:    13 | Num Queries: 2895 | Num 429:   96 | Alchemy CUs: 43326 | QuickNode CUs: 5774 | Data: 6.1 MiB [    18s @ 0 blocks/sec ]
+Num Blocks:    15 | Num Queries: 3058 | Num 429:  104 | Alchemy CUs: 45772 | QuickNode CUs: 6100 | Data: 7.0 MiB [    19s @ 0 blocks/sec ]
+Num Blocks:    16 | Num Queries: 3074 | Num 429:  104 | Alchemy CUs: 46013 | QuickNode CUs: 6132 | Data: 7.0 MiB [    20s @ 0 blocks/sec ]
+Num Blocks:    18 | Num Queries: 3354 | Num 429:  112 | Alchemy CUs: 50216 | QuickNode CUs: 6692 | Data: 7.5 MiB [    21s @ 0 blocks/sec ]
+Num Blocks:    19 | Num Queries: 3402 | Num 429:  112 | Alchemy CUs: 50936 | QuickNode CUs: 6788 | Data: 8.0 MiB [    22s @ 0 blocks/sec ]
+Num Blocks:    20 | Num Queries: 3727 | Num 429:  120 | Alchemy CUs: 55813 | QuickNode CUs: 7438 | Data: 8.6 MiB [    23s @ 0 blocks/sec ]
+Num Blocks:    21 | Num Queries: 3892 | Num 429:  125 | Alchemy CUs: 58288 | QuickNode CUs: 7768 | Data: 9.2 MiB [    24s @ 0 blocks/sec ]
+Num Blocks:    21 | Num Queries: 4121 | Num 429:  133 | Alchemy CUs: 61724 | QuickNode CUs: 8226 | Data: 9.2 MiB [    25s @ 0 blocks/sec ]
+Num Blocks:    21 | Num Queries: 4173 | Num 429:  133 | Alchemy CUs: 62504 | QuickNode CUs: 8330 | Data: 9.2 MiB [    26s @ 0 blocks/sec ]
+Num Blocks:    22 | Num Queries: 4221 | Num 429:  141 | Alchemy CUs: 63225 | QuickNode CUs: 8426 | Data: 10 MiB [    27s @ 0 blocks/sec ]
+Num Blocks:    24 | Num Queries: 4380 | Num 429:  149 | Alchemy CUs: 65612 | QuickNode CUs: 8744 | Data: 11 MiB [    28s @ 0 blocks/sec ]
+Num Blocks:    24 | Num Queries: 4642 | Num 429:  157 | Alchemy CUs: 69542 | QuickNode CUs: 9268 | Data: 11 MiB [    29s @ 0 blocks/sec ]
+Num Blocks:    24 | Num Queries: 4664 | Num 429:  157 | Alchemy CUs: 69872 | QuickNode CUs: 9312 | Data: 11 MiB [    30s @ 0 blocks/sec ]
+Num Blocks:    26 | Num Queries: 4818 | Num 429:  165 | Alchemy CUs: 72184 | QuickNode CUs: 9620 | Data: 12 MiB [    31s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 4991 | Num 429:  165 | Alchemy CUs: 74780 | QuickNode CUs: 9966 | Data: 13 MiB [    32s @ 0 blocks/sec ]
+Num Blocks:    27 | Num Queries: 5104 | Num 429:  173 | Alchemy CUs: 76475 | QuickNode CUs: 10192 | Data: 13 MiB [    33s @ 0 blocks/sec ]
+Num Blocks:    29 | Num Queries: 5440 | Num 429:  173 | Alchemy CUs: 81532 | QuickNode CUs: 10866 | Data: 13 MiB [    34s @ 0 blocks/sec ]
+Num Blocks:    30 | Num Queries: 5766 | Num 429:  181 | Alchemy CUs: 86408 | QuickNode CUs: 11516 | Data: 14 MiB [    35s @ 0 blocks/sec ]
+Num Blocks:    30 | Num Queries: 5895 | Num 429:  189 | Alchemy CUs: 88343 | QuickNode CUs: 11774 | Data: 14 MiB [    36s @ 0 blocks/sec ]
+Num Blocks:    30 | Num Queries: 5960 | Num 429:  189 | Alchemy CUs: 89318 | QuickNode CUs: 11904 | Data: 14 MiB [    37s @ 0 blocks/sec ]
+Num Blocks:    34 | Num Queries: 6484 | Num 429:  190 | Alchemy CUs: 97182 | QuickNode CUs: 12952 | Data: 16 MiB [    38s @ 0 blocks/sec ]
+Num Blocks:    34 | Num Queries: 6546 | Num 429:  197 | Alchemy CUs: 98112 | QuickNode CUs: 13076 | Data: 16 MiB [    39s @ 0 blocks/sec ]
+Num Blocks:    35 | Num Queries: 6661 | Num 429:  205 | Alchemy CUs: 99838 | QuickNode CUs: 13306 | Data: 17 MiB [    40s @ 0 blocks/sec ]
+Num Blocks:    37 | Num Queries: 6880 | Num 429:  205 | Alchemy CUs: 103125 | QuickNode CUs: 13744 | Data: 18 MiB [    41s @ 0 blocks/sec ]
+Num Blocks:    40 | Num Queries: 7303 | Num 429:  212 | Alchemy CUs: 109473 | QuickNode CUs: 14590 | Data: 20 MiB [    42s @ 0 blocks/sec ]
+Num Blocks:    40 | Num Queries: 7395 | Num 429:  212 | Alchemy CUs: 110853 | QuickNode CUs: 14774 | Data: 20 MiB [    43s @ 0 blocks/sec ]
+Num Blocks:    40 | Num Queries: 7544 | Num 429:  220 | Alchemy CUs: 113088 | QuickNode CUs: 15072 | Data: 20 MiB [    44s @ 0 blocks/sec ]
+Num Blocks:    43 | Num Queries: 7869 | Num 429:  220 | Alchemy CUs: 117965 | QuickNode CUs: 15722 | Data: 21 MiB [    45s @ 0 blocks/sec ]
+Num Blocks:    43 | Num Queries: 7925 | Num 429:  228 | Alchemy CUs: 118806 | QuickNode CUs: 15834 | Data: 21 MiB [    46s @ 0 blocks/sec ]
+Num Blocks:    43 | Num Queries: 8244 | Num 429:  236 | Alchemy CUs: 123591 | QuickNode CUs: 16472 | Data: 21 MiB [    47s @ 0 blocks/sec ]
+Num Blocks:    44 | Num Queries: 8366 | Num 429:  236 | Alchemy CUs: 125421 | QuickNode CUs: 16716 | Data: 22 MiB [    48s @ 0 blocks/sec ]
+Num Blocks:    44 | Num Queries: 8474 | Num 429:  244 | Alchemy CUs: 127042 | QuickNode CUs: 16932 | Data: 22 MiB [    49s @ 0 blocks/sec ]
+Num Blocks:    47 | Num Queries: 8684 | Num 429:  252 | Alchemy CUs: 130195 | QuickNode CUs: 17352 | Data: 24 MiB [    50s @ 0 blocks/sec ]
+Num Blocks:    49 | Num Queries: 8784 | Num 429:  258 | Alchemy CUs: 131697 | QuickNode CUs: 17552 | Data: 24 MiB [    51s @ 0 blocks/sec ]
+Num Blocks:    49 | Num Queries: 8784 | Num 429:  260 | Alchemy CUs: 131697 | QuickNode CUs: 17552 | Data: 24 MiB [    52s @ 0 blocks/sec ]
+Num Blocks:    49 | Num Queries: 8884 | Num 429:  268 | Alchemy CUs: 133197 | QuickNode CUs: 17752 | Data: 24 MiB [    53s @ 0 blocks/sec ]
+Num Blocks:    50 | Num Queries: 9036 | Num 429:  276 | Alchemy CUs: 135478 | QuickNode CUs: 18056 | Data: 25 MiB [    54s @ 0 blocks/sec ]
+Num Blocks:    51 | Num Queries: 9178 | Num 429:  276 | Alchemy CUs: 137609 | QuickNode CUs: 18340 | Data: 25 MiB [    55s @ 0 blocks/sec ]
+Num Blocks:    52 | Num Queries: 9253 | Num 429:  284 | Alchemy CUs: 138735 | QuickNode CUs: 18490 | Data: 26 MiB [    56s @ 0 blocks/sec ]
+Num Blocks:    53 | Num Queries: 9479 | Num 429:  292 | Alchemy CUs: 142126 | QuickNode CUs: 18942 | Data: 26 MiB [    57s @ 0 blocks/sec ]
+Num Blocks:    53 | Num Queries: 9693 | Num 429:  300 | Alchemy CUs: 145336 | QuickNode CUs: 19370 | Data: 26 MiB [    58s @ 0 blocks/sec ]
+Num Blocks:    53 | Num Queries: 9699 | Num 429:  300 | Alchemy CUs: 145426 | QuickNode CUs: 19382 | Data: 26 MiB [    59s @ 0 blocks/sec ]
+Num Blocks:    54 | Num Queries: 9849 | Num 429:  308 | Alchemy CUs: 147676 | QuickNode CUs: 19682 | Data: 27 MiB [   1m0s @ 0 blocks/sec ]
+Num Blocks:    54 | Num Queries: 10006 | Num 429:  316 | Alchemy CUs: 150032 | QuickNode CUs: 19996 | Data: 27 MiB [   1m1s @ 0 blocks/sec ]
+Num Blocks:    54 | Num Queries: 10106 | Num 429:  324 | Alchemy CUs: 151532 | QuickNode CUs: 20196 | Data: 27 MiB [   1m2s @ 0 blocks/sec ]
+Num Blocks:    54 | Num Queries: 10120 | Num 429:  324 | Alchemy CUs: 151742 | QuickNode CUs: 20224 | Data: 27 MiB [   1m3s @ 0 blocks/sec ]
+Num Blocks:    54 | Num Queries: 10206 | Num 429:  332 | Alchemy CUs: 153032 | QuickNode CUs: 20396 | Data: 27 MiB [   1m4s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 10632 | Num 429:  332 | Alchemy CUs: 159423 | QuickNode CUs: 21248 | Data: 29 MiB [   1m5s @ 0 blocks/sec ]
+Num Blocks:    56 | Num Queries: 10681 | Num 429:  340 | Alchemy CUs: 160159 | QuickNode CUs: 21346 | Data: 29 MiB [   1m6s @ 0 blocks/sec ]
+Num Blocks:    59 | Num Queries: 10866 | Num 429:  348 | Alchemy CUs: 162937 | QuickNode CUs: 21716 | Data: 31 MiB [   1m7s @ 0 blocks/sec ]
+Num Blocks:    59 | Num Queries: 10966 | Num 429:  356 | Alchemy CUs: 164437 | QuickNode CUs: 21916 | Data: 31 MiB [   1m8s @ 0 blocks/sec ]
+Num Blocks:    60 | Num Queries: 11066 | Num 429:  364 | Alchemy CUs: 165938 | QuickNode CUs: 22116 | Data: 31 MiB [   1m9s @ 0 blocks/sec ]
+Num Blocks:    60 | Num Queries: 11066 | Num 429:  364 | Alchemy CUs: 165938 | QuickNode CUs: 22116 | Data: 31 MiB [  1m10s @ 0 blocks/sec ]
+Num Blocks:    60 | Num Queries: 11305 | Num 429:  372 | Alchemy CUs: 169523 | QuickNode CUs: 22594 | Data: 31 MiB [  1m11s @ 0 blocks/sec ]
+Num Blocks:    60 | Num Queries: 11405 | Num 429:  380 | Alchemy CUs: 171023 | QuickNode CUs: 22794 | Data: 31 MiB [  1m12s @ 0 blocks/sec ]
+Num Blocks:    60 | Num Queries: 11484 | Num 429:  380 | Alchemy CUs: 172208 | QuickNode CUs: 22952 | Data: 31 MiB [  1m13s @ 0 blocks/sec ]
+Num Blocks:    60 | Num Queries: 11505 | Num 429:  388 | Alchemy CUs: 172523 | QuickNode CUs: 22994 | Data: 31 MiB [  1m14s @ 0 blocks/sec ]
+Num Blocks:    61 | Num Queries: 11673 | Num 429:  396 | Alchemy CUs: 175044 | QuickNode CUs: 23330 | Data: 32 MiB [  1m15s @ 0 blocks/sec ]
+Num Blocks:    62 | Num Queries: 11775 | Num 429:  404 | Alchemy CUs: 176575 | QuickNode CUs: 23534 | Data: 32 MiB [  1m16s @ 0 blocks/sec ]
+Num Blocks:    63 | Num Queries: 11957 | Num 429:  404 | Alchemy CUs: 179305 | QuickNode CUs: 23898 | Data: 33 MiB [  1m17s @ 0 blocks/sec ]
+Num Blocks:    63 | Num Queries: 12002 | Num 429:  412 | Alchemy CUs: 179981 | QuickNode CUs: 23988 | Data: 33 MiB [  1m18s @ 0 blocks/sec ]
+Num Blocks:    63 | Num Queries: 12107 | Num 429:  420 | Alchemy CUs: 181556 | QuickNode CUs: 24198 | Data: 33 MiB [  1m19s @ 0 blocks/sec ]
+Num Blocks:    65 | Num Queries: 12261 | Num 429:  428 | Alchemy CUs: 183868 | QuickNode CUs: 24506 | Data: 35 MiB [  1m20s @ 0 blocks/sec ]
+Num Blocks:    66 | Num Queries: 12395 | Num 429:  428 | Alchemy CUs: 185879 | QuickNode CUs: 24774 | Data: 35 MiB [  1m21s @ 0 blocks/sec ]
+Num Blocks:    67 | Num Queries: 12498 | Num 429:  436 | Alchemy CUs: 187425 | QuickNode CUs: 24980 | Data: 35 MiB [  1m22s @ 0 blocks/sec ]
+Num Blocks:    68 | Num Queries: 12639 | Num 429:  444 | Alchemy CUs: 189541 | QuickNode CUs: 25262 | Data: 36 MiB [  1m23s @ 0 blocks/sec ]
+Num Blocks:    69 | Num Queries: 12875 | Num 429:  444 | Alchemy CUs: 193082 | QuickNode CUs: 25734 | Data: 36 MiB [  1m24s @ 0 blocks/sec ]
+Num Blocks:    69 | Num Queries: 12970 | Num 429:  451 | Alchemy CUs: 194507 | QuickNode CUs: 25924 | Data: 36 MiB [  1m25s @ 0 blocks/sec ]
+Num Blocks:    72 | Num Queries: 13216 | Num 429:  458 | Alchemy CUs: 198199 | QuickNode CUs: 26416 | Data: 39 MiB [  1m26s @ 0 blocks/sec ]
+Num Blocks:    73 | Num Queries: 13395 | Num 429:  466 | Alchemy CUs: 200886 | QuickNode CUs: 26774 | Data: 39 MiB [  1m27s @ 0 blocks/sec ]
+Num Blocks:    73 | Num Queries: 13467 | Num 429:  466 | Alchemy CUs: 201966 | QuickNode CUs: 26918 | Data: 39 MiB [  1m28s @ 0 blocks/sec ]
+Num Blocks:    74 | Num Queries: 13663 | Num 429:  474 | Alchemy CUs: 204907 | QuickNode CUs: 27310 | Data: 39 MiB [  1m29s @ 0 blocks/sec ]
+Num Blocks:    75 | Num Queries: 13842 | Num 429:  482 | Alchemy CUs: 207593 | QuickNode CUs: 27668 | Data: 39 MiB [  1m30s @ 0 blocks/sec ]
+Num Blocks:    76 | Num Queries: 13929 | Num 429:  482 | Alchemy CUs: 208899 | QuickNode CUs: 27842 | Data: 40 MiB [  1m31s @ 0 blocks/sec ]
+Num Blocks:    78 | Num Queries: 14312 | Num 429:  487 | Alchemy CUs: 214646 | QuickNode CUs: 28608 | Data: 41 MiB [  1m32s @ 0 blocks/sec ]
+Num Blocks:    81 | Num Queries: 14531 | Num 429:  490 | Alchemy CUs: 217934 | QuickNode CUs: 29046 | Data: 42 MiB [  1m33s @ 0 blocks/sec ]
+Num Blocks:    81 | Num Queries: 14659 | Num 429:  496 | Alchemy CUs: 219854 | QuickNode CUs: 29302 | Data: 42 MiB [  1m34s @ 0 blocks/sec ]
+Num Blocks:    82 | Num Queries: 14846 | Num 429:  502 | Alchemy CUs: 222660 | QuickNode CUs: 29676 | Data: 44 MiB [  1m35s @ 0 blocks/sec ]
+Num Blocks:    83 | Num Queries: 15106 | Num 429:  507 | Alchemy CUs: 226561 | QuickNode CUs: 30196 | Data: 44 MiB [  1m36s @ 0 blocks/sec ]
+Num Blocks:    85 | Num Queries: 15407 | Num 429:  515 | Alchemy CUs: 231078 | QuickNode CUs: 30798 | Data: 45 MiB [  1m37s @ 0 blocks/sec ]
+Num Blocks:    85 | Num Queries: 15425 | Num 429:  515 | Alchemy CUs: 231348 | QuickNode CUs: 30834 | Data: 45 MiB [  1m38s @ 0 blocks/sec ]
+Num Blocks:    85 | Num Queries: 15507 | Num 429:  523 | Alchemy CUs: 232578 | QuickNode CUs: 30998 | Data: 45 MiB [  1m39s @ 0 blocks/sec ]
+Num Blocks:    86 | Num Queries: 15652 | Num 429:  531 | Alchemy CUs: 234754 | QuickNode CUs: 31288 | Data: 45 MiB [  1m40s @ 0 blocks/sec ]
+Num Blocks:    87 | Num Queries: 15860 | Num 429:  531 | Alchemy CUs: 237875 | QuickNode CUs: 31704 | Data: 45 MiB [  1m41s @ 0 blocks/sec ]
+Num Blocks:    87 | Num Queries: 16002 | Num 429:  539 | Alchemy CUs: 240005 | QuickNode CUs: 31988 | Data: 45 MiB [  1m42s @ 0 blocks/sec ]
+Num Blocks:    89 | Num Queries: 16192 | Num 429:  547 | Alchemy CUs: 242857 | QuickNode CUs: 32368 | Data: 47 MiB [  1m43s @ 0 blocks/sec ]
+Num Blocks:    90 | Num Queries: 16292 | Num 429:  555 | Alchemy CUs: 244358 | QuickNode CUs: 32568 | Data: 48 MiB [  1m44s @ 0 blocks/sec ]
+Num Blocks:    91 | Num Queries: 16362 | Num 429:  555 | Alchemy CUs: 245409 | QuickNode CUs: 32708 | Data: 48 MiB [  1m45s @ 0 blocks/sec ]
+Num Blocks:    91 | Num Queries: 16392 | Num 429:  563 | Alchemy CUs: 245859 | QuickNode CUs: 32768 | Data: 48 MiB [  1m46s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 16555 | Num 429:  571 | Alchemy CUs: 248305 | QuickNode CUs: 33094 | Data: 49 MiB [  1m47s @ 0 blocks/sec ]
+Num Blocks:    92 | Num Queries: 16721 | Num 429:  579 | Alchemy CUs: 250795 | QuickNode CUs: 33426 | Data: 49 MiB [  1m48s @ 0 blocks/sec ]
+Num Blocks:    93 | Num Queries: 16880 | Num 429:  579 | Alchemy CUs: 253181 | QuickNode CUs: 33744 | Data: 49 MiB [  1m49s @ 0 blocks/sec ]
+Num Blocks:    93 | Num Queries: 16958 | Num 429:  587 | Alchemy CUs: 254351 | QuickNode CUs: 33900 | Data: 49 MiB [  1m50s @ 0 blocks/sec ]
+Num Blocks:    93 | Num Queries: 17058 | Num 429:  595 | Alchemy CUs: 255851 | QuickNode CUs: 34100 | Data: 49 MiB [  1m51s @ 0 blocks/sec ]
+Num Blocks:    94 | Num Queries: 17171 | Num 429:  603 | Alchemy CUs: 257547 | QuickNode CUs: 34326 | Data: 50 MiB [  1m52s @ 0 blocks/sec ]
+Num Blocks:    94 | Num Queries: 17248 | Num 429:  603 | Alchemy CUs: 258702 | QuickNode CUs: 34480 | Data: 50 MiB [  1m53s @ 0 blocks/sec ]
+Num Blocks:    94 | Num Queries: 17271 | Num 429:  611 | Alchemy CUs: 259047 | QuickNode CUs: 34526 | Data: 50 MiB [  1m54s @ 0 blocks/sec ]
+Num Blocks:    97 | Num Queries: 17568 | Num 429:  615 | Alchemy CUs: 263504 | QuickNode CUs: 35120 | Data: 54 MiB [  1m55s @ 0 blocks/sec ]
+Num Blocks:    98 | Num Queries: 17651 | Num 429:  623 | Alchemy CUs: 264751 | QuickNode CUs: 35286 | Data: 54 MiB [  1m56s @ 0 blocks/sec ]
+Num Blocks:    98 | Num Queries: 17797 | Num 429:  631 | Alchemy CUs: 266941 | QuickNode CUs: 35578 | Data: 54 MiB [  1m57s @ 0 blocks/sec ]
+Num Blocks:    99 | Num Queries: 17897 | Num 429:  639 | Alchemy CUs: 268441 | QuickNode CUs: 35778 | Data: 55 MiB [  1m58s @ 0 blocks/sec ]
+Num Blocks:   100 | Num Queries: 17976 | Num 429:  639 | Alchemy CUs: 269628 | QuickNode CUs: 35936 | Data: 55 MiB [  1m59s @ 0 blocks/sec ]
+Num Blocks:   100 | Num Queries: 18066 | Num 429:  647 | Alchemy CUs: 270978 | QuickNode CUs: 36116 | Data: 55 MiB [   2m0s @ 0 blocks/sec ]
+Num Blocks:   100 | Num Queries: 18358 | Num 429:  647 | Alchemy CUs: 275358 | QuickNode CUs: 36700 | Data: 55 MiB [   2m1s @ 0 blocks/sec ]
+Num Blocks:   100 | Num Queries: 18371 | Num 429:  655 | Alchemy CUs: 275553 | QuickNode CUs: 36726 | Data: 55 MiB [   2m2s @ 0 blocks/sec ]
+Num Blocks:   102 | Num Queries: 18614 | Num 429:  661 | Alchemy CUs: 279200 | QuickNode CUs: 37212 | Data: 56 MiB [   2m3s @ 0 blocks/sec ]
+Num Blocks:   103 | Num Queries: 18693 | Num 429:  669 | Alchemy CUs: 280386 | QuickNode CUs: 37370 | Data: 57 MiB [   2m4s @ 0 blocks/sec ]
+Num Blocks:   104 | Num Queries: 18893 | Num 429:  677 | Alchemy CUs: 283387 | QuickNode CUs: 37770 | Data: 57 MiB [   2m5s @ 0 blocks/sec ]
+Num Blocks:   105 | Num Queries: 18993 | Num 429:  685 | Alchemy CUs: 284888 | QuickNode CUs: 37970 | Data: 58 MiB [   2m6s @ 0 blocks/sec ]
+Num Blocks:   105 | Num Queries: 19012 | Num 429:  685 | Alchemy CUs: 285188 | QuickNode CUs: 38010 | Data: 58 MiB [   2m7s @ 0 blocks/sec ]
+Num Blocks:   107 | Num Queries: 19093 | Num 429:  693 | Alchemy CUs: 286389 | QuickNode CUs: 38170 | Data: 59 MiB [   2m8s @ 0 blocks/sec ]
+Num Blocks:   108 | Num Queries: 19365 | Num 429:  701 | Alchemy CUs: 290471 | QuickNode CUs: 38714 | Data: 59 MiB [   2m9s @ 0 blocks/sec ]
+Num Blocks:   108 | Num Queries: 19465 | Num 429:  709 | Alchemy CUs: 291971 | QuickNode CUs: 38914 | Data: 59 MiB [  2m10s @ 0 blocks/sec ]
+Num Blocks:   108 | Num Queries: 19491 | Num 429:  709 | Alchemy CUs: 292361 | QuickNode CUs: 38966 | Data: 59 MiB [  2m11s @ 0 blocks/sec ]
+Num Blocks:   108 | Num Queries: 19565 | Num 429:  717 | Alchemy CUs: 293471 | QuickNode CUs: 39114 | Data: 59 MiB [  2m12s @ 0 blocks/sec ]
+Num Blocks:   109 | Num Queries: 19666 | Num 429:  725 | Alchemy CUs: 294987 | QuickNode CUs: 39316 | Data: 60 MiB [  2m13s @ 0 blocks/sec ]
+Num Blocks:   111 | Num Queries: 19815 | Num 429:  733 | Alchemy CUs: 297224 | QuickNode CUs: 39614 | Data: 61 MiB [  2m14s @ 0 blocks/sec ]
+Num Blocks:   112 | Num Queries: 19915 | Num 429:  736 | Alchemy CUs: 298725 | QuickNode CUs: 39814 | Data: 61 MiB [  2m15s @ 0 blocks/sec ]
+Num Blocks:   113 | Num Queries: 20166 | Num 429:  741 | Alchemy CUs: 302491 | QuickNode CUs: 40316 | Data: 62 MiB [  2m16s @ 0 blocks/sec ]
+Num Blocks:   113 | Num Queries: 20446 | Num 429:  749 | Alchemy CUs: 306691 | QuickNode CUs: 40876 | Data: 62 MiB [  2m17s @ 0 blocks/sec ]
+Num Blocks:   113 | Num Queries: 20488 | Num 429:  749 | Alchemy CUs: 307321 | QuickNode CUs: 40960 | Data: 62 MiB [  2m18s @ 0 blocks/sec ]
+Num Blocks:   113 | Num Queries: 20546 | Num 429:  757 | Alchemy CUs: 308191 | QuickNode CUs: 41076 | Data: 62 MiB [  2m19s @ 0 blocks/sec ]
+Num Blocks:   114 | Num Queries: 20646 | Num 429:  765 | Alchemy CUs: 309692 | QuickNode CUs: 41276 | Data: 62 MiB [  2m20s @ 0 blocks/sec ]
+Num Blocks:   114 | Num Queries: 20746 | Num 429:  773 | Alchemy CUs: 311192 | QuickNode CUs: 41476 | Data: 62 MiB [  2m21s @ 0 blocks/sec ]
+Num Blocks:   114 | Num Queries: 20950 | Num 429:  773 | Alchemy CUs: 314252 | QuickNode CUs: 41884 | Data: 62 MiB [  2m22s @ 0 blocks/sec ]
+Num Blocks:   114 | Num Queries: 21040 | Num 429:  781 | Alchemy CUs: 315602 | QuickNode CUs: 42064 | Data: 62 MiB [  2m23s @ 0 blocks/sec ]
+Num Blocks:   116 | Num Queries: 21235 | Num 429:  788 | Alchemy CUs: 318529 | QuickNode CUs: 42454 | Data: 64 MiB [  2m24s @ 0 blocks/sec ]
+Num Blocks:   116 | Num Queries: 21429 | Num 429:  796 | Alchemy CUs: 321439 | QuickNode CUs: 42842 | Data: 64 MiB [  2m25s @ 0 blocks/sec ]
+Num Blocks:   116 | Num Queries: 21535 | Num 429:  796 | Alchemy CUs: 323029 | QuickNode CUs: 43054 | Data: 64 MiB [  2m26s @ 0 blocks/sec ]
+Num Blocks:   118 | Num Queries: 21615 | Num 429:  804 | Alchemy CUs: 324230 | QuickNode CUs: 43214 | Data: 65 MiB [  2m27s @ 0 blocks/sec ]
+Num Blocks:   121 | Num Queries: 21775 | Num 429:  812 | Alchemy CUs: 326634 | QuickNode CUs: 43534 | Data: 66 MiB [  2m28s @ 0 blocks/sec ]
+Num Blocks:   122 | Num Queries: 21926 | Num 429:  812 | Alchemy CUs: 328900 | QuickNode CUs: 43836 | Data: 66 MiB [  2m29s @ 0 blocks/sec ]
+Num Blocks:   123 | Num Queries: 22022 | Num 429:  819 | Alchemy CUs: 330341 | QuickNode CUs: 44028 | Data: 67 MiB [  2m30s @ 0 blocks/sec ]
+Num Blocks:   123 | Num Queries: 22111 | Num 429:  827 | Alchemy CUs: 331676 | QuickNode CUs: 44206 | Data: 67 MiB [  2m31s @ 0 blocks/sec ]
+Num Blocks:   124 | Num Queries: 22241 | Num 429:  834 | Alchemy CUs: 333627 | QuickNode CUs: 44466 | Data: 68 MiB [  2m32s @ 0 blocks/sec ]
+Num Blocks:   125 | Num Queries: 22431 | Num 429:  836 | Alchemy CUs: 336478 | QuickNode CUs: 44846 | Data: 69 MiB [  2m33s @ 0 blocks/sec ]
+Num Blocks:   125 | Num Queries: 22650 | Num 429:  842 | Alchemy CUs: 339763 | QuickNode CUs: 45284 | Data: 69 MiB [  2m34s @ 0 blocks/sec ]
+Num Blocks:   127 | Num Queries: 22889 | Num 429:  850 | Alchemy CUs: 343350 | QuickNode CUs: 45762 | Data: 69 MiB [  2m35s @ 0 blocks/sec ]
+Num Blocks:   129 | Num Queries: 23017 | Num 429:  850 | Alchemy CUs: 345272 | QuickNode CUs: 46018 | Data: 70 MiB [  2m36s @ 0 blocks/sec ]
+Num Blocks:   129 | Num Queries: 23175 | Num 429:  858 | Alchemy CUs: 347642 | QuickNode CUs: 46334 | Data: 70 MiB [  2m37s @ 0 blocks/sec ]
+Num Blocks:   134 | Num Queries: 23541 | Num 429:  858 | Alchemy CUs: 353137 | QuickNode CUs: 47066 | Data: 73 MiB [  2m38s @ 0 blocks/sec ]
+Num Blocks:   134 | Num Queries: 23666 | Num 429:  866 | Alchemy CUs: 355012 | QuickNode CUs: 47316 | Data: 73 MiB [  2m39s @ 0 blocks/sec ]
+Num Blocks:   135 | Num Queries: 23766 | Num 429:  874 | Alchemy CUs: 356513 | QuickNode CUs: 47516 | Data: 73 MiB [  2m40s @ 0 blocks/sec ]
+Num Blocks:   135 | Num Queries: 23866 | Num 429:  882 | Alchemy CUs: 358013 | QuickNode CUs: 47716 | Data: 73 MiB [  2m41s @ 0 blocks/sec ]
+Num Blocks:   135 | Num Queries: 23979 | Num 429:  882 | Alchemy CUs: 359708 | QuickNode CUs: 47942 | Data: 73 MiB [  2m42s @ 0 blocks/sec ]
+Num Blocks:   135 | Num Queries: 24046 | Num 429:  890 | Alchemy CUs: 360713 | QuickNode CUs: 48076 | Data: 73 MiB [  2m43s @ 0 blocks/sec ]
+Num Blocks:   135 | Num Queries: 24146 | Num 429:  898 | Alchemy CUs: 362213 | QuickNode CUs: 48276 | Data: 73 MiB [  2m44s @ 0 blocks/sec ]
+Num Blocks:   135 | Num Queries: 24296 | Num 429:  906 | Alchemy CUs: 364463 | QuickNode CUs: 48576 | Data: 73 MiB [  2m45s @ 0 blocks/sec ]
+Num Blocks:   137 | Num Queries: 24438 | Num 429:  906 | Alchemy CUs: 366595 | QuickNode CUs: 48860 | Data: 74 MiB [  2m46s @ 0 blocks/sec ]
+Num Blocks:   140 | Num Queries: 24803 | Num 429:  908 | Alchemy CUs: 372088 | QuickNode CUs: 49592 | Data: 75 MiB [  2m47s @ 0 blocks/sec ]
+Num Blocks:   140 | Num Queries: 24837 | Num 429:  916 | Alchemy CUs: 372583 | QuickNode CUs: 49658 | Data: 75 MiB [  2m48s @ 0 blocks/sec ]
+Num Blocks:   140 | Num Queries: 24941 | Num 429:  924 | Alchemy CUs: 374143 | QuickNode CUs: 49866 | Data: 75 MiB [  2m49s @ 0 blocks/sec ]
+Num Blocks:   141 | Num Queries: 25209 | Num 429:  927 | Alchemy CUs: 378164 | QuickNode CUs: 50402 | Data: 76 MiB [  2m50s @ 0 blocks/sec ]
+Num Blocks:   141 | Num Queries: 25466 | Num 429:  927 | Alchemy CUs: 382019 | QuickNode CUs: 50916 | Data: 76 MiB [  2m51s @ 0 blocks/sec ]
+Num Blocks:   148 | Num Queries: 25809 | Num 429:  935 | Alchemy CUs: 387171 | QuickNode CUs: 51602 | Data: 78 MiB [  2m52s @ 0 blocks/sec ]
+Num Blocks:   148 | Num Queries: 25826 | Num 429:  935 | Alchemy CUs: 387441 | QuickNode CUs: 51638 | Data: 78 MiB [  2m53s @ 0 blocks/sec ]
+Num Blocks:   151 | Num Queries: 26076 | Num 429:  943 | Alchemy CUs: 391179 | QuickNode CUs: 52136 | Data: 80 MiB [  2m54s @ 0 blocks/sec ]
+Num Blocks:   151 | Num Queries: 26190 | Num 429:  951 | Alchemy CUs: 392889 | QuickNode CUs: 52364 | Data: 80 MiB [  2m55s @ 0 blocks/sec ]
+Num Blocks:   152 | Num Queries: 26290 | Num 429:  951 | Alchemy CUs: 394389 | QuickNode CUs: 52564 | Data: 80 MiB [  2m56s @ 0 blocks/sec ]
+Num Blocks:   152 | Num Queries: 26362 | Num 429:  959 | Alchemy CUs: 395470 | QuickNode CUs: 52708 | Data: 80 MiB [  2m57s @ 0 blocks/sec ]
+Num Blocks:   152 | Num Queries: 26462 | Num 429:  967 | Alchemy CUs: 396970 | QuickNode CUs: 52908 | Data: 80 MiB [  2m58s @ 0 blocks/sec ]
+Num Blocks:   152 | Num Queries: 26586 | Num 429:  975 | Alchemy CUs: 398830 | QuickNode CUs: 53156 | Data: 80 MiB [  2m59s @ 0 blocks/sec ]
+Num Blocks:   152 | Num Queries: 26714 | Num 429:  983 | Alchemy CUs: 400750 | QuickNode CUs: 53412 | Data: 80 MiB [   3m0s @ 0 blocks/sec ]
+Num Blocks:   152 | Num Queries: 26750 | Num 429:  983 | Alchemy CUs: 401290 | QuickNode CUs: 53484 | Data: 80 MiB [   3m1s @ 0 blocks/sec ]
+Num Blocks:   155 | Num Queries: 27186 | Num 429:  983 | Alchemy CUs: 407833 | QuickNode CUs: 54356 | Data: 81 MiB [   3m2s @ 0 blocks/sec ]
+Num Blocks:   155 | Num Queries: 27300 | Num 429:  991 | Alchemy CUs: 409543 | QuickNode CUs: 54584 | Data: 81 MiB [   3m3s @ 0 blocks/sec ]
+Num Blocks:   156 | Num Queries: 27400 | Num 429:  999 | Alchemy CUs: 411043 | QuickNode CUs: 54784 | Data: 82 MiB [   3m4s @ 0 blocks/sec ]
+Num Blocks:   157 | Num Queries: 27549 | Num 429: 1005 | Alchemy CUs: 413280 | QuickNode CUs: 55082 | Data: 83 MiB [   3m5s @ 0 blocks/sec ]
+Num Blocks:   159 | Num Queries: 27832 | Num 429: 1005 | Alchemy CUs: 417527 | QuickNode CUs: 55648 | Data: 84 MiB [   3m6s @ 0 blocks/sec ]
+Num Blocks:   159 | Num Queries: 27855 | Num 429: 1013 | Alchemy CUs: 417872 | QuickNode CUs: 55694 | Data: 84 MiB [   3m7s @ 0 blocks/sec ]
+Num Blocks:   159 | Num Queries: 28108 | Num 429: 1021 | Alchemy CUs: 421667 | QuickNode CUs: 56200 | Data: 84 MiB [   3m8s @ 0 blocks/sec ]
+Num Blocks:   160 | Num Queries: 28208 | Num 429: 1029 | Alchemy CUs: 423168 | QuickNode CUs: 56400 | Data: 84 MiB [   3m9s @ 0 blocks/sec ]
+Num Blocks:   160 | Num Queries: 28210 | Num 429: 1029 | Alchemy CUs: 423198 | QuickNode CUs: 56404 | Data: 84 MiB [  3m10s @ 0 blocks/sec ]
+Num Blocks:   161 | Num Queries: 28411 | Num 429: 1034 | Alchemy CUs: 426214 | QuickNode CUs: 56806 | Data: 85 MiB [  3m11s @ 0 blocks/sec ]
+Num Blocks:   161 | Num Queries: 28663 | Num 429: 1041 | Alchemy CUs: 429994 | QuickNode CUs: 57310 | Data: 85 MiB [  3m12s @ 0 blocks/sec ]
+Num Blocks:   164 | Num Queries: 28800 | Num 429: 1049 | Alchemy CUs: 432052 | QuickNode CUs: 57584 | Data: 87 MiB [  3m13s @ 0 blocks/sec ]
+Num Blocks:   165 | Num Queries: 28853 | Num 429: 1049 | Alchemy CUs: 432848 | QuickNode CUs: 57690 | Data: 87 MiB [  3m14s @ 0 blocks/sec ]
+Num Blocks:   166 | Num Queries: 29251 | Num 429: 1057 | Alchemy CUs: 438819 | QuickNode CUs: 58486 | Data: 88 MiB [  3m15s @ 0 blocks/sec ]
+Num Blocks:   166 | Num Queries: 29379 | Num 429: 1060 | Alchemy CUs: 440739 | QuickNode CUs: 58742 | Data: 88 MiB [  3m16s @ 0 blocks/sec ]
+Num Blocks:   166 | Num Queries: 29564 | Num 429: 1065 | Alchemy CUs: 443514 | QuickNode CUs: 59112 | Data: 88 MiB [  3m17s @ 0 blocks/sec ]
+Num Blocks:   167 | Num Queries: 29775 | Num 429: 1073 | Alchemy CUs: 446680 | QuickNode CUs: 59534 | Data: 89 MiB [  3m18s @ 0 blocks/sec ]
+Num Blocks:   168 | Num Queries: 29921 | Num 429: 1073 | Alchemy CUs: 448871 | QuickNode CUs: 59826 | Data: 89 MiB [  3m19s @ 0 blocks/sec ]
+Num Blocks:   169 | Num Queries: 29993 | Num 429: 1081 | Alchemy CUs: 449952 | QuickNode CUs: 59970 | Data: 89 MiB [  3m20s @ 0 blocks/sec ]
+Num Blocks:   169 | Num Queries: 30115 | Num 429: 1089 | Alchemy CUs: 451782 | QuickNode CUs: 60214 | Data: 89 MiB [  3m21s @ 0 blocks/sec ]
+Num Blocks:   169 | Num Queries: 30277 | Num 429: 1097 | Alchemy CUs: 454212 | QuickNode CUs: 60538 | Data: 89 MiB [  3m22s @ 0 blocks/sec ]
+Num Blocks:   169 | Num Queries: 30339 | Num 429: 1097 | Alchemy CUs: 455142 | QuickNode CUs: 60662 | Data: 89 MiB [  3m23s @ 0 blocks/sec ]
+Num Blocks:   170 | Num Queries: 30415 | Num 429: 1105 | Alchemy CUs: 456283 | QuickNode CUs: 60814 | Data: 90 MiB [  3m24s @ 0 blocks/sec ]
+Num Blocks:   170 | Num Queries: 30545 | Num 429: 1113 | Alchemy CUs: 458233 | QuickNode CUs: 61074 | Data: 90 MiB [  3m25s @ 0 blocks/sec ]
+Num Blocks:   170 | Num Queries: 30680 | Num 429: 1121 | Alchemy CUs: 460258 | QuickNode CUs: 61344 | Data: 90 MiB [  3m26s @ 0 blocks/sec ]
+Num Blocks:   171 | Num Queries: 30821 | Num 429: 1121 | Alchemy CUs: 462374 | QuickNode CUs: 61626 | Data: 92 MiB [  3m27s @ 0 blocks/sec ]
+Num Blocks:   171 | Num Queries: 30906 | Num 429: 1129 | Alchemy CUs: 463649 | QuickNode CUs: 61796 | Data: 92 MiB [  3m28s @ 0 blocks/sec ]
+Num Blocks:   172 | Num Queries: 31006 | Num 429: 1137 | Alchemy CUs: 465150 | QuickNode CUs: 61996 | Data: 92 MiB [  3m29s @ 0 blocks/sec ]
+Num Blocks:   174 | Num Queries: 31204 | Num 429: 1145 | Alchemy CUs: 468122 | QuickNode CUs: 62392 | Data: 94 MiB [  3m30s @ 0 blocks/sec ]
+Num Blocks:   175 | Num Queries: 31268 | Num 429: 1145 | Alchemy CUs: 469083 | QuickNode CUs: 62520 | Data: 94 MiB [  3m31s @ 0 blocks/sec ]
+Num Blocks:   175 | Num Queries: 31304 | Num 429: 1153 | Alchemy CUs: 469623 | QuickNode CUs: 62592 | Data: 94 MiB [  3m32s @ 0 blocks/sec ]
+Num Blocks:   175 | Num Queries: 31441 | Num 429: 1161 | Alchemy CUs: 471678 | QuickNode CUs: 62866 | Data: 94 MiB [  3m33s @ 0 blocks/sec ]
+Num Blocks:   176 | Num Queries: 31710 | Num 429: 1169 | Alchemy CUs: 475714 | QuickNode CUs: 63404 | Data: 96 MiB [  3m34s @ 0 blocks/sec ]
+Num Blocks:   176 | Num Queries: 31736 | Num 429: 1169 | Alchemy CUs: 476104 | QuickNode CUs: 63456 | Data: 96 MiB [  3m35s @ 0 blocks/sec ]
+Num Blocks:   176 | Num Queries: 31848 | Num 429: 1177 | Alchemy CUs: 477784 | QuickNode CUs: 63680 | Data: 96 MiB [  3m36s @ 0 blocks/sec ]
+Num Blocks:   177 | Num Queries: 31949 | Num 429: 1185 | Alchemy CUs: 479300 | QuickNode CUs: 63882 | Data: 96 MiB [  3m37s @ 0 blocks/sec ]
+Num Blocks:   177 | Num Queries: 32049 | Num 429: 1193 | Alchemy CUs: 480800 | QuickNode CUs: 64082 | Data: 96 MiB [  3m38s @ 0 blocks/sec ]
+Num Blocks:   179 | Num Queries: 32216 | Num 429: 1193 | Alchemy CUs: 483307 | QuickNode CUs: 64416 | Data: 98 MiB [  3m39s @ 0 blocks/sec ]
+Num Blocks:   180 | Num Queries: 32343 | Num 429: 1201 | Alchemy CUs: 485213 | QuickNode CUs: 64670 | Data: 98 MiB [  3m40s @ 0 blocks/sec ]
+Num Blocks:   182 | Num Queries: 32503 | Num 429: 1201 | Alchemy CUs: 487614 | QuickNode CUs: 64990 | Data: 98 MiB [  3m41s @ 0 blocks/sec ]
+Num Blocks:   182 | Num Queries: 32726 | Num 429: 1205 | Alchemy CUs: 490960 | QuickNode CUs: 65436 | Data: 98 MiB [  3m42s @ 0 blocks/sec ]
+Num Blocks:   184 | Num Queries: 32901 | Num 429: 1212 | Alchemy CUs: 493587 | QuickNode CUs: 65786 | Data: 99 MiB [  3m43s @ 0 blocks/sec ]
+Num Blocks:   184 | Num Queries: 33125 | Num 429: 1220 | Alchemy CUs: 496947 | QuickNode CUs: 66234 | Data: 99 MiB [  3m44s @ 0 blocks/sec ]
+Num Blocks:   184 | Num Queries: 33212 | Num 429: 1220 | Alchemy CUs: 498252 | QuickNode CUs: 66408 | Data: 99 MiB [  3m45s @ 0 blocks/sec ]
+Num Blocks:   186 | Num Queries: 33483 | Num 429: 1228 | Alchemy CUs: 502319 | QuickNode CUs: 66950 | Data: 100 MiB [  3m46s @ 0 blocks/sec ]
+Num Blocks:   187 | Num Queries: 33602 | Num 429: 1236 | Alchemy CUs: 504105 | QuickNode CUs: 67188 | Data: 100 MiB [  3m47s @ 0 blocks/sec ]
+Num Blocks:   187 | Num Queries: 33650 | Num 429: 1236 | Alchemy CUs: 504825 | QuickNode CUs: 67284 | Data: 100 MiB [  3m48s @ 0 blocks/sec ]
+Num Blocks:   187 | Num Queries: 33774 | Num 429: 1244 | Alchemy CUs: 506685 | QuickNode CUs: 67532 | Data: 100 MiB [  3m49s @ 0 blocks/sec ]
+Num Blocks:   188 | Num Queries: 33876 | Num 429: 1252 | Alchemy CUs: 508216 | QuickNode CUs: 67736 | Data: 101 MiB [  3m50s @ 0 blocks/sec ]
+Num Blocks:   188 | Num Queries: 33987 | Num 429: 1252 | Alchemy CUs: 509881 | QuickNode CUs: 67958 | Data: 101 MiB [  3m51s @ 0 blocks/sec ]
+Num Blocks:   188 | Num Queries: 34070 | Num 429: 1260 | Alchemy CUs: 511126 | QuickNode CUs: 68124 | Data: 101 MiB [  3m52s @ 0 blocks/sec ]
+Num Blocks:   189 | Num Queries: 34193 | Num 429: 1267 | Alchemy CUs: 512972 | QuickNode CUs: 68370 | Data: 102 MiB [  3m53s @ 0 blocks/sec ]
+Num Blocks:   189 | Num Queries: 34300 | Num 429: 1275 | Alchemy CUs: 514577 | QuickNode CUs: 68584 | Data: 102 MiB [  3m54s @ 0 blocks/sec ]
+Num Blocks:   190 | Num Queries: 34402 | Num 429: 1283 | Alchemy CUs: 516108 | QuickNode CUs: 68788 | Data: 103 MiB [  3m55s @ 0 blocks/sec ]
+Num Blocks:   190 | Num Queries: 34415 | Num 429: 1283 | Alchemy CUs: 516303 | QuickNode CUs: 68814 | Data: 103 MiB [  3m56s @ 0 blocks/sec ]
+Num Blocks:   190 | Num Queries: 34598 | Num 429: 1291 | Alchemy CUs: 519048 | QuickNode CUs: 69180 | Data: 103 MiB [  3m57s @ 0 blocks/sec ]
+Num Blocks:   190 | Num Queries: 34703 | Num 429: 1299 | Alchemy CUs: 520623 | QuickNode CUs: 69390 | Data: 103 MiB [  3m58s @ 0 blocks/sec ]
+Num Blocks:   191 | Num Queries: 34851 | Num 429: 1299 | Alchemy CUs: 522844 | QuickNode CUs: 69686 | Data: 104 MiB [  3m59s @ 0 blocks/sec ]
+Num Blocks:   191 | Num Queries: 34895 | Num 429: 1307 | Alchemy CUs: 523504 | QuickNode CUs: 69774 | Data: 104 MiB [   4m0s @ 0 blocks/sec ]
+Num Blocks:   192 | Num Queries: 34995 | Num 429: 1315 | Alchemy CUs: 525005 | QuickNode CUs: 69974 | Data: 105 MiB [   4m1s @ 0 blocks/sec ]
+Num Blocks:   192 | Num Queries: 35100 | Num 429: 1323 | Alchemy CUs: 526580 | QuickNode CUs: 70184 | Data: 105 MiB [   4m2s @ 0 blocks/sec ]
+Num Blocks:   193 | Num Queries: 35183 | Num 429: 1323 | Alchemy CUs: 527826 | QuickNode CUs: 70350 | Data: 106 MiB [   4m3s @ 0 blocks/sec ]
+Num Blocks:   197 | Num Queries: 35470 | Num 429: 1331 | Alchemy CUs: 532135 | QuickNode CUs: 70924 | Data: 108 MiB [   4m4s @ 0 blocks/sec ]
+Num Blocks:   198 | Num Queries: 35567 | Num 429: 1332 | Alchemy CUs: 533606 | QuickNode CUs: 71120 | Data: 108 MiB [   4m5s @ 0 blocks/sec ]
+Num Blocks:   198 | Num Queries: 35648 | Num 429: 1339 | Alchemy CUs: 534806 | QuickNode CUs: 71280 | Data: 108 MiB [   4m6s @ 0 blocks/sec ]
+Num Blocks:   198 | Num Queries: 35820 | Num 429: 1347 | Alchemy CUs: 537386 | QuickNode CUs: 71624 | Data: 108 MiB [   4m7s @ 0 blocks/sec ]
+Num Blocks:   200 | Num Queries: 35977 | Num 429: 1347 | Alchemy CUs: 539743 | QuickNode CUs: 71938 | Data: 109 MiB [   4m8s @ 0 blocks/sec ]
+Num Blocks:   200 | Num Queries: 36123 | Num 429: 1355 | Alchemy CUs: 541933 | QuickNode CUs: 72230 | Data: 109 MiB [   4m9s @ 0 blocks/sec ]
+Num Blocks:   202 | Num Queries: 36293 | Num 429: 1355 | Alchemy CUs: 544485 | QuickNode CUs: 72570 | Data: 110 MiB [  4m10s @ 0 blocks/sec ]
+Num Blocks:   203 | Num Queries: 36458 | Num 429: 1363 | Alchemy CUs: 546961 | QuickNode CUs: 72900 | Data: 110 MiB [  4m11s @ 0 blocks/sec ]
+Num Blocks:   204 | Num Queries: 36595 | Num 429: 1363 | Alchemy CUs: 549017 | QuickNode CUs: 73174 | Data: 111 MiB [  4m12s @ 0 blocks/sec ]
+Num Blocks:   205 | Num Queries: 36724 | Num 429: 1371 | Alchemy CUs: 550953 | QuickNode CUs: 73432 | Data: 111 MiB [  4m13s @ 0 blocks/sec ]
+Num Blocks:   205 | Num Queries: 37006 | Num 429: 1379 | Alchemy CUs: 555183 | QuickNode CUs: 73996 | Data: 111 MiB [  4m14s @ 0 blocks/sec ]
+Num Blocks:   205 | Num Queries: 37030 | Num 429: 1379 | Alchemy CUs: 555543 | QuickNode CUs: 74044 | Data: 111 MiB [  4m15s @ 0 blocks/sec ]
+Num Blocks:   206 | Num Queries: 37174 | Num 429: 1387 | Alchemy CUs: 557704 | QuickNode CUs: 74332 | Data: 112 MiB [  4m16s @ 0 blocks/sec ]
+Num Blocks:   209 | Num Queries: 37425 | Num 429: 1395 | Alchemy CUs: 561472 | QuickNode CUs: 74834 | Data: 113 MiB [  4m17s @ 0 blocks/sec ]
+Num Blocks:   210 | Num Queries: 37450 | Num 429: 1395 | Alchemy CUs: 561847 | QuickNode CUs: 74884 | Data: 113 MiB [  4m18s @ 0 blocks/sec ]
+Num Blocks:   210 | Num Queries: 37525 | Num 429: 1403 | Alchemy CUs: 562973 | QuickNode CUs: 75034 | Data: 113 MiB [  4m19s @ 0 blocks/sec ]
+Num Blocks:   210 | Num Queries: 37660 | Num 429: 1411 | Alchemy CUs: 564998 | QuickNode CUs: 75304 | Data: 113 MiB [  4m20s @ 0 blocks/sec ]
+Num Blocks:   212 | Num Queries: 37760 | Num 429: 1419 | Alchemy CUs: 566500 | QuickNode CUs: 75504 | Data: 114 MiB [  4m21s @ 0 blocks/sec ]
+Num Blocks:   212 | Num Queries: 37850 | Num 429: 1419 | Alchemy CUs: 567850 | QuickNode CUs: 75684 | Data: 114 MiB [  4m22s @ 0 blocks/sec ]
+Num Blocks:   214 | Num Queries: 38117 | Num 429: 1427 | Alchemy CUs: 571857 | QuickNode CUs: 76218 | Data: 115 MiB [  4m23s @ 0 blocks/sec ]
+Num Blocks:   215 | Num Queries: 38230 | Num 429: 1435 | Alchemy CUs: 573553 | QuickNode CUs: 76444 | Data: 116 MiB [  4m24s @ 0 blocks/sec ]
+Num Blocks:   215 | Num Queries: 38270 | Num 429: 1435 | Alchemy CUs: 574153 | QuickNode CUs: 76524 | Data: 116 MiB [  4m25s @ 0 blocks/sec ]
+Num Blocks:   217 | Num Queries: 38646 | Num 429: 1442 | Alchemy CUs: 579795 | QuickNode CUs: 77276 | Data: 118 MiB [  4m26s @ 0 blocks/sec ]
+Num Blocks:   217 | Num Queries: 38647 | Num 429: 1443 | Alchemy CUs: 579810 | QuickNode CUs: 77278 | Data: 118 MiB [  4m27s @ 0 blocks/sec ]
+Num Blocks:   217 | Num Queries: 38943 | Num 429: 1443 | Alchemy CUs: 584250 | QuickNode CUs: 77870 | Data: 118 MiB [  4m28s @ 0 blocks/sec ]
+Num Blocks:   219 | Num Queries: 39186 | Num 429: 1450 | Alchemy CUs: 587897 | QuickNode CUs: 78356 | Data: 119 MiB [  4m29s @ 0 blocks/sec ]
+Num Blocks:   219 | Num Queries: 39392 | Num 429: 1450 | Alchemy CUs: 590987 | QuickNode CUs: 78768 | Data: 119 MiB [  4m30s @ 0 blocks/sec ]
+Num Blocks:   219 | Num Queries: 39407 | Num 429: 1458 | Alchemy CUs: 591212 | QuickNode CUs: 78798 | Data: 119 MiB [  4m31s @ 0 blocks/sec ]
+Num Blocks:   223 | Num Queries: 39622 | Num 429: 1458 | Alchemy CUs: 594441 | QuickNode CUs: 79228 | Data: 120 MiB [  4m32s @ 0 blocks/sec ]
+Num Blocks:   224 | Num Queries: 39767 | Num 429: 1465 | Alchemy CUs: 596617 | QuickNode CUs: 79518 | Data: 120 MiB [  4m33s @ 0 blocks/sec ]
+Num Blocks:   224 | Num Queries: 39962 | Num 429: 1473 | Alchemy CUs: 599542 | QuickNode CUs: 79908 | Data: 120 MiB [  4m34s @ 0 blocks/sec ]
+Num Blocks:   225 | Num Queries: 40084 | Num 429: 1473 | Alchemy CUs: 601373 | QuickNode CUs: 80152 | Data: 121 MiB [  4m35s @ 0 blocks/sec ]
+Num Blocks:   227 | Num Queries: 40238 | Num 429: 1481 | Alchemy CUs: 603685 | QuickNode CUs: 80460 | Data: 122 MiB [  4m36s @ 0 blocks/sec ]
+Num Blocks:   227 | Num Queries: 40479 | Num 429: 1489 | Alchemy CUs: 607300 | QuickNode CUs: 80942 | Data: 122 MiB [  4m37s @ 0 blocks/sec ]
+Num Blocks:   227 | Num Queries: 40529 | Num 429: 1489 | Alchemy CUs: 608050 | QuickNode CUs: 81042 | Data: 122 MiB [  4m38s @ 0 blocks/sec ]
+Num Blocks:   227 | Num Queries: 40731 | Num 429: 1497 | Alchemy CUs: 611080 | QuickNode CUs: 81446 | Data: 122 MiB [  4m39s @ 0 blocks/sec ]
+Num Blocks:   228 | Num Queries: 40919 | Num 429: 1497 | Alchemy CUs: 613901 | QuickNode CUs: 81822 | Data: 123 MiB [  4m40s @ 0 blocks/sec ]
+Num Blocks:   229 | Num Queries: 41067 | Num 429: 1504 | Alchemy CUs: 616122 | QuickNode CUs: 82118 | Data: 123 MiB [  4m41s @ 0 blocks/sec ]
+Num Blocks:   230 | Num Queries: 41308 | Num 429: 1512 | Alchemy CUs: 619738 | QuickNode CUs: 82600 | Data: 124 MiB [  4m42s @ 0 blocks/sec ]
+Num Blocks:   231 | Num Queries: 41383 | Num 429: 1512 | Alchemy CUs: 620864 | QuickNode CUs: 82750 | Data: 125 MiB [  4m43s @ 0 blocks/sec ]
+Num Blocks:   232 | Num Queries: 41517 | Num 429: 1520 | Alchemy CUs: 622875 | QuickNode CUs: 83018 | Data: 125 MiB [  4m44s @ 0 blocks/sec ]
+Num Blocks:   233 | Num Queries: 41661 | Num 429: 1528 | Alchemy CUs: 625036 | QuickNode CUs: 83306 | Data: 125 MiB [  4m45s @ 0 blocks/sec ]
+Num Blocks:   234 | Num Queries: 41801 | Num 429: 1536 | Alchemy CUs: 627137 | QuickNode CUs: 83586 | Data: 126 MiB [  4m46s @ 0 blocks/sec ]
+Num Blocks:   234 | Num Queries: 41815 | Num 429: 1536 | Alchemy CUs: 627347 | QuickNode CUs: 83614 | Data: 126 MiB [  4m47s @ 0 blocks/sec ]
+Num Blocks:   235 | Num Queries: 41968 | Num 429: 1544 | Alchemy CUs: 629643 | QuickNode CUs: 83920 | Data: 127 MiB [  4m48s @ 0 blocks/sec ]
+Num Blocks:   238 | Num Queries: 42232 | Num 429: 1544 | Alchemy CUs: 633605 | QuickNode CUs: 84448 | Data: 128 MiB [  4m49s @ 0 blocks/sec ]
+Num Blocks:   238 | Num Queries: 42419 | Num 429: 1552 | Alchemy CUs: 636411 | QuickNode CUs: 84822 | Data: 128 MiB [  4m50s @ 0 blocks/sec ]
+Num Blocks:   240 | Num Queries: 42643 | Num 429: 1552 | Alchemy CUs: 639773 | QuickNode CUs: 85270 | Data: 129 MiB [  4m51s @ 0 blocks/sec ]
+Num Blocks:   241 | Num Queries: 42838 | Num 429: 1560 | Alchemy CUs: 642699 | QuickNode CUs: 85660 | Data: 129 MiB [  4m52s @ 0 blocks/sec ]
+Num Blocks:   242 | Num Queries: 42962 | Num 429: 1568 | Alchemy CUs: 644560 | QuickNode CUs: 85908 | Data: 130 MiB [  4m53s @ 0 blocks/sec ]
+Num Blocks:   242 | Num Queries: 43090 | Num 429: 1568 | Alchemy CUs: 646480 | QuickNode CUs: 86164 | Data: 130 MiB [  4m54s @ 0 blocks/sec ]
+Num Blocks:   243 | Num Queries: 43204 | Num 429: 1576 | Alchemy CUs: 648191 | QuickNode CUs: 86392 | Data: 130 MiB [  4m55s @ 0 blocks/sec ]
+Num Blocks:   243 | Num Queries: 43322 | Num 429: 1584 | Alchemy CUs: 649961 | QuickNode CUs: 86628 | Data: 130 MiB [  4m56s @ 0 blocks/sec ]
+Num Blocks:   244 | Num Queries: 43458 | Num 429: 1592 | Alchemy CUs: 652002 | QuickNode CUs: 86900 | Data: 131 MiB [  4m57s @ 0 blocks/sec ]
+Num Blocks:   244 | Num Queries: 43520 | Num 429: 1592 | Alchemy CUs: 652932 | QuickNode CUs: 87024 | Data: 131 MiB [  4m58s @ 0 blocks/sec ]
+Num Blocks:   245 | Num Queries: 43618 | Num 429: 1600 | Alchemy CUs: 654403 | QuickNode CUs: 87220 | Data: 131 MiB [  4m59s @ 0 blocks/sec ]
+Num Blocks:   247 | Num Queries: 43792 | Num 429: 1608 | Alchemy CUs: 657015 | QuickNode CUs: 87568 | Data: 132 MiB [   5m0s @ 0 blocks/sec ]
+Num Blocks:   247 | Num Queries: 43825 | Num 429: 1608 | Alchemy CUs: 657510 | QuickNode CUs: 87634 | Data: 132 MiB [   5m1s @ 0 blocks/sec ]
+Num Blocks:   247 | Num Queries: 43892 | Num 429: 1616 | Alchemy CUs: 658515 | QuickNode CUs: 87768 | Data: 132 MiB [   5m2s @ 0 blocks/sec ]
+Num Blocks:   248 | Num Queries: 44118 | Num 429: 1624 | Alchemy CUs: 661906 | QuickNode CUs: 88220 | Data: 132 MiB [   5m3s @ 0 blocks/sec ]
+Num Blocks:   248 | Num Queries: 44132 | Num 429: 1624 | Alchemy CUs: 662116 | QuickNode CUs: 88248 | Data: 132 MiB [   5m4s @ 0 blocks/sec ]
+Num Blocks:   248 | Num Queries: 44243 | Num 429: 1632 | Alchemy CUs: 663781 | QuickNode CUs: 88470 | Data: 132 MiB [   5m5s @ 0 blocks/sec ]
+Num Blocks:   249 | Num Queries: 44583 | Num 429: 1632 | Alchemy CUs: 668882 | QuickNode CUs: 89150 | Data: 133 MiB [   5m6s @ 0 blocks/sec ]
+Num Blocks:   251 | Num Queries: 44697 | Num 429: 1640 | Alchemy CUs: 670594 | QuickNode CUs: 89378 | Data: 134 MiB [   5m7s @ 0 blocks/sec ]
+Num Blocks:   251 | Num Queries: 44797 | Num 429: 1648 | Alchemy CUs: 672094 | QuickNode CUs: 89578 | Data: 134 MiB [   5m8s @ 0 blocks/sec ]
+Num Blocks:   251 | Num Queries: 44908 | Num 429: 1656 | Alchemy CUs: 673759 | QuickNode CUs: 89800 | Data: 134 MiB [   5m9s @ 0 blocks/sec ]
+Num Blocks:   251 | Num Queries: 44960 | Num 429: 1656 | Alchemy CUs: 674539 | QuickNode CUs: 89904 | Data: 134 MiB [  5m10s @ 0 blocks/sec ]
+Num Blocks:   252 | Num Queries: 45181 | Num 429: 1664 | Alchemy CUs: 677855 | QuickNode CUs: 90346 | Data: 134 MiB [  5m11s @ 0 blocks/sec ]
+Num Blocks:   252 | Num Queries: 45281 | Num 429: 1672 | Alchemy CUs: 679355 | QuickNode CUs: 90546 | Data: 134 MiB [  5m12s @ 0 blocks/sec ]
+Num Blocks:   253 | Num Queries: 45288 | Num 429: 1672 | Alchemy CUs: 679460 | QuickNode CUs: 90560 | Data: 136 MiB [  5m13s @ 0 blocks/sec ]
+Num Blocks:   253 | Num Queries: 45381 | Num 429: 1680 | Alchemy CUs: 680856 | QuickNode CUs: 90746 | Data: 136 MiB [  5m14s @ 0 blocks/sec ]
+Num Blocks:   253 | Num Queries: 45533 | Num 429: 1688 | Alchemy CUs: 683136 | QuickNode CUs: 91050 | Data: 136 MiB [  5m15s @ 0 blocks/sec ]
+Num Blocks:   254 | Num Queries: 45658 | Num 429: 1696 | Alchemy CUs: 685011 | QuickNode CUs: 91300 | Data: 136 MiB [  5m16s @ 0 blocks/sec ]
+Num Blocks:   254 | Num Queries: 45668 | Num 429: 1696 | Alchemy CUs: 685161 | QuickNode CUs: 91320 | Data: 136 MiB [  5m17s @ 0 blocks/sec ]
+Num Blocks:   254 | Num Queries: 45837 | Num 429: 1704 | Alchemy CUs: 687697 | QuickNode CUs: 91658 | Data: 136 MiB [  5m18s @ 0 blocks/sec ]
+Num Blocks:   255 | Num Queries: 46130 | Num 429: 1704 | Alchemy CUs: 692093 | QuickNode CUs: 92244 | Data: 136 MiB [  5m19s @ 0 blocks/sec ]
+Num Blocks:   256 | Num Queries: 46252 | Num 429: 1712 | Alchemy CUs: 693924 | QuickNode CUs: 92488 | Data: 137 MiB [  5m20s @ 0 blocks/sec ]
+Num Blocks:   258 | Num Queries: 46437 | Num 429: 1712 | Alchemy CUs: 696701 | QuickNode CUs: 92858 | Data: 139 MiB [  5m21s @ 0 blocks/sec ]
+Num Blocks:   260 | Num Queries: 46542 | Num 429: 1720 | Alchemy CUs: 698278 | QuickNode CUs: 93068 | Data: 139 MiB [  5m22s @ 0 blocks/sec ]
+Num Blocks:   263 | Num Queries: 46742 | Num 429: 1728 | Alchemy CUs: 701281 | QuickNode CUs: 93468 | Data: 142 MiB [  5m23s @ 0 blocks/sec ]
+Num Blocks:   263 | Num Queries: 46778 | Num 429: 1728 | Alchemy CUs: 701821 | QuickNode CUs: 93540 | Data: 142 MiB [  5m24s @ 0 blocks/sec ]
+Num Blocks:   263 | Num Queries: 46914 | Num 429: 1736 | Alchemy CUs: 703861 | QuickNode CUs: 93812 | Data: 142 MiB [  5m25s @ 0 blocks/sec ]
+Num Blocks:   265 | Num Queries: 47014 | Num 429: 1744 | Alchemy CUs: 705363 | QuickNode CUs: 94012 | Data: 142 MiB [  5m26s @ 0 blocks/sec ]
+Num Blocks:   265 | Num Queries: 47170 | Num 429: 1752 | Alchemy CUs: 707703 | QuickNode CUs: 94324 | Data: 142 MiB [  5m27s @ 0 blocks/sec ]
+Num Blocks:   265 | Num Queries: 47203 | Num 429: 1752 | Alchemy CUs: 708198 | QuickNode CUs: 94390 | Data: 142 MiB [  5m28s @ 0 blocks/sec ]
+Num Blocks:   265 | Num Queries: 47270 | Num 429: 1760 | Alchemy CUs: 709203 | QuickNode CUs: 94524 | Data: 142 MiB [  5m29s @ 0 blocks/sec ]
+Num Blocks:   265 | Num Queries: 47386 | Num 429: 1768 | Alchemy CUs: 710943 | QuickNode CUs: 94756 | Data: 142 MiB [  5m30s @ 0 blocks/sec ]
+Num Blocks:   265 | Num Queries: 47501 | Num 429: 1768 | Alchemy CUs: 712668 | QuickNode CUs: 94986 | Data: 142 MiB [  5m31s @ 0 blocks/sec ]
+Num Blocks:   267 | Num Queries: 47688 | Num 429: 1776 | Alchemy CUs: 715475 | QuickNode CUs: 95360 | Data: 144 MiB [  5m32s @ 0 blocks/sec ]
+Num Blocks:   267 | Num Queries: 47744 | Num 429: 1776 | Alchemy CUs: 716315 | QuickNode CUs: 95472 | Data: 144 MiB [  5m33s @ 0 blocks/sec ]
+Num Blocks:   267 | Num Queries: 47962 | Num 429: 1784 | Alchemy CUs: 719585 | QuickNode CUs: 95908 | Data: 144 MiB [  5m34s @ 0 blocks/sec ]
+Num Blocks:   267 | Num Queries: 48050 | Num 429: 1784 | Alchemy CUs: 720905 | QuickNode CUs: 96084 | Data: 144 MiB [  5m35s @ 0 blocks/sec ]
+Num Blocks:   267 | Num Queries: 48104 | Num 429: 1792 | Alchemy CUs: 721715 | QuickNode CUs: 96192 | Data: 144 MiB [  5m36s @ 0 blocks/sec ]
+Num Blocks:   268 | Num Queries: 48357 | Num 429: 1800 | Alchemy CUs: 725511 | QuickNode CUs: 96698 | Data: 144 MiB [  5m37s @ 0 blocks/sec ]
+Num Blocks:   268 | Num Queries: 48408 | Num 429: 1800 | Alchemy CUs: 726291 | QuickNode CUs: 96802 | Data: 144 MiB [  5m38s @ 0 blocks/sec ]
+Num Blocks:   270 | Num Queries: 48476 | Num 429: 1808 | Alchemy CUs: 727298 | QuickNode CUs: 96936 | Data: 145 MiB [  5m39s @ 0 blocks/sec ]
+Num Blocks:   271 | Num Queries: 48580 | Num 429: 1816 | Alchemy CUs: 728859 | QuickNode CUs: 97144 | Data: 146 MiB [  5m40s @ 0 blocks/sec ]
+Num Blocks:   272 | Num Queries: 48736 | Num 429: 1816 | Alchemy CUs: 731200 | QuickNode CUs: 97456 | Data: 146 MiB [  5m41s @ 0 blocks/sec ]
+Num Blocks:   273 | Num Queries: 48769 | Num 429: 1824 | Alchemy CUs: 731695 | QuickNode CUs: 97522 | Data: 147 MiB [  5m42s @ 0 blocks/sec ]
+Num Blocks:   273 | Num Queries: 48869 | Num 429: 1832 | Alchemy CUs: 733196 | QuickNode CUs: 97722 | Data: 147 MiB [  5m43s @ 0 blocks/sec ]
+Num Blocks:   275 | Num Queries: 49125 | Num 429: 1832 | Alchemy CUs: 737038 | QuickNode CUs: 98234 | Data: 148 MiB [  5m44s @ 0 blocks/sec ]
+Num Blocks:   275 | Num Queries: 49139 | Num 429: 1840 | Alchemy CUs: 737248 | QuickNode CUs: 98262 | Data: 148 MiB [  5m45s @ 0 blocks/sec ]
+Num Blocks:   275 | Num Queries: 49239 | Num 429: 1848 | Alchemy CUs: 738748 | QuickNode CUs: 98462 | Data: 148 MiB [  5m46s @ 0 blocks/sec ]
+Num Blocks:   276 | Num Queries: 49559 | Num 429: 1848 | Alchemy CUs: 743549 | QuickNode CUs: 99102 | Data: 148 MiB [  5m47s @ 0 blocks/sec ]
+Num Blocks:   276 | Num Queries: 49605 | Num 429: 1856 | Alchemy CUs: 744239 | QuickNode CUs: 99194 | Data: 148 MiB [  5m48s @ 0 blocks/sec ]
+Num Blocks:   277 | Num Queries: 49706 | Num 429: 1864 | Alchemy CUs: 745755 | QuickNode CUs: 99396 | Data: 148 MiB [  5m49s @ 0 blocks/sec ]
+Num Blocks:   279 | Num Queries: 49963 | Num 429: 1864 | Alchemy CUs: 749612 | QuickNode CUs: 99910 | Data: 149 MiB [  5m50s @ 0 blocks/sec ]
+Num Blocks:   279 | Num Queries: 50051 | Num 429: 1872 | Alchemy CUs: 750932 | QuickNode CUs: 100086 | Data: 149 MiB [  5m51s @ 0 blocks/sec ]
+Num Blocks:   280 | Num Queries: 50202 | Num 429: 1878 | Alchemy CUs: 753198 | QuickNode CUs: 100388 | Data: 150 MiB [  5m52s @ 0 blocks/sec ]
+Num Blocks:   281 | Num Queries: 50389 | Num 429: 1878 | Alchemy CUs: 756004 | QuickNode CUs: 100762 | Data: 151 MiB [  5m53s @ 0 blocks/sec ]
+Num Blocks:   281 | Num Queries: 50393 | Num 429: 1886 | Alchemy CUs: 756064 | QuickNode CUs: 100770 | Data: 151 MiB [  5m54s @ 0 blocks/sec ]
+Num Blocks:   281 | Num Queries: 50540 | Num 429: 1894 | Alchemy CUs: 758269 | QuickNode CUs: 101064 | Data: 151 MiB [  5m55s @ 0 blocks/sec ]
+Num Blocks:   282 | Num Queries: 50654 | Num 429: 1902 | Alchemy CUs: 759980 | QuickNode CUs: 101292 | Data: 151 MiB [  5m56s @ 0 blocks/sec ]
+Num Blocks:   283 | Num Queries: 50754 | Num 429: 1910 | Alchemy CUs: 761481 | QuickNode CUs: 101492 | Data: 152 MiB [  5m57s @ 0 blocks/sec ]
+Num Blocks:   283 | Num Queries: 50806 | Num 429: 1910 | Alchemy CUs: 762261 | QuickNode CUs: 101596 | Data: 152 MiB [  5m58s @ 0 blocks/sec ]
+Num Blocks:   283 | Num Queries: 50941 | Num 429: 1918 | Alchemy CUs: 764286 | QuickNode CUs: 101866 | Data: 152 MiB [  5m59s @ 0 blocks/sec ]
+Num Blocks:   284 | Num Queries: 51041 | Num 429: 1926 | Alchemy CUs: 765787 | QuickNode CUs: 102066 | Data: 152 MiB [   6m0s @ 0 blocks/sec ]
+Num Blocks:   284 | Num Queries: 51154 | Num 429: 1926 | Alchemy CUs: 767482 | QuickNode CUs: 102292 | Data: 152 MiB [   6m1s @ 0 blocks/sec ]
+Num Blocks:   286 | Num Queries: 51560 | Num 429: 1934 | Alchemy CUs: 773574 | QuickNode CUs: 103104 | Data: 153 MiB [   6m2s @ 0 blocks/sec ]
+Num Blocks:   286 | Num Queries: 51572 | Num 429: 1934 | Alchemy CUs: 773754 | QuickNode CUs: 103128 | Data: 153 MiB [   6m3s @ 0 blocks/sec ]
+Num Blocks:   287 | Num Queries: 51795 | Num 429: 1942 | Alchemy CUs: 777100 | QuickNode CUs: 103574 | Data: 154 MiB [   6m4s @ 0 blocks/sec ]
+Num Blocks:   288 | Num Queries: 51898 | Num 429: 1949 | Alchemy CUs: 778646 | QuickNode CUs: 103780 | Data: 155 MiB [   6m5s @ 0 blocks/sec ]
+Num Blocks:   289 | Num Queries: 52045 | Num 429: 1949 | Alchemy CUs: 780852 | QuickNode CUs: 104074 | Data: 155 MiB [   6m6s @ 0 blocks/sec ]
+Num Blocks:   289 | Num Queries: 52191 | Num 429: 1957 | Alchemy CUs: 783042 | QuickNode CUs: 104366 | Data: 155 MiB [   6m7s @ 0 blocks/sec ]
+Num Blocks:   290 | Num Queries: 52374 | Num 429: 1965 | Alchemy CUs: 785788 | QuickNode CUs: 104732 | Data: 156 MiB [   6m8s @ 0 blocks/sec ]
+Num Blocks:   290 | Num Queries: 52491 | Num 429: 1973 | Alchemy CUs: 787543 | QuickNode CUs: 104966 | Data: 156 MiB [   6m9s @ 0 blocks/sec ]
+Num Blocks:   290 | Num Queries: 52493 | Num 429: 1973 | Alchemy CUs: 787573 | QuickNode CUs: 104970 | Data: 156 MiB [  6m10s @ 0 blocks/sec ]
+Num Blocks:   292 | Num Queries: 52789 | Num 429: 1973 | Alchemy CUs: 792015 | QuickNode CUs: 105562 | Data: 157 MiB [  6m11s @ 0 blocks/sec ]
+Num Blocks:   292 | Num Queries: 52836 | Num 429: 1981 | Alchemy CUs: 792720 | QuickNode CUs: 105656 | Data: 157 MiB [  6m12s @ 0 blocks/sec ]
+Num Blocks:   293 | Num Queries: 53032 | Num 429: 1989 | Alchemy CUs: 795661 | QuickNode CUs: 106048 | Data: 158 MiB [  6m13s @ 0 blocks/sec ]
+Num Blocks:   293 | Num Queries: 53191 | Num 429: 1997 | Alchemy CUs: 798046 | QuickNode CUs: 106366 | Data: 158 MiB [  6m14s @ 0 blocks/sec ]
+Num Blocks:   293 | Num Queries: 53219 | Num 429: 1997 | Alchemy CUs: 798466 | QuickNode CUs: 106422 | Data: 158 MiB [  6m15s @ 0 blocks/sec ]
+Num Blocks:   296 | Num Queries: 53490 | Num 429: 2005 | Alchemy CUs: 802534 | QuickNode CUs: 106964 | Data: 159 MiB [  6m16s @ 0 blocks/sec ]
+Num Blocks:   297 | Num Queries: 53632 | Num 429: 2005 | Alchemy CUs: 804664 | QuickNode CUs: 107248 | Data: 161 MiB [  6m17s @ 0 blocks/sec ]
+Num Blocks:   298 | Num Queries: 54019 | Num 429: 2008 | Alchemy CUs: 810486 | QuickNode CUs: 108024 | Data: 161 MiB [  6m18s @ 0 blocks/sec ]
+Num Blocks:   298 | Num Queries: 54113 | Num 429: 2016 | Alchemy CUs: 811881 | QuickNode CUs: 108210 | Data: 161 MiB [  6m19s @ 0 blocks/sec ]
+Num Blocks:   299 | Num Queries: 54327 | Num 429: 2024 | Alchemy CUs: 815092 | QuickNode CUs: 108638 | Data: 162 MiB [  6m20s @ 0 blocks/sec ]
+Num Blocks:   300 | Num Queries: 54402 | Num 429: 2024 | Alchemy CUs: 816218 | QuickNode CUs: 108788 | Data: 162 MiB [  6m21s @ 0 blocks/sec ]
+Num Blocks:   302 | Num Queries: 54668 | Num 429: 2032 | Alchemy CUs: 820210 | QuickNode CUs: 109320 | Data: 163 MiB [  6m22s @ 0 blocks/sec ]
+Num Blocks:   303 | Num Queries: 54763 | Num 429: 2032 | Alchemy CUs: 821636 | QuickNode CUs: 109510 | Data: 164 MiB [  6m23s @ 0 blocks/sec ]
+Num Blocks:   305 | Num Queries: 55182 | Num 429: 2039 | Alchemy CUs: 827923 | QuickNode CUs: 110348 | Data: 164 MiB [  6m24s @ 0 blocks/sec ]
+Num Blocks:   305 | Num Queries: 55190 | Num 429: 2040 | Alchemy CUs: 828043 | QuickNode CUs: 110364 | Data: 164 MiB [  6m25s @ 0 blocks/sec ]
+Num Blocks:   306 | Num Queries: 55432 | Num 429: 2048 | Alchemy CUs: 831674 | QuickNode CUs: 110848 | Data: 165 MiB [  6m26s @ 0 blocks/sec ]
+Num Blocks:   307 | Num Queries: 55585 | Num 429: 2053 | Alchemy CUs: 833970 | QuickNode CUs: 111154 | Data: 165 MiB [  6m27s @ 0 blocks/sec ]
+Num Blocks:   308 | Num Queries: 55775 | Num 429: 2061 | Alchemy CUs: 836821 | QuickNode CUs: 111534 | Data: 166 MiB [  6m28s @ 0 blocks/sec ]
+Num Blocks:   308 | Num Queries: 55847 | Num 429: 2061 | Alchemy CUs: 837901 | QuickNode CUs: 111678 | Data: 166 MiB [  6m29s @ 0 blocks/sec ]
+Num Blocks:   308 | Num Queries: 55918 | Num 429: 2069 | Alchemy CUs: 838966 | QuickNode CUs: 111820 | Data: 166 MiB [  6m30s @ 0 blocks/sec ]
+Num Blocks:   309 | Num Queries: 56098 | Num 429: 2077 | Alchemy CUs: 841667 | QuickNode CUs: 112180 | Data: 166 MiB [  6m31s @ 0 blocks/sec ]
+Num Blocks:   309 | Num Queries: 56232 | Num 429: 2077 | Alchemy CUs: 843692 | QuickNode CUs: 112450 | Data: 166 MiB [  6m32s @ 0 blocks/sec ]
+Num Blocks:   310 | Num Queries: 56269 | Num 429: 2085 | Alchemy CUs: 844232 | QuickNode CUs: 112522 | Data: 166 MiB [  6m33s @ 0 blocks/sec ]
+Num Blocks:   310 | Num Queries: 56476 | Num 429: 2093 | Alchemy CUs: 847338 | QuickNode CUs: 112936 | Data: 166 MiB [  6m34s @ 0 blocks/sec ]
+Num Blocks:   311 | Num Queries: 56576 | Num 429: 2101 | Alchemy CUs: 848839 | QuickNode CUs: 113136 | Data: 167 MiB [  6m35s @ 0 blocks/sec ]
+Num Blocks:   311 | Num Queries: 56656 | Num 429: 2101 | Alchemy CUs: 850039 | QuickNode CUs: 113296 | Data: 167 MiB [  6m36s @ 0 blocks/sec ]
+Num Blocks:   313 | Num Queries: 56763 | Num 429: 2108 | Alchemy CUs: 851646 | QuickNode CUs: 113510 | Data: 168 MiB [  6m37s @ 0 blocks/sec ]
+Num Blocks:   313 | Num Queries: 56871 | Num 429: 2116 | Alchemy CUs: 853266 | QuickNode CUs: 113726 | Data: 168 MiB [  6m38s @ 0 blocks/sec ]
+Num Blocks:   314 | Num Queries: 57024 | Num 429: 2124 | Alchemy CUs: 855562 | QuickNode CUs: 114032 | Data: 169 MiB [  6m39s @ 0 blocks/sec ]
+Num Blocks:   314 | Num Queries: 57067 | Num 429: 2124 | Alchemy CUs: 856207 | QuickNode CUs: 114118 | Data: 169 MiB [  6m40s @ 0 blocks/sec ]
+Num Blocks:   315 | Num Queries: 57261 | Num 429: 2132 | Alchemy CUs: 859118 | QuickNode CUs: 114506 | Data: 169 MiB [  6m41s @ 0 blocks/sec ]
+Num Blocks:   315 | Num Queries: 57361 | Num 429: 2140 | Alchemy CUs: 860618 | QuickNode CUs: 114706 | Data: 169 MiB [  6m42s @ 0 blocks/sec ]
+Num Blocks:   315 | Num Queries: 57461 | Num 429: 2148 | Alchemy CUs: 862118 | QuickNode CUs: 114906 | Data: 169 MiB [  6m43s @ 0 blocks/sec ]
+Num Blocks:   315 | Num Queries: 57461 | Num 429: 2148 | Alchemy CUs: 862118 | QuickNode CUs: 114906 | Data: 169 MiB [  6m44s @ 0 blocks/sec ]
+Num Blocks:   315 | Num Queries: 57561 | Num 429: 2156 | Alchemy CUs: 863618 | QuickNode CUs: 115106 | Data: 169 MiB [  6m45s @ 0 blocks/sec ]
+Num Blocks:   316 | Num Queries: 57787 | Num 429: 2164 | Alchemy CUs: 867009 | QuickNode CUs: 115558 | Data: 170 MiB [  6m46s @ 0 blocks/sec ]
+Num Blocks:   316 | Num Queries: 57892 | Num 429: 2164 | Alchemy CUs: 868584 | QuickNode CUs: 115768 | Data: 170 MiB [  6m47s @ 0 blocks/sec ]
+Num Blocks:   316 | Num Queries: 57915 | Num 429: 2172 | Alchemy CUs: 868929 | QuickNode CUs: 115814 | Data: 170 MiB [  6m48s @ 0 blocks/sec ]
+Num Blocks:   318 | Num Queries: 58128 | Num 429: 2180 | Alchemy CUs: 872126 | QuickNode CUs: 116240 | Data: 171 MiB [  6m49s @ 0 blocks/sec ]
+Num Blocks:   319 | Num Queries: 58228 | Num 429: 2188 | Alchemy CUs: 873627 | QuickNode CUs: 116440 | Data: 172 MiB [  6m50s @ 0 blocks/sec ]
+Num Blocks:   319 | Num Queries: 58283 | Num 429: 2188 | Alchemy CUs: 874452 | QuickNode CUs: 116550 | Data: 172 MiB [  6m51s @ 0 blocks/sec ]
+Num Blocks:   320 | Num Queries: 58597 | Num 429: 2196 | Alchemy CUs: 879163 | QuickNode CUs: 117178 | Data: 172 MiB [  6m52s @ 0 blocks/sec ]
+Num Blocks:   320 | Num Queries: 58636 | Num 429: 2196 | Alchemy CUs: 879748 | QuickNode CUs: 117256 | Data: 172 MiB [  6m53s @ 0 blocks/sec ]
+Num Blocks:   320 | Num Queries: 58697 | Num 429: 2204 | Alchemy CUs: 880663 | QuickNode CUs: 117378 | Data: 172 MiB [  6m54s @ 0 blocks/sec ]
+Num Blocks:   322 | Num Queries: 58918 | Num 429: 2212 | Alchemy CUs: 883980 | QuickNode CUs: 117820 | Data: 173 MiB [  6m55s @ 0 blocks/sec ]
+Num Blocks:   323 | Num Queries: 59041 | Num 429: 2212 | Alchemy CUs: 885825 | QuickNode CUs: 118066 | Data: 174 MiB [  6m56s @ 0 blocks/sec ]
+Num Blocks:   323 | Num Queries: 59149 | Num 429: 2220 | Alchemy CUs: 887446 | QuickNode CUs: 118282 | Data: 174 MiB [  6m57s @ 0 blocks/sec ]
+Num Blocks:   324 | Num Queries: 59396 | Num 429: 2222 | Alchemy CUs: 891151 | QuickNode CUs: 118776 | Data: 174 MiB [  6m58s @ 0 blocks/sec ]
+Num Blocks:   325 | Num Queries: 59628 | Num 429: 2230 | Alchemy CUs: 894633 | QuickNode CUs: 119240 | Data: 175 MiB [  6m59s @ 0 blocks/sec ]
+Num Blocks:   325 | Num Queries: 59702 | Num 429: 2230 | Alchemy CUs: 895743 | QuickNode CUs: 119388 | Data: 175 MiB [   7m0s @ 0 blocks/sec ]
+Num Blocks:   325 | Num Queries: 59728 | Num 429: 2238 | Alchemy CUs: 896133 | QuickNode CUs: 119440 | Data: 175 MiB [   7m1s @ 0 blocks/sec ]
+Num Blocks:   327 | Num Queries: 59930 | Num 429: 2246 | Alchemy CUs: 899165 | QuickNode CUs: 119844 | Data: 176 MiB [   7m2s @ 0 blocks/sec ]
+Num Blocks:   331 | Num Queries: 60044 | Num 429: 2246 | Alchemy CUs: 900877 | QuickNode CUs: 120072 | Data: 177 MiB [   7m3s @ 0 blocks/sec ]
+Num Blocks:   331 | Num Queries: 60049 | Num 429: 2254 | Alchemy CUs: 900954 | QuickNode CUs: 120082 | Data: 177 MiB [   7m4s @ 0 blocks/sec ]
+Num Blocks:   331 | Num Queries: 60168 | Num 429: 2262 | Alchemy CUs: 902739 | QuickNode CUs: 120320 | Data: 177 MiB [   7m5s @ 0 blocks/sec ]
+Num Blocks:   331 | Num Queries: 60414 | Num 429: 2270 | Alchemy CUs: 906429 | QuickNode CUs: 120812 | Data: 177 MiB [   7m6s @ 0 blocks/sec ]
+Num Blocks:   331 | Num Queries: 60470 | Num 429: 2270 | Alchemy CUs: 907269 | QuickNode CUs: 120924 | Data: 177 MiB [   7m7s @ 0 blocks/sec ]
+Num Blocks:   331 | Num Queries: 60525 | Num 429: 2278 | Alchemy CUs: 908094 | QuickNode CUs: 121034 | Data: 177 MiB [   7m8s @ 0 blocks/sec ]
+Num Blocks:   334 | Num Queries: 60816 | Num 429: 2283 | Alchemy CUs: 912462 | QuickNode CUs: 121616 | Data: 179 MiB [   7m9s @ 0 blocks/sec ]
+Num Blocks:   334 | Num Queries: 60951 | Num 429: 2286 | Alchemy CUs: 914487 | QuickNode CUs: 121886 | Data: 179 MiB [  7m10s @ 0 blocks/sec ]
+Num Blocks:   336 | Num Queries: 61264 | Num 429: 2286 | Alchemy CUs: 919183 | QuickNode CUs: 122512 | Data: 181 MiB [  7m11s @ 0 blocks/sec ]
+Num Blocks:   337 | Num Queries: 61361 | Num 429: 2294 | Alchemy CUs: 920640 | QuickNode CUs: 122706 | Data: 181 MiB [  7m12s @ 0 blocks/sec ]
+Num Blocks:   338 | Num Queries: 61498 | Num 429: 2302 | Alchemy CUs: 922696 | QuickNode CUs: 122980 | Data: 182 MiB [  7m13s @ 0 blocks/sec ]
+Num Blocks:   338 | Num Queries: 61598 | Num 429: 2310 | Alchemy CUs: 924196 | QuickNode CUs: 123180 | Data: 182 MiB [  7m14s @ 0 blocks/sec ]
+Num Blocks:   338 | Num Queries: 61695 | Num 429: 2310 | Alchemy CUs: 925651 | QuickNode CUs: 123374 | Data: 182 MiB [  7m15s @ 0 blocks/sec ]
+Num Blocks:   338 | Num Queries: 61698 | Num 429: 2318 | Alchemy CUs: 925696 | QuickNode CUs: 123380 | Data: 182 MiB [  7m16s @ 0 blocks/sec ]
+Num Blocks:   338 | Num Queries: 61798 | Num 429: 2326 | Alchemy CUs: 927196 | QuickNode CUs: 123580 | Data: 182 MiB [  7m17s @ 0 blocks/sec ]
+Num Blocks:   340 | Num Queries: 62116 | Num 429: 2326 | Alchemy CUs: 931968 | QuickNode CUs: 124216 | Data: 182 MiB [  7m18s @ 0 blocks/sec ]
+Num Blocks:   340 | Num Queries: 62180 | Num 429: 2334 | Alchemy CUs: 932928 | QuickNode CUs: 124344 | Data: 182 MiB [  7m19s @ 0 blocks/sec ]
+Num Blocks:   340 | Num Queries: 62346 | Num 429: 2342 | Alchemy CUs: 935418 | QuickNode CUs: 124676 | Data: 182 MiB [  7m20s @ 0 blocks/sec ]
+Num Blocks:   340 | Num Queries: 62489 | Num 429: 2342 | Alchemy CUs: 937563 | QuickNode CUs: 124962 | Data: 182 MiB [  7m21s @ 0 blocks/sec ]
+Num Blocks:   342 | Num Queries: 62669 | Num 429: 2350 | Alchemy CUs: 940265 | QuickNode CUs: 125322 | Data: 183 MiB [  7m22s @ 0 blocks/sec ]
+Num Blocks:   342 | Num Queries: 62869 | Num 429: 2358 | Alchemy CUs: 943265 | QuickNode CUs: 125722 | Data: 183 MiB [  7m23s @ 0 blocks/sec ]
+Num Blocks:   342 | Num Queries: 62905 | Num 429: 2358 | Alchemy CUs: 943805 | QuickNode CUs: 125794 | Data: 183 MiB [  7m24s @ 0 blocks/sec ]
+Num Blocks:   345 | Num Queries: 63331 | Num 429: 2358 | Alchemy CUs: 950198 | QuickNode CUs: 126646 | Data: 183 MiB [  7m25s @ 0 blocks/sec ]
+Num Blocks:   347 | Num Queries: 63679 | Num 429: 2366 | Alchemy CUs: 955420 | QuickNode CUs: 127342 | Data: 185 MiB [  7m26s @ 0 blocks/sec ]
+Num Blocks:   347 | Num Queries: 63746 | Num 429: 2366 | Alchemy CUs: 956425 | QuickNode CUs: 127476 | Data: 185 MiB [  7m27s @ 0 blocks/sec ]
+Num Blocks:   349 | Num Queries: 63946 | Num 429: 2374 | Alchemy CUs: 959427 | QuickNode CUs: 127876 | Data: 186 MiB [  7m28s @ 0 blocks/sec ]
+Num Blocks:   350 | Num Queries: 64195 | Num 429: 2374 | Alchemy CUs: 963163 | QuickNode CUs: 128374 | Data: 187 MiB [  7m29s @ 0 blocks/sec ]
+Num Blocks:   354 | Num Queries: 64422 | Num 429: 2382 | Alchemy CUs: 966572 | QuickNode CUs: 128828 | Data: 190 MiB [  7m30s @ 0 blocks/sec ]
+Num Blocks:   355 | Num Queries: 64527 | Num 429: 2390 | Alchemy CUs: 968148 | QuickNode CUs: 129038 | Data: 190 MiB [  7m31s @ 0 blocks/sec ]
+Num Blocks:   355 | Num Queries: 64579 | Num 429: 2390 | Alchemy CUs: 968928 | QuickNode CUs: 129142 | Data: 190 MiB [  7m32s @ 0 blocks/sec ]
+Num Blocks:   355 | Num Queries: 64627 | Num 429: 2398 | Alchemy CUs: 969648 | QuickNode CUs: 129238 | Data: 190 MiB [  7m33s @ 0 blocks/sec ]
+Num Blocks:   356 | Num Queries: 64727 | Num 429: 2406 | Alchemy CUs: 971149 | QuickNode CUs: 129438 | Data: 190 MiB [  7m34s @ 0 blocks/sec ]
+Num Blocks:   357 | Num Queries: 64913 | Num 429: 2414 | Alchemy CUs: 973940 | QuickNode CUs: 129810 | Data: 191 MiB [  7m35s @ 0 blocks/sec ]
+Num Blocks:   357 | Num Queries: 64959 | Num 429: 2414 | Alchemy CUs: 974645 | QuickNode CUs: 129904 | Data: 191 MiB [  7m36s @ 0 blocks/sec ]
+Num Blocks:   360 | Num Queries: 65323 | Num 429: 2422 | Alchemy CUs: 980093 | QuickNode CUs: 130630 | Data: 194 MiB [  7m37s @ 0 blocks/sec ]
+Num Blocks:   360 | Num Queries: 65402 | Num 429: 2422 | Alchemy CUs: 981278 | QuickNode CUs: 130788 | Data: 194 MiB [  7m38s @ 0 blocks/sec ]
+Num Blocks:   360 | Num Queries: 65488 | Num 429: 2430 | Alchemy CUs: 982568 | QuickNode CUs: 130960 | Data: 194 MiB [  7m39s @ 0 blocks/sec ]
+Num Blocks:   360 | Num Queries: 65588 | Num 429: 2438 | Alchemy CUs: 984068 | QuickNode CUs: 131160 | Data: 194 MiB [  7m40s @ 0 blocks/sec ]
+Num Blocks:   361 | Num Queries: 65763 | Num 429: 2438 | Alchemy CUs: 986694 | QuickNode CUs: 131510 | Data: 194 MiB [  7m41s @ 0 blocks/sec ]
+Num Blocks:   361 | Num Queries: 65984 | Num 429: 2446 | Alchemy CUs: 990009 | QuickNode CUs: 131952 | Data: 194 MiB [  7m42s @ 0 blocks/sec ]
+Num Blocks:   361 | Num Queries: 66084 | Num 429: 2454 | Alchemy CUs: 991509 | QuickNode CUs: 132152 | Data: 194 MiB [  7m43s @ 0 blocks/sec ]
+Num Blocks:   362 | Num Queries: 66152 | Num 429: 2454 | Alchemy CUs: 992530 | QuickNode CUs: 132288 | Data: 195 MiB [  7m44s @ 0 blocks/sec ]
+Num Blocks:   363 | Num Queries: 66186 | Num 429: 2462 | Alchemy CUs: 993041 | QuickNode CUs: 132356 | Data: 195 MiB [  7m45s @ 0 blocks/sec ]
+Num Blocks:   363 | Num Queries: 66519 | Num 429: 2470 | Alchemy CUs: 998036 | QuickNode CUs: 133022 | Data: 195 MiB [  7m46s @ 0 blocks/sec ]
+Num Blocks:   364 | Num Queries: 66617 | Num 429: 2470 | Alchemy CUs: 999507 | QuickNode CUs: 133218 | Data: 195 MiB [  7m47s @ 0 blocks/sec ]
+Num Blocks:   365 | Num Queries: 66769 | Num 429: 2478 | Alchemy CUs: 1001788 | QuickNode CUs: 133522 | Data: 196 MiB [  7m48s @ 0 blocks/sec ]
+Num Blocks:   367 | Num Queries: 67048 | Num 429: 2478 | Alchemy CUs: 1005975 | QuickNode CUs: 134080 | Data: 198 MiB [  7m49s @ 0 blocks/sec ]
+Num Blocks:   368 | Num Queries: 67335 | Num 429: 2486 | Alchemy CUs: 1010281 | QuickNode CUs: 134654 | Data: 198 MiB [  7m50s @ 0 blocks/sec ]
+Num Blocks:   368 | Num Queries: 67413 | Num 429: 2486 | Alchemy CUs: 1011451 | QuickNode CUs: 134810 | Data: 198 MiB [  7m51s @ 0 blocks/sec ]
+Num Blocks:   368 | Num Queries: 67532 | Num 429: 2494 | Alchemy CUs: 1013236 | QuickNode CUs: 135048 | Data: 198 MiB [  7m52s @ 0 blocks/sec ]
+Num Blocks:   368 | Num Queries: 67632 | Num 429: 2502 | Alchemy CUs: 1014736 | QuickNode CUs: 135248 | Data: 198 MiB [  7m53s @ 0 blocks/sec ]
+Num Blocks:   368 | Num Queries: 67732 | Num 429: 2510 | Alchemy CUs: 1016236 | QuickNode CUs: 135448 | Data: 198 MiB [  7m54s @ 0 blocks/sec ]
+Num Blocks:   368 | Num Queries: 67809 | Num 429: 2510 | Alchemy CUs: 1017391 | QuickNode CUs: 135602 | Data: 198 MiB [  7m55s @ 0 blocks/sec ]
+Num Blocks:   369 | Num Queries: 68106 | Num 429: 2518 | Alchemy CUs: 1021847 | QuickNode CUs: 136196 | Data: 199 MiB [  7m56s @ 0 blocks/sec ]
+Num Blocks:   369 | Num Queries: 68229 | Num 429: 2520 | Alchemy CUs: 1023692 | QuickNode CUs: 136442 | Data: 199 MiB [  7m57s @ 0 blocks/sec ]
+Num Blocks:   370 | Num Queries: 68313 | Num 429: 2521 | Alchemy CUs: 1024968 | QuickNode CUs: 136612 | Data: 199 MiB [  7m58s @ 0 blocks/sec ]
+Num Blocks:   372 | Num Queries: 68534 | Num 429: 2527 | Alchemy CUs: 1028270 | QuickNode CUs: 137052 | Data: 200 MiB [  7m59s @ 0 blocks/sec ]
+Num Blocks:   373 | Num Queries: 68702 | Num 429: 2527 | Alchemy CUs: 1030791 | QuickNode CUs: 137388 | Data: 201 MiB [   8m0s @ 0 blocks/sec ]
+Num Blocks:   376 | Num Queries: 68828 | Num 429: 2535 | Alchemy CUs: 1032684 | QuickNode CUs: 137640 | Data: 204 MiB [   8m1s @ 0 blocks/sec ]
+Num Blocks:   376 | Num Queries: 68928 | Num 429: 2543 | Alchemy CUs: 1034184 | QuickNode CUs: 137840 | Data: 204 MiB [   8m2s @ 0 blocks/sec ]
+Num Blocks:   377 | Num Queries: 68960 | Num 429: 2543 | Alchemy CUs: 1034664 | QuickNode CUs: 137904 | Data: 204 MiB [   8m3s @ 0 blocks/sec ]
+Num Blocks:   378 | Num Queries: 69061 | Num 429: 2551 | Alchemy CUs: 1036181 | QuickNode CUs: 138106 | Data: 204 MiB [   8m4s @ 0 blocks/sec ]
+Num Blocks:   378 | Num Queries: 69161 | Num 429: 2559 | Alchemy CUs: 1037681 | QuickNode CUs: 138306 | Data: 204 MiB [   8m5s @ 0 blocks/sec ]
+Num Blocks:   378 | Num Queries: 69333 | Num 429: 2559 | Alchemy CUs: 1040261 | QuickNode CUs: 138650 | Data: 204 MiB [   8m6s @ 0 blocks/sec ]
+Num Blocks:   378 | Num Queries: 69353 | Num 429: 2567 | Alchemy CUs: 1040561 | QuickNode CUs: 138690 | Data: 204 MiB [   8m7s @ 0 blocks/sec ]
+Num Blocks:   378 | Num Queries: 69607 | Num 429: 2575 | Alchemy CUs: 1044371 | QuickNode CUs: 139198 | Data: 204 MiB [   8m8s @ 0 blocks/sec ]
+Num Blocks:   381 | Num Queries: 69716 | Num 429: 2575 | Alchemy CUs: 1046009 | QuickNode CUs: 139416 | Data: 205 MiB [   8m9s @ 0 blocks/sec ]
+Num Blocks:   384 | Num Queries: 69978 | Num 429: 2579 | Alchemy CUs: 1049942 | QuickNode CUs: 139940 | Data: 207 MiB [  8m10s @ 0 blocks/sec ]
+Num Blocks:   385 | Num Queries: 70175 | Num 429: 2579 | Alchemy CUs: 1052898 | QuickNode CUs: 140334 | Data: 207 MiB [  8m11s @ 0 blocks/sec ]
+Num Blocks:   385 | Num Queries: 70240 | Num 429: 2587 | Alchemy CUs: 1053873 | QuickNode CUs: 140464 | Data: 207 MiB [  8m12s @ 0 blocks/sec ]
+Num Blocks:   385 | Num Queries: 70405 | Num 429: 2595 | Alchemy CUs: 1056348 | QuickNode CUs: 140794 | Data: 207 MiB [  8m13s @ 0 blocks/sec ]
+Num Blocks:   385 | Num Queries: 70505 | Num 429: 2603 | Alchemy CUs: 1057848 | QuickNode CUs: 140994 | Data: 207 MiB [  8m14s @ 0 blocks/sec ]
+Num Blocks:   385 | Num Queries: 70547 | Num 429: 2603 | Alchemy CUs: 1058478 | QuickNode CUs: 141078 | Data: 207 MiB [  8m15s @ 0 blocks/sec ]
+Num Blocks:   386 | Num Queries: 70815 | Num 429: 2611 | Alchemy CUs: 1062499 | QuickNode CUs: 141614 | Data: 208 MiB [  8m16s @ 0 blocks/sec ]
+Num Blocks:   386 | Num Queries: 70942 | Num 429: 2611 | Alchemy CUs: 1064404 | QuickNode CUs: 141868 | Data: 208 MiB [  8m17s @ 0 blocks/sec ]
+Num Blocks:   388 | Num Queries: 71286 | Num 429: 2619 | Alchemy CUs: 1069566 | QuickNode CUs: 142556 | Data: 209 MiB [  8m18s @ 0 blocks/sec ]
+Num Blocks:   388 | Num Queries: 71346 | Num 429: 2619 | Alchemy CUs: 1070466 | QuickNode CUs: 142676 | Data: 209 MiB [  8m19s @ 0 blocks/sec ]
+Num Blocks:   388 | Num Queries: 71463 | Num 429: 2626 | Alchemy CUs: 1072221 | QuickNode CUs: 142910 | Data: 209 MiB [  8m20s @ 0 blocks/sec ]
+Num Blocks:   391 | Num Queries: 71682 | Num 429: 2626 | Alchemy CUs: 1075509 | QuickNode CUs: 143348 | Data: 210 MiB [  8m21s @ 0 blocks/sec ]
+Num Blocks:   391 | Num Queries: 71757 | Num 429: 2634 | Alchemy CUs: 1076634 | QuickNode CUs: 143498 | Data: 210 MiB [  8m22s @ 0 blocks/sec ]
+Num Blocks:   392 | Num Queries: 71857 | Num 429: 2642 | Alchemy CUs: 1078135 | QuickNode CUs: 143698 | Data: 211 MiB [  8m23s @ 0 blocks/sec ]
+Num Blocks:   394 | Num Queries: 72027 | Num 429: 2642 | Alchemy CUs: 1080687 | QuickNode CUs: 144038 | Data: 213 MiB [  8m24s @ 0 blocks/sec ]
+Num Blocks:   394 | Num Queries: 72080 | Num 429: 2650 | Alchemy CUs: 1081482 | QuickNode CUs: 144144 | Data: 213 MiB [  8m25s @ 0 blocks/sec ]
+Num Blocks:   394 | Num Queries: 72189 | Num 429: 2658 | Alchemy CUs: 1083117 | QuickNode CUs: 144362 | Data: 213 MiB [  8m26s @ 0 blocks/sec ]
+Num Blocks:   394 | Num Queries: 72399 | Num 429: 2658 | Alchemy CUs: 1086267 | QuickNode CUs: 144782 | Data: 213 MiB [  8m27s @ 0 blocks/sec ]
+Num Blocks:   398 | Num Queries: 72641 | Num 429: 2662 | Alchemy CUs: 1089901 | QuickNode CUs: 145266 | Data: 215 MiB [  8m28s @ 0 blocks/sec ]
+Num Blocks:   398 | Num Queries: 72801 | Num 429: 2670 | Alchemy CUs: 1092301 | QuickNode CUs: 145586 | Data: 215 MiB [  8m29s @ 0 blocks/sec ]
+Num Blocks:   399 | Num Queries: 72966 | Num 429: 2678 | Alchemy CUs: 1094777 | QuickNode CUs: 145916 | Data: 215 MiB [  8m30s @ 0 blocks/sec ]
+Num Blocks:   399 | Num Queries: 73013 | Num 429: 2678 | Alchemy CUs: 1095482 | QuickNode CUs: 146010 | Data: 215 MiB [  8m31s @ 0 blocks/sec ]
+Num Blocks:   399 | Num Queries: 73066 | Num 429: 2686 | Alchemy CUs: 1096277 | QuickNode CUs: 146116 | Data: 215 MiB [  8m32s @ 0 blocks/sec ]
+Num Blocks:   399 | Num Queries: 73359 | Num 429: 2686 | Alchemy CUs: 1100672 | QuickNode CUs: 146702 | Data: 215 MiB [  8m33s @ 0 blocks/sec ]
+Num Blocks:   403 | Num Queries: 73765 | Num 429: 2686 | Alchemy CUs: 1106766 | QuickNode CUs: 147514 | Data: 217 MiB [  8m34s @ 0 blocks/sec ]
+Num Blocks:   403 | Num Queries: 73831 | Num 429: 2693 | Alchemy CUs: 1107756 | QuickNode CUs: 147646 | Data: 217 MiB [  8m35s @ 0 blocks/sec ]
+Num Blocks:   406 | Num Queries: 73958 | Num 429: 2701 | Alchemy CUs: 1109664 | QuickNode CUs: 147900 | Data: 219 MiB [  8m36s @ 0 blocks/sec ]
+Num Blocks:   407 | Num Queries: 74058 | Num 429: 2709 | Alchemy CUs: 1111165 | QuickNode CUs: 148100 | Data: 219 MiB [  8m37s @ 0 blocks/sec ]
+Num Blocks:   407 | Num Queries: 74158 | Num 429: 2717 | Alchemy CUs: 1112665 | QuickNode CUs: 148300 | Data: 219 MiB [  8m38s @ 0 blocks/sec ]
+Num Blocks:   407 | Num Queries: 74211 | Num 429: 2717 | Alchemy CUs: 1113460 | QuickNode CUs: 148406 | Data: 219 MiB [  8m39s @ 0 blocks/sec ]
+Num Blocks:   408 | Num Queries: 74430 | Num 429: 2725 | Alchemy CUs: 1116746 | QuickNode CUs: 148844 | Data: 219 MiB [  8m40s @ 0 blocks/sec ]
+Num Blocks:   409 | Num Queries: 74540 | Num 429: 2725 | Alchemy CUs: 1118397 | QuickNode CUs: 149064 | Data: 220 MiB [  8m41s @ 0 blocks/sec ]
+Num Blocks:   413 | Num Queries: 74891 | Num 429: 2725 | Alchemy CUs: 1123666 | QuickNode CUs: 149766 | Data: 221 MiB [  8m42s @ 0 blocks/sec ]
+Num Blocks:   414 | Num Queries: 74922 | Num 429: 2733 | Alchemy CUs: 1124132 | QuickNode CUs: 149828 | Data: 222 MiB [  8m43s @ 0 blocks/sec ]
+Num Blocks:   415 | Num Queries: 75022 | Num 429: 2741 | Alchemy CUs: 1125633 | QuickNode CUs: 150028 | Data: 223 MiB [  8m44s @ 0 blocks/sec ]
+Num Blocks:   417 | Num Queries: 75294 | Num 429: 2741 | Alchemy CUs: 1129715 | QuickNode CUs: 150572 | Data: 224 MiB [  8m45s @ 0 blocks/sec ]
+Num Blocks:   417 | Num Queries: 75355 | Num 429: 2749 | Alchemy CUs: 1130630 | QuickNode CUs: 150694 | Data: 224 MiB [  8m46s @ 0 blocks/sec ]
+Num Blocks:   417 | Num Queries: 75483 | Num 429: 2757 | Alchemy CUs: 1132550 | QuickNode CUs: 150950 | Data: 224 MiB [  8m47s @ 0 blocks/sec ]
+Num Blocks:   417 | Num Queries: 75597 | Num 429: 2764 | Alchemy CUs: 1134260 | QuickNode CUs: 151178 | Data: 224 MiB [  8m48s @ 0 blocks/sec ]
+Num Blocks:   417 | Num Queries: 75742 | Num 429: 2764 | Alchemy CUs: 1136435 | QuickNode CUs: 151468 | Data: 224 MiB [  8m49s @ 0 blocks/sec ]
+Num Blocks:   417 | Num Queries: 75791 | Num 429: 2772 | Alchemy CUs: 1137170 | QuickNode CUs: 151566 | Data: 224 MiB [  8m50s @ 0 blocks/sec ]
+Num Blocks:   417 | Num Queries: 76012 | Num 429: 2772 | Alchemy CUs: 1140485 | QuickNode CUs: 152008 | Data: 224 MiB [  8m51s @ 0 blocks/sec ]
+Num Blocks:   418 | Num Queries: 76341 | Num 429: 2772 | Alchemy CUs: 1145421 | QuickNode CUs: 152666 | Data: 224 MiB [  8m52s @ 0 blocks/sec ]
+Num Blocks:   419 | Num Queries: 76493 | Num 429: 2778 | Alchemy CUs: 1147702 | QuickNode CUs: 152970 | Data: 225 MiB [  8m53s @ 0 blocks/sec ]
+Num Blocks:   421 | Num Queries: 76717 | Num 429: 2786 | Alchemy CUs: 1151064 | QuickNode CUs: 153418 | Data: 226 MiB [  8m54s @ 0 blocks/sec ]
+Num Blocks:   422 | Num Queries: 76836 | Num 429: 2786 | Alchemy CUs: 1152850 | QuickNode CUs: 153656 | Data: 227 MiB [  8m55s @ 0 blocks/sec ]
+Num Blocks:   422 | Num Queries: 76897 | Num 429: 2794 | Alchemy CUs: 1153765 | QuickNode CUs: 153778 | Data: 227 MiB [  8m56s @ 0 blocks/sec ]
+Num Blocks:   422 | Num Queries: 77013 | Num 429: 2802 | Alchemy CUs: 1155505 | QuickNode CUs: 154010 | Data: 227 MiB [  8m57s @ 0 blocks/sec ]
+Num Blocks:   422 | Num Queries: 77197 | Num 429: 2802 | Alchemy CUs: 1158265 | QuickNode CUs: 154378 | Data: 227 MiB [  8m58s @ 0 blocks/sec ]
+Num Blocks:   422 | Num Queries: 77213 | Num 429: 2810 | Alchemy CUs: 1158505 | QuickNode CUs: 154410 | Data: 227 MiB [  8m59s @ 0 blocks/sec ]
+Num Blocks:   423 | Num Queries: 77349 | Num 429: 2817 | Alchemy CUs: 1160546 | QuickNode CUs: 154682 | Data: 227 MiB [   9m0s @ 0 blocks/sec ]
+Num Blocks:   423 | Num Queries: 77442 | Num 429: 2825 | Alchemy CUs: 1161941 | QuickNode CUs: 154868 | Data: 227 MiB [   9m1s @ 0 blocks/sec ]
+Num Blocks:   423 | Num Queries: 77587 | Num 429: 2833 | Alchemy CUs: 1164116 | QuickNode CUs: 155158 | Data: 227 MiB [   9m2s @ 0 blocks/sec ]
+Num Blocks:   423 | Num Queries: 77654 | Num 429: 2833 | Alchemy CUs: 1165121 | QuickNode CUs: 155292 | Data: 227 MiB [   9m3s @ 0 blocks/sec ]
+Num Blocks:   425 | Num Queries: 77906 | Num 429: 2837 | Alchemy CUs: 1168902 | QuickNode CUs: 155796 | Data: 229 MiB [   9m4s @ 0 blocks/sec ]
+Num Blocks:   427 | Num Queries: 78195 | Num 429: 2845 | Alchemy CUs: 1173240 | QuickNode CUs: 156374 | Data: 230 MiB [   9m5s @ 0 blocks/sec ]
+Num Blocks:   427 | Num Queries: 78341 | Num 429: 2845 | Alchemy CUs: 1175430 | QuickNode CUs: 156666 | Data: 230 MiB [   9m6s @ 0 blocks/sec ]
+Num Blocks:   427 | Num Queries: 78458 | Num 429: 2853 | Alchemy CUs: 1177185 | QuickNode CUs: 156900 | Data: 230 MiB [   9m7s @ 0 blocks/sec ]
+Num Blocks:   428 | Num Queries: 78565 | Num 429: 2861 | Alchemy CUs: 1178791 | QuickNode CUs: 157114 | Data: 230 MiB [   9m8s @ 0 blocks/sec ]
+Num Blocks:   430 | Num Queries: 78747 | Num 429: 2863 | Alchemy CUs: 1181522 | QuickNode CUs: 157478 | Data: 232 MiB [   9m9s @ 0 blocks/sec ]
+Num Blocks:   430 | Num Queries: 79003 | Num 429: 2869 | Alchemy CUs: 1185363 | QuickNode CUs: 157990 | Data: 232 MiB [  9m10s @ 0 blocks/sec ]
+Num Blocks:   431 | Num Queries: 79123 | Num 429: 2869 | Alchemy CUs: 1187164 | QuickNode CUs: 158230 | Data: 232 MiB [  9m11s @ 0 blocks/sec ]
+Num Blocks:   432 | Num Queries: 79451 | Num 429: 2877 | Alchemy CUs: 1192085 | QuickNode CUs: 158886 | Data: 232 MiB [  9m12s @ 0 blocks/sec ]
+Num Blocks:   432 | Num Queries: 79520 | Num 429: 2877 | Alchemy CUs: 1193120 | QuickNode CUs: 159024 | Data: 232 MiB [  9m13s @ 0 blocks/sec ]
+Num Blocks:   432 | Num Queries: 79597 | Num 429: 2885 | Alchemy CUs: 1194275 | QuickNode CUs: 159178 | Data: 232 MiB [  9m14s @ 0 blocks/sec ]
+Num Blocks:   432 | Num Queries: 79805 | Num 429: 2893 | Alchemy CUs: 1197395 | QuickNode CUs: 159594 | Data: 232 MiB [  9m15s @ 0 blocks/sec ]
+Num Blocks:   432 | Num Queries: 79877 | Num 429: 2893 | Alchemy CUs: 1198475 | QuickNode CUs: 159738 | Data: 232 MiB [  9m16s @ 0 blocks/sec ]
+Num Blocks:   433 | Num Queries: 79986 | Num 429: 2901 | Alchemy CUs: 1200111 | QuickNode CUs: 159956 | Data: 233 MiB [  9m17s @ 0 blocks/sec ]
+Num Blocks:   434 | Num Queries: 80091 | Num 429: 2909 | Alchemy CUs: 1201687 | QuickNode CUs: 160166 | Data: 234 MiB [  9m18s @ 0 blocks/sec ]
+Num Blocks:   435 | Num Queries: 80300 | Num 429: 2909 | Alchemy CUs: 1204823 | QuickNode CUs: 160584 | Data: 234 MiB [  9m19s @ 0 blocks/sec ]
+Num Blocks:   438 | Num Queries: 80636 | Num 429: 2917 | Alchemy CUs: 1209866 | QuickNode CUs: 161256 | Data: 236 MiB [  9m20s @ 0 blocks/sec ]
+Num Blocks:   438 | Num Queries: 80697 | Num 429: 2917 | Alchemy CUs: 1210781 | QuickNode CUs: 161378 | Data: 236 MiB [  9m21s @ 0 blocks/sec ]
+Num Blocks:   438 | Num Queries: 80760 | Num 429: 2925 | Alchemy CUs: 1211726 | QuickNode CUs: 161504 | Data: 236 MiB [  9m22s @ 0 blocks/sec ]
+Num Blocks:   439 | Num Queries: 80879 | Num 429: 2933 | Alchemy CUs: 1213511 | QuickNode CUs: 161742 | Data: 236 MiB [  9m23s @ 0 blocks/sec ]
+Num Blocks:   439 | Num Queries: 81050 | Num 429: 2941 | Alchemy CUs: 1216077 | QuickNode CUs: 162084 | Data: 236 MiB [  9m24s @ 0 blocks/sec ]
+Num Blocks:   439 | Num Queries: 81094 | Num 429: 2941 | Alchemy CUs: 1216737 | QuickNode CUs: 162172 | Data: 236 MiB [  9m25s @ 0 blocks/sec ]
+Num Blocks:   439 | Num Queries: 81231 | Num 429: 2949 | Alchemy CUs: 1218792 | QuickNode CUs: 162446 | Data: 236 MiB [  9m26s @ 0 blocks/sec ]
+Num Blocks:   439 | Num Queries: 81388 | Num 429: 2957 | Alchemy CUs: 1221147 | QuickNode CUs: 162760 | Data: 236 MiB [  9m27s @ 0 blocks/sec ]
+Num Blocks:   440 | Num Queries: 81488 | Num 429: 2965 | Alchemy CUs: 1222648 | QuickNode CUs: 162960 | Data: 236 MiB [  9m28s @ 0 blocks/sec ]
+Num Blocks:   440 | Num Queries: 81521 | Num 429: 2965 | Alchemy CUs: 1223143 | QuickNode CUs: 163026 | Data: 236 MiB [  9m29s @ 0 blocks/sec ]
+Num Blocks:   440 | Num Queries: 81607 | Num 429: 2973 | Alchemy CUs: 1224433 | QuickNode CUs: 163198 | Data: 236 MiB [  9m30s @ 0 blocks/sec ]
+Num Blocks:   442 | Num Queries: 81782 | Num 429: 2979 | Alchemy CUs: 1227060 | QuickNode CUs: 163548 | Data: 238 MiB [  9m31s @ 0 blocks/sec ]
+Num Blocks:   442 | Num Queries: 81875 | Num 429: 2979 | Alchemy CUs: 1228455 | QuickNode CUs: 163734 | Data: 238 MiB [  9m32s @ 0 blocks/sec ]
+Num Blocks:   443 | Num Queries: 82009 | Num 429: 2987 | Alchemy CUs: 1230466 | QuickNode CUs: 164002 | Data: 239 MiB [  9m33s @ 0 blocks/sec ]
+Num Blocks:   443 | Num Queries: 82109 | Num 429: 2995 | Alchemy CUs: 1231966 | QuickNode CUs: 164202 | Data: 239 MiB [  9m34s @ 0 blocks/sec ]
+Num Blocks:   446 | Num Queries: 82271 | Num 429: 2995 | Alchemy CUs: 1234398 | QuickNode CUs: 164526 | Data: 241 MiB [  9m35s @ 0 blocks/sec ]
+Num Blocks:   446 | Num Queries: 82393 | Num 429: 3003 | Alchemy CUs: 1236229 | QuickNode CUs: 164770 | Data: 241 MiB [  9m36s @ 0 blocks/sec ]
+Num Blocks:   447 | Num Queries: 82577 | Num 429: 3011 | Alchemy CUs: 1238990 | QuickNode CUs: 165138 | Data: 241 MiB [  9m37s @ 0 blocks/sec ]
+Num Blocks:   447 | Num Queries: 82677 | Num 429: 3019 | Alchemy CUs: 1240490 | QuickNode CUs: 165338 | Data: 241 MiB [  9m38s @ 0 blocks/sec ]
+Num Blocks:   447 | Num Queries: 82722 | Num 429: 3019 | Alchemy CUs: 1241165 | QuickNode CUs: 165428 | Data: 241 MiB [  9m39s @ 0 blocks/sec ]
+Num Blocks:   447 | Num Queries: 82777 | Num 429: 3027 | Alchemy CUs: 1241990 | QuickNode CUs: 165538 | Data: 241 MiB [  9m40s @ 0 blocks/sec ]
+Num Blocks:   449 | Num Queries: 83074 | Num 429: 3034 | Alchemy CUs: 1246447 | QuickNode CUs: 166132 | Data: 242 MiB [  9m41s @ 0 blocks/sec ]
+Num Blocks:   449 | Num Queries: 83074 | Num 429: 3035 | Alchemy CUs: 1246447 | QuickNode CUs: 166132 | Data: 242 MiB [  9m42s @ 0 blocks/sec ]
+Num Blocks:   449 | Num Queries: 83291 | Num 429: 3043 | Alchemy CUs: 1249702 | QuickNode CUs: 166566 | Data: 242 MiB [  9m43s @ 0 blocks/sec ]
+Num Blocks:   450 | Num Queries: 83392 | Num 429: 3051 | Alchemy CUs: 1251218 | QuickNode CUs: 166768 | Data: 242 MiB [  9m44s @ 0 blocks/sec ]
+Num Blocks:   450 | Num Queries: 83508 | Num 429: 3051 | Alchemy CUs: 1252958 | QuickNode CUs: 167000 | Data: 242 MiB [  9m45s @ 0 blocks/sec ]
+Num Blocks:   451 | Num Queries: 83563 | Num 429: 3059 | Alchemy CUs: 1253783 | QuickNode CUs: 167110 | Data: 242 MiB [  9m46s @ 0 blocks/sec ]
+Num Blocks:   453 | Num Queries: 83744 | Num 429: 3067 | Alchemy CUs: 1256501 | QuickNode CUs: 167472 | Data: 243 MiB [  9m47s @ 0 blocks/sec ]
+Num Blocks:   454 | Num Queries: 83920 | Num 429: 3067 | Alchemy CUs: 1259142 | QuickNode CUs: 167824 | Data: 244 MiB [  9m48s @ 0 blocks/sec ]
+Num Blocks:   456 | Num Queries: 84219 | Num 429: 3075 | Alchemy CUs: 1263629 | QuickNode CUs: 168422 | Data: 245 MiB [  9m49s @ 0 blocks/sec ]
+Num Blocks:   456 | Num Queries: 84375 | Num 429: 3077 | Alchemy CUs: 1265969 | QuickNode CUs: 168734 | Data: 245 MiB [  9m50s @ 0 blocks/sec ]
+Num Blocks:   456 | Num Queries: 84432 | Num 429: 3083 | Alchemy CUs: 1266824 | QuickNode CUs: 168848 | Data: 245 MiB [  9m51s @ 0 blocks/sec ]
+Num Blocks:   457 | Num Queries: 84751 | Num 429: 3083 | Alchemy CUs: 1271610 | QuickNode CUs: 169486 | Data: 246 MiB [  9m52s @ 0 blocks/sec ]
+Num Blocks:   457 | Num Queries: 84781 | Num 429: 3091 | Alchemy CUs: 1272060 | QuickNode CUs: 169546 | Data: 246 MiB [  9m53s @ 0 blocks/sec ]
+Num Blocks:   458 | Num Queries: 85059 | Num 429: 3099 | Alchemy CUs: 1276231 | QuickNode CUs: 170102 | Data: 247 MiB [  9m54s @ 0 blocks/sec ]
+Num Blocks:   459 | Num Queries: 85159 | Num 429: 3107 | Alchemy CUs: 1277732 | QuickNode CUs: 170302 | Data: 247 MiB [  9m55s @ 0 blocks/sec ]
+Num Blocks:   459 | Num Queries: 85165 | Num 429: 3107 | Alchemy CUs: 1277822 | QuickNode CUs: 170314 | Data: 247 MiB [  9m56s @ 0 blocks/sec ]
+Num Blocks:   461 | Num Queries: 85259 | Num 429: 3115 | Alchemy CUs: 1279234 | QuickNode CUs: 170502 | Data: 249 MiB [  9m57s @ 0 blocks/sec ]
+Num Blocks:   466 | Num Queries: 85567 | Num 429: 3115 | Alchemy CUs: 1283859 | QuickNode CUs: 171118 | Data: 250 MiB [  9m58s @ 0 blocks/sec ]
+Num Blocks:   466 | Num Queries: 85683 | Num 429: 3123 | Alchemy CUs: 1285599 | QuickNode CUs: 171350 | Data: 250 MiB [  9m59s @ 0 blocks/sec ]
+Num Blocks:   467 | Num Queries: 85900 | Num 429: 3131 | Alchemy CUs: 1288855 | QuickNode CUs: 171784 | Data: 251 MiB [  10m0s @ 0 blocks/sec ]
+Num Blocks:   468 | Num Queries: 85951 | Num 429: 3131 | Alchemy CUs: 1289635 | QuickNode CUs: 171888 | Data: 252 MiB [  10m1s @ 0 blocks/sec ]
+Num Blocks:   469 | Num Queries: 86112 | Num 429: 3137 | Alchemy CUs: 1292065 | QuickNode CUs: 172212 | Data: 252 MiB [  10m2s @ 0 blocks/sec ]
+Num Blocks:   469 | Num Queries: 86209 | Num 429: 3137 | Alchemy CUs: 1293520 | QuickNode CUs: 172406 | Data: 252 MiB [  10m3s @ 0 blocks/sec ]
+Num Blocks:   470 | Num Queries: 86373 | Num 429: 3142 | Alchemy CUs: 1295995 | QuickNode CUs: 172736 | Data: 253 MiB [  10m4s @ 0 blocks/sec ]
+Num Blocks:   472 | Num Queries: 86492 | Num 429: 3142 | Alchemy CUs: 1297810 | QuickNode CUs: 172978 | Data: 254 MiB [  10m5s @ 0 blocks/sec ]
+Num Blocks:   472 | Num Queries: 86665 | Num 429: 3142 | Alchemy CUs: 1300405 | QuickNode CUs: 173324 | Data: 254 MiB [  10m6s @ 0 blocks/sec ]
+Num Blocks:   473 | Num Queries: 86803 | Num 429: 3142 | Alchemy CUs: 1302490 | QuickNode CUs: 173602 | Data: 254 MiB [  10m7s @ 0 blocks/sec ]
+Num Blocks:   474 | Num Queries: 86900 | Num 429: 3142 | Alchemy CUs: 1303960 | QuickNode CUs: 173798 | Data: 255 MiB [  10m8s @ 0 blocks/sec ]
+Num Blocks:   474 | Num Queries: 86958 | Num 429: 3142 | Alchemy CUs: 1304830 | QuickNode CUs: 173914 | Data: 255 MiB [  10m9s @ 0 blocks/sec ]
+-----------------------
+Latency in milliseconds
+ -- Histogram: 
+Min value: 15 
+Max value: 49530 
+Count: 475 
+50p: 10240.00 
+75p: 13312.00 
+90p: 19456.00 
+[8, 16) 1 0.21% 0.21%
+[16, 32) 10 2.11% 2.32%
+[64, 128) 1 0.21% 2.53%
+[128, 256) 4 0.84% 3.37%
+[256, 512) 2 0.42% 3.79%
+[512, 1024) 1 0.21% 4.00%
+[1024, 2048) 24 5.05% 9.05%
+[2048, 3072) 16 3.37% 12.42%
+[3072, 4096) 21 4.42% 16.84%
+[4096, 5120) 25 5.26% 22.11%
+[5120, 6144) 26 5.47% 27.58%
+[6144, 7168) 32 6.74% 34.32%
+[7168, 8192) 27 5.68% 40.00%
+[8192, 9216) 29 6.11% 46.11%
+[9216, 10240) 41 8.63% 54.74%
+[10240, 11264) 37 7.79% 62.53%
+[11264, 12288) 35 7.37% 69.89%
+[12288, 13312) 29 6.11% 76.00%
+[13312, 14336) 29 6.11% 82.11%
+[14336, 15360) 10 2.11% 84.21%
+[15360, 16384) 7 1.47% 85.68%
+[16384, 17408) 6 1.26% 86.95%
+[17408, 18432) 11 2.32% 89.26%
+[18432, 19456) 7 1.47% 90.74%
+[19456, 20480) 7 1.47% 92.21%
+[20480, 21504) 11 2.32% 94.53%
+[21504, 22528) 4 0.84% 95.37%
+[22528, 23552) 5 1.05% 96.42%
+[23552, 24576) 4 0.84% 97.26%
+[25600, 26624) 5 1.05% 98.32%
+[26624, 27648) 3 0.63% 98.95%
+[28672, 29696) 1 0.21% 99.16%
+[31744, 32768) 1 0.21% 99.37%
+[34816, 35840) 1 0.21% 99.58%
+[47104, 48128) 1 0.21% 99.79%
+[49152, 50176) 1 0.21% 100.00%
+ --
+
+-----------------------
+Resp size in bytes
+ -- Histogram: 
+Min value: 1459 
+Max value: 2303992 
+Count: 475 
+50p: 544768.00 
+75p: 685056.00 
+90p: 1009664.00 
+[1024, 2048) 12 2.53% 2.53%
+[8192, 9216) 1 0.21% 2.74%
+[25600, 26624) 1 0.21% 2.95%
+[28672, 29696) 1 0.21% 3.16%
+[32768, 33792) 2 0.42% 3.58%
+[36864, 37888) 1 0.21% 3.79%
+[41984, 43008) 1 0.21% 4.00%
+[43008, 44032) 1 0.21% 4.21%
+[47104, 48128) 1 0.21% 4.42%
+[50176, 51200) 1 0.21% 4.63%
+[53248, 54272) 1 0.21% 4.84%
+[57344, 58368) 1 0.21% 5.05%
+[63488, 64512) 1 0.21% 5.26%
+[65536, 66560) 1 0.21% 5.47%
+[67584, 68608) 1 0.21% 5.68%
+[74752, 75776) 1 0.21% 5.89%
+[75776, 76800) 1 0.21% 6.11%
+[79872, 80896) 1 0.21% 6.32%
+[86016, 87040) 2 0.42% 6.74%
+[93184, 94208) 1 0.21% 6.95%
+[94208, 95232) 1 0.21% 7.16%
+[103424, 104448) 1 0.21% 7.37%
+[106496, 107520) 1 0.21% 7.58%
+[109568, 110592) 1 0.21% 7.79%
+[110592, 111616) 1 0.21% 8.00%
+[114688, 115712) 1 0.21% 8.21%
+[119808, 120832) 1 0.21% 8.42%
+[120832, 121856) 1 0.21% 8.63%
+[128000, 129024) 2 0.42% 9.05%
+[137216, 138240) 1 0.21% 9.26%
+[144384, 145408) 1 0.21% 9.47%
+[145408, 146432) 1 0.21% 9.68%
+[146432, 147456) 1 0.21% 9.89%
+[148480, 149504) 1 0.21% 10.11%
+[150528, 151552) 2 0.42% 10.53%
+[157696, 158720) 1 0.21% 10.74%
+[160768, 161792) 1 0.21% 10.95%
+[164864, 165888) 1 0.21% 11.16%
+[183296, 184320) 1 0.21% 11.37%
+[191488, 192512) 1 0.21% 11.58%
+[200704, 201728) 1 0.21% 11.79%
+[204800, 205824) 1 0.21% 12.00%
+[208896, 209920) 1 0.21% 12.21%
+[210944, 211968) 1 0.21% 12.42%
+[212992, 214016) 1 0.21% 12.63%
+[217088, 218112) 1 0.21% 12.84%
+[219136, 220160) 1 0.21% 13.05%
+[225280, 226304) 1 0.21% 13.26%
+[228352, 229376) 1 0.21% 13.47%
+[229376, 230400) 1 0.21% 13.68%
+[231424, 232448) 1 0.21% 13.89%
+[235520, 236544) 1 0.21% 14.11%
+[240640, 241664) 1 0.21% 14.32%
+[244736, 245760) 1 0.21% 14.53%
+[247808, 248832) 1 0.21% 14.74%
+[250880, 251904) 1 0.21% 14.95%
+[251904, 252928) 1 0.21% 15.16%
+[260096, 261120) 1 0.21% 15.37%
+[262144, 263168) 2 0.42% 15.79%
+[268288, 269312) 1 0.21% 16.00%
+[274432, 275456) 1 0.21% 16.21%
+[282624, 283648) 1 0.21% 16.42%
+[292864, 293888) 1 0.21% 16.63%
+[293888, 294912) 2 0.42% 17.05%
+[295936, 296960) 3 0.63% 17.68%
+[301056, 302080) 1 0.21% 17.89%
+[306176, 307200) 1 0.21% 18.11%
+[308224, 309248) 1 0.21% 18.32%
+[310272, 311296) 1 0.21% 18.53%
+[315392, 316416) 1 0.21% 18.74%
+[319488, 320512) 1 0.21% 18.95%
+[324608, 325632) 1 0.21% 19.16%
+[327680, 328704) 1 0.21% 19.37%
+[331776, 332800) 1 0.21% 19.58%
+[333824, 334848) 1 0.21% 19.79%
+[334848, 335872) 1 0.21% 20.00%
+[336896, 337920) 2 0.42% 20.42%
+[338944, 339968) 1 0.21% 20.63%
+[343040, 344064) 2 0.42% 21.05%
+[346112, 347136) 1 0.21% 21.26%
+[348160, 349184) 1 0.21% 21.47%
+[353280, 354304) 1 0.21% 21.68%
+[355328, 356352) 3 0.63% 22.32%
+[359424, 360448) 1 0.21% 22.53%
+[367616, 368640) 1 0.21% 22.74%
+[368640, 369664) 1 0.21% 22.95%
+[370688, 371712) 1 0.21% 23.16%
+[371712, 372736) 1 0.21% 23.37%
+[372736, 373760) 1 0.21% 23.58%
+[373760, 374784) 1 0.21% 23.79%
+[374784, 375808) 2 0.42% 24.21%
+[381952, 382976) 2 0.42% 24.63%
+[382976, 384000) 1 0.21% 24.84%
+[385024, 386048) 1 0.21% 25.05%
+[389120, 390144) 1 0.21% 25.26%
+[393216, 394240) 1 0.21% 25.47%
+[399360, 400384) 1 0.21% 25.68%
+[405504, 406528) 1 0.21% 25.89%
+[407552, 408576) 2 0.42% 26.32%
+[409600, 410624) 2 0.42% 26.74%
+[410624, 411648) 1 0.21% 26.95%
+[412672, 413696) 1 0.21% 27.16%
+[417792, 418816) 1 0.21% 27.37%
+[420864, 421888) 3 0.63% 28.00%
+[428032, 429056) 1 0.21% 28.21%
+[429056, 430080) 2 0.42% 28.63%
+[431104, 432128) 2 0.42% 29.05%
+[433152, 434176) 1 0.21% 29.26%
+[435200, 436224) 2 0.42% 29.68%
+[436224, 437248) 1 0.21% 29.89%
+[437248, 438272) 1 0.21% 30.11%
+[439296, 440320) 1 0.21% 30.32%
+[440320, 441344) 1 0.21% 30.53%
+[442368, 443392) 1 0.21% 30.74%
+[443392, 444416) 1 0.21% 30.95%
+[444416, 445440) 2 0.42% 31.37%
+[446464, 447488) 3 0.63% 32.00%
+[448512, 449536) 1 0.21% 32.21%
+[449536, 450560) 1 0.21% 32.42%
+[451584, 452608) 2 0.42% 32.84%
+[452608, 453632) 1 0.21% 33.05%
+[455680, 456704) 1 0.21% 33.26%
+[456704, 457728) 1 0.21% 33.47%
+[461824, 462848) 1 0.21% 33.68%
+[462848, 463872) 1 0.21% 33.89%
+[463872, 464896) 1 0.21% 34.11%
+[464896, 465920) 1 0.21% 34.32%
+[465920, 466944) 1 0.21% 34.53%
+[466944, 467968) 1 0.21% 34.74%
+[468992, 470016) 1 0.21% 34.95%
+[473088, 474112) 1 0.21% 35.16%
+[474112, 475136) 2 0.42% 35.58%
+[477184, 478208) 2 0.42% 36.00%
+[478208, 479232) 1 0.21% 36.21%
+[481280, 482304) 1 0.21% 36.42%
+[482304, 483328) 1 0.21% 36.63%
+[484352, 485376) 1 0.21% 36.84%
+[485376, 486400) 1 0.21% 37.05%
+[486400, 487424) 3 0.63% 37.68%
+[487424, 488448) 2 0.42% 38.11%
+[490496, 491520) 2 0.42% 38.53%
+[492544, 493568) 2 0.42% 38.95%
+[494592, 495616) 2 0.42% 39.37%
+[495616, 496640) 1 0.21% 39.58%
+[497664, 498688) 1 0.21% 39.79%
+[498688, 499712) 1 0.21% 40.00%
+[500736, 501760) 2 0.42% 40.42%
+[502784, 503808) 1 0.21% 40.63%
+[503808, 504832) 1 0.21% 40.84%
+[504832, 505856) 2 0.42% 41.26%
+[507904, 508928) 1 0.21% 41.47%
+[508928, 509952) 2 0.42% 41.89%
+[509952, 510976) 1 0.21% 42.11%
+[510976, 512000) 4 0.84% 42.95%
+[512000, 513024) 2 0.42% 43.37%
+[513024, 514048) 2 0.42% 43.79%
+[514048, 515072) 1 0.21% 44.00%
+[516096, 517120) 1 0.21% 44.21%
+[517120, 518144) 1 0.21% 44.42%
+[518144, 519168) 1 0.21% 44.63%
+[519168, 520192) 1 0.21% 44.84%
+[522240, 523264) 2 0.42% 45.26%
+[525312, 526336) 2 0.42% 45.68%
+[526336, 527360) 2 0.42% 46.11%
+[529408, 530432) 2 0.42% 46.53%
+[531456, 532480) 1 0.21% 46.74%
+[532480, 533504) 3 0.63% 47.37%
+[533504, 534528) 2 0.42% 47.79%
+[534528, 535552) 2 0.42% 48.21%
+[535552, 536576) 2 0.42% 48.63%
+[536576, 537600) 1 0.21% 48.84%
+[537600, 538624) 1 0.21% 49.05%
+[538624, 539648) 1 0.21% 49.26%
+[540672, 541696) 1 0.21% 49.47%
+[541696, 542720) 1 0.21% 49.68%
+[543744, 544768) 1 0.21% 49.89%
+[545792, 546816) 4 0.84% 50.74%
+[546816, 547840) 1 0.21% 50.95%
+[547840, 548864) 1 0.21% 51.16%
+[548864, 549888) 1 0.21% 51.37%
+[550912, 551936) 1 0.21% 51.58%
+[551936, 552960) 2 0.42% 52.00%
+[552960, 553984) 1 0.21% 52.21%
+[553984, 555008) 2 0.42% 52.63%
+[555008, 556032) 1 0.21% 52.84%
+[556032, 557056) 4 0.84% 53.68%
+[557056, 558080) 1 0.21% 53.89%
+[558080, 559104) 2 0.42% 54.32%
+[559104, 560128) 1 0.21% 54.53%
+[560128, 561152) 1 0.21% 54.74%
+[562176, 563200) 2 0.42% 55.16%
+[563200, 564224) 1 0.21% 55.37%
+[564224, 565248) 1 0.21% 55.58%
+[565248, 566272) 2 0.42% 56.00%
+[566272, 567296) 1 0.21% 56.21%
+[567296, 568320) 1 0.21% 56.42%
+[568320, 569344) 2 0.42% 56.84%
+[569344, 570368) 1 0.21% 57.05%
+[570368, 571392) 2 0.42% 57.47%
+[571392, 572416) 1 0.21% 57.68%
+[572416, 573440) 1 0.21% 57.89%
+[574464, 575488) 3 0.63% 58.53%
+[581632, 582656) 1 0.21% 58.74%
+[583680, 584704) 2 0.42% 59.16%
+[584704, 585728) 1 0.21% 59.37%
+[585728, 586752) 2 0.42% 59.79%
+[586752, 587776) 1 0.21% 60.00%
+[587776, 588800) 2 0.42% 60.42%
+[589824, 590848) 1 0.21% 60.63%
+[591872, 592896) 1 0.21% 60.84%
+[593920, 594944) 2 0.42% 61.26%
+[594944, 595968) 2 0.42% 61.68%
+[595968, 596992) 1 0.21% 61.89%
+[599040, 600064) 2 0.42% 62.32%
+[602112, 603136) 2 0.42% 62.74%
+[603136, 604160) 1 0.21% 62.95%
+[604160, 605184) 1 0.21% 63.16%
+[605184, 606208) 1 0.21% 63.37%
+[607232, 608256) 1 0.21% 63.58%
+[608256, 609280) 2 0.42% 64.00%
+[609280, 610304) 1 0.21% 64.21%
+[614400, 615424) 1 0.21% 64.42%
+[615424, 616448) 1 0.21% 64.63%
+[616448, 617472) 2 0.42% 65.05%
+[617472, 618496) 2 0.42% 65.47%
+[619520, 620544) 1 0.21% 65.68%
+[623616, 624640) 2 0.42% 66.11%
+[627712, 628736) 2 0.42% 66.53%
+[629760, 630784) 1 0.21% 66.74%
+[630784, 631808) 2 0.42% 67.16%
+[634880, 635904) 2 0.42% 67.58%
+[636928, 637952) 3 0.63% 68.21%
+[640000, 641024) 1 0.21% 68.42%
+[642048, 643072) 2 0.42% 68.84%
+[645120, 646144) 1 0.21% 69.05%
+[647168, 648192) 1 0.21% 69.26%
+[648192, 649216) 2 0.42% 69.68%
+[649216, 650240) 1 0.21% 69.89%
+[650240, 651264) 2 0.42% 70.32%
+[652288, 653312) 1 0.21% 70.53%
+[653312, 654336) 1 0.21% 70.74%
+[654336, 655360) 2 0.42% 71.16%
+[656384, 657408) 2 0.42% 71.58%
+[657408, 658432) 1 0.21% 71.79%
+[660480, 661504) 2 0.42% 72.21%
+[662528, 663552) 1 0.21% 72.42%
+[663552, 664576) 2 0.42% 72.84%
+[667648, 668672) 1 0.21% 73.05%
+[668672, 669696) 1 0.21% 73.26%
+[671744, 672768) 1 0.21% 73.47%
+[673792, 674816) 1 0.21% 73.68%
+[675840, 676864) 2 0.42% 74.11%
+[678912, 679936) 2 0.42% 74.53%
+[679936, 680960) 1 0.21% 74.74%
+[684032, 685056) 1 0.21% 74.95%
+[686080, 687104) 1 0.21% 75.16%
+[687104, 688128) 1 0.21% 75.37%
+[688128, 689152) 1 0.21% 75.58%
+[689152, 690176) 1 0.21% 75.79%
+[690176, 691200) 2 0.42% 76.21%
+[691200, 692224) 1 0.21% 76.42%
+[692224, 693248) 1 0.21% 76.63%
+[693248, 694272) 1 0.21% 76.84%
+[694272, 695296) 1 0.21% 77.05%
+[696320, 697344) 1 0.21% 77.26%
+[697344, 698368) 1 0.21% 77.47%
+[698368, 699392) 1 0.21% 77.68%
+[699392, 700416) 2 0.42% 78.11%
+[703488, 704512) 1 0.21% 78.32%
+[704512, 705536) 1 0.21% 78.53%
+[706560, 707584) 1 0.21% 78.74%
+[708608, 709632) 1 0.21% 78.95%
+[714752, 715776) 2 0.42% 79.37%
+[716800, 717824) 1 0.21% 79.58%
+[717824, 718848) 1 0.21% 79.79%
+[719872, 720896) 1 0.21% 80.00%
+[721920, 722944) 1 0.21% 80.21%
+[723968, 724992) 2 0.42% 80.63%
+[724992, 726016) 1 0.21% 80.84%
+[729088, 730112) 1 0.21% 81.05%
+[730112, 731136) 1 0.21% 81.26%
+[731136, 732160) 1 0.21% 81.47%
+[732160, 733184) 1 0.21% 81.68%
+[738304, 739328) 1 0.21% 81.89%
+[754688, 755712) 1 0.21% 82.11%
+[755712, 756736) 1 0.21% 82.32%
+[760832, 761856) 2 0.42% 82.74%
+[761856, 762880) 1 0.21% 82.95%
+[762880, 763904) 2 0.42% 83.37%
+[765952, 766976) 1 0.21% 83.58%
+[769024, 770048) 1 0.21% 83.79%
+[774144, 775168) 1 0.21% 84.00%
+[776192, 777216) 1 0.21% 84.21%
+[787456, 788480) 1 0.21% 84.42%
+[798720, 799744) 1 0.21% 84.63%
+[799744, 800768) 1 0.21% 84.84%
+[809984, 811008) 1 0.21% 85.05%
+[814080, 815104) 1 0.21% 85.26%
+[822272, 823296) 1 0.21% 85.47%
+[825344, 826368) 1 0.21% 85.68%
+[832512, 833536) 1 0.21% 85.89%
+[835584, 836608) 1 0.21% 86.11%
+[858112, 859136) 1 0.21% 86.32%
+[874496, 875520) 1 0.21% 86.53%
+[884736, 885760) 1 0.21% 86.74%
+[886784, 887808) 1 0.21% 86.95%
+[911360, 912384) 2 0.42% 87.37%
+[912384, 913408) 1 0.21% 87.58%
+[923648, 924672) 1 0.21% 87.79%
+[924672, 925696) 2 0.42% 88.21%
+[929792, 930816) 1 0.21% 88.42%
+[932864, 933888) 1 0.21% 88.63%
+[951296, 952320) 1 0.21% 88.84%
+[957440, 958464) 1 0.21% 89.05%
+[962560, 963584) 1 0.21% 89.26%
+[968704, 969728) 1 0.21% 89.47%
+[971776, 972800) 1 0.21% 89.68%
+[1008640, 1009664) 1 0.21% 89.89%
+[1011712, 1012736) 1 0.21% 90.11%
+[1012736, 1013760) 1 0.21% 90.32%
+[1031168, 1032192) 1 0.21% 90.53%
+[1038336, 1039360) 1 0.21% 90.74%
+[1039360, 1040384) 1 0.21% 90.95%
+[1.0 MiB, infinity) 43 9.05% 100.00%
+ --
+
+Num Blocks:   475 | Num Queries: 87016 | Num 429: 3142 | Alchemy CUs: 1305715 | QuickNode CUs: 174032 | Data: 256 MiB [ 10m10s @ 0 blocks/sec ]
+Num Blocks:   475 | Num Queries: 87016 | Num 429: 3142 | Alchemy CUs: 1305715 | QuickNode CUs: 174032 | Data: 256 MiB [ 10m11s @ 0 blocks/sec ]
+DONE
