@@ -70,24 +70,28 @@ func init() {
 		"Location to write the final dgraph data directories.")
 	flag.Bool("replace_out", false,
 		"Replace out directory and its contents if it exists.")
-	flag.String("tmp", "tmp",
-		"Temp directory used to use for on-disk scratch space. Requires free space proportional"+
+	flag.String("map", "map",
+		"Map directory used to use for on-disk scratch space. Requires free space proportional"+
 			" to the size of the RDF file and the amount of indexing used.")
+	flag.String("buf", "buf",
+		"Buffer dir used for temporary buffers. Ideally located in a fast drive.")
 
 	flag.IntP("num_go_routines", "j", int(math.Ceil(float64(runtime.NumCPU())*0.85)),
 		"Number of worker threads to use. MORE THREADS LEAD TO HIGHER RAM USAGE.")
-	flag.Int64("mapoutput_mb", 2048,
+	flag.Int64("mapoutput_mb", 4096,
 		"The estimated size of each map file output. Increasing this increases memory usage.")
-	flag.Int64("partition_mb", 4, "Pick a partition key every N megabytes of data.")
+	flag.Int64("partition_mb", 8, "Pick a partition key every N megabytes of data.")
 	flag.Bool("skip_map_phase", false,
 		"Skip the map phase (assumes that map output files already exist).")
-	flag.Bool("cleanup_tmp", true,
-		"Clean up the tmp directory after the loader finishes. Setting this to false allows the"+
+	flag.Bool("cleanup_map", false,
+		"Clean up the map directory after the loader finishes. Setting this to false allows the"+
 			" boot loader to be re-run while skipping the map phase.")
 	flag.Int("reducers", 1,
 		"Number of reducers to run concurrently. Increasing this can improve performance, and "+
 			"must be less than or equal to the number of reduce shards.")
 	flag.Bool("version", false, "Prints the version of Dgraph Boot Loader.")
+	flag.String("unique_types", "", "List of types which only have one instance."+
+		" We can skip the XID map for these.")
 	flag.String("xidmap", "", "Directory to store xid to uid mapping")
 	// TODO: Potentially move http server to main.
 	flag.String("http", "localhost:8080", "Address to serve http (pprof).")
@@ -138,7 +142,8 @@ func run() {
 		GqlType:          Boot.Conf.GetString("type"),
 		OutDir:           Boot.Conf.GetString("out"),
 		ReplaceOutDir:    Boot.Conf.GetBool("replace_out"),
-		TmpDir:           Boot.Conf.GetString("tmp"),
+		MapDir:           Boot.Conf.GetString("map"),
+		BufDir:           Boot.Conf.GetString("buf"),
 		NumGoroutines:    Boot.Conf.GetInt("num_go_routines"),
 		MapBufSize:       uint64(Boot.Conf.GetInt("mapoutput_mb")),
 		PartitionBufSize: int64(Boot.Conf.GetInt("partition_mb")),
@@ -155,6 +160,14 @@ func run() {
 		ClientDir:        Boot.Conf.GetString("xidmap"),
 		Namespace:        Boot.Conf.GetUint64("force-namespace"),
 		Badger:           bopts,
+	}
+
+	opt.UniqueTypes = make(map[string]bool)
+	if typeStr := Boot.Conf.GetString("unique_types"); len(typeStr) > 0 {
+		types := strings.Split(typeStr, ",")
+		for _, typ := range types {
+			opt.UniqueTypes[typ] = true
+		}
 	}
 
 	// set MaxSplits because while boot-loading alpha won't be running and rollup would not be
@@ -241,15 +254,15 @@ func run() {
 
 	// Create a directory just for boot loader's usage.
 	if !opt.SkipMapPhase {
-		x.Check(os.RemoveAll(opt.TmpDir))
-		x.Check(os.MkdirAll(opt.TmpDir, 0700))
+		x.Check(os.RemoveAll(opt.MapDir))
+		x.Check(os.MkdirAll(opt.MapDir, 0700))
 	}
 	if opt.CleanupTmp {
-		defer os.RemoveAll(opt.TmpDir)
+		defer os.RemoveAll(opt.MapDir)
 	}
 
 	// Create directory for temporary buffers used in map-reduce phase
-	bufDir := filepath.Join(opt.TmpDir, bufferDir)
+	bufDir := opt.BufDir
 	x.Check(os.RemoveAll(bufDir))
 	x.Check(os.MkdirAll(bufDir, 0700))
 	defer os.RemoveAll(bufDir)
@@ -257,7 +270,7 @@ func run() {
 	loader := newLoader(&opt)
 
 	const bootMetaFilename = "boot.meta"
-	bootMetaPath := filepath.Join(opt.TmpDir, bootMetaFilename)
+	bootMetaPath := filepath.Join(opt.MapDir, bootMetaFilename)
 
 	if opt.SkipMapPhase {
 		bootMetaData, err := ioutil.ReadFile(bootMetaPath)
@@ -337,7 +350,8 @@ type options struct {
 	GqlType          string
 	OutDir           string
 	ReplaceOutDir    bool
-	TmpDir           string
+	MapDir           string
+	BufDir           string
 	NumGoroutines    int
 	MapBufSize       uint64
 	PartitionBufSize int64
@@ -350,6 +364,7 @@ type options struct {
 	IgnoreErrors     bool
 	CustomTokenizers string
 	ClientDir        string
+	UniqueTypes      map[string]bool
 
 	dqlSchema string
 	gqlSchema *gqlSchema.Schema
@@ -381,6 +396,29 @@ type state struct {
 	tmpDbs        []*badger.DB // Temporary DB to write the split lists to avoid ordering issues.
 	writeTs       uint64       // All badger writes use this timestamp
 	namespaces    *sync.Map    // To store the encountered namespaces.
+}
+
+func (st *state) objectModifier(m map[string]interface{}, typ *gqlSchema.Type) {
+	if _, ok := m["uid"]; ok {
+		// has uid, so use it.
+		return
+	}
+	if st.opt.UniqueTypes[typ.Name()] {
+		// is unique. We can just assign a UID here.
+		m["uid"] = x.ToHexString(st.xids.AllocateUid())
+		return
+	}
+
+	// Use the type of the object and the corresponding XID fields to
+	// determine the UID.
+	var comp []string
+	for _, fd := range typ.XIDFields() {
+		val, ok := m[fd.Name()]
+		if ok {
+			comp = append(comp, val.(string))
+		}
+	}
+	m["uid"] = fmt.Sprintf("_:%s.%s", typ.Name(), strings.Join(comp, "|"))
 }
 
 type loader struct {
@@ -420,8 +458,10 @@ func newLoader(opt *options) *loader {
 		state:   st,
 		mappers: make([]*mapper, opt.NumGoroutines),
 	}
-	for i := 0; i < opt.NumGoroutines; i++ {
-		ld.mappers[i] = newMapper(st)
+	if !ld.opt.SkipMapPhase {
+		for i := 0; i < opt.NumGoroutines; i++ {
+			ld.mappers[i] = newMapper(st)
+		}
 	}
 	go ld.prog.report()
 	return ld
@@ -461,7 +501,7 @@ func (ld *loader) blockingFileReader() {
 			r, cleanup := fs.ChunkReader(file, nil)
 			defer cleanup()
 
-			chunk := chunker.NewChunker(ld.gqlSchema, 1000)
+			chunk := chunker.NewChunker(ld.gqlSchema, 1000, ld.objectModifier)
 			for {
 				chunkBuf, err := chunk.Chunk(r)
 				if chunkBuf != nil && chunkBuf.Len() > 0 {
@@ -497,7 +537,7 @@ func (ld *loader) blockingIPCReader() {
 			defer fd.Close()
 
 			r := bufio.NewReaderSize(fd, 32<<20)
-			chunk := chunker.NewChunker(ld.gqlSchema, 1000)
+			chunk := chunker.NewChunker(ld.gqlSchema, 1000, ld.objectModifier)
 			for {
 				chunkBuf, err := chunk.Chunk(r)
 				if chunkBuf != nil && chunkBuf.Len() > 0 {
@@ -528,7 +568,7 @@ func (ld *loader) mapStage() {
 	}
 	ld.xids = xidmap.New(xidmap.XidMapOptions{
 		DB:  db,
-		Dir: filepath.Join(ld.opt.TmpDir, bufferDir),
+		Dir: ld.opt.BufDir,
 	})
 
 	var mapperWg sync.WaitGroup

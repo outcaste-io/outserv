@@ -123,7 +123,7 @@ func DefaultOptions(path string) Options {
 		NumLevelZeroTablesStall: 15,
 		NumMemtables:            15,
 		BloomFalsePositive:      0.01,
-		BlockSize:               4 * 1024,
+		BlockSize:               32 * 1024, // Default 32 KB block size.
 		NumVersionsToKeep:       1,
 		CompactL0OnClose:        false,
 		VerifyValueChecksum:     false,

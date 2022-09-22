@@ -868,7 +868,7 @@ func addSelectionSetFrom(
 			if f.Type().Name() == schema.IDType && !f.IsExternal() {
 				child.Attr = "uid"
 			} else {
-				child.Attr = f.DgraphPredicate()
+				child.Attr = f.DgraphAlias()
 			}
 			q.Children = append(q.Children, child)
 		}

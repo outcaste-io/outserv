@@ -187,14 +187,16 @@ type NQuadBuffer struct {
 	nquads    []*pb.Edge
 	nqCh      chan []*pb.Edge
 	schema    *gqlSchema.Schema
+	objMod    UidFunc
 }
 
 // NewNQuadBuffer returns a new NQuadBuffer instance with the specified batch size.
-func NewNQuadBuffer(schema *gqlSchema.Schema, batchSize int) *NQuadBuffer {
+func NewNQuadBuffer(schema *gqlSchema.Schema, batchSize int, objMod UidFunc) *NQuadBuffer {
 	buf := &NQuadBuffer{
 		batchSize: batchSize,
 		nqCh:      make(chan []*pb.Edge, 10),
 		schema:    schema,
+		objMod:    objMod,
 	}
 	if buf.batchSize > 0 {
 		buf.nquads = make([]*pb.Edge, 0, batchSize)
@@ -256,6 +258,11 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, typ *gqlSchema.Typ
 	x.AssertTrue(typ != nil)
 	var mr mapResponse
 
+	// Run the callback func, which can possibly add a uid field.
+	if buf.objMod != nil {
+		buf.objMod(m, typ)
+	}
+
 	// Check field in map.
 	if uidVal, ok := m["uid"]; ok {
 		var uid uint64
@@ -289,19 +296,6 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, typ *gqlSchema.Typ
 		if uid > 0 {
 			mr.uid = x.ToHexString(uid)
 		}
-	}
-
-	// Use the type of the object and the corresponding XID fields to
-	// determine the UID.
-	if mr.uid == "" {
-		var comp []string
-		for _, fd := range typ.XIDFields() {
-			val, ok := m[fd.Name()]
-			if ok {
-				comp = append(comp, val.(string))
-			}
-		}
-		mr.uid = fmt.Sprintf("_:%s.%s", typ.Name(), strings.Join(comp, "|"))
 	}
 
 	if mr.uid == "" {
@@ -347,6 +341,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, typ *gqlSchema.Typ
 			continue
 		}
 
+		fullPredName := typ.Name() + "." + pred
 		if v == nil {
 			if op == DeleteNquads {
 				// This corresponds to edge deletion.
@@ -354,7 +349,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, typ *gqlSchema.Typ
 				x.Check(err)
 				nq := &pb.Edge{
 					Subject:     mr.uid,
-					Predicate:   pred,
+					Predicate:   fullPredName,
 					Namespace:   namespace,
 					ObjectValue: val,
 				}
@@ -366,10 +361,9 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, typ *gqlSchema.Typ
 			continue
 		}
 
-		// TODO: We should perhaps create the type.predicate here.
 		nq := pb.Edge{
 			Subject:   mr.uid,
-			Predicate: pred,
+			Predicate: fullPredName,
 			Namespace: namespace,
 		}
 
@@ -405,7 +399,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, typ *gqlSchema.Typ
 				return mr, err
 			}
 
-			// Add the connecting edge beteween the entities.
+			// Add the connecting edge between the entities.
 			nq.ObjectId = cr.uid
 			buf.Push(&nq)
 		case []interface{}:
@@ -413,7 +407,7 @@ func (buf *NQuadBuffer) mapToNquads(m map[string]interface{}, typ *gqlSchema.Typ
 			for _, item := range v {
 				nq := pb.Edge{
 					Subject:   mr.uid,
-					Predicate: pred,
+					Predicate: fullPredName,
 					Namespace: namespace,
 				}
 				childType := typ.Field(pred).Type()
@@ -479,6 +473,7 @@ const (
 // This function is very similar to buf.ParseJSON, but we just replace encoding/json with
 // simdjson-go.
 func (buf *NQuadBuffer) FastParseJSON(b []byte, gqlType *schema.Type, op int) error {
+
 	if !simdjson.SupportedCPU() {
 		// default to slower / old parser
 		return buf.ParseJSON(b, gqlType, op)
@@ -600,7 +595,7 @@ func (buf *NQuadBuffer) ParseJSON(b []byte, typ *gqlSchema.Type, op int) error {
 // ParseJSON is a convenience wrapper function to get all NQuads in one call. This can however, lead
 // to high memory usage. So be careful using this.
 func ParseJSON(b []byte, typ *gqlSchema.Type, op int) ([]*pb.Edge, error) {
-	buf := NewNQuadBuffer(typ.Schema(), -1)
+	buf := NewNQuadBuffer(typ.Schema(), -1, nil)
 	err := buf.FastParseJSON(b, typ, op)
 	if err != nil {
 		return nil, err

@@ -46,6 +46,7 @@ type flagOptions struct {
 	testOpenFiles bool
 	keyLookup     string
 	rollupKey     string
+	parseKey      string
 	keyHistory    bool
 	predicate     string
 	prefix        string
@@ -91,6 +92,7 @@ func init() {
 		"Show a histogram of the key and value sizes.")
 	flag.BoolVar(&opt.onlySummary, "only-summary", false,
 		"If true, only show the summary of the p directory.")
+	flag.StringVarP(&opt.parseKey, "parse", "", "", "Parse and output the key")
 
 	// Flags related to WAL.
 	flag.StringVarP(&opt.wdir, "wal", "w", "", "Directory where Raft write-ahead logs are stored.")
@@ -626,6 +628,18 @@ func testOpenFilesLimit() {
 func run() {
 	if opt.testOpenFiles {
 		testOpenFilesLimit()
+		return
+	}
+	if len(opt.parseKey) > 0 {
+		key, err := hex.DecodeString(opt.parseKey)
+		if err != nil {
+			log.Fatalf("Got error when decoding key: %v\n", err)
+		}
+		pk, err := x.Parse(key)
+		if err != nil {
+			log.Fatalf("Got error when parsing key: %v\n", err)
+		}
+		fmt.Printf("Parsed key: %+v\n", pk)
 		return
 	}
 

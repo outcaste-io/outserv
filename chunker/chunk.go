@@ -45,10 +45,12 @@ func (jc *Chunker) NQuads() *NQuadBuffer {
 	return jc.nqs
 }
 
+type UidFunc func(m map[string]interface{}, typ *gqlSchema.Type)
+
 // NewChunker returns a new chunker for the specified format.
-func NewChunker(schema *gqlSchema.Schema, batchSize int) *Chunker {
+func NewChunker(schema *gqlSchema.Schema, batchSize int, f UidFunc) *Chunker {
 	return &Chunker{
-		nqs: NewNQuadBuffer(schema, batchSize),
+		nqs: NewNQuadBuffer(schema, batchSize, f),
 	}
 }
 

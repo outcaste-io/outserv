@@ -16,7 +16,6 @@ import (
 const (
 	mapShardDir    = "map_output"
 	reduceShardDir = "shards"
-	bufferDir      = "buffer"
 )
 
 func mergeMapShardsIntoReduceShards(opt *options) {
@@ -25,7 +24,7 @@ func mergeMapShardsIntoReduceShards(opt *options) {
 		os.Exit(1)
 	}
 
-	shardDirs := readShardDirs(filepath.Join(opt.TmpDir, mapShardDir))
+	shardDirs := readShardDirs(filepath.Join(opt.MapDir, mapShardDir))
 	if len(shardDirs) == 0 {
 		fmt.Printf(
 			"No map shards found. Possibly caused by empty data files passed to the bulk loader.\n")
@@ -40,7 +39,7 @@ func mergeMapShardsIntoReduceShards(opt *options) {
 
 	var reduceShards []string
 	for i := 0; i < opt.ReduceShards; i++ {
-		shardDir := filepath.Join(opt.TmpDir, reduceShardDir, fmt.Sprintf("shard_%d", i))
+		shardDir := filepath.Join(opt.MapDir, reduceShardDir, fmt.Sprintf("shard_%d", i))
 		x.Check(os.MkdirAll(shardDir, 0750))
 		reduceShards = append(reduceShards, shardDir)
 	}
