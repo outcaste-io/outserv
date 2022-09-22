@@ -25,14 +25,15 @@ import (
 )
 
 var (
-	graphql  = flag.String("graphql", "", "Outserv GraphQL endpoint")
-	rpc      = flag.String("rpc", "", "JSON-RPC endpoint")
-	gor      = flag.Int("j", 128, "Num Goroutines to use")
-	minBlock = flag.Int64("min", 10000000, "Min block number")
-	maxBlock = flag.Int64("max", 15300000, "Max block number")
-	dur      = flag.Duration("dur", time.Minute, "How long to run the benchmark")
-	all      = flag.Bool("all", false, "Retrieve all fields.")
-	sample   = flag.Int("sample", 10000, "Output query and response every N times")
+	graphql   = flag.String("graphql", "", "Outserv GraphQL endpoint")
+	rpc       = flag.String("rpc", "", "JSON-RPC endpoint")
+	streamUrl = flag.String("stream", "", "0xFast stream service")
+	gor       = flag.Int("j", 128, "Num Goroutines to use")
+	minBlock  = flag.Int64("min", 10000000, "Min block number")
+	maxBlock  = flag.Int64("max", 15300000, "Max block number")
+	dur       = flag.Duration("dur", time.Minute, "How long to run the benchmark")
+	all       = flag.Bool("all", false, "Retrieve all fields.")
+	sample    = flag.Int("sample", 10000, "Output query and response every N times")
 
 	blockFields     = `difficulty, extraData, gasLimit, gasUsed, hash, logsBloom, miner { address }, mixHash, nonce, number, parentHash, receiptsRoot, sha3Uncles, size, stateRoot, timestamp, totalDifficulty`
 	blockFieldsMini = `gasUsed, hash, number, size, timestamp`
@@ -214,7 +215,47 @@ func fetchBlockWithTxnAndLogsWithRPC(client *http.Client, blockNum int64) (int64
 		}
 		for _, log := range txnResp.Result.Logs {
 			if log.BlockNumber != hno {
-				fmt.Printf("Got result: %+v. Expecting: %s Test Failed.\n", txnResp.Result)
+				fmt.Printf("Got result: %+v. Expecting: %s Test Failed.\n", txnResp.Result, hno)
+				fmt.Printf("Response: %s\n", data)
+				os.Exit(1)
+			}
+		}
+	}
+	return sz, nil
+}
+
+func fetchBlockViaStream(client *http.Client, blockNum int64) (int64, error) {
+	hno := hexutil.EncodeUint64(uint64(blockNum))
+	req, err := http.NewRequest("GET", *streamUrl+"/"+hno, nil)
+	x.Check(err)
+	hresp, err := client.Do(req)
+	x.Check(err)
+	data, err := ioutil.ReadAll(hresp.Body)
+	x.Check(err)
+	hresp.Body.Close()
+
+	atomic.AddUint64(&numQueries, 1)
+	sz := int64(len(data))
+
+	var block Block
+	if err := json.Unmarshal(data, &block); err != nil {
+		fmt.Printf("Got invalid block data: %s\n", data)
+		os.Exit(1)
+	}
+	if block.Number != hno {
+		fmt.Printf("Got result: %+v. Expecting: %s Test Failed.\n", block, hno)
+		fmt.Printf("Response: %s\n", data)
+		os.Exit(1)
+	}
+	for _, txn := range block.Transactions {
+		if txn.BlockNumber != hno {
+			fmt.Printf("Got result: %+v. Expecting: %s Test Failed.\n", block, hno)
+			fmt.Printf("Response: %s\n", data)
+			os.Exit(1)
+		}
+		for _, log := range txn.Logs {
+			if log.BlockNumber != hno {
+				fmt.Printf("Got result: %+v. Expecting: %s Test Failed.\n", log, hno)
 				fmt.Printf("Response: %s\n", data)
 				os.Exit(1)
 			}
@@ -292,8 +333,10 @@ func main() {
 					sz, err = fetchBlockWithTxnAndLogs(client, bno)
 				} else if len(*rpc) > 0 {
 					sz, err = fetchBlockWithTxnAndLogsWithRPC(client, bno)
+				} else if len(*streamUrl) > 0 {
+					sz, err = fetchBlockViaStream(client, bno)
 				} else {
-					log.Fatalf("One of graphql or rpc URLs should be provided")
+					log.Fatalf("One of graphql, rpc, or stream URLs should be provided")
 				}
 				x.Check(err)
 
