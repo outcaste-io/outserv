@@ -495,15 +495,6 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 
 			for _, itr := range mapItrs {
 				itr.Next(cbuf, pkey, keyCount)
-				// for key, cnt := range keyCount {
-				// 	if cnt < 1000 {
-				// 		// Remove small keys.
-				// 		delete(keyCount, key)
-				// 	}
-				// }
-			}
-			if len(keyCount) > 0 {
-				fmt.Printf("[%d] keyCount size: %d\n", i, len(keyCount))
 			}
 
 			fps := make(map[uint64]uint64)
