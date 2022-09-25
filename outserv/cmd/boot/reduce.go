@@ -489,18 +489,18 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 		partitionKeys = append(partitionKeys, nil)
 		fmt.Printf("Num Partitions: %d\n", len(partitionKeys))
 
+		keyCount := make(map[uint64]uint64)
 		for i := 0; i < len(partitionKeys); i++ {
 			pkey := partitionKeys[i]
 
-			keyCount := make(map[uint64]uint64)
 			for _, itr := range mapItrs {
 				itr.Next(cbuf, pkey, keyCount)
-				for key, cnt := range keyCount {
-					if cnt < 1000 {
-						// Remove small keys.
-						delete(keyCount, key)
-					}
-				}
+				// for key, cnt := range keyCount {
+				// 	if cnt < 1000 {
+				// 		// Remove small keys.
+				// 		delete(keyCount, key)
+				// 	}
+				// }
 			}
 			if len(keyCount) > 0 {
 				fmt.Printf("[%d] keyCount size: %d\n", i, len(keyCount))
@@ -512,7 +512,9 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 					fps[key] = cnt
 					fmt.Printf("[%d] SKIP key: %x with count: %d\n", i, key, cnt)
 				}
+				delete(keyCount, key) // Empty it out for future use.
 			}
+			x.AssertTrue(len(keyCount) == 0)
 			if len(fps) > 0 {
 				fmt.Printf("[%d] SKIPPING %d keys\n", i, len(fps))
 				dst := getBuf(r.opt.BufDir)
