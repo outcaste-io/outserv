@@ -158,7 +158,7 @@ type mapIterator struct {
 
 // Next adds keys below the partitionKey, and returns back any keys that need to
 // be skipped.
-func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte) (skipKeys []string) {
+func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte, keyCount map[uint64]uint64) {
 	readMapEntry := func() error {
 		if len(mi.meBuf) > 0 {
 			return nil
@@ -182,8 +182,6 @@ func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte) (skipKeys []str
 		// atomic.AddInt64(&r.prog.reduceEdgeCount, 1)
 		return nil
 	}
-	var lastKey, skipKey []byte
-	var count int
 	for {
 		if err := readMapEntry(); err == io.EOF {
 			break
@@ -191,35 +189,20 @@ func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte) (skipKeys []str
 			x.Check(err)
 		}
 		key := MapEntry(mi.meBuf).Key()
-		if bytes.Equal(lastKey, key) {
-			count++
-			if count%100000 == 0 {
-				fmt.Printf("Key %x has %d count\n", key, count)
-			}
-			if count > 10e6 { // 10 million instances of this key.
-				skipKey = y.SafeCopy(skipKey, key)
-				fmt.Printf("Found a key to skip: %x\n", skipKey)
-				skipKeys = append(skipKeys, string(skipKey))
-				// TODO: Remove all instances of this key from cbuf.
-			}
-			// TODO(mrjn): If we have too many instances of the same key, then
-			// just skip it. We'd have to iterate over the cbuf, and reset it to
-			// the offset, where the key comes first time.
-		} else {
-			lastKey = y.SafeCopy(lastKey, key)
-			count = 0
-			skipKey = nil
+		fp := z.MemHash(key)
+		keyCount[fp]++
+		count := keyCount[fp]
+
+		if count%100000 == 0 {
+			fmt.Printf("Key %x has %d count\n", key, count)
 		}
 
 		if len(partitionKey) == 0 || bytes.Compare(key, partitionKey) < 0 {
-			if bytes.Equal(key, skipKey) {
+			if count >= 1e6 {
 				// nullify meBuf, and continue to the next key.
 				mi.meBuf = mi.meBuf[:0]
 				continue
 			}
-			// if cbuf.LenWithPadding() > 64<<30 {
-			// 	fmt.Printf("part key: %x | key: %x | sz: %d\n", partitionKey, key, len(mi.meBuf))
-			// }
 			b := cbuf.SliceAllocate(len(mi.meBuf))
 			copy(b, mi.meBuf)
 			mi.meBuf = mi.meBuf[:0]
@@ -508,17 +491,27 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 		for i := 0; i < len(partitionKeys); i++ {
 			pkey := partitionKeys[i]
 
-			var skipKeys []string
+			keyCount := make(map[uint64]uint64)
 			for _, itr := range mapItrs {
-				skip := itr.Next(cbuf, pkey)
-				skipKeys = append(skipKeys, skip...)
-			}
-			if len(skipKeys) > 0 {
-				fps := make(map[uint64]bool)
-				for _, key := range skipKeys {
-					fps[z.MemHashString(key)] = true
-					fmt.Printf("SKIPPING key: %x\n", key)
+				itr.Next(cbuf, pkey, keyCount)
+				for key, cnt := range keyCount {
+					if cnt < 1000 {
+						// Remove small keys.
+						delete(keyCount, key)
+					}
 				}
+			}
+			fmt.Printf("keyCount size: %d\n", len(keyCount))
+
+			fps := make(map[uint64]uint64)
+			for key, cnt := range keyCount {
+				if cnt >= 1e6 {
+					fps[key] = cnt
+					fmt.Printf("SKIP key: %x with count: %d\n", key, cnt)
+				}
+			}
+			if len(fps) > 0 {
+				fmt.Printf("SKIPPING %d keys\n", len(fps))
 				dst := getBuf(r.opt.BufDir)
 				var skipCount, skipBytes uint64
 				err := cbuf.SliceIterate(func(slice []byte) error {
