@@ -487,6 +487,7 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 		cbuf := getBuf(r.opt.BufDir)
 		// Append nil for the last entries.
 		partitionKeys = append(partitionKeys, nil)
+		fmt.Printf("Num Partitions: %d\n", len(partitionKeys))
 
 		for i := 0; i < len(partitionKeys); i++ {
 			pkey := partitionKeys[i]
@@ -501,17 +502,19 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 					}
 				}
 			}
-			fmt.Printf("keyCount size: %d\n", len(keyCount))
+			if len(keyCount) > 0 {
+				fmt.Printf("[%d] keyCount size: %d\n", i, len(keyCount))
+			}
 
 			fps := make(map[uint64]uint64)
 			for key, cnt := range keyCount {
 				if cnt >= 1e6 {
 					fps[key] = cnt
-					fmt.Printf("SKIP key: %x with count: %d\n", key, cnt)
+					fmt.Printf("[%d] SKIP key: %x with count: %d\n", i, key, cnt)
 				}
 			}
 			if len(fps) > 0 {
-				fmt.Printf("SKIPPING %d keys\n", len(fps))
+				fmt.Printf("[%d] SKIPPING %d keys\n", i, len(fps))
 				dst := getBuf(r.opt.BufDir)
 				var skipCount, skipBytes uint64
 				err := cbuf.SliceIterate(func(slice []byte) error {
@@ -526,8 +529,8 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 					return nil
 				})
 				x.Check(err)
-				fmt.Printf("Skipped over %d keys | data: %s\n",
-					skipCount, humanize.IBytes(skipBytes))
+				fmt.Printf("[%d] Skipped over %d keys | data: %s\n",
+					i, skipCount, humanize.IBytes(skipBytes))
 				cbuf.Release()
 				cbuf = dst
 			}
@@ -539,7 +542,7 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 			hd.Update(int64(cbuf.LenNoPadding()))
 			select {
 			case <-ticker.C:
-				fmt.Printf("Histogram of buffer sizes: %s\n", hd.String())
+				fmt.Printf("[%d] Histogram of buffer sizes: %s\n", i, hd.String())
 			default:
 			}
 
