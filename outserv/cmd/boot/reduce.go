@@ -510,12 +510,16 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 				fmt.Printf("[%d] SKIPPING %d keys\n", i, len(fps))
 				dst := getBuf(r.opt.BufDir)
 				var skipCount, skipBytes uint64
+				printed := make(map[uint64]bool)
 				err := cbuf.SliceIterate(func(slice []byte) error {
 					me := MapEntry(slice)
 					fp := z.MemHash(me.Key())
-					if _, has := fps[fp]; !has {
+					if cnt, has := fps[fp]; !has {
 						dst.WriteSlice(slice)
 					} else {
+						if _, did := printed[fp]; !did {
+							fmt.Printf("SKIPPING KEY: %x . Count: %d\n", me.Key(), cnt)
+						}
 						skipCount++
 						skipBytes += uint64(len(slice))
 					}
