@@ -409,13 +409,19 @@ func (r *reducer) writeSplitLists(db, tmpDb *badger.DB, writer *badger.StreamWri
 	x.Check(stream.Orchestrate(context.Background()))
 }
 
-const limit = 2 << 30
+const limit = 16 << 30
+
+var tcounter int64
 
 func (r *reducer) throttle() {
-	for {
+	num := atomic.AddInt64(&tcounter, 1)
+	for i := 0; ; i++ {
 		sz := atomic.LoadInt64(&r.prog.numEncoding)
 		if sz < limit {
 			return
+		}
+		for i%10 == 0 {
+			fmt.Printf("[%x] [%d] Throttling sz: %d\n", num, i, sz)
 		}
 		time.Sleep(time.Second)
 	}
@@ -517,11 +523,12 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 					if cnt, has := fps[fp]; !has {
 						dst.WriteSlice(slice)
 					} else {
-						if _, did := printed[fp]; !did {
-							fmt.Printf("SKIPPING KEY: %x . Count: %d\n", me.Key(), cnt)
-						}
 						skipCount++
 						skipBytes += uint64(len(slice))
+						if _, did := printed[fp]; !did {
+							fmt.Printf("SKIPPING KEY: %x . Count: %d\n", me.Key(), cnt)
+							printed[fp] = true
+						}
 					}
 					return nil
 				})
@@ -544,6 +551,7 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 			}
 
 			buffers <- cbuf
+			fmt.Printf("[%d] len(buffers): %d\n", i, len(buffers))
 			// cbuf.Reset()
 			cbuf = getBuf(r.opt.BufDir)
 		}
