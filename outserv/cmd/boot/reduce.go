@@ -209,6 +209,7 @@ func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte, keyCount map[ui
 }
 
 func (mi *mapIterator) Close() error {
+	mi.reader.Close()
 	return mi.fd.Close()
 }
 
