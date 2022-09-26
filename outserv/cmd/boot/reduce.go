@@ -552,8 +552,6 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 			}
 
 			buffers <- cbuf
-			fmt.Printf("[%d] len(buffers): %d\n", i, len(buffers))
-			// cbuf.Reset()
 			cbuf = getBuf(r.opt.BufDir)
 		}
 		if !cbuf.IsEmpty() {
