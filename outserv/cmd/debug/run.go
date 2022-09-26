@@ -21,6 +21,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/DataDog/zstd"
 	"github.com/dustin/go-humanize"
 	"github.com/outcaste-io/outserv/badger"
 	bpb "github.com/outcaste-io/outserv/badger/pb"
@@ -43,6 +44,7 @@ var (
 )
 
 type flagOptions struct {
+	testZstd      bool
 	testOpenFiles bool
 	keyLookup     string
 	rollupKey     string
@@ -77,6 +79,7 @@ func init() {
 	Debug.Cmd.SetHelpTemplate(x.NonRootTemplate)
 
 	flag := Debug.Cmd.Flags()
+	flag.BoolVar(&opt.testZstd, "zstd", false, "Reads from stdin, decompress and write to stdout")
 	flag.BoolVar(&opt.testOpenFiles, "ulimit", false, "Test how many open files can we have.")
 	flag.BoolVar(&opt.itemMeta, "item", true, "Output item meta as well. Set to false for diffs.")
 	flag.Uint64Var(&opt.readTs, "at", math.MaxUint64, "Set read timestamp for all txns.")
@@ -625,7 +628,29 @@ func testOpenFilesLimit() {
 	}
 }
 
+func testZstdDecompress() {
+	reader := zstd.NewReader(os.Stdin)
+	defer reader.Close()
+
+	br := bufio.NewReaderSize(reader, 1<<20)
+	buf := make([]byte, 64<<20)
+
+	for {
+		_, err := br.Read(buf)
+		if err == io.EOF {
+			return
+		}
+		x.Check(err)
+		_, err = os.Stdout.Write(buf)
+		x.Check(err)
+	}
+}
+
 func run() {
+	if opt.testZstd {
+		testZstdDecompress()
+		return
+	}
 	if opt.testOpenFiles {
 		testOpenFilesLimit()
 		return
