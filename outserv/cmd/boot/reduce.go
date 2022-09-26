@@ -420,7 +420,7 @@ func (r *reducer) throttle() {
 		if sz < limit {
 			return
 		}
-		for i%10 == 0 {
+		if i%10 == 0 {
 			fmt.Printf("[%x] [%d] Throttling sz: %d\n", num, i, sz)
 		}
 		time.Sleep(time.Second)
@@ -530,7 +530,7 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 		writerCh <- req
 	}
 
-	buffers := make(chan *BufReq, 8)
+	buffers := make(chan *BufReq, 4)
 
 	go func() {
 		// Start collecting buffers.
