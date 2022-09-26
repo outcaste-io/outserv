@@ -1,13 +1,13 @@
 package x
 
 import (
-	"encoding/binary"
 	"io"
+
+	"github.com/outcaste-io/ristretto/z"
 )
 
 type BufReader struct {
 	r      io.Reader
-	u64buf []byte
 	curBuf []byte
 	ch     chan []byte
 	bufs   [2][]byte
@@ -15,15 +15,20 @@ type BufReader struct {
 
 func NewBufReader(r io.Reader, bufSize int) *BufReader {
 	br := &BufReader{
-		r:      r,
-		ch:     make(chan []byte), // unbuffered
-		u64buf: make([]byte, binary.MaxVarintLen64),
+		r:  r,
+		ch: make(chan []byte), // unbuffered
 	}
 	for i := 0; i < len(br.bufs); i++ {
-		br.bufs[i] = make([]byte, bufSize)
+		br.bufs[i] = z.Calloc(bufSize, "BufReader")
 	}
 	go br.fill()
 	return br
+}
+
+func (br *BufReader) Close() {
+	for i := 0; i < len(br.bufs); i++ {
+		z.Free(br.bufs[i])
+	}
 }
 
 func (br *BufReader) fill() {
