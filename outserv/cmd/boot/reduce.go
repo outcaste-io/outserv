@@ -409,7 +409,7 @@ func (r *reducer) writeSplitLists(db, tmpDb *badger.DB, writer *badger.StreamWri
 	x.Check(stream.Orchestrate(context.Background()))
 }
 
-const limit = 16 << 30
+const limit = 32 << 30
 
 var tcounter int64
 
@@ -420,9 +420,7 @@ func (r *reducer) throttle() {
 		if sz < limit {
 			return
 		}
-		if i%10 == 0 {
-			fmt.Printf("[%x] [%d] Throttling sz: %d\n", num, i, sz)
-		}
+		fmt.Printf("[%d] [%d] Throttling sz: %d\n", num, i, sz)
 		time.Sleep(time.Second)
 	}
 }
@@ -512,6 +510,9 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 				delete(keyCount, key) // Empty it out for future use.
 			}
 			x.AssertTrue(len(keyCount) == 0)
+
+			// Moving this part out to be concurrent doesn't help. The
+			// bottleneck is the throttle.
 			if len(fps) > 0 {
 				fmt.Printf("[%d] SKIPPING %d keys\n", i, len(fps))
 				dst := getBuf(r.opt.BufDir)
