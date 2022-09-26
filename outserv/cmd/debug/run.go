@@ -636,12 +636,12 @@ func testZstdDecompress() {
 	buf := make([]byte, 64<<20)
 
 	for {
-		_, err := br.Read(buf)
+		n, err := br.Read(buf[:cap(buf)])
 		if err == io.EOF {
 			return
 		}
 		x.Check(err)
-		_, err = os.Stdout.Write(buf)
+		_, err = os.Stdout.Write(buf[:n])
 		x.Check(err)
 	}
 }
