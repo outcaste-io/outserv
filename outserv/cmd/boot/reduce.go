@@ -449,56 +449,8 @@ func bufferStats(cbuf *z.Buffer) {
 
 func getBuf(dir string) *z.Buffer {
 	return z.NewBuffer(64<<20, "Reducer.GetBuf").
-		WithAutoMmap(4<<30, dir).
+		WithAutoMmap(1<<30, dir).
 		WithMaxSize(128 << 30)
-}
-
-type BufReq struct {
-	sync.WaitGroup
-	cbuf     *z.Buffer
-	keyCount map[uint64]uint64
-	bufDir   string
-}
-
-func (breq *BufReq) Trim() {
-	defer breq.Done()
-
-	fps := make(map[uint64]uint64)
-	for key, cnt := range breq.keyCount {
-		if cnt >= 1e6 {
-			fps[key] = cnt
-			fmt.Printf("SKIP key: %x with count: %d\n", key, cnt)
-		}
-	}
-	if len(fps) == 0 {
-		return
-	}
-	fmt.Printf("SKIPPING %d keys\n", len(fps))
-
-	var skipCount, skipBytes uint64
-	printed := make(map[uint64]bool)
-	dst := getBuf(breq.bufDir)
-
-	err := breq.cbuf.SliceIterate(func(slice []byte) error {
-		me := MapEntry(slice)
-		fp := z.MemHash(me.Key())
-		if cnt, has := fps[fp]; !has {
-			dst.WriteSlice(slice)
-		} else {
-			skipCount++
-			skipBytes += uint64(len(slice))
-			if _, did := printed[fp]; !did {
-				fmt.Printf("SKIPPING KEY: %x . Count: %d\n", me.Key(), cnt)
-				printed[fp] = true
-			}
-		}
-		return nil
-	})
-	x.Check(err)
-	fmt.Printf("Skipped over %d keys | data: %s\n",
-		skipCount, humanize.IBytes(skipBytes))
-	breq.cbuf.Release()
-	breq.cbuf = dst
 }
 
 func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *countIndexer) {
@@ -530,60 +482,90 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 		writerCh <- req
 	}
 
-	buffers := make(chan *BufReq, 4)
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+
+	buffers := make(chan *z.Buffer, 3)
 
 	go func() {
 		// Start collecting buffers.
+		hd := z.NewHistogramData(z.HistogramBounds(16, 40))
 		cbuf := getBuf(r.opt.BufDir)
-		keyCount := make(map[uint64]uint64)
-
 		// Append nil for the last entries.
 		partitionKeys = append(partitionKeys, nil)
 		fmt.Printf("Num Partitions: %d\n", len(partitionKeys))
 
+		keyCount := make(map[uint64]uint64)
 		for i := 0; i < len(partitionKeys); i++ {
 			pkey := partitionKeys[i]
 
 			for _, itr := range mapItrs {
 				itr.Next(cbuf, pkey, keyCount)
 			}
-			if i < len(partitionKeys)-1 && cbuf.LenNoPadding() < 1<<30 {
-				// Don't enter this if for penultimate loop.
+
+			fps := make(map[uint64]uint64)
+			for key, cnt := range keyCount {
+				if cnt >= 1e6 {
+					fps[key] = cnt
+					fmt.Printf("[%d] SKIP key: %x with count: %d\n", i, key, cnt)
+				}
+				delete(keyCount, key) // Empty it out for future use.
+			}
+			x.AssertTrue(len(keyCount) == 0)
+			if len(fps) > 0 {
+				fmt.Printf("[%d] SKIPPING %d keys\n", i, len(fps))
+				dst := getBuf(r.opt.BufDir)
+				var skipCount, skipBytes uint64
+				printed := make(map[uint64]bool)
+				err := cbuf.SliceIterate(func(slice []byte) error {
+					me := MapEntry(slice)
+					fp := z.MemHash(me.Key())
+					if cnt, has := fps[fp]; !has {
+						dst.WriteSlice(slice)
+					} else {
+						skipCount++
+						skipBytes += uint64(len(slice))
+						if _, did := printed[fp]; !did {
+							fmt.Printf("SKIPPING KEY: %x . Count: %d\n", me.Key(), cnt)
+							printed[fp] = true
+						}
+					}
+					return nil
+				})
+				x.Check(err)
+				fmt.Printf("[%d] Skipped over %d keys | data: %s\n",
+					i, skipCount, humanize.IBytes(skipBytes))
+				cbuf.Release()
+				cbuf = dst
+			}
+			if cbuf.LenNoPadding() < 256<<20 {
 				// Pick up more data.
 				continue
 			}
 
-			breq := &BufReq{
-				cbuf:     cbuf,
-				keyCount: keyCount,
-				bufDir:   r.opt.BufDir,
+			hd.Update(int64(cbuf.LenNoPadding()))
+			select {
+			case <-ticker.C:
+				fmt.Printf("[%d] Histogram of buffer sizes: %s\n", i, hd.String())
+			default:
 			}
-			breq.Add(1)
-			go breq.Trim()
-			buffers <- breq
 
-			// Prepare for next.
-			keyCount = make(map[uint64]uint64)
+			buffers <- cbuf
+			fmt.Printf("[%d] len(buffers): %d\n", i, len(buffers))
+			// cbuf.Reset()
 			cbuf = getBuf(r.opt.BufDir)
 		}
-		x.AssertTrue(cbuf.IsEmpty())
-		cbuf.Release()
+		if !cbuf.IsEmpty() {
+			hd.Update(int64(cbuf.LenNoPadding()))
+			buffers <- cbuf
+		} else {
+			cbuf.Release()
+		}
+		fmt.Printf("Final Histogram of buffer sizes: %s\n", hd.String())
 		close(buffers)
 	}()
 
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
-
-	hd := z.NewHistogramData(z.HistogramBounds(16, 40))
-	for breq := range buffers {
-		breq.Wait()
-		cbuf := breq.cbuf
-		hd.Update(int64(cbuf.LenNoPadding()))
-		select {
-		case <-ticker.C:
-			fmt.Printf("Histogram of buffer sizes: %s\n", hd.String())
-		default:
-		}
+	for cbuf := range buffers {
 		if cbuf.LenNoPadding() > limit/2 {
 			bufferStats(cbuf)
 		}
@@ -592,7 +574,6 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 		atomic.AddInt64(&r.prog.numEncoding, int64(cbuf.LenNoPadding()))
 		sendReq(cbuf)
 	}
-	fmt.Printf("Final Histogram of buffer sizes: %s\n", hd.String())
 
 	// Close the encodes.
 	close(encoderCh)
