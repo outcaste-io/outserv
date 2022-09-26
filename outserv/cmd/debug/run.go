@@ -82,7 +82,7 @@ func init() {
 
 	flag := Debug.Cmd.Flags()
 	flag.StringVar(&opt.testDecompress, "decompress", "",
-		"Reads from stdin, decompress and write to stdout. Values are: zstd, snappy, echo")
+		"Reads from stdin, decompress and write to stdout. Values are: zstd, zstd-buf, snappy, echo")
 	flag.StringVar(&opt.testCompress, "compress", "",
 		"Reads from stdin, compress and write to stdout. Values are: zstd, snappy, echo")
 	flag.BoolVar(&opt.testOpenFiles, "ulimit", false, "Test how many open files can we have.")
@@ -640,6 +640,11 @@ func testDecompress() {
 		zr := zstd.NewReader(os.Stdin)
 		defer zr.Close()
 		reader = zr
+	case "zstd-buf":
+		zr := zstd.NewReader(os.Stdin)
+		defer zr.Close()
+		br := x.NewBufReader(zr, 16<<20)
+		reader = br
 	case "snappy":
 		reader = snappy.NewReader(os.Stdin)
 	case "echo":
@@ -648,11 +653,9 @@ func testDecompress() {
 		log.Fatalf("Invalid option")
 	}
 
-	br := bufio.NewReaderSize(reader, 1<<20)
 	buf := make([]byte, 64<<20)
-
 	for {
-		n, err := br.Read(buf[:cap(buf)])
+		n, err := reader.Read(buf)
 		if err == io.EOF {
 			return
 		}

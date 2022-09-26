@@ -4,14 +4,12 @@
 package boot
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -152,7 +150,7 @@ func (r *reducer) createTmpBadger() *badger.DB {
 
 type mapIterator struct {
 	fd     *os.File
-	reader *bufio.Reader
+	reader *x.BufReader
 	meBuf  []byte
 }
 
@@ -164,21 +162,16 @@ func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte, keyCount map[ui
 			return nil
 		}
 		r := mi.reader
-		sizeBuf, err := r.Peek(binary.MaxVarintLen64)
+		sz, err := binary.ReadUvarint(r)
 		if err != nil {
 			return err
 		}
-		sz, n := binary.Uvarint(sizeBuf)
-		if n <= 0 {
-			log.Fatalf("Could not read uvarint: %d", n)
-		}
-		x.Check2(r.Discard(n))
 		if cap(mi.meBuf) < int(sz) {
 			mi.meBuf = make([]byte, int(sz))
 		}
 		mi.meBuf = mi.meBuf[:int(sz)]
 		x.Check2(io.ReadFull(r, mi.meBuf))
-		atomic.AddUint64(&bytesRead, sz+uint64(n))
+		atomic.AddUint64(&bytesRead, sz)
 		// atomic.AddInt64(&r.prog.reduceEdgeCount, 1)
 		return nil
 	}
@@ -225,12 +218,12 @@ func newMapIterator(filename string) (*pb.MapHeader, *mapIterator) {
 
 	// TODO: Release dec in the end.
 	dec := zstd.NewReader(fd)
+	reader := x.NewBufReader(dec, 1<<20)
 	// dec, err := zstd.NewReader(fd, zstd.WithDecoderConcurrency(1), zstd.WithDecoderLowmem(true))
 	// x.Check(err)
 	// r := snappy.NewReader(fd)
 
 	// Read the header size.
-	reader := bufio.NewReaderSize(dec, 1<<20)
 	headerLenBuf := make([]byte, 4)
 	x.Check2(io.ReadFull(reader, headerLenBuf))
 	headerLen := binary.BigEndian.Uint32(headerLenBuf)
