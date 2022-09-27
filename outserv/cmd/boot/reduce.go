@@ -219,7 +219,7 @@ func newMapIterator(filename string) (*pb.MapHeader, *mapIterator) {
 
 	// TODO: Release dec in the end.
 	dec := zstd.NewReader(fd)
-	reader := x.NewBufReader(dec, 1<<20)
+	reader := x.NewBufReader(dec, 512<<10)
 	// dec, err := zstd.NewReader(fd, zstd.WithDecoderConcurrency(1), zstd.WithDecoderLowmem(true))
 	// x.Check(err)
 	// r := snappy.NewReader(fd)
@@ -403,7 +403,8 @@ func (r *reducer) writeSplitLists(db, tmpDb *badger.DB, writer *badger.StreamWri
 	x.Check(stream.Orchestrate(context.Background()))
 }
 
-const limit = 32 << 30
+// 2 GB is good. Don't increase it.
+const limit = 2 << 30
 
 var tcounter int64
 
