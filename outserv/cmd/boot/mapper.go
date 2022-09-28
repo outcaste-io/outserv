@@ -38,11 +38,14 @@ type shardState struct {
 	mu   sync.Mutex // Allow only 1 write per shard at a time.
 }
 
+var mapBuf int64
+
 func newMapperBuffer(opt *options) *z.Buffer {
 	sz := float64(opt.MapBufSize) * 1.1
 	// We don't have a lot of map shards. So, we can just store all this in
 	// memory, instead of writing to a file on disk.
-	buf := z.NewBuffer(int(sz), "map.buffer")
+	id := atomic.AddInt64(&mapBuf, 1)
+	buf := z.NewBuffer(int(sz), fmt.Sprintf("map.buffer-%02d", id/4))
 	return buf.WithMaxSize(2 * int(opt.MapBufSize))
 }
 
