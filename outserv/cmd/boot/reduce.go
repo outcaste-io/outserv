@@ -46,6 +46,7 @@ type reducer struct {
 
 func (r *reducer) run() error {
 	dirs := readShardDirs(filepath.Join(r.opt.MapDir, reduceShardDir))
+	fmt.Printf("dirs: %+v\n", dirs)
 	x.AssertTrue(len(dirs) == r.opt.ReduceShards)
 	x.AssertTrue(len(r.opt.shardOutputDirs) == r.opt.ReduceShards)
 
@@ -57,7 +58,9 @@ func (r *reducer) run() error {
 		go func(shardId int, db *badger.DB, tmpDb *badger.DB) {
 			defer thr.Done(nil)
 
+			fmt.Printf("tree: %s\n", dirs[shardId])
 			mapFiles := filenamesInTree(dirs[shardId])
+			fmt.Printf("num map files: %d\n", len(mapFiles))
 			var mapItrs []*mapIterator
 
 			// Dedup the partition keys.

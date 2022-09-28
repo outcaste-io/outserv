@@ -76,6 +76,7 @@ func readShardDirs(d string) []string {
 		shards[i] = filepath.Join(d, shard)
 	}
 	sort.Strings(shards)
+	fmt.Printf("shards: %+v\n", shards)
 	return shards
 }
 
@@ -85,7 +86,7 @@ func filenamesInTree(dir string) []string {
 		if err != nil {
 			return err
 		}
-		if strings.HasSuffix(path, ".gz") {
+		if strings.HasSuffix(path, ".map") {
 			fnames = append(fnames, path)
 		}
 		return nil
