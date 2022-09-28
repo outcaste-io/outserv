@@ -16,7 +16,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/klauspost/compress/zstd"
+	"github.com/golang/snappy"
 	"github.com/outcaste-io/outserv/chunker"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -157,7 +157,7 @@ func (m *mapper) writeMapEntriesToFile(cbuf *z.Buffer, shardIdx int) {
 	// operations needed.
 	var buf bytes.Buffer
 	buf.Grow(int(m.opt.MapBufSize / 8))
-	w, err := zstd.NewWriter(&buf)
+	w := snappy.NewWriter(&buf)
 	x.Check(err)
 	defer func() {
 		x.Check(w.Close())
