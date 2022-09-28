@@ -153,7 +153,7 @@ func (r *reducer) createTmpBadger() *badger.DB {
 
 type mapIterator struct {
 	fd     *os.File
-	reader *snappy.Reader
+	reader *x.BufReader
 	meBuf  []byte
 }
 
@@ -221,10 +221,10 @@ func newMapIterator(filename string) (*pb.MapHeader, *mapIterator) {
 
 	// TODO: Release dec in the end.
 	// dec := zstd.NewReader(fd)
-	// reader := x.NewBufReader(dec, 512<<10)
 	// dec, err := zstd.NewReader(fd, zstd.WithDecoderConcurrency(1), zstd.WithDecoderLowmem(true))
 	// x.Check(err)
-	reader := snappy.NewReader(fd)
+	r := snappy.NewReader(fd)
+	reader := x.NewBufReader(r, 1<<20)
 
 	// Read the header size.
 	headerLenBuf := make([]byte, 4)

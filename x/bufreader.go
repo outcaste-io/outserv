@@ -7,13 +7,13 @@ import (
 )
 
 type BufReader struct {
-	r      io.ReadCloser
+	r      io.Reader
 	curBuf []byte
 	ch     chan []byte
 	bufs   [2][]byte
 }
 
-func NewBufReader(r io.ReadCloser, bufSize int) *BufReader {
+func NewBufReader(r io.Reader, bufSize int) *BufReader {
 	br := &BufReader{
 		r:  r,
 		ch: make(chan []byte), // unbuffered
@@ -26,7 +26,6 @@ func NewBufReader(r io.ReadCloser, bufSize int) *BufReader {
 }
 
 func (br *BufReader) Close() {
-	br.r.Close()
 	for i := 0; i < len(br.bufs); i++ {
 		z.Free(br.bufs[i])
 	}
