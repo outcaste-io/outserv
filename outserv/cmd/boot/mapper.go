@@ -146,25 +146,13 @@ func (m *mapper) writeMapEntriesToFile(cbuf *z.Buffer, shardIdx int) {
 
 	f, err := m.openOutputFile(shardIdx)
 	x.Check(err)
-
-	defer func() {
-		x.Check(f.Sync())
-		x.Check(f.Close())
-	}()
-
-	// We first write everything into a buffer, and then in one shot write it
-	// all out to a file. This way, we can reduce the number of file write
-	// operations needed.
-	var buf bytes.Buffer
-	buf.Grow(int(m.opt.MapBufSize / 8))
-	w := snappy.NewWriter(&buf)
+	w := snappy.NewBufferedWriter(f)
 	x.Check(err)
+
 	defer func() {
 		x.Check(w.Close())
-
-		n, err := f.Write(buf.Bytes())
-		x.Check(err)
-		x.AssertTrue(n == len(buf.Bytes()))
+		x.Check(f.Sync())
+		x.Check(f.Close())
 	}()
 
 	// Create partition keys for the map file.
