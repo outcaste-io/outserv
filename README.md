@@ -15,7 +15,11 @@ step towards web3 decentralization.
 
 ## Demo
 
-An Outserv server with first 14.5M polygon blocks is running here: http://graphql.outserv.io/polygon
+An Outserv server with first 14.5M polygon blocks is running here: https://poly.0xfast.com/graphql . You can point any GraphQL editor to this address to get the full schema.
+
+```
+curl -XPOST https://poly.0xfast.com/graphql -H "Content-Type: application/graphql" -d '{queryLog(filter: {address: {eq: "0x5e1ddf2e5a0ecdd923692d4b4429d8603825a8c6"}}, first: 10) { address, topics, data, blockNumber }}'
+```
 
 ## Latest Release
 
