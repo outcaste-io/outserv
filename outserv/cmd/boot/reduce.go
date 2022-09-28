@@ -19,9 +19,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/DataDog/zstd"
 	"github.com/dustin/go-humanize"
 	"github.com/golang/glog"
+	"github.com/golang/snappy"
 
 	// "github.com/klauspost/compress/zstd"
 	"github.com/outcaste-io/outserv/badger"
@@ -140,7 +140,7 @@ func (r *reducer) createBadger(i int) *badger.DB {
 }
 
 func (r *reducer) createTmpBadger() *badger.DB {
-	tmpDir, err := ioutil.TempDir(r.opt.MapDir, "split")
+	tmpDir, err := ioutil.TempDir(r.opt.BufDir, "split")
 	x.Check(err)
 	// Do not enable compression in temporary badger to improve performance.
 	db := r.createBadgerInternal(tmpDir, false)
@@ -150,7 +150,7 @@ func (r *reducer) createTmpBadger() *badger.DB {
 
 type mapIterator struct {
 	fd     *os.File
-	reader *x.BufReader
+	reader *snappy.Reader
 	meBuf  []byte
 }
 
@@ -209,7 +209,6 @@ func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte, keyCount map[ui
 }
 
 func (mi *mapIterator) Close() error {
-	mi.reader.Close()
 	return mi.fd.Close()
 }
 
@@ -218,11 +217,11 @@ func newMapIterator(filename string) (*pb.MapHeader, *mapIterator) {
 	x.Check(err)
 
 	// TODO: Release dec in the end.
-	dec := zstd.NewReader(fd)
-	reader := x.NewBufReader(dec, 512<<10)
+	// dec := zstd.NewReader(fd)
+	// reader := x.NewBufReader(dec, 512<<10)
 	// dec, err := zstd.NewReader(fd, zstd.WithDecoderConcurrency(1), zstd.WithDecoderLowmem(true))
 	// x.Check(err)
-	// r := snappy.NewReader(fd)
+	reader := snappy.NewReader(fd)
 
 	// Read the header size.
 	headerLenBuf := make([]byte, 4)
