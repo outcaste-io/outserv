@@ -63,7 +63,6 @@ func mergeMapShardsIntoReduceShards(opt *options) {
 
 func readShardDirs(d string) []string {
 	_, err := os.Stat(d)
-	fmt.Printf("d: %s | error: %v\n", d, err)
 	if os.IsNotExist(err) {
 		return nil
 	}
@@ -76,7 +75,6 @@ func readShardDirs(d string) []string {
 		shards[i] = filepath.Join(d, shard)
 	}
 	sort.Strings(shards)
-	fmt.Printf("shards: %+v\n", shards)
 	return shards
 }
 
