@@ -78,9 +78,9 @@ func init() {
 
 	flag.IntP("num_go_routines", "j", int(math.Ceil(float64(runtime.NumCPU())*0.85)),
 		"Number of worker threads to use. MORE THREADS LEAD TO HIGHER RAM USAGE.")
-	flag.Int64("mapoutput_mb", 4096,
+	flag.Int64("mapoutput_mb", 2048, // We need to stick to 2GB to use 32 concurrent processes.
 		"The estimated size of each map file output. Increasing this increases memory usage.")
-	flag.Int64("partition_mb", 8, "Pick a partition key every N megabytes of data.")
+	flag.Int64("partition_mb", 32, "Pick a partition key every N megabytes of data.")
 	flag.Bool("skip_map_phase", false,
 		"Skip the map phase (assumes that map output files already exist).")
 	flag.Bool("cleanup_map", false,

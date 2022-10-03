@@ -4,14 +4,12 @@
 package boot
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -21,9 +19,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/DataDog/zstd"
 	"github.com/dustin/go-humanize"
 	"github.com/golang/glog"
+	"github.com/golang/snappy"
 
 	// "github.com/klauspost/compress/zstd"
 	"github.com/outcaste-io/outserv/badger"
@@ -142,7 +140,7 @@ func (r *reducer) createBadger(i int) *badger.DB {
 }
 
 func (r *reducer) createTmpBadger() *badger.DB {
-	tmpDir, err := ioutil.TempDir(r.opt.MapDir, "split")
+	tmpDir, err := ioutil.TempDir(r.opt.BufDir, "split")
 	x.Check(err)
 	// Do not enable compression in temporary badger to improve performance.
 	db := r.createBadgerInternal(tmpDir, false)
@@ -152,38 +150,31 @@ func (r *reducer) createTmpBadger() *badger.DB {
 
 type mapIterator struct {
 	fd     *os.File
-	reader *bufio.Reader
+	reader *x.BufReader
 	meBuf  []byte
 }
 
 // Next adds keys below the partitionKey, and returns back any keys that need to
 // be skipped.
-func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte) (skipKeys []string) {
+func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte, keyCount map[uint64]uint64) {
 	readMapEntry := func() error {
 		if len(mi.meBuf) > 0 {
 			return nil
 		}
 		r := mi.reader
-		sizeBuf, err := r.Peek(binary.MaxVarintLen64)
+		sz, err := binary.ReadUvarint(r)
 		if err != nil {
 			return err
 		}
-		sz, n := binary.Uvarint(sizeBuf)
-		if n <= 0 {
-			log.Fatalf("Could not read uvarint: %d", n)
-		}
-		x.Check2(r.Discard(n))
 		if cap(mi.meBuf) < int(sz) {
 			mi.meBuf = make([]byte, int(sz))
 		}
 		mi.meBuf = mi.meBuf[:int(sz)]
 		x.Check2(io.ReadFull(r, mi.meBuf))
-		atomic.AddUint64(&bytesRead, sz+uint64(n))
+		atomic.AddUint64(&bytesRead, sz)
 		// atomic.AddInt64(&r.prog.reduceEdgeCount, 1)
 		return nil
 	}
-	var lastKey, skipKey []byte
-	var count int
 	for {
 		if err := readMapEntry(); err == io.EOF {
 			break
@@ -191,35 +182,20 @@ func (mi *mapIterator) Next(cbuf *z.Buffer, partitionKey []byte) (skipKeys []str
 			x.Check(err)
 		}
 		key := MapEntry(mi.meBuf).Key()
-		if bytes.Equal(lastKey, key) {
-			count++
-			if count%100000 == 0 {
-				fmt.Printf("Key %x has %d count\n", key, count)
-			}
-			if count > 10e6 { // 10 million instances of this key.
-				skipKey = y.SafeCopy(skipKey, key)
-				fmt.Printf("Found a key to skip: %x\n", skipKey)
-				skipKeys = append(skipKeys, string(skipKey))
-				// TODO: Remove all instances of this key from cbuf.
-			}
-			// TODO(mrjn): If we have too many instances of the same key, then
-			// just skip it. We'd have to iterate over the cbuf, and reset it to
-			// the offset, where the key comes first time.
-		} else {
-			lastKey = y.SafeCopy(lastKey, key)
-			count = 0
-			skipKey = nil
+		fp := z.MemHash(key)
+		keyCount[fp]++
+		count := keyCount[fp]
+
+		if count%100000 == 0 {
+			fmt.Printf("Key %x has %d count\n", key, count)
 		}
 
 		if len(partitionKey) == 0 || bytes.Compare(key, partitionKey) < 0 {
-			if bytes.Equal(key, skipKey) {
+			if count >= 1e6 {
 				// nullify meBuf, and continue to the next key.
 				mi.meBuf = mi.meBuf[:0]
 				continue
 			}
-			// if cbuf.LenWithPadding() > 64<<30 {
-			// 	fmt.Printf("part key: %x | key: %x | sz: %d\n", partitionKey, key, len(mi.meBuf))
-			// }
 			b := cbuf.SliceAllocate(len(mi.meBuf))
 			copy(b, mi.meBuf)
 			mi.meBuf = mi.meBuf[:0]
@@ -240,14 +216,10 @@ func newMapIterator(filename string) (*pb.MapHeader, *mapIterator) {
 	fd, err := os.Open(filename)
 	x.Check(err)
 
-	// TODO: Release dec in the end.
-	dec := zstd.NewReader(fd)
-	// dec, err := zstd.NewReader(fd, zstd.WithDecoderConcurrency(1), zstd.WithDecoderLowmem(true))
-	// x.Check(err)
-	// r := snappy.NewReader(fd)
+	r := snappy.NewReader(fd)
+	reader := x.NewBufReader(r, 1<<20)
 
 	// Read the header size.
-	reader := bufio.NewReaderSize(dec, 1<<20)
 	headerLenBuf := make([]byte, 4)
 	x.Check2(io.ReadFull(reader, headerLenBuf))
 	headerLen := binary.BigEndian.Uint32(headerLenBuf)
@@ -426,14 +398,19 @@ func (r *reducer) writeSplitLists(db, tmpDb *badger.DB, writer *badger.StreamWri
 	x.Check(stream.Orchestrate(context.Background()))
 }
 
+// 2 GB is good. Don't increase it.
 const limit = 2 << 30
 
+var tcounter int64
+
 func (r *reducer) throttle() {
-	for {
+	num := atomic.AddInt64(&tcounter, 1)
+	for i := 0; ; i++ {
 		sz := atomic.LoadInt64(&r.prog.numEncoding)
 		if sz < limit {
 			return
 		}
+		fmt.Printf("[%d] [%d] Throttling sz: %d\n", num, i, sz)
 		time.Sleep(time.Second)
 	}
 }
@@ -504,37 +481,51 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 		cbuf := getBuf(r.opt.BufDir)
 		// Append nil for the last entries.
 		partitionKeys = append(partitionKeys, nil)
+		fmt.Printf("Num Partitions: %d\n", len(partitionKeys))
 
+		keyCount := make(map[uint64]uint64)
 		for i := 0; i < len(partitionKeys); i++ {
 			pkey := partitionKeys[i]
 
-			var skipKeys []string
 			for _, itr := range mapItrs {
-				skip := itr.Next(cbuf, pkey)
-				skipKeys = append(skipKeys, skip...)
+				itr.Next(cbuf, pkey, keyCount)
 			}
-			if len(skipKeys) > 0 {
-				fps := make(map[uint64]bool)
-				for _, key := range skipKeys {
-					fps[z.MemHashString(key)] = true
-					fmt.Printf("SKIPPING key: %x\n", key)
+
+			fps := make(map[uint64]uint64)
+			for key, cnt := range keyCount {
+				if cnt >= 1e6 {
+					fps[key] = cnt
+					fmt.Printf("[%d] SKIP key: %x with count: %d\n", i, key, cnt)
 				}
+				delete(keyCount, key) // Empty it out for future use.
+			}
+			x.AssertTrue(len(keyCount) == 0)
+
+			// Moving this part out to be concurrent doesn't help. The
+			// bottleneck is the throttle.
+			if len(fps) > 0 {
+				fmt.Printf("[%d] SKIPPING %d keys\n", i, len(fps))
 				dst := getBuf(r.opt.BufDir)
 				var skipCount, skipBytes uint64
+				printed := make(map[uint64]bool)
 				err := cbuf.SliceIterate(func(slice []byte) error {
 					me := MapEntry(slice)
 					fp := z.MemHash(me.Key())
-					if _, has := fps[fp]; !has {
+					if cnt, has := fps[fp]; !has {
 						dst.WriteSlice(slice)
 					} else {
 						skipCount++
 						skipBytes += uint64(len(slice))
+						if _, did := printed[fp]; !did {
+							fmt.Printf("SKIPPING KEY: %x . Count: %d\n", me.Key(), cnt)
+							printed[fp] = true
+						}
 					}
 					return nil
 				})
 				x.Check(err)
-				fmt.Printf("Skipped over %d keys | data: %s\n",
-					skipCount, humanize.IBytes(skipBytes))
+				fmt.Printf("[%d] Skipped over %d keys | data: %s\n",
+					i, skipCount, humanize.IBytes(skipBytes))
 				cbuf.Release()
 				cbuf = dst
 			}
@@ -546,12 +537,11 @@ func (r *reducer) reduce(partitionKeys [][]byte, mapItrs []*mapIterator, ci *cou
 			hd.Update(int64(cbuf.LenNoPadding()))
 			select {
 			case <-ticker.C:
-				fmt.Printf("Histogram of buffer sizes: %s\n", hd.String())
+				fmt.Printf("[%d] Histogram of buffer sizes: %s\n", i, hd.String())
 			default:
 			}
 
 			buffers <- cbuf
-			// cbuf.Reset()
 			cbuf = getBuf(r.opt.BufDir)
 		}
 		if !cbuf.IsEmpty() {

@@ -21,7 +21,9 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/DataDog/zstd"
 	"github.com/dustin/go-humanize"
+	"github.com/golang/snappy"
 	"github.com/outcaste-io/outserv/badger"
 	bpb "github.com/outcaste-io/outserv/badger/pb"
 	"github.com/outcaste-io/ristretto/z"
@@ -43,21 +45,23 @@ var (
 )
 
 type flagOptions struct {
-	testOpenFiles bool
-	keyLookup     string
-	rollupKey     string
-	parseKey      string
-	keyHistory    bool
-	predicate     string
-	prefix        string
-	readOnly      bool
-	pdir          string
-	itemMeta      bool
-	readTs        uint64
-	sizeHistogram bool
-	namespace     uint64
-	key           x.Sensitive
-	onlySummary   bool
+	testDecompress string
+	testCompress   string
+	testOpenFiles  bool
+	keyLookup      string
+	rollupKey      string
+	parseKey       string
+	keyHistory     bool
+	predicate      string
+	prefix         string
+	readOnly       bool
+	pdir           string
+	itemMeta       bool
+	readTs         uint64
+	sizeHistogram  bool
+	namespace      uint64
+	key            x.Sensitive
+	onlySummary    bool
 
 	// Options related to the WAL.
 	wdir           string
@@ -77,6 +81,10 @@ func init() {
 	Debug.Cmd.SetHelpTemplate(x.NonRootTemplate)
 
 	flag := Debug.Cmd.Flags()
+	flag.StringVar(&opt.testDecompress, "decompress", "",
+		"Reads from stdin, decompress and write to stdout. Values are: zstd, zstd-buf, snappy, echo")
+	flag.StringVar(&opt.testCompress, "compress", "",
+		"Reads from stdin, compress and write to stdout. Values are: zstd, snappy, echo")
 	flag.BoolVar(&opt.testOpenFiles, "ulimit", false, "Test how many open files can we have.")
 	flag.BoolVar(&opt.itemMeta, "item", true, "Output item meta as well. Set to false for diffs.")
 	flag.Uint64Var(&opt.readTs, "at", math.MaxUint64, "Set read timestamp for all txns.")
@@ -625,7 +633,77 @@ func testOpenFilesLimit() {
 	}
 }
 
+func testDecompress() {
+	var reader io.Reader
+	switch opt.testDecompress {
+	case "zstd":
+		zr := zstd.NewReader(os.Stdin)
+		defer zr.Close()
+		reader = zr
+	case "zstd-buf":
+		zr := zstd.NewReader(os.Stdin)
+		defer zr.Close()
+		br := x.NewBufReader(zr, 16<<20)
+		reader = br
+	case "snappy":
+		reader = snappy.NewReader(os.Stdin)
+	case "echo":
+		reader = os.Stdin
+	default:
+		log.Fatalf("Invalid option")
+	}
+
+	buf := make([]byte, 64<<20)
+	for {
+		n, err := reader.Read(buf)
+		if err == io.EOF {
+			return
+		}
+		x.Check(err)
+		_, err = os.Stdout.Write(buf[:n])
+		x.Check(err)
+	}
+}
+
+func testCompress() {
+	var writer io.Writer
+	switch opt.testCompress {
+	case "zstd":
+		zw := zstd.NewWriter(os.Stdout)
+		defer zw.Flush()
+		writer = zw
+	case "snappy":
+		sw := snappy.NewBufferedWriter(os.Stdout)
+		defer sw.Flush()
+		writer = sw
+	case "echo":
+		writer = os.Stdout
+	default:
+		log.Fatalf("Invalid option")
+	}
+
+	buf := make([]byte, 64<<20)
+
+	for {
+		n, err := os.Stdin.Read(buf[:cap(buf)])
+		if err == io.EOF {
+			return
+		}
+		x.Check(err)
+		_, err = writer.Write(buf[:n])
+		x.Check(err)
+	}
+}
+
 func run() {
+	if len(opt.testDecompress) > 0 {
+		testDecompress()
+		return
+	}
+	if len(opt.testCompress) > 0 {
+		testCompress()
+		return
+	}
 	if opt.testOpenFiles {
 		testOpenFilesLimit()
 		return

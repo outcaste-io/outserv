@@ -16,7 +16,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/klauspost/compress/zstd"
+	"github.com/golang/snappy"
 	"github.com/outcaste-io/outserv/chunker"
 	"github.com/outcaste-io/outserv/posting"
 	"github.com/outcaste-io/outserv/protos/pb"
@@ -38,11 +38,14 @@ type shardState struct {
 	mu   sync.Mutex // Allow only 1 write per shard at a time.
 }
 
+var mapBuf int64
+
 func newMapperBuffer(opt *options) *z.Buffer {
 	sz := float64(opt.MapBufSize) * 1.1
 	// We don't have a lot of map shards. So, we can just store all this in
 	// memory, instead of writing to a file on disk.
-	buf := z.NewBuffer(int(sz), "map.buffer")
+	id := atomic.AddInt64(&mapBuf, 1)
+	buf := z.NewBuffer(int(sz), fmt.Sprintf("map.buffer-%02d", id/4))
 	return buf.WithMaxSize(2 * int(opt.MapBufSize))
 }
 
@@ -123,7 +126,7 @@ func (m *mapper) openOutputFile(shardIdx int) (*os.File, error) {
 		m.opt.MapDir,
 		mapShardDir,
 		fmt.Sprintf("%03d", shardIdx),
-		fmt.Sprintf("%06d.map.gz", fileNum),
+		fmt.Sprintf("%06d.map", fileNum),
 	)
 	x.Check(os.MkdirAll(filepath.Dir(filename), 0750))
 	return os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
@@ -143,25 +146,13 @@ func (m *mapper) writeMapEntriesToFile(cbuf *z.Buffer, shardIdx int) {
 
 	f, err := m.openOutputFile(shardIdx)
 	x.Check(err)
-
-	defer func() {
-		x.Check(f.Sync())
-		x.Check(f.Close())
-	}()
-
-	// We first write everything into a buffer, and then in one shot write it
-	// all out to a file. This way, we can reduce the number of file write
-	// operations needed.
-	var buf bytes.Buffer
-	buf.Grow(int(m.opt.MapBufSize / 8))
-	w, err := zstd.NewWriter(&buf)
+	w := snappy.NewBufferedWriter(f)
 	x.Check(err)
+
 	defer func() {
 		x.Check(w.Close())
-
-		n, err := f.Write(buf.Bytes())
-		x.Check(err)
-		x.AssertTrue(n == len(buf.Bytes()))
+		x.Check(f.Sync())
+		x.Check(f.Close())
 	}()
 
 	// Create partition keys for the map file.
