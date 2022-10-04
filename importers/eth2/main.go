@@ -202,69 +202,79 @@ func main() {
 
 		}
 
-		// RPC get latest block on gETH
-		latestGethRes := JsonRpcEth("eth_blockNumber", "[]", 1)
-		var latestGethBlockNumberHex string
-		x.Check(json.Unmarshal(latestGethRes.Result, &latestGethBlockNumberHex))
-		latestGethBlockNumber, err := strconv.ParseInt(latestGethBlockNumberHex, 0, 64)
-		fmt.Println("Latest geth Block : ", latestGethBlockNumberHex, " ", latestGethBlockNumber)
-		x.Check(err)
+		// Live update loop
+		for {
+			// RPC get latest block on gETH
+			latestGethRes := JsonRpcEth("eth_blockNumber", "[]", 1)
+			var latestGethBlockNumberHex string
+			x.Check(json.Unmarshal(latestGethRes.Result, &latestGethBlockNumberHex))
+			latestGethBlockNumber, err := strconv.ParseInt(latestGethBlockNumberHex, 0, 64)
+			fmt.Println("Latest geth Block : ", latestGethBlockNumberHex, " ", latestGethBlockNumber)
+			x.Check(err)
 
-		marker.LatestGethBlock = latestGethBlockNumber
-		marker.LatestGethBlockHash = "TODO"
-		marker.Timestamp = time.Now().UTC().String()
+			marker.LatestGethBlock = latestGethBlockNumber
+			marker.LatestGethBlockHash = "TODO"
+			marker.Timestamp = time.Now().UTC().String()
 
-		// write to file
-		if mrkData, err := json.Marshal(marker); err == nil {
-			x.Check(ioutil.WriteFile("./marker.json", mrkData, 0644))
-		} else {
-			log.Fatal(err)
-		}
-
-		fmt.Printf("Marker :\n Latest Stream Block: %d \n Latest geth block: %d\n", marker.ProcessedBlock, marker.LatestGethBlock)
-
-		bar := progressbar.Default(marker.LatestGethBlock - marker.ProcessedBlock)
-		var blocksBuffer []BlockOut
-
-		// Start catching up to geth
-		for blockNum := marker.ProcessedBlock + 1; blockNum <= marker.LatestGethBlock; blockNum++ {
-			bar.Add(1)
-			fmt.Printf("\nProcessing Block Number : %d 0x%x\n", blockNum, blockNum)
-			// RPC
-			var blkOut = new(BlockOut)
-
-			// read data from geth json-rpc
-			RPCFetchGethBlock(blockNum, blkOut)
-
-			blocksBuffer = append(blocksBuffer, *blkOut)
-
-			fmt.Printf("================\n")
-			
-			// TODO: for dev;write to file , replace later with network call to /write
-			if len(blocksBuffer) == *bpf {
-				fmt.Printf("\n Reached checkpoint of %d blocks at %d, writing to file ... \n", *bpf, blockNum)
-				lo, err := strconv.ParseInt(blocksBuffer[0].Number, 0, 64)
-				x.Check(err)
-				hi, err := strconv.ParseInt(blocksBuffer[len(blocksBuffer)-1].Number, 0, 64)
-				x.Check(err)
-				bo, err := json.Marshal(blocksBuffer)
-				x.Check(err)
-				x.Check(ioutil.WriteFile(fmt.Sprintf("./tmp/%d-%d.json", lo, hi), bo, 0644))
-
-				// reset buffer
-				blocksBuffer = []BlockOut{}
-
-				// update marker
-				marker.ProcessedBlock = blockNum
-				marker.Timestamp = time.Now().UTC().String()
-				if mrkData, err := json.Marshal(marker); err == nil {
-					x.Check(ioutil.WriteFile("./marker.json", mrkData, 0644))
-				} else {
-					log.Fatal(err)
-				}
-				fmt.Printf("\nSaved \"%d-%d.json\" successfully.\n", lo, hi)
+			// waiting condition
+			if marker.ProcessedBlock == latestGethBlockNumber {
+				fmt.Println("Stream is now up-to date with geth. Latest Block ", latestGethBlockNumber, ".Waiting for new blocks ...")
+				time.Sleep(60 * time.Second)
+				continue
 			}
 
+			// write to file
+			if mrkData, err := json.Marshal(marker); err == nil {
+				x.Check(ioutil.WriteFile("./marker.json", mrkData, 0644))
+			} else {
+				log.Fatal(err)
+			}
+
+			fmt.Printf("Marker :\n Latest Stream Block: %d \n Latest geth block: %d\n", marker.ProcessedBlock, marker.LatestGethBlock)
+
+			bar := progressbar.Default(marker.LatestGethBlock - marker.ProcessedBlock)
+			var blocksBuffer []BlockOut
+
+			// Start catching up to geth
+			for blockNum := marker.ProcessedBlock + 1; blockNum <= marker.LatestGethBlock; blockNum++ {
+				bar.Add(1)
+				fmt.Printf("\nProcessing Block Number : %d 0x%x\n", blockNum, blockNum)
+				// RPC
+				var blkOut = new(BlockOut)
+
+				// read data from geth json-rpc
+				RPCFetchGethBlock(blockNum, blkOut)
+
+				blocksBuffer = append(blocksBuffer, *blkOut)
+
+				fmt.Printf("================\n")
+
+				// TODO: for dev;write to file , replace later with network call to /write
+				if len(blocksBuffer) == *bpf {
+					fmt.Printf("\n Reached checkpoint of %d blocks at %d, writing to file ... \n", *bpf, blockNum)
+					lo, err := strconv.ParseInt(blocksBuffer[0].Number, 0, 64)
+					x.Check(err)
+					hi, err := strconv.ParseInt(blocksBuffer[len(blocksBuffer)-1].Number, 0, 64)
+					x.Check(err)
+					bo, err := json.Marshal(blocksBuffer)
+					x.Check(err)
+					x.Check(ioutil.WriteFile(fmt.Sprintf("./tmp/%d-%d.json", lo, hi), bo, 0644))
+
+					// reset buffer
+					blocksBuffer = []BlockOut{}
+
+					// update marker
+					marker.ProcessedBlock = blockNum
+					marker.Timestamp = time.Now().UTC().String()
+					if mrkData, err := json.Marshal(marker); err == nil {
+						x.Check(ioutil.WriteFile("./marker.json", mrkData, 0644))
+					} else {
+						log.Fatal(err)
+					}
+					fmt.Printf("\nSaved \"%d-%d.json\" successfully.\n", lo, hi)
+				}
+
+			}
 		}
 	}
 
