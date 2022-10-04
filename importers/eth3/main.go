@@ -152,7 +152,6 @@ func parseReceipts(out *BlockOut, rs []*types.ReceiptForStorage) {
 			txn.Logs = append(txn.Logs, log)
 			out.Logs = append(out.Logs, Log{Lid: log.Lid}) // Just a ref is sufficient.
 		}
-		out.Transactions = append(out.Transactions, txn)
 	}
 }
 
