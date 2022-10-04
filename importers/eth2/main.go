@@ -142,6 +142,10 @@ func main() {
 		fmt.Printf("Target Api : %s\n", *TargetApi)
 		fmt.Printf("Geth RPC Endpoint : %s\n", *GethRPCEndpoint)
 
+		// check if tmp dir is present , else create it
+		err := os.MkdirAll("./tmp", 0755) // If path is already a directory, MkdirAll does nothing and returns nil.
+		x.Check(err)
+
 		// fetch latest block from stream API
 		resp, err := http.Get(fmt.Sprintf("%s/block/latest", *TargetApi))
 		x.Check(err)
