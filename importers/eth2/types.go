@@ -3,34 +3,64 @@ package main
 import "encoding/json"
 
 type Block struct {
-	Hash             string            `json:"hash,omitempty"`
-	Number           string            `json:"number,omitempty"`
-	BaseFeePerGas    string            `json:"baseFeePerGas,omitempty"`
-	Difficulty       string            `json:"difficulty,omitempty"`
-	ExtraData        string            `json:"extraData,omitempty"`
-	GasLimit         string            `json:"gasLimit,omitempty"`
-	GasUsed          string            `json:"gasUsed,omitempty"`
-	LogsBloom        string            `json:"logsBloom,omitempty"`
-	MixHash          string            `json:"mixHash,omitempty"`
-	Nonce            string            `json:"nonce,omitempty"`
-	ParentHash       string            `json:"parentHash,omitempty"`
-	ReceiptsRoot     string            `json:"receiptsRoot,omitempty"`
-	Sha3Uncles       string            `json:"sha3Uncles,omitempty"`
-	Size             string            `json:"size,omitempty"`
-	StateRoot        string            `json:"stateRoot,omitempty"`
-	Timestamp        string            `json:"timestamp,omitempty"`
-	TotalDifficulty  string            `json:"totalDifficulty,omitempty"`
-	TransactionsRoot string            `json:"transactionsRoot,omitempty"`
-	Transactions     []*TransactionOut `json:"transactions,omitempty"`
+	Hash             string `json:"hash,omitempty"`
+	Number           string `json:"number,omitempty"`
+	BaseFeePerGas    string `json:"baseFeePerGas,omitempty"`
+	Difficulty       string `json:"difficulty,omitempty"`
+	ExtraData        string `json:"extraData,omitempty"`
+	GasLimit         string `json:"gasLimit,omitempty"`
+	GasUsed          string `json:"gasUsed,omitempty"`
+	LogsBloom        string `json:"logsBloom,omitempty"`
+	MixHash          string `json:"mixHash,omitempty"`
+	Nonce            string `json:"nonce,omitempty"`
+	ParentHash       string `json:"parentHash,omitempty"`
+	ReceiptsRoot     string `json:"receiptsRoot,omitempty"`
+	Sha3Uncles       string `json:"sha3Uncles,omitempty"`
+	Size             string `json:"size,omitempty"`
+	StateRoot        string `json:"stateRoot,omitempty"`
+	Timestamp        string `json:"timestamp,omitempty"`
+	TotalDifficulty  string `json:"totalDifficulty,omitempty"`
+	TransactionsRoot string `json:"transactionsRoot,omitempty"`
+
+	Uncles []string `json:"uncles,omitempty"`
+
 	// Logs             []Log             `json:"logs,omitempty"`
+}
+
+type BlockInInner struct {
+	Hash             string         `json:"hash,omitempty"`
+	Number           string         `json:"number,omitempty"`
+	BaseFeePerGas    string         `json:"baseFeePerGas,omitempty"`
+	Difficulty       string         `json:"difficulty,omitempty"`
+	ExtraData        string         `json:"extraData,omitempty"`
+	GasLimit         string         `json:"gasLimit,omitempty"`
+	GasUsed          string         `json:"gasUsed,omitempty"`
+	LogsBloom        string         `json:"logsBloom,omitempty"`
+	MixHash          string         `json:"mixHash,omitempty"`
+	Nonce            string         `json:"nonce,omitempty"`
+	ParentHash       string         `json:"parentHash,omitempty"`
+	ReceiptsRoot     string         `json:"receiptsRoot,omitempty"`
+	Sha3Uncles       string         `json:"sha3Uncles,omitempty"`
+	Size             string         `json:"size,omitempty"`
+	StateRoot        string         `json:"stateRoot,omitempty"`
+	Timestamp        string         `json:"timestamp,omitempty"`
+	TotalDifficulty  string         `json:"totalDifficulty,omitempty"`
+	TransactionsRoot string         `json:"transactionsRoot,omitempty"`
+	Transactions     []*Transaction `json:"transactions,omitempty"`
+	Uncles           []string       `json:"uncles,omitempty"`
+}
+type BlockIn struct {
+	BlockInInner
+	Miner string `json:"miner,omitempty"`
 }
 
 type BlockOut struct {
 	Block
-	Type       string     `json:"@type,omitempty"`
-	Miner      *Account   `json:"miner,omitempty"`
-	Ommers     []BlockOut `json:"ommers,omitempty"`
-	OmmerCount string     `json:"ommerCount,omitempty"`
+	Transactions []*TransactionOut `json:"transactions,omitempty"`
+	Type         string            `json:"@type,omitempty"`
+	Miner        *Account          `json:"miner,omitempty"`
+	Ommers       []BlockOut        `json:"ommers,omitempty"`
+	OmmerCount   string            `json:"ommerCount,omitempty"`
 }
 
 func (b *BlockOut) MarshalJSON() ([]byte, error) {
@@ -65,6 +95,34 @@ type Transaction struct {
 	// EffectiveGasPrice string `json:"effectiveGasPrice,omitempty"` // = GasPrice
 	GasUsed string `json:"gasUsed,omitempty"` // != Gas
 	Status  string `json:"status,omitempty"`
+}
+
+type TransactionByHashResponse struct {
+	BlockHash   string `json:"blockHash"`
+	BlockNumber string `json:"blockNumber"`
+	From        string `json:"from"`
+	Gas         string `json:"gas"`
+	// GasPrice             string        `json:"gasPrice"`
+	MaxFeePerGas         string        `json:"maxFeePerGas"`
+	MaxPriorityFeePerGas string        `json:"maxPriorityFeePerGas"`
+	Hash                 string        `json:"hash"`
+	Input                string        `json:"input"`
+	Nonce                string        `json:"nonce"`
+	To                   string        `json:"to"`
+	TransactionIndex     string        `json:"transactionIndex"`
+	Value                string        `json:"value"`
+	Type                 string        `json:"type"`
+	AccessList           []interface{} `json:"accessList"`
+	ChainID              string        `json:"chainId"`
+	V                    string        `json:"v"`
+	R                    string        `json:"r"`
+	S                    string        `json:"s"`
+}
+
+type TransactionIn struct {
+	Transaction
+	From string `json:"from,omitempty"`
+	To   string `json:"to,omitempty"`
 }
 
 type TransactionOut struct {
@@ -122,11 +180,8 @@ type Marker struct {
 	Timestamp           string `json:"ts,omitempty"`
 }
 
-type GethBockResponse struct {
-	Data struct {
-		Block struct {
-			Number int64  `json:"number"`
-			Hash   string `json:"hash"`
-		} `json:"block"`
-	} `json:"data"`
+type GethRPCResponse struct {
+	JsonRPC string `json:"jsonrpc"`
+	ID      int    `json:"id"`
+	Result  json.RawMessage
 }
