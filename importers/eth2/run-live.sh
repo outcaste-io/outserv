@@ -1,0 +1,1 @@
+go build . && ./eth2 -live=true -bpf=1000

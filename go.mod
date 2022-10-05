@@ -45,7 +45,7 @@ require (
 	github.com/graph-gophers/graphql-go v1.3.0
 	github.com/klauspost/compress v1.15.10
 	github.com/klauspost/cpuid/v2 v2.0.11 // indirect
-	github.com/mattn/go-runewidth v0.0.13 // indirect
+	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/minio/minio-go/v6 v6.0.55
 	github.com/minio/sha256-simd v1.0.0 // indirect
 	github.com/outcaste-io/dgo/v210 v210.0.0-20220225180226-43bd1b427e86
@@ -58,7 +58,9 @@ require (
 	github.com/pkg/profile v1.2.1
 	github.com/prometheus/client_golang v1.0.0
 	github.com/prometheus/tsdb v0.10.0 // indirect
+	github.com/rivo/uniseg v0.4.2 // indirect
 	github.com/rjeczalik/notify v0.9.2 // indirect
+	github.com/schollz/progressbar/v3 v3.11.0 // indirect
 	github.com/sergi/go-diff v1.2.0
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shirou/gopsutil/v3 v3.22.2
@@ -81,8 +83,8 @@ require (
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
-	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
+	golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec
+	golang.org/x/term v0.0.0-20220919170432-7a66f970e087
 	golang.org/x/text v0.3.7
 	golang.org/x/tools v0.1.8-0.20211029000441-d6a9af8af023
 	google.golang.org/api v0.46.0
