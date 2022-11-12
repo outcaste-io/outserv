@@ -1,5 +1,7 @@
 # Outserv: Blockchain Search with GraphQL APIs
 
+**Note (Nov 12, 2022): 0xfast.com doesn't use Outserv directly.**
+
 Outserv enables you to run production grade GraphQL Search APIs over any
 blockchain data 10x faster than existing mechanisms.
 
